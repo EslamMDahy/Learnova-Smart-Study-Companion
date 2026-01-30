@@ -1,5 +1,5 @@
 from .users import User
-from .subscription import Subscription
+from .subscription_plans import SubscriptionPlan
 from .organization import Organization
 from .organization_member import OrganizationMember
 from .credit_wallet import CreditWallet
