@@ -2,13 +2,10 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from fastapi import HTTPException
 
-from app.core.security import hash_password
-from app.core.emailer import send_email
-
 from .schemas import RegisterRequest
 
-# pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
+from app.core.security import hash_password
+from app.core.emailer import send_email
 
 def register_user(payload: RegisterRequest, db: Session):
     # 1) Check email unique
@@ -22,7 +19,7 @@ def register_user(payload: RegisterRequest, db: Session):
     # 2) Check invite code exists (organizations table)
     org = db.execute(
         text("SELECT id FROM organizations WHERE invite_code = :code"),
-        {"code": payload.invite_code},
+        {"code": str(payload.invite_code)},
     ).first()
     if not org:
         raise HTTPException(status_code=400, detail="Invalid invite code")
@@ -30,14 +27,36 @@ def register_user(payload: RegisterRequest, db: Session):
     # 3) Hash password
     hashed_pw = hash_password(payload.password)
 
-    # 4) Insert user
+    # 4) Insert user (لاحظ: hashed_password + أعمدة NOT NULL)
     db.execute(
         text(
-            "INSERT INTO users (full_name, email, password) "
-            "VALUES (:full_name, :email, :password)"
+            """
+            INSERT INTO users
+            (full_name, email, hashed_password, system_role, is_email_verified, created_at, updated_at)
+            VALUES
+            (:full_name, :email, :hashed_password, :system_role, :is_email_verified, NOW(), NOW())
+            """
         ),
-        {"full_name": payload.full_name, "email": payload.email, "password": hashed_pw},
+        {
+            "full_name": payload.full_name,
+            "email": payload.email,
+            "hashed_password": hashed_pw,
+            "system_role": "student",
+            "is_email_verified": False,
+        },
     )
     db.commit()
 
-    return {"ok": True, "email": payload.email, "full_name": payload.full_name}
+    # 5) Send dummy email (بعد الـ commit)
+    try:
+        send_email(
+            to=payload.email,
+            subject="Learnova - Test Email",
+            body="Hello! This is a test email after registration."
+        )
+
+    except Exception:
+        # مهم: منبوّظش التسجيل لو الإيميل وقع
+        pass
+
+    return {"message": "Registration successful. Please check your email."}

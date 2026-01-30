@@ -80,6 +80,10 @@ VALUES
 )
 ON CONFLICT (invite_code) DO NOTHING;
 ```
+### To delete user from the DB for testing
+```sql
+DELETE FROM users WHERE email = 'your@email.com';
+```
 ## 5) Alembic (Migrations)
 >must be in the root of the project (besaide `alembic.ini`)
 

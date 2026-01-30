@@ -1,27 +1,29 @@
-# app/core/emailer.py
-
 import os
 import smtplib
 from email.message import EmailMessage
 
+def send_email(to: str, subject: str, body: str) -> None:
+    host = os.getenv("SMTP_HOST")
+    port = int(os.getenv("SMTP_PORT", "587"))
+    user = os.getenv("SMTP_USER")
+    password = os.getenv("SMTP_PASS")
+    sender = os.getenv("SMTP_FROM") or user
 
-def send_email(to: str, subject: str, body: str):
-    smtp_host = os.getenv("SMTP_HOST")
-    smtp_port = int(os.getenv("SMTP_PORT", "587"))
-    smtp_user = os.getenv("SMTP_USER")
-    smtp_pass = os.getenv("SMTP_PASS")
-    smtp_from = os.getenv("SMTP_FROM") or smtp_user
-
-    if not all([smtp_host, smtp_port, smtp_user, smtp_pass]):
-        raise RuntimeError("Missing SMTP configuration")
+    missing = [k for k, v in {
+        "SMTP_HOST": host,
+        "SMTP_USER": user,
+        "SMTP_PASS": password,
+    }.items() if not v]
+    if missing:
+        raise RuntimeError(f"Missing SMTP env vars: {', '.join(missing)}")
 
     msg = EmailMessage()
-    msg["From"] = smtp_from
-    msg["To"] = to
     msg["Subject"] = subject
+    msg["From"] = sender
+    msg["To"] = to
     msg.set_content(body)
 
-    with smtplib.SMTP(smtp_host, smtp_port) as server:
-        server.starttls()
-        server.login(smtp_user, smtp_pass)
-        server.send_message(msg)
+    with smtplib.SMTP(host, port) as smtp:
+        smtp.starttls()
+        smtp.login(user, password)
+        smtp.send_message(msg)
