@@ -35,10 +35,10 @@ def upgrade() -> None:
     sa.Column('name', sa.String(length=255), nullable=False),
     sa.Column('owner_id', sa.Integer(), nullable=False),
     sa.Column('invite_code', sa.String(length=255), nullable=False),
-    sa.Column('subscription_id', sa.Integer(), nullable=False),
+    sa.Column('subscriptions_id', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
     sa.ForeignKeyConstraint(['owner_id'], ['users.id'], ),
-    sa.ForeignKeyConstraint(['subscription_id'], ['subscriptions.id'], ),
+    sa.ForeignKeyConstraint(['subscriptions_id'], ['subscriptions.id'], ),
     sa.PrimaryKeyConstraint('id'),
     sa.UniqueConstraint('invite_code')
     )
