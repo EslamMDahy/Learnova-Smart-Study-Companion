@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from fastapi import HTTPException
+
 from app.core.security import hash_password
+from app.core.emailer import send_email
 
 from .schemas import RegisterRequest
 
