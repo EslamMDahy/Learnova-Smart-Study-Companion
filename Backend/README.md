@@ -33,7 +33,7 @@ C:\pgsql\bin\psql -U postgres -d learnova
 \dt
 ```
 ## 5) Alembic (Migrations)
->must be in the root of the project (besaide ```alembic.ini```)
+>must be in the root of the project (besaide `alembic.ini`)
 
 ## Create a new migration (auto-generate)
 ```bat
