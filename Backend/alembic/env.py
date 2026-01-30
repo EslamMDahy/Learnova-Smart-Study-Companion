@@ -10,7 +10,7 @@ from sqlalchemy import pool
 
 # from models import Base
 from app.db.base import Base
-import app.models
+from app import models
 
 from alembic import context
 

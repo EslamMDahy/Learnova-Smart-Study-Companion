@@ -1,4 +1,5 @@
 from .users import User
+from .user_tokens import UserToken
 from .subscription_plans import SubscriptionPlan
 from .organization import Organization
 from .organization_member import OrganizationMember
