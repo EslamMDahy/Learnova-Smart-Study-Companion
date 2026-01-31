@@ -1,38 +1,185 @@
+# Learnova Backend
 
-# Learnova Backend – Commands
+FastAPI + PostgreSQL + SQLAlchemy + Alembic
 
-## 1) Activate Virtual Environment (Windows CMD)
+This guide is for teammates who want to run the **backend locally** (Windows-focused, with Linux/macOS notes).
+
+---
+
+## What you need
+
+- **Python 3.10+** (recommended **3.11**)
+- **Git**
+- **PostgreSQL** (portable ZIP or normal installer)
+- (Optional) pgAdmin
+
+> Important: run commands from the **backend root** (same folder as `alembic.ini`).
+
+---
+
+## 1) Clone & enter project
+
 ```bat
-cd /d "X:\NCTU  (ICT)\Graduation Project II\learnova"
+git clone <REPO_URL>
+cd Learnova-Smart-Study-Companion\Backend
+```
+
+---
+
+## 2) Create & activate venv
+
+**CMD**
+```bat
+python -m venv .venv
 .venv\Scripts\activate.bat
 ```
-## 2) Run FastAPI Dev Server
-```bat
-fastapi dev app/main.py
+
+**PowerShell**
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
 ```
-## 3) PostgreSQL (ZIP install) – Start/Stop Server
-### Start
+
+---
+
+## 3) Install dependencies
+
+```bat
+pip install -r requirements.txt
+```
+
+Notes:
+- `psycopg` / `psycopg-binary` is included in requirements and is used as the PostgreSQL driver. fileciteturn4file2L27-L29  
+<!-- - `passlib` / `bcrypt` are also in requirements (legacy). If your local hashing uses `app/core/security.py` (PBKDF2), you **do not need them**, but keeping them installed is harmless. fileciteturn4file2L5-L6L26-L26 -->
+
+---
+
+## 4) PostgreSQL setup (Windows ZIP / Portable)
+
+### Extract PostgreSQL
+Example:
+```
+C:\pgsql\
+```
+
+Required binaries:
+- `C:\pgsql\bin\psql.exe`
+- `C:\pgsql\bin\pg_ctl.exe`
+- `C:\pgsql\bin\initdb.exe` fileciteturn4file0L53-L57
+
+### Initialize DB directory (one time only)
+
+Skip if `C:\pgsql\data` already exists:
+```bat
+C:\pgsql\bin\initdb -D C:\pgsql\data -U postgres -A password -W
+```
+<!-- fileciteturn4file0L60-L66 -->
+
+### Start / stop PostgreSQL
+
+Start:
 ```bat
 C:\pgsql\bin\pg_ctl -D C:\pgsql\data -l C:\pgsql\logfile.log start
 ```
-### End
+
+Stop:
 ```bat
 C:\pgsql\bin\pg_ctl -D C:\pgsql\data stop
 ```
-## 4) Check Databases / Connect / List Tables
-### List databases
+<!-- fileciteturn4file0L70-L80 -->
+
+---
+
+## 5) Create the database
+
+Open psql:
 ```bat
-C:\pgsql\bin\psql -U postgres -l
+C:\pgsql\bin\psql -U postgres
 ```
-### Connect to project DB
+
+Create DB:
+```sql
+CREATE DATABASE learnova;
+\q
+```
+<!-- fileciteturn4file0L166-L175 -->
+
+---
+
+## 6) Environment variables (SMTP + Base URL + DB)
+
+### Recommended: `.env` (DO NOT COMMIT)
+
+Create a `.env` file in the backend root (same level as `alembic.ini`):
+
+```env
+# Database (pick ONE style that matches your driver)
+DATABASE_URL=postgresql+psycopg://postgres:<PASSWORD>@localhost:5432/learnova
+# If your project uses psycopg2 instead:
+# DATABASE_URL=postgresql+psycopg2://postgres:<PASSWORD>@localhost:5432/learnova
+
+# SMTP (Gmail App Password)
+SMTP_HOST=smtp.gmail.com
+SMTP_PORT=587
+SMTP_USER=your_email@gmail.com
+SMTP_PASS=your_gmail_app_password
+SMTP_FROM=your_email@gmail.com
+
+# App
+API_BASE_URL=http://127.0.0.1:8000
+```
+<!-- This format matches the earlier README template. fileciteturn4file0L142-L160 -->
+
+### If you prefer setting env vars in CMD (Windows)
+
+**Important detail:** use quotes when the value contains `http://` so CMD doesn’t parse it weirdly.
+
+```bat
+set SMTP_HOST=smtp.gmail.com
+set SMTP_PORT=587
+set SMTP_USER=your_email@gmail.com
+set SMTP_PASS=your_app_password
+set "API_BASE_URL=http://127.0.0.1:8000"
+```
+<!-- fileciteturn4file1L110-L118 -->
+
+---
+
+## 7) Run Alembic migrations
+
+Apply migrations:
+```bat
+alembic upgrade head
+```
+<!-- fileciteturn4file0L185-L190 -->
+
+Useful:
+```bat
+alembic current
+alembic history
+```
+<!-- fileciteturn4file0L192-L196 -->
+
+---
+
+## 8) Seed test data (Subscription plans + Owner users + Organizations)
+
+Connect to DB:
 ```bat
 C:\pgsql\bin\psql -U postgres -d learnova
 ```
-### Inside psql: list tables
+<!-- fileciteturn4file1L27-L34 -->
+
+### Generate a real password hash (recommended)
+Instead of using `TEMP_HASH`, generate a PBKDF2 hash using the project code:
+
 ```bat
-\dt
+python -c "from app.core.security import hash_password; print(hash_password('ChangeMe123'))"
 ```
-### Insert intilization values to test
+
+Copy the output and paste it into the SQL below (replace `TEMP_HASH`).
+
+### Seed SQL
 ```sql
 -- 1) Subscription plans (2 rows)
 INSERT INTO subscription_plans
@@ -80,80 +227,61 @@ VALUES
 )
 ON CONFLICT (invite_code) DO NOTHING;
 ```
-### To delete user from the DB for testing
+<!-- fileciteturn4file1L36-L82 -->
+
+---
+
+## 9) Run the API server
+
+Option A (uvicorn):
+```bat
+uvicorn app.main:app --reload
+```
+<!-- fileciteturn4file0L222-L229 -->
+
+Option B (fastapi dev):
+```bat
+fastapi dev app/main.py
+```
+<!-- fileciteturn4file0L231-L234 -->
+
+Server:
+```
+http://127.0.0.1:8000
+```
+<!-- fileciteturn4file0L236-L239 -->
+
+---
+
+## 10) Helpful DB cleanup for testing
+
+Delete a user by email:
 ```sql
 DELETE FROM users WHERE email = 'your@email.com';
 ```
-## 5) Alembic (Migrations)
->must be in the root of the project (besaide `alembic.ini`)
+<!-- fileciteturn4file1L83-L86 -->
 
-### Create a new migration (auto-generate)
-```bat
-alembic revision --autogenerate -m "your message here"
-```
-### Apply migrations to DB
-```bat
-alembic upgrade head
-```
-### Check current migration version
-```bat
-alembic current
-```
-### View migration history
-```bat
-alembic history
-```
-### Downgrade one step (if needed)
-```bat
-alembic downgrade -1
-```
-## 6) SMTP Configration
-### Set the env var in the (.venv) CMD
-```bat
-set SMTP_HOST=smtp.gmail.com
-set SMTP_PORT=587
-set SMTP_USER=gprojectx159@gmail.com
-set SMTP_PASS=gwzsgkmpjangsdtx 
-set "API_BASE_URL=http://127.0.0.1:8000" 
-```
-<!-- ```
-FirstAPI/
-├─ app/
-│  ├─ main.py
-│  ├─ core/
-│  │  └─ config.py
-│  ├─ db/
-│  │  ├─ session.py
-│  │  └─ base.py
-│  ├─ models/
-│  │  └─ user.py
-│  ├─ schemas/
-│  │  └─ auth.py
-│  ├─ routers/
-│  │  └─ auth.py
-│  └─ services/
-│     └─ auth_service.py
-│
-├─ alembic/
-├─ alembic.ini
-├─ .venv/
-└─ requirements.txt
-```
+> If you have related rows (tokens, memberships, etc.), make sure the FK rules are `ON DELETE CASCADE` where needed.
 
-```
-app/
-├─ main.py
-├─ core/
-│  └─ config.py
-├─ db/
-│  ├─ session.py
-│  └─ base.py
-├─ models/
-│  ├─ __init__.py
-│  └─ user.py
-└─ features/
-   └─ auth/
-      ├─ router.py
-      ├─ schemas.py
-      └─ service.py
-``` -->
+---
+
+## Troubleshooting
+
+- **SMTP env vars missing** → confirm you set `SMTP_HOST/SMTP_USER/SMTP_PASS` and restarted your terminal or loaded `.env`.
+- **CMD: `'http:' is not recognized`** → use:
+  ```bat
+  set "API_BASE_URL=http://127.0.0.1:8000"
+  ```
+  (quotes matter on Windows CMD) fileciteturn4file1L117-L118
+- **Alembic errors** → run:
+  ```bat
+  alembic current
+  alembic upgrade head
+  ```
+
+---
+
+## Security notes
+
+- Never commit `.env` or SMTP credentials. fileciteturn4file0L262-L265
+- Gmail needs **App Password** (not your normal password). fileciteturn4file0L162-L163
