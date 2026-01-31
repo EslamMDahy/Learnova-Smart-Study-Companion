@@ -49,7 +49,7 @@ def register_user(payload: RegisterRequest, db: Session):
         "system_role": "student",         # أو أي default عندك
         "is_email_verified": False,
     },
-    ).scalar_one()
+    ).first()
 
     user_id = row[0]
     db.commit()
@@ -96,3 +96,49 @@ def register_user(payload: RegisterRequest, db: Session):
         pass
 
     return {"message": "Registration successful. Please check your email."}
+
+
+def verify_email_token(token: str, db: Session):
+    # 1) fetch token row
+    row = db.execute(
+        text("""
+            SELECT id, user_id, expires_at, used_at
+            FROM user_tokens
+            WHERE token = :token AND type = 'verify_email'
+        """),
+        {"token": token},
+    ).first()
+
+    if row is None:
+        raise HTTPException(status_code=400, detail="Invalid verification token")
+
+    token_id, user_id, expires_at, used_at = row
+
+    # 2) already used?
+    if used_at is not None:
+        raise HTTPException(status_code=400, detail="Token already used")
+
+    # 3) expired?
+    # expires_at جاي من DB كـ timestamp with time zone، فالمقارنة مباشرة مع NOW() أسهل داخل SQL
+    expired = db.execute(
+        text("SELECT (NOW() > :expires_at)"),
+        {"expires_at": expires_at},
+    ).scalar()
+
+    if expired:
+        raise HTTPException(status_code=400, detail="Token expired")
+
+    # 4) mark user verified + mark token used
+    db.execute(
+        text("UPDATE users SET is_email_verified = TRUE, updated_at = NOW() WHERE id = :uid"),
+        {"uid": user_id},
+    )
+
+    db.execute(
+        text("UPDATE user_tokens SET used_at = NOW() WHERE id = :tid"),
+        {"tid": token_id},
+    )
+
+    db.commit()
+
+    return {"message": "Email verified successfully"}
