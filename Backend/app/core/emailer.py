@@ -7,12 +7,13 @@ def send_email(to: str, subject: str, body: str) -> None:
     port = int(os.getenv("SMTP_PORT", "587"))
     user = os.getenv("SMTP_USER")
     password = os.getenv("SMTP_PASS")
-    sender = os.getenv("SMTP_FROM") or user
+    sender = os.getenv("SMTP_FROM") or user  # fallback
 
     missing = [k for k, v in {
         "SMTP_HOST": host,
         "SMTP_USER": user,
         "SMTP_PASS": password,
+        "SMTP_FROM": sender,
     }.items() if not v]
     if missing:
         raise RuntimeError(f"Missing SMTP env vars: {', '.join(missing)}")

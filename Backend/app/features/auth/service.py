@@ -1,6 +1,12 @@
+from fastapi import HTTPException
+
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from fastapi import HTTPException
+
+import secrets
+import os
+
+from datetime import datetime, timedelta, timezone
 
 from .schemas import RegisterRequest
 
@@ -28,31 +34,61 @@ def register_user(payload: RegisterRequest, db: Session):
     hashed_pw = hash_password(payload.password)
 
     # 4) Insert user (لاحظ: hashed_password + أعمدة NOT NULL)
+    row = db.execute(
+    text(
+        """
+        INSERT INTO users (full_name, email, hashed_password, system_role, is_email_verified, created_at, updated_at)
+        VALUES (:full_name, :email, :hashed_password, :system_role, :is_email_verified, NOW(), NOW())
+        RETURNING id
+        """
+    ),
+    {
+        "full_name": payload.full_name,
+        "email": payload.email,
+        "hashed_password": hashed_pw,
+        "system_role": "student",         # أو أي default عندك
+        "is_email_verified": False,
+    },
+    ).scalar_one()
+
+    user_id = row[0]
+    db.commit()
+
+    # 5) Create verification token
+    verify_token = secrets.token_urlsafe(32)
+
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)  # مثال: 30 دقيقة
+
     db.execute(
         text(
             """
-            INSERT INTO users
-            (full_name, email, hashed_password, system_role, is_email_verified, created_at, updated_at)
-            VALUES
-            (:full_name, :email, :hashed_password, :system_role, :is_email_verified, NOW(), NOW())
+            INSERT INTO user_tokens (user_id, type, token, expires_at, created_at)
+            VALUES (:user_id, :type, :token, :expires_at, NOW())
             """
         ),
         {
-            "full_name": payload.full_name,
-            "email": payload.email,
-            "hashed_password": hashed_pw,
-            "system_role": "student",
-            "is_email_verified": False,
+            "user_id": user_id,
+            "type": "verify_email",
+            "token": verify_token,
+            "expires_at": expires_at,
         },
     )
     db.commit()
 
-    # 5) Send dummy email (بعد الـ commit)
+    # 6) building the verification link
+    base_url = os.getenv("API_BASE_URL")
+    if not base_url:
+        raise RuntimeError("Missing API_BASE_URL env var")
+
+    verify_link = f"{base_url.rstrip('/')}/auth/verify-email?token={verify_token}"
+
+
+    # 7) Send verification email (بعد الـ commit)
     try:
         send_email(
             to=payload.email,
-            subject="Learnova - Test Email",
-            body="Hello! This is a test email after registration."
+            subject="Learnova - Verify your email",
+            body=f"Welcome to Learnova!\n\nVerify your email:\n{verify_link}\n\nThis link expires in 30 minutes.",
         )
 
     except Exception:

@@ -87,25 +87,34 @@ DELETE FROM users WHERE email = 'your@email.com';
 ## 5) Alembic (Migrations)
 >must be in the root of the project (besaide `alembic.ini`)
 
-## Create a new migration (auto-generate)
+### Create a new migration (auto-generate)
 ```bat
 alembic revision --autogenerate -m "your message here"
 ```
-## Apply migrations to DB
+### Apply migrations to DB
 ```bat
 alembic upgrade head
 ```
-## Check current migration version
+### Check current migration version
 ```bat
 alembic current
 ```
-## View migration history
+### View migration history
 ```bat
 alembic history
 ```
-## Downgrade one step (if needed)
+### Downgrade one step (if needed)
 ```bat
 alembic downgrade -1
+```
+## 6) SMTP Configration
+### Set the env var in the (.venv) CMD
+```bat
+set SMTP_HOST=smtp.gmail.com
+set SMTP_PORT=587
+set SMTP_USER=gprojectx159@gmail.com
+set SMTP_PASS=gwzsgkmpjangsdtx 
+set "API_BASE_URL=http://127.0.0.1:8000" 
 ```
 <!-- ```
 FirstAPI/
