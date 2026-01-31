@@ -9,8 +9,10 @@ import os
 from datetime import datetime, timedelta, timezone
 
 from .schemas import RegisterRequest
+from .schemas import LoginRequest
 
 from app.core.security import hash_password
+from app.core.security import verify_password
 from app.core.emailer import send_email
 
 def register_user(payload: RegisterRequest, db: Session):
@@ -51,7 +53,7 @@ def register_user(payload: RegisterRequest, db: Session):
     },
     ).first()
 
-    user_id = row[0]
+    user_id = row[0] # type: ignore
     db.commit()
 
     # 5) Create verification token
@@ -142,3 +144,36 @@ def verify_email_token(token: str, db: Session):
     db.commit()
 
     return {"message": "Email verified successfully"}
+
+def login_user(payload: LoginRequest, db: Session):
+    # 1) هات بيانات اليوزر الأساسية (بـ email)
+    row = db.execute( # type: ignore
+        text(
+            """
+            SELECT id, full_name, email, hashed_password, is_email_verified
+            FROM users
+            WHERE email = :email
+            """
+        ),
+        {"email": payload.email},
+    ).first()
+
+    # 2) لو الإيميل مش موجود => 401 (نفس رسالة الباسورد الغلط)
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    user_id, full_name, email, hashed_pw, is_verified = row
+
+    # 3) لو مش verified => 403
+    if not is_verified:
+        raise HTTPException(status_code=403, detail="Email not verified")
+
+    # 4) لو الباسورد غلط => 401
+    if not verify_password(payload.password, hashed_pw):
+        raise HTTPException(status_code=401, detail="Invalid credentials")
+
+    # 5) نجاح (لسه مفيش JWT هنا)
+    return {
+        "message": "Login OK",
+        "user": {"id": user_id, "email": email, "full_name": full_name},
+    }
