@@ -8,6 +8,7 @@ from app.db.session import get_db
 from .schemas import RegisterRequest
 from .schemas import LoginRequest
 from . import service
+from app.core.deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -23,3 +24,7 @@ def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
 @router.post("/login")
 def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return service.login_user(payload, db)
+
+@router.get("/me")
+def me(user = Depends(get_current_user)):
+    return {"user": user}
