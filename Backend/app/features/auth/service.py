@@ -90,7 +90,7 @@ def register_user(payload: RegisterRequest, db: Session):
         send_email(
             to=payload.email,
             subject="Learnova - Verify your email",
-            body=f"Welcome to Learnova!\n\nVerify your email:\n{verify_link}\n\nThis link expires in 30 minutes.",
+            body=f"Welcome to Learnova!\n\nVerify your email:\n{verify_link}\n\nThis link expires in 24 hours.",
         )
 
     except Exception:
