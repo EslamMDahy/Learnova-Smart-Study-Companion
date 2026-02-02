@@ -14,6 +14,7 @@ from .schemas import LoginRequest
 from app.core.security import hash_password
 from app.core.security import verify_password
 from app.core.emailer import send_email
+from app.core.jwt import create_access_token
 
 def register_user(payload: RegisterRequest, db: Session):
     # 1) Check email unique
@@ -172,8 +173,18 @@ def login_user(payload: LoginRequest, db: Session):
     if not verify_password(payload.password, hashed_pw):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # 5) نجاح (لسه مفيش JWT هنا)
+    # 5) نكريت JWT لو اللوجين نجح
+    access_token = create_access_token(
+        subject=str(user_id),
+        extra={
+            "email": email,
+            "full_name": full_name,
+        },
+    )
+
+    # 6) هنبعت الريسبونس فيه الاكسيس توكين و الداتا الي الUI محتاجها 
     return {
-        "message": "Login OK",
+        "access_token": access_token,
+        "token_type": "bearer",
         "user": {"id": user_id, "email": email, "full_name": full_name},
     }
