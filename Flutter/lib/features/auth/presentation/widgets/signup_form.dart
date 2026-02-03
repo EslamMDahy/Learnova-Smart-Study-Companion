@@ -24,21 +24,37 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
 
   AccountType accountType = AccountType.user;
   UserKind userKind = UserKind.student;
+  
 
   bool isChecked = false;
   bool _obscurePassword = true;
 
-  String? _authError;
+  String? _authError; // ✅ UI/local error فقط
+
+  String? validatePassword(String? v) {
+  final s = (v ?? '').trim();
+    if (s.isEmpty) return 'Password is required';
+    if (s.length < 8) return 'Min 8 characters';
+    if (!RegExp(r'[A-Z]').hasMatch(s)) return 'Add at least 1 uppercase letter';
+    if (!RegExp(r'[a-z]').hasMatch(s)) return 'Add at least 1 lowercase letter';
+    if (!RegExp(r'\d').hasMatch(s)) return 'Add at least 1 number';
+    if (!RegExp(r'[!@#$%^&*(),.?":{}|<>_\-\\/\[\]=+~`]').hasMatch(s)) {
+      return 'Add at least 1 special character';
+    }
+    if (s.contains(' ')) return 'No spaces allowed';
+    return null;
+  }
 
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
   final emailController = TextEditingController();
-  final orgCodeController = TextEditingController(); // ✅ Organization Code
+  final orgCodeController = TextEditingController();
   final passwordController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
+
     void clearErr() {
       if (_authError != null) setState(() => _authError = null);
     }
@@ -78,30 +94,27 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
     final fullName =
         '${firstNameController.text.trim()} ${lastNameController.text.trim()}'
             .trim();
-
+    final role = accountType == AccountType.user ? userKind.name : 'owner';
     final ok = await ref.read(signupControllerProvider.notifier).signup(
-          fullName: fullName,
-          email: emailController.text.trim(),
-          password: passwordController.text,
-
-          // ✅ لو هتحتاج تبعتهم للباك:
-          // accountType: accountType.name,
-          // systemRole: (accountType == AccountType.owner)
-          //     ? 'owner'
-          //     : userKind.name,
-          // orgInviteCode: accountType == AccountType.user
-          //     ? orgCodeController.text.trim()
-          //     : null,
-        );
+        fullName: fullName,
+        email: emailController.text.trim(),
+        password: passwordController.text,
+        accountType: accountType.name,
+        inviteCode: accountType == AccountType.user ? orgCodeController.text.trim() : null,
+        systemRole: role, // ✅
+      );
 
     if (!mounted) return;
 
     if (ok) {
       context.go(Routes.login);
     } else {
-      setState(() {
-        _authError = ref.read(signupControllerProvider).error ?? 'Signup failed';
-      });
+      // ✅ سيب عرض error للـ provider (مش لازم نعمل setState)
+      // بس لو حابب رسالة fallback محلية:
+      final apiErr = ref.read(signupControllerProvider).error;
+      if (apiErr == null) {
+        setState(() => _authError = 'Signup failed');
+      }
     }
   }
 
@@ -109,11 +122,13 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
   Widget build(BuildContext context) {
     final state = ref.watch(signupControllerProvider);
 
+    // ✅ اللي هيتعرض في الـ box: local UI error أولاً، وإلا API error
+    final shownError = _authError ?? state.error;
+
     return Container(
       color: Colors.white,
       padding: EdgeInsets.symmetric(horizontal: widget.isMobile ? 24 : 56),
       child: Center(
-        // ✅ NO SCROLL + لو المساحة قليلة يصغر بدل ما يعمل overflow
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 420),
           child: FittedBox(
@@ -143,7 +158,8 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                     ),
                     const SizedBox(height: 16),
 
-                    if (_authError != null) ...[
+                    // ✅ Error Box (no snackbar)
+                    if (shownError != null) ...[
                       Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(12),
@@ -153,7 +169,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                           border: Border.all(color: const Color(0xFFFFC7C7)),
                         ),
                         child: Text(
-                          _authError!,
+                          shownError,
                           style: const TextStyle(
                             color: Color(0xFFB00020),
                             fontSize: 13,
@@ -164,7 +180,6 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                       const SizedBox(height: 14),
                     ],
 
-                    // ✅ 1) Account Type: User / Owner
                     _segmented(
                       leftText: 'User',
                       rightText: 'Owner',
@@ -179,13 +194,11 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
 
                     const SizedBox(height: 12),
 
-                    // ✅ 2) لو User: اختار Student/Instructor/Assistant
                     if (accountType == AccountType.user) ...[
                       _tripleToggle(state),
                       const SizedBox(height: 12),
                     ],
 
-                    // FIRST + LAST
                     Row(
                       children: [
                         Expanded(
@@ -224,7 +237,6 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
 
                     const SizedBox(height: 14),
 
-                    // EMAIL
                     _labeledField(
                       label: 'Email',
                       child: TextFormField(
@@ -246,7 +258,6 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
 
                     const SizedBox(height: 14),
 
-                    // ✅ 3) Org Code يظهر فقط لو User
                     if (accountType == AccountType.user) ...[
                       _labeledField(
                         label: 'Organization Code',
@@ -264,19 +275,13 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                       const SizedBox(height: 14),
                     ],
 
-                    // PASSWORD
                     _labeledField(
                       label: 'Password',
                       child: TextFormField(
                         controller: passwordController,
                         obscureText: _obscurePassword,
                         style: const TextStyle(color: Colors.black),
-                        validator: (v) {
-                          final s = v ?? '';
-                          if (s.isEmpty) return 'Password is required';
-                          if (s.length < 8) return 'Min 8 chars';
-                          return null;
-                        },
+                        validator: validatePassword,
                         decoration: _inputDecoration(
                           hint: 'Create a password',
                           prefixIcon: Icons.lock_outline,
@@ -296,7 +301,6 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
 
                     const SizedBox(height: 10),
 
-                    // TERMS
                     Row(
                       children: [
                         Checkbox(
@@ -312,8 +316,8 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                             children: [
                               const Text(
                                 'I agree to the ',
-                                style:
-                                    TextStyle(color: Colors.black, fontSize: 14),
+                                style: TextStyle(
+                                    color: Colors.black, fontSize: 14),
                               ),
                               InkWell(
                                 onTap: state.loading ? null : () {},
@@ -328,8 +332,8 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               ),
                               const Text(
                                 ' and ',
-                                style:
-                                    TextStyle(color: Colors.black, fontSize: 14),
+                                style: TextStyle(
+                                    color: Colors.black, fontSize: 14),
                               ),
                               InkWell(
                                 onTap: state.loading ? null : () {},
@@ -372,8 +376,8 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               )
                             : const Text(
                                 'Create Account',
-                                style:
-                                    TextStyle(color: Colors.white, fontSize: 16),
+                                style: TextStyle(
+                                    color: Colors.white, fontSize: 16),
                               ),
                       ),
                     ),
@@ -386,9 +390,8 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                         const Text("Already have an account? ",
                             style: TextStyle(color: Colors.black)),
                         InkWell(
-                          onTap: state.loading
-                              ? null
-                              : () => context.go(Routes.login),
+                          onTap:
+                              state.loading ? null : () => context.go(Routes.login),
                           child: Text(
                             "Log in",
                             style: TextStyle(

@@ -23,8 +23,6 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   bool rememberMe = false;
   bool _obscurePassword = true;
 
-  String? _authError;
-
   @override
   void dispose() {
     _emailCtrl.dispose();
@@ -33,8 +31,6 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   }
 
   Future<void> _onLogin() async {
-    setState(() => _authError = null);
-
     final okForm = _formKey.currentState?.validate() ?? false;
     if (!okForm) return;
 
@@ -49,16 +45,13 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
     if (ok) {
       context.go(Routes.home);
-    } else {
-      setState(() {
-        _authError = ref.read(loginControllerProvider).error ?? 'Login failed';
-      });
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(loginControllerProvider);
+    final err = state.error;
 
     return Container(
       color: Colors.white,
@@ -87,7 +80,8 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   ),
                   const SizedBox(height: 24),
 
-                  if (_authError != null) ...[
+                  // ERROR (from Riverpod state)
+                  if (err != null) ...[
                     Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(12),
@@ -97,7 +91,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                         border: Border.all(color: const Color(0xFFFFC7C7)),
                       ),
                       child: Text(
-                        _authError!,
+                        err,
                         style: const TextStyle(
                           color: Color(0xFFB00020),
                           fontSize: 13,
@@ -126,8 +120,8 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                     decoration: InputDecoration(
                       hintText: 'Enter your email address',
                       hintStyle: const TextStyle(color: Colors.black38),
-                      prefixIcon: const Icon(Icons.mail_outline,
-                          color: Colors.black54),
+                      prefixIcon:
+                          const Icon(Icons.mail_outline, color: Colors.black54),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
                         vertical: 16,
@@ -161,8 +155,8 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                     decoration: InputDecoration(
                       hintText: 'Enter your password',
                       hintStyle: const TextStyle(color: Colors.black38),
-                      prefixIcon: const Icon(Icons.lock_outline,
-                          color: Colors.black54),
+                      prefixIcon:
+                          const Icon(Icons.lock_outline, color: Colors.black54),
                       suffixIcon: IconButton(
                         icon: Icon(
                           _obscurePassword
@@ -279,9 +273,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                         style: TextStyle(color: Colors.black),
                       ),
                       InkWell(
-                        onTap: state.loading ? null : () {
-                          context.go(Routes.signup);
-                        },
+                        onTap: state.loading ? null : () => context.go(Routes.signup),
                         child: Text(
                           "Sign up",
                           style: TextStyle(

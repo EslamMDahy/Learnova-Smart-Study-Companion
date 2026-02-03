@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/error_mapper.dart';
 import '../../data/auth_api.dart';
 import '../../data/auth_repository.dart';
 
@@ -35,9 +36,9 @@ class LoginController extends StateNotifier<LoginState> {
         await _repo.login(email: email, password: password, persist: persist);
         state = state.copyWith(loading: false);
         return true;
-    } catch (e) {
-        state = state.copyWith(loading: false, error: e.toString());
+      } catch (e) {
+        state = state.copyWith(loading: false, error: mapApiError(e));
         return false;
-    }
+      }
     }
 }
