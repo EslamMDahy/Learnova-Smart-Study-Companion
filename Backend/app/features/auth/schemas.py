@@ -1,11 +1,14 @@
+from typing import Optional
 from pydantic import BaseModel, EmailStr,  Field
 
 
 class RegisterRequest(BaseModel):
     full_name: str
     email: EmailStr
-    password: str
-    invite_code: str  # خليه str عشان في DB غالبًا varchar
+    password: str = Field(min_length=8)
+    account_type: str
+    invite_code: Optional[str] = None
+    system_role: Optional[str] = None
 
 class LoginRequest(BaseModel):
     email: EmailStr

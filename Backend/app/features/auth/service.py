@@ -16,7 +16,7 @@ from app.core.security import verify_password
 from app.core.emailer import send_email
 from app.core.jwt import create_access_token
 
-def register_user(payload: RegisterRequest, db: Session):
+def register_user(payload, db: Session):
     # 1) Check email unique
     existing = db.execute(
         text("SELECT 1 FROM users WHERE email = :email"),
@@ -25,42 +25,79 @@ def register_user(payload: RegisterRequest, db: Session):
     if existing:
         raise HTTPException(status_code=409, detail="Email already exists")
 
-    # 2) Check invite code exists (organizations table)
-    org = db.execute(
-        text("SELECT id FROM organizations WHERE invite_code = :code"),
-        {"code": str(payload.invite_code)},
-    ).first()
-    if not org:
-        raise HTTPException(status_code=400, detail="Invalid invite code")
+    # 2) Decide logic based on account_type
+    account_type = (payload.account_type or "").strip().lower()
+    system_role = (payload.system_role or "").strip().lower()
+
+    ALLOWED_USER_ROLES = {"student", "instructor", "assistant"}
+
+    if account_type == "user":
+        # invite_code required
+        if not payload.invite_code or not str(payload.invite_code).strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Organization code is required",
+            )
+
+        org = db.execute(
+            text("SELECT id FROM organizations WHERE invite_code = :code"),
+            {"code": str(payload.invite_code).strip()},
+        ).first()
+
+        if not org:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid organization code",
+            )
+
+        # ✅ validate system role
+        if system_role not in ALLOWED_USER_ROLES:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid user role. Choose student, instructor, or assistant.",
+            )
+
+    elif account_type == "owner":
+        # owner doesn't need invite_code or role from frontend
+        system_role = "owner"
+
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid account type",
+        )
+
 
     # 3) Hash password
     hashed_pw = hash_password(payload.password)
 
-    # 4) Insert user (لاحظ: hashed_password + أعمدة NOT NULL)
+    # 4) Insert user
     row = db.execute(
-    text(
-        """
-        INSERT INTO users (full_name, email, hashed_password, system_role, is_email_verified, created_at, updated_at)
-        VALUES (:full_name, :email, :hashed_password, :system_role, :is_email_verified, NOW(), NOW())
-        RETURNING id
-        """
-    ),
-    {
-        "full_name": payload.full_name,
-        "email": payload.email,
-        "hashed_password": hashed_pw,
-        "system_role": "student",         # أو أي default عندك
-        "is_email_verified": False,
-    },
+        text(
+            """
+            INSERT INTO users (full_name, email, hashed_password, system_role, is_email_verified, created_at, updated_at)
+            VALUES (:full_name, :email, :hashed_password, :system_role, :is_email_verified, NOW(), NOW())
+            RETURNING id
+            """
+        ),
+        {
+            "full_name": payload.full_name,
+            "email": payload.email,
+            "hashed_password": hashed_pw,
+            "system_role": system_role,
+            "is_email_verified": False,
+        },
     ).first()
 
-    user_id = row[0] # type: ignore
+    if not row:
+        raise HTTPException(status_code=500, detail="Failed to create user")
+
+    user_id = row[0]
     db.commit()
 
     # 5) Create verification token
     verify_token = secrets.token_urlsafe(32)
-
-    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)  # مثال: 30 دقيقة
+    expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
     db.execute(
         text(
@@ -78,27 +115,87 @@ def register_user(payload: RegisterRequest, db: Session):
     )
     db.commit()
 
-    # 6) building the verification link
-    base_url = os.getenv("API_BASE_URL")
-    if not base_url:
-        raise RuntimeError("Missing API_BASE_URL env var")
+    # 6) Build verification link (fallback بدل RuntimeError)
+    frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+    verify_link = f"{frontend_url.rstrip('/')}/#/verify-email?token={verify_token}"
 
-    verify_link = f"{base_url.rstrip('/')}/auth/verify-email?token={verify_token}"
+    text_body = f"""
+    Welcome to Learnova!
+
+    Verify your email:
+    {verify_link}
+
+    This link expires in 24 hours.
+    """
+
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center" style="padding:24px;">
+            <table width="520" style="background:#ffffff;border-radius:12px;padding:24px;border:1px solid #e5e7eb;">
+                <tr>
+                <td>
+                    <h2 style="margin:0 0 12px;color:#111827;">
+                    Welcome to Learnova 👋
+                    </h2>
+                    <p style="margin:0 0 16px;color:#374151;line-height:1.6;">
+                    Please confirm your email address to activate your account.
+                    </p>
+
+                    <a href="{verify_link}"
+                    style="
+                        display:inline-block;
+                        background:#137FEC;
+                        color:#ffffff;
+                        text-decoration:none;
+                        padding:12px 20px;
+                        border-radius:8px;
+                        font-weight:600;
+                        margin-bottom:16px;
+                    ">
+                    Verify Email
+                    </a>
+
+                    <p style="margin:16px 0 0;color:#6b7280;font-size:13px;">
+                    This link expires in 24 hours.
+                    </p>
+
+                    <p style="margin:12px 0 0;color:#9ca3af;font-size:12px;">
+                    If the button doesn’t work, copy and paste this link:<br>
+                    <span style="word-break:break-all;">{verify_link}</span>
+                    </p>
+                </td>
+                </tr>
+            </table>
+            </td>
+        </tr>
+        </table>
+    </body>
+    </html>
+    """
 
 
-    # 7) Send verification email (بعد الـ commit)
+    # 7) Send verification email (متبوظش التسجيل لو الإيميل وقع)
     try:
         send_email(
             to=payload.email,
-            subject="Learnova - Verify your email",
-            body=f"Welcome to Learnova!\n\nVerify your email:\n{verify_link}\n\nThis link expires in 24 hours.",
+            subject="Learnova – Verify your email",
+            body=text_body,
+            html=html_body,
         )
-
     except Exception:
-        # مهم: منبوّظش التسجيل لو الإيميل وقع
         pass
 
-    return {"message": "Registration successful. Please check your email."}
+    return {
+        "message": "Registration successful. Please check your email.",
+        "email_verification_required": True,
+        "account_type": account_type,
+    }
+
+
 
 
 def verify_email_token(token: str, db: Session):
@@ -146,43 +243,37 @@ def verify_email_token(token: str, db: Session):
 
     return {"message": "Email verified successfully"}
 
+
+
 def login_user(payload: LoginRequest, db: Session):
-    # 1) هات بيانات اليوزر الأساسية (بـ email)
-    row = db.execute( # type: ignore
-        text(
-            """
+    row = db.execute(
+        text("""
             SELECT id, full_name, email, hashed_password, is_email_verified
             FROM users
             WHERE email = :email
-            """
-        ),
+        """),
         {"email": payload.email},
     ).first()
 
-    # 2) لو الإيميل مش موجود => 401 (نفس رسالة الباسورد الغلط)
+    # 1) email مش موجود
     if not row:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
     user_id, full_name, email, hashed_pw, is_verified = row
 
-    # 3) لو مش verified => 403
-    if not is_verified:
-        raise HTTPException(status_code=403, detail="Email not verified")
-
-    # 4) لو الباسورد غلط => 401
+    # 2) باسورد غلط (قبل verification)
     if not verify_password(payload.password, hashed_pw):
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    # 5) نكريت JWT لو اللوجين نجح
+    # 3) هنا فقط نكشف أنه مش verified لأن credentials صح
+    if not is_verified:
+        raise HTTPException(status_code=403, detail="Email not verified")
+
     access_token = create_access_token(
         subject=str(user_id),
-        extra={
-            "email": email,
-            "full_name": full_name,
-        },
+        extra={"email": email, "full_name": full_name},
     )
 
-    # 6) هنبعت الريسبونس فيه الاكسيس توكين و الداتا الي الUI محتاجها 
     return {
         "access_token": access_token,
         "token_type": "bearer",

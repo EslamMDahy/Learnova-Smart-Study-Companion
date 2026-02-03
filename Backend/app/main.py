@@ -3,6 +3,9 @@ from fastapi import FastAPI
 from app.features.auth.router import router as auth_router
 
 from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+
+load_dotenv("env.env")
 
 app = FastAPI()
 origins = [
