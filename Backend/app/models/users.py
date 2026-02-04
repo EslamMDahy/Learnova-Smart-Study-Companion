@@ -1,4 +1,4 @@
-from sqlalchemy import String, DateTime, Boolean
+from sqlalchemy import String, DateTime, Boolean, Integer
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 
@@ -25,3 +25,6 @@ class User(Base):
         default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
+
+    token_version: Mapped[int] = mapped_column(Integer, nullable=False, server_default="1")
+

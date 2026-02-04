@@ -22,13 +22,15 @@ def get_current_user(
     payload = decode_access_token(token)
 
     user_id = payload.get("sub")
+    token_version = int(payload.get("tv", -1))
+
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
     # 3) هات اليوزر من DB
     row = db.execute(
         text("""
-            SELECT id, email, full_name, is_email_verified
+            SELECT id, email, full_name, is_email_verified, token_version
             FROM users
             WHERE id = :id
         """),
@@ -38,11 +40,14 @@ def get_current_user(
     if not row:
         raise HTTPException(status_code=401, detail="User not found")
 
-    uid, email, full_name, is_verified = row
+    uid, email, full_name, is_verified, db_tv = row
 
     # (اختياري لكن بروفيشنال): لو حد اتسربتله توكين قديم قبل التفعيل
     if not is_verified:
         raise HTTPException(status_code=403, detail="Email not verified")
+    
+    if token_version != db_tv:
+        raise HTTPException(401, "Token revoked")
 
     # رجّع dict بسيط
     return {"id": uid, "email": email, "full_name": full_name}

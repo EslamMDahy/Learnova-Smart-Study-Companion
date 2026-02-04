@@ -248,10 +248,14 @@ def verify_email_token(token: str, db: Session):
 def login_user(payload: LoginRequest, db: Session):
     row = db.execute(
         text("""
-            SELECT id, full_name, email, hashed_password, is_email_verified
-            FROM users
-            WHERE email = :email
-        """),
+             SELECT
+             id, full_name, email, avatar_url,
+             system_role, hashed_password, 
+             is_email_verified, token_version
+             FROM users
+             WHERE email = :email
+             """
+        ),
         {"email": payload.email},
     ).first()
 
@@ -259,7 +263,7 @@ def login_user(payload: LoginRequest, db: Session):
     if not row:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    user_id, full_name, email, hashed_pw, is_verified = row
+    user_id, full_name, email, avatar_url, system_role, hashed_pw, is_verified, token_version = row
 
     # 2) باسورد غلط (قبل verification)
     if not verify_password(payload.password, hashed_pw):
@@ -269,16 +273,67 @@ def login_user(payload: LoginRequest, db: Session):
     if not is_verified:
         raise HTTPException(status_code=403, detail="Email not verified")
 
+    # 4) preparing the login response data
+    user = {
+        "id": user_id,
+        "full_name": full_name,
+        "email": email,
+        "avatar_url": avatar_url,
+        "system_role": system_role,
+    }
+
+    orgs = []
+    if system_role == "owner":
+        org_rows = db.execute(
+            text("""
+                SELECT
+                id, name, description, logo_url,
+                owner_id, subscription_plan_id, invite_code,
+                subscription_status, subscription_started_at,
+                subscription_renews_at, trial_ends_at
+                FROM organizations
+                WHERE owner_id = :uid
+                ORDER BY id
+            """),
+            {"uid": user_id},
+        ).all()
+
+        orgs = [
+            {
+                "id": r[0],
+                "name": r[1],
+                "description": r[2],
+                "logo_url": r[3],
+                "owner_id": r[4],
+                "subscription_plan_id": r[5],
+                "invite_code": r[6],
+                "subscription_status": r[7],
+                "subscription_started_at": r[8],
+                "subscription_renews_at": r[9],
+                "trial_ends_at": r[10],
+            }
+            for r in org_rows
+        ]
+
+
+    # 5) Cereating JWT
     access_token = create_access_token(
         subject=str(user_id),
-        extra={"email": email, "full_name": full_name},
+        extra={"email": email, "full_name": full_name, "tv": token_version},
     )
 
-    return {
-        "access_token": access_token,
-        "token_type": "bearer",
-        "user": {"id": user_id, "email": email, "full_name": full_name},
+    # 6) Sending the login response
+    resp = {
+    "access_token": access_token,
+    "token_type": "bearer",
+    "user": user,
     }
+
+    if system_role == "owner":
+        resp["organizations"] = orgs
+
+    return resp
+
 
 
 
@@ -389,7 +444,9 @@ def reset_password(payload, db):
     db.execute(
         text("""
             UPDATE users
-            SET hashed_password = :hp, updated_at = NOW()
+            SET hashed_password = :hp, 
+                updated_at = NOW(),
+                token_version = token_version + 1
             WHERE id = :uid
             """
         ),
