@@ -29,11 +29,13 @@ def get_current_user(
 
     # 3) هات اليوزر من DB
     row = db.execute(
-        text("""
+        text(
+            """
             SELECT id, email, full_name, is_email_verified, token_version
             FROM users
             WHERE id = :id
-        """),
+            """
+        ),
         {"id": int(user_id)},
     ).first()
 
