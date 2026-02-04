@@ -19,3 +19,17 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
     full_name: str
     email: str
+
+class ForgetPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ForgetPasswordResponse(BaseModel):
+    message: str
+
+class ResetPasswordRequest(BaseModel):
+    token: str = Field(..., min_length=10)
+    new_password: str = Field(..., min_length=6)
+
+class ResetPasswordResponse(BaseModel):
+    message: str
+

@@ -15,6 +15,7 @@ from app.core.security import hash_password
 from app.core.security import verify_password
 from app.core.emailer import send_email
 from app.core.jwt import create_access_token
+from app.core.token_store import mark_token_used
 
 def register_user(payload, db: Session):
     # 1) Check email unique
@@ -197,7 +198,6 @@ def register_user(payload, db: Session):
 
 
 
-
 def verify_email_token(token: str, db: Session):
     # 1) fetch token row
     row = db.execute(
@@ -279,3 +279,129 @@ def login_user(payload: LoginRequest, db: Session):
         "token_type": "bearer",
         "user": {"id": user_id, "email": email, "full_name": full_name},
     }
+
+
+
+def forget_password_request(payload, db):
+    # 1) دور على اليوزر بالايميل
+    row = db.execute(
+        text("SELECT id, full_name, email, is_email_verified FROM users WHERE email = :email"),
+        {"email": payload.email},
+    ).first()
+ 
+    # 2) رد ثابت سواء الايميل موجود او لا عشان السيكيورتي
+    ok_response = {"message": "If this email exists, a reser link has been sent."}
+
+    if not row:
+        return ok_response
+    
+    user_id, full_name, email, is_verified = row
+
+    # 3) نبطل اي ريسيت توكين قديمه لليوزر
+    db.execute(
+        text(
+            """
+            UPDATE user_tokens
+            SET used_at = NOW()
+            WHERE user_id = :uid AND type = 'reset_password' AND used_at IS NULL
+            """
+        ),
+        {"uid": user_id}
+    )
+
+    # 4) نكريت توكين قويه 
+    resetPass_token = secrets.token_urlsafe(32)
+
+    # 5) الاكسبيريشن دايت هنخليه 15 دقيقه
+    now = datetime.now(timezone.utc)
+    expires_at = now + timedelta(minutes=15)
+
+    # 6) store the token in the DB
+    db.execute(
+        text(
+            """
+            INSERT INTO user_tokens
+            (user_id, type, token, expires_at, created_at)
+            VALUES
+            (:uid, :type, :token, :expires_at, NOW())
+            """
+        ),
+        {"uid": user_id, "type": "reset_password", "token": resetPass_token, "expires_at": expires_at}
+    ) 
+    db.commit()
+    
+    
+    frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+    reset_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={resetPass_token}"
+
+    subject = "Lernova - Reset your password"
+    body = (
+        f"hello {full_name or ''}\n\n"
+        f"Click this link to reset your passwoed:\n{reset_link}\n\n"
+        f"This link expires in 15 minutes.\n"
+        f"If you didn't request this ignore this email."
+    )
+
+    send_email(to=email, subject=subject, body=body)
+
+    return ok_response
+
+    
+
+def reset_password(payload, db):
+    # 1) هات التوكن من DB لو صالح (مش مستخدم ولسه ما انتهيش)
+    row = db.execute(
+        text("""
+            SELECT id, user_id, expires_at, used_at
+            FROM user_tokens
+            WHERE token = :token AND type = 'reset_password'
+            LIMIT 1
+            """
+        ),
+        {"token": payload.token},
+    ).first()
+
+    if not row:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    token_id, user_id, expires_at, used_at = row
+
+    # 2) check used
+    if used_at is not None:
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    # 3) check expiry
+    now = datetime.now(timezone.utc)
+    # expires_at غالبًا timezone-aware من postgres
+    if expires_at <= now:
+        # نقدر نعمل used_at هنا كمان عشان نقفلها
+        db.execute(
+            text("UPDATE user_tokens SET used_at = NOW() WHERE id = :tid"),
+            {"tid": token_id},
+        )
+        db.commit()
+        raise HTTPException(status_code=400, detail="Invalid or expired token")
+
+    # 4) hash new password
+    new_hashed = hash_password(payload.new_password)
+
+    # 5) update user password
+    db.execute(
+        text("""
+            UPDATE users
+            SET hashed_password = :hp, updated_at = NOW()
+            WHERE id = :uid
+            """
+        ),
+        {"hp": new_hashed, "uid": user_id},
+    )
+
+    # 6) mark token used
+    db.execute(
+        text("UPDATE user_tokens SET used_at = NOW() WHERE id = :tid"),
+        {"tid": token_id},
+    )
+
+    db.commit()
+
+    return {"message": "Password reset successfully"}    
