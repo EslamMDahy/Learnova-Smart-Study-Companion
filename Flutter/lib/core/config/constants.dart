@@ -1,3 +1,5 @@
 class AppConstants {
-  static const String appName = 'Learnova';
+  AppConstants._();
+
+  static const appName = 'Learnova';
 }

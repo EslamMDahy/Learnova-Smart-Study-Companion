@@ -18,11 +18,9 @@ class AuthScaffold extends StatelessWidget {
           final isDesktop = c.maxWidth >= 900;
 
           if (!isDesktop) {
-            // موبايل/تابلت: نعرض الفورم فقط بعرض الشاشة
             return right;
           }
 
-          // Desktop: نثبت عرض الصفحة عشان مايحصلش “3 بلوكات”
           return Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1400),

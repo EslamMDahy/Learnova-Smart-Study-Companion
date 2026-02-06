@@ -13,8 +13,8 @@ class SignUpPage extends StatelessWidget {
           if (constraints.maxWidth > 900) {
             return Row(
               children: const [
-                Expanded(flex: 6, child: SignupLeftPanel()),
-                Expanded(flex: 4, child: SignUpForm(isMobile: false)),
+                Expanded(flex: 5, child: SignupLeftPanel()),
+                Expanded(flex: 5, child: SignUpForm(isMobile: false)),
               ],
             );
           }

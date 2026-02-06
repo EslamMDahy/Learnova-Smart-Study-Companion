@@ -15,7 +15,7 @@ class AuthShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final w = MediaQuery.sizeOf(context).width;
-    final isCompact = w < 980; // responsive للويب
+    final isCompact = w < 980;
 
     return Scaffold(
       backgroundColor: const Color(0xFF0B0F14),
@@ -42,12 +42,12 @@ class AuthShell extends StatelessWidget {
 }
 
 class AuthLeftPanel {
-  final String? backgroundAsset; // صورة الخلفية
-  final Gradient? overlayGradient; // overlay
-  final Widget? topLogo; // لوجو/علامة
+  final String? backgroundAsset; 
+  final Gradient? overlayGradient; 
+  final Widget? topLogo; 
   final String title;
   final String subtitle;
-  final List<String> bullets; // optional
+  final List<String> bullets;
   final Color textColor;
 
   const AuthLeftPanel({

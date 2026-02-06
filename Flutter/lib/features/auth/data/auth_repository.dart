@@ -6,13 +6,24 @@ class AuthRepository {
   final AuthApi _api;
   AuthRepository(this._api);
 
+  // ---------------- Auth ----------------
+
   Future<void> login({
     required String email,
     required String password,
     required bool persist,
   }) async {
-    final res = await _api.login(LoginRequest(email: email, password: password));
-    TokenStorage.saveToken(res.accessToken, persist: persist);
+    final res = await _api.login(
+      LoginRequest(
+        email: email.trim(),
+        password: password,
+      ),
+    );
+
+    TokenStorage.saveToken(
+      res.accessToken,
+      persist: persist,
+    );
   }
 
   Future<void> signup({
@@ -20,22 +31,42 @@ class AuthRepository {
     required String email,
     required String password,
     required String accountType,
-    required String systemRole, // ✅ student/instructor/assistant/owner
+    required String systemRole,
     String? inviteCode,
   }) async {
     await _api.signup(
-      fullName: fullName,
-      email: email,
+      fullName: fullName.trim(),
+      email: email.trim(),
       password: password,
       accountType: accountType,
-      systemRole: systemRole, // ✅
+      systemRole: systemRole,
       inviteCode: inviteCode,
     );
   }
 
-  Future<void> verifyEmail(String token) async {
-    await _api.verifyEmail(token);
+  Future<String> verifyEmail(String token) {
+    return _api.verifyEmail(token);
   }
 
-  void logout() => TokenStorage.clear();
+  // ---------------- Password ----------------
+
+  Future<String> forgotPassword(String email) {
+    return _api.forgotPassword(email.trim());
+  }
+
+  Future<String> resetPassword({
+    required String token,
+    required String newPassword,
+  }) {
+    return _api.resetPassword(
+      token: token,
+      newPassword: newPassword,
+    );
+  }
+
+  // ---------------- Session ----------------
+
+  void logout() {
+    TokenStorage.clear();
+  }
 }

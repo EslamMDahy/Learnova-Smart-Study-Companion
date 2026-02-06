@@ -13,8 +13,8 @@ class ForgetPasswordPage extends StatelessWidget {
           if (constraints.maxWidth > 900) {
             return Row(
               children: const [
-                Expanded(flex: 6, child: ForgetPasswordLeftPanel()),
-                Expanded(flex: 4, child: ForgetPasswordForm(isMobile: false)),
+                Expanded(flex: 5, child: ForgetPasswordLeftPanel()),
+                Expanded(flex: 5, child: ForgetPasswordForm(isMobile: false)),
               ],
             );
           }

@@ -1,42 +1,31 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/network/api_client.dart';
 import '../../../../core/network/error_mapper.dart';
-import '../../data/auth_api.dart';
+import '../../data/auth_providers.dart';
 import '../../data/auth_repository.dart';
-
-class SignupState {
-  final bool loading;
-  final String? error;
-
-  const SignupState({this.loading = false, this.error});
-
-  SignupState copyWith({bool? loading, String? error}) =>
-      SignupState(loading: loading ?? this.loading, error: error);
-}
-
-// Providers
-final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
-final authApiProvider =
-    Provider<AuthApi>((ref) => AuthApi(ref.read(apiClientProvider)));
-final authRepoProvider =
-    Provider<AuthRepository>((ref) => AuthRepository(ref.read(authApiProvider)));
+import 'signup_state.dart';
 
 final signupControllerProvider =
-    StateNotifierProvider<SignupController, SignupState>((ref) {
-  return SignupController(ref.read(authRepoProvider));
-});
+    StateNotifierProvider<SignupController, SignupState>(
+  (ref) => SignupController(ref.read(authRepositoryProvider)),
+);
 
 class SignupController extends StateNotifier<SignupState> {
   SignupController(this._repo) : super(const SignupState());
 
   final AuthRepository _repo;
 
-  /// لو عايز تمسح الايرور من الـ UI لما اليوزر يكتب
   void clearError() {
     if (state.error != null) {
       state = state.copyWith(error: null);
     }
+  }
+
+  void reset() => state = const SignupState();
+
+  bool _looksLikeEmail(String v) {
+    final s = v.trim();
+    return s.isNotEmpty && s.contains('@') && s.contains('.');
   }
 
   Future<bool> signup({
@@ -44,26 +33,62 @@ class SignupController extends StateNotifier<SignupState> {
     required String email,
     required String password,
     required String accountType,
-    required String systemRole, // ✅ student / instructor / assistant
-    String? inviteCode,         // ✅ required only for user
+    required String systemRole,
+    String? inviteCode,
   }) async {
-    // لو فيه error قديم امسحه وابدأ لودينج
     state = state.copyWith(loading: true, error: null);
+
+    final cleanFullName = fullName.trim();
+    final cleanEmail = email.trim();
+    final cleanAccountType = accountType.trim().toLowerCase();
+    final cleanSystemRole = systemRole.trim();
+    final cleanInvite =
+        (inviteCode == null || inviteCode.trim().isEmpty) ? null : inviteCode.trim();
+
+    // ✅ Local validation (خفيف واحترافي)
+    if (cleanFullName.isEmpty) {
+      state = state.copyWith(loading: false, error: 'Full name is required.');
+      return false;
+    }
+
+    if (!_looksLikeEmail(cleanEmail)) {
+      state = state.copyWith(loading: false, error: 'Please enter a valid email.');
+      return false;
+    }
+
+    if (password.trim().length < 8) {
+      state = state.copyWith(
+        loading: false,
+        error: 'Password must be at least 8 characters.',
+      );
+      return false;
+    }
+
+    if (cleanAccountType == 'user' && cleanInvite == null) {
+      state = state.copyWith(
+        loading: false,
+        error: 'Invite code is required for user accounts.',
+      );
+      return false;
+    }
 
     try {
       await _repo.signup(
-        fullName: fullName,
-        email: email,
+        fullName: cleanFullName,
+        email: cleanEmail,
         password: password,
-        accountType: accountType,
-        systemRole: systemRole,
-        inviteCode: inviteCode,
+        accountType: cleanAccountType,
+        systemRole: cleanSystemRole,
+        inviteCode: cleanInvite,
       );
 
       state = state.copyWith(loading: false, error: null);
       return true;
     } catch (e) {
-      state = state.copyWith(loading: false, error: mapApiError(e));
+      state = state.copyWith(
+        loading: false,
+        error: mapApiError(e),
+      );
       return false;
     }
   }

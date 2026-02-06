@@ -1,8 +1,12 @@
 class Endpoints {
-  // Auth
-  static const String login = '/auth/login';
-  static const String signup = '/auth/register';
-  static const String forgotPassword = '/auth/forgot-password';
-  static const String resetPassword = '/auth/reset-password';
-  static const String verifyEmail = '/auth/verify-email';
+  Endpoints._(); // يمنع عمل instance
+
+  static const _auth = '/auth';
+
+  // ================= AUTH =================
+  static const login = '$_auth/login';
+  static const signup = '$_auth/register';
+  static const forgotPassword = '$_auth/forgot-password';
+  static const resetPassword = '$_auth/reset-password';
+  static const verifyEmail = '$_auth/verify-email';
 }

@@ -7,43 +7,79 @@ class AuthApi {
   final ApiClient _client;
   AuthApi(this._client);
 
+  // ---------------- Auth ----------------
+
   Future<LoginResponse> login(LoginRequest request) async {
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.login,
       data: request.toJson(),
     );
 
-    return LoginResponse.fromJson(res.data ?? {});
+    return LoginResponse.fromJson(res.data ?? const {});
   }
 
-    Future<void> signup({
-      required String fullName,
-      required String email,
-      required String password,
-      required String accountType,
-      required String systemRole,
-      String? inviteCode,
-    }) async {
-      await _client.post(
-        Endpoints.signup,
-        data: {
-          "full_name": fullName,
-          "email": email,
-          "password": password,
-          "account_type": accountType,
-          "system_role": systemRole,
-          if (inviteCode != null) "invite_code": inviteCode,
-        },
-      );
-    }
-
-
-  Future<void> verifyEmail(String token) async {
-    await _client.get(
-      Endpoints.verifyEmail,
-      queryParameters: {"token": token},
+  Future<void> signup({
+    required String fullName,
+    required String email,
+    required String password,
+    required String accountType,
+    required String systemRole,
+    String? inviteCode,
+  }) async {
+    await _client.post(
+      Endpoints.signup,
+      data: {
+        "full_name": fullName.trim(),
+        "email": email.trim(),
+        "password": password,
+        "account_type": accountType.trim(),
+        "system_role": systemRole.trim(),
+        if (inviteCode != null && inviteCode.trim().isNotEmpty)
+          "invite_code": inviteCode.trim(),
+      },
     );
   }
 
+  Future<String> verifyEmail(String token) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.verifyEmail,
+      queryParameters: {"token": token.trim()},
+    );
 
+    return _readMessage(res.data);
+  }
+
+  // ---------------- Password ----------------
+
+  Future<String> forgotPassword(String email) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.forgotPassword,
+      data: {"email": email.trim()},
+    );
+
+    return _readMessage(res.data);
+  }
+
+  Future<String> resetPassword({
+    required String token,
+    required String newPassword,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.resetPassword,
+      data: {
+        "token": token.trim(),
+        "new_password": newPassword,
+      },
+    );
+
+    return _readMessage(res.data);
+  }
+
+  // ---------------- Helpers ----------------
+
+  String _readMessage(Map<String, dynamic>? data) {
+    final v = data?['message'];
+    if (v == null) return '';
+    return v.toString();
+  }
 }
