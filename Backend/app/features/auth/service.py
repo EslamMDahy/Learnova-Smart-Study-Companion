@@ -478,7 +478,8 @@ def forget_password_request(payload, db):
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     reset_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={resetPass_token}"
 
-    logo_url = "F:\Graduation Project\Clone\Learnova-Smart-Study-Companion\Backend\assets\logo.png"
+    logo_url = ""
+
     brand_year = 2026
     support_email = "support@learnova.com"
 
