@@ -1,5 +1,5 @@
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
+from typing import Optional, List
 
 
 class CreateOrganizationRequest(BaseModel):
@@ -18,6 +18,18 @@ class OrganizationOut(BaseModel):
     invite_code: str
     subscription_status: str
 
-
 class CreateOrganizationResponse(BaseModel):
     organization: OrganizationOut
+
+
+class JoinRequestUser(BaseModel):
+    id: int
+    full_name: str
+    email: EmailStr
+    avatar_url: Optional[str] = None
+    system_role: str
+    status: str
+
+class JoinRequestsResponse(BaseModel):
+    count: int
+    users: List[JoinRequestUser]

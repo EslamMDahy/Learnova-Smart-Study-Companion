@@ -53,7 +53,7 @@ def register_user(payload, db: Session):
 
         org_code = org[0]
 
-        # ✅ validate system role
+        # validate system role
         if system_role not in ALLOWED_USER_ROLES:
             raise HTTPException(
                 status_code=400,

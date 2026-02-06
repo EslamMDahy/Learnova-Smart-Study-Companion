@@ -1,7 +1,8 @@
-import secrets
+from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
-from fastapi import HTTPException
+import secrets
+from typing import Dict, Any, List
 
 
 def _generate_invite_code() -> str:
@@ -67,3 +68,80 @@ def create_organization(payload, db: Session, current_user):
             "subscription_status": row[7],
         }
     }
+
+
+def list_join_requests(*, organization_id: int, view: str, db: Session, current_user) -> Dict[str, Any]:
+    """
+    Returns join requests for a given organization owned by the current owner.
+
+    view:
+      - "pending"  -> status IN ("pending")
+      - "accepted" -> status IN ("accepted", "suspended")
+    """
+
+    # 1) Owner-only
+    if current_user.get("system_role") != "owner":
+        raise HTTPException(status_code=403, detail="Only owners can view join requests")
+
+    owner_id = current_user.get("id")
+    if owner_id is None:
+        # Defensive: get_current_user should always include id
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # 2) Validate view
+    view = (view or "").strip().lower()
+    if view not in {"pending", "accepted"}:
+        raise HTTPException(status_code=400, detail="Invalid view")
+
+    if view == "pending":
+        statuses = ("pending",)
+    else:
+        # "accepted" view shows accepted + suspended together (per your leader decision)
+        statuses = ("accepted", "suspended")
+
+    # 3) Ownership check: organization_id must belong to this owner
+    org_exists = db.execute(
+        text("""
+            SELECT 1
+            FROM organizations
+            WHERE id = :org_id AND owner_id = :owner_id
+        """),
+        {"org_id": organization_id, "owner_id": owner_id},
+    ).first()
+
+    if not org_exists:
+        # Either org doesn't exist OR not owned by this owner (security)
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    # 4) Fetch users from organization_members + users
+    rows = db.execute(
+        text("""
+            SELECT
+                u.id,
+                u.full_name,
+                u.email,
+                u.avatar_url,
+                u.system_role,
+                om.status
+            FROM organization_members om
+            JOIN users u ON u.id = om.user_id
+            WHERE om.organization_id = :org_id
+              AND om.status = ANY(:statuses)
+            ORDER BY u.id ASC
+        """),
+        {"org_id": organization_id, "statuses": list(statuses)},
+    ).all()
+
+    users: List[Dict[str, Any]] = [
+        {
+            "id": r[0],
+            "full_name": r[1],
+            "email": r[2],
+            "avatar_url": r[3],
+            "system_role": r[4],
+            "status": r[5],
+        }
+        for r in rows
+    ]
+
+    return {"count": len(users), "users": users}
