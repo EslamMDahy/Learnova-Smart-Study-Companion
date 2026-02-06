@@ -1,4 +1,4 @@
-from sqlalchemy import String, DateTime, ForeignKey
+from sqlalchemy import String, DateTime, ForeignKey, text
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 
@@ -21,7 +21,8 @@ class Organization(Base):
 
     subscription_plan_id: Mapped[int] = mapped_column(
         ForeignKey("subscription_plans.id", ondelete="RESTRICT"),
-        nullable=False
+        nullable=False,
+        server_default="1",
     )
 
     invite_code: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)

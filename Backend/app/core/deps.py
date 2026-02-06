@@ -31,7 +31,7 @@ def get_current_user(
     row = db.execute(
         text(
             """
-            SELECT id, email, full_name, is_email_verified, token_version
+            SELECT id, email, full_name, system_role, is_email_verified, token_version
             FROM users
             WHERE id = :id
             """
@@ -42,7 +42,7 @@ def get_current_user(
     if not row:
         raise HTTPException(status_code=401, detail="User not found")
 
-    uid, email, full_name, is_verified, db_tv = row
+    uid, email, full_name, system_role, is_verified, db_tv = row
 
     # (اختياري لكن بروفيشنال): لو حد اتسربتله توكين قديم قبل التفعيل
     if not is_verified:
@@ -52,4 +52,4 @@ def get_current_user(
         raise HTTPException(401, "Token revoked")
 
     # رجّع dict بسيط
-    return {"id": uid, "email": email, "full_name": full_name}
+    return {"id": uid, "email": email, "full_name": full_name, "system_role": system_role}
