@@ -51,6 +51,8 @@ def register_user(payload, db: Session):
                 detail="Invalid organization code",
             )
 
+        org_code = org[0]
+
         # ✅ validate system role
         if system_role not in ALLOWED_USER_ROLES:
             raise HTTPException(
@@ -94,7 +96,24 @@ def register_user(payload, db: Session):
         raise HTTPException(status_code=500, detail="Failed to create user")
 
     user_id = row[0]
-    db.commit()
+
+    # 4.5) Insert organization_member for normal users (pending by default)
+    if account_type == "user":
+        db.execute(
+            text(
+                """
+                INSERT INTO organization_members (organization_id, user_id, role, status)
+                VALUES (:org_id, :user_id, :role, :status)
+                """
+            ),
+            {
+                "org_id": org_code, # type: ignore
+                "user_id": user_id,
+                "role": system_role,  # نفس users.system_role (انت أكدت)
+                "status": "pending",
+            },
+        )
+
 
     # 5) Create verification token
     verify_token = secrets.token_urlsafe(32)
