@@ -15,7 +15,7 @@ from app.core.security import hash_password
 from app.core.security import verify_password
 from app.core.emailer import send_email
 from app.core.jwt import create_access_token
-from app.core.token_store import mark_token_used
+# from app.core.token_store import mark_token_used
 
 def register_user(payload, db: Session):
     # 1) Check email unique
@@ -409,7 +409,7 @@ def login_user(payload: LoginRequest, db: Session):
     # 5) Cereating JWT
     access_token = create_access_token(
         subject=str(user_id),
-        extra={"email": email, "full_name": full_name, "tv": token_version},
+        extra={"email": email, "full_name": full_name, "tv": token_version, "system_role": system_role},
     )
 
     # 6) Sending the login response
