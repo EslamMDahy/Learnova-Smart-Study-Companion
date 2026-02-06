@@ -116,9 +116,14 @@ def register_user(payload, db: Session):
     )
     db.commit()
 
+    
+
     # 6) Build verification link (fallback بدل RuntimeError)
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     verify_link = f"{frontend_url.rstrip('/')}/#/verify-email?token={verify_token}"
+    logo_url = ""
+    brand_year = 2026
+    support_email = "support@learnova.com"
 
     text_body = f"""
     Welcome to Learnova!
@@ -128,48 +133,133 @@ def register_user(payload, db: Session):
 
     This link expires in 24 hours.
     """
-
     html_body = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,sans-serif;">
-        <table width="100%" cellpadding="0" cellspacing="0">
+        <!-- Preheader (hidden) -->
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+        Verify your email to activate your Learnova account.
+        </div>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;">
         <tr>
-            <td align="center" style="padding:24px;">
-            <table width="520" style="background:#ffffff;border-radius:12px;padding:24px;border:1px solid #e5e7eb;">
+            <td align="center" style="padding:28px 16px;">
+
+            <!-- Outer container -->
+            <table width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:560px;">
+
+                <!-- Brand header -->
                 <tr>
-                <td>
-                    <h2 style="margin:0 0 12px;color:#111827;">
-                    Welcome to Learnova 👋
-                    </h2>
-                    <p style="margin:0 0 16px;color:#374151;line-height:1.6;">
-                    Please confirm your email address to activate your account.
+                <td align="left" style="padding:0 8px 14px;">
+                    <table cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="vertical-align:middle;">
+                        <img src="{logo_url}" width="40" height="40" alt="Learnova"
+                            style="display:block;border:0;outline:none;border-radius:10px;" />
+                        </td>
+                        <td style="vertical-align:middle;padding-left:10px;">
+                        <div style="font-size:16px;font-weight:800;color:#111827;line-height:1;">
+                            Learnova
+                        </div>
+                        <div style="font-size:12px;color:#6b7280;margin-top:2px;">
+                            Email Verification
+                        </div>
+                        </td>
+                    </tr>
+                    </table>
+                </td>
+                </tr>
+
+                <!-- Card -->
+                <tr>
+                <td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
+                    <!-- Top accent -->
+                    <div style="height:6px;background:#137FEC;"></div>
+
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="padding:26px 26px 10px;">
+                        <h2 style="margin:0;color:#111827;font-size:22px;line-height:1.25;">
+                            Welcome to Learnova 👋
+                        </h2>
+                        <p style="margin:10px 0 0;color:#374151;line-height:1.7;font-size:14px;">
+                            Please confirm your email address to activate your account.
+                        </p>
+
+                        <!-- Button -->
+                        <table cellpadding="0" cellspacing="0" style="margin-top:18px;">
+                            <tr>
+                            <td align="center" bgcolor="#137FEC" style="border-radius:10px;">
+                                <a href="{verify_link}"
+                                style="display:inline-block;padding:12px 18px;font-size:14px;font-weight:700;
+                                        color:#ffffff;text-decoration:none;border-radius:10px;">
+                                Verify Email
+                                </a>
+                            </td>
+                            </tr>
+                        </table>
+
+                        <!-- Info chips -->
+                        <table cellpadding="0" cellspacing="0" style="margin-top:16px;">
+                            <tr>
+                            <td style="background:#F3F4F6;border:1px solid #E5E7EB;border-radius:999px;padding:6px 10px;">
+                                <span style="font-size:12px;color:#374151;">
+                                ⏳ Expires in 24 hours
+                                </span>
+                            </td>
+                            <td style="width:10px;"></td>
+                            <td style="background:#EAF3FF;border:1px solid #BBD9FF;border-radius:999px;padding:6px 10px;">
+                                <span style="font-size:12px;color:#1F4B99;">
+                                🔒 Secure link
+                                </span>
+                            </td>
+                            </tr>
+                        </table>
+
+                        </td>
+                    </tr>
+
+                    <!-- Divider -->
+                    <tr>
+                        <td style="padding:0 26px;">
+                        <div style="height:1px;background:#E5E7EB;"></div>
+                        </td>
+                    </tr>
+
+                    <!-- Fallback link -->
+                    <tr>
+                        <td style="padding:14px 26px 24px;">
+                        <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.6;">
+                            If the button doesn’t work, copy and paste this link into your browser:
+                        </p>
+                        <p style="margin:10px 0 0;font-size:12px;line-height:1.6;">
+                            <a href="{verify_link}" style="color:#137FEC;text-decoration:none;word-break:break-all;">
+                            {verify_link}
+                            </a>
+                        </p>
+
+                        <p style="margin:16px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                            If you didn’t create an account, you can safely ignore this email.
+                        </p>
+                        </td>
+                    </tr>
+                    </table>
+                </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                <td align="center" style="padding:14px 10px 0;">
+                    <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                    © {brand_year} Learnova. All rights reserved.
                     </p>
-
-                    <a href="{verify_link}"
-                    style="
-                        display:inline-block;
-                        background:#137FEC;
-                        color:#ffffff;
-                        text-decoration:none;
-                        padding:12px 20px;
-                        border-radius:8px;
-                        font-weight:600;
-                        margin-bottom:16px;
-                    ">
-                    Verify Email
-                    </a>
-
-                    <p style="margin:16px 0 0;color:#6b7280;font-size:13px;">
-                    This link expires in 24 hours.
-                    </p>
-
-                    <p style="margin:12px 0 0;color:#9ca3af;font-size:12px;">
-                    If the button doesn’t work, copy and paste this link:<br>
-                    <span style="word-break:break-all;">{verify_link}</span>
+                    <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                    Need help? Contact us at <a href="mailto:{support_email}" style="color:#137FEC;text-decoration:none;">{support_email}</a>
                     </p>
                 </td>
                 </tr>
+
             </table>
             </td>
         </tr>
@@ -388,6 +478,10 @@ def forget_password_request(payload, db):
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     reset_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={resetPass_token}"
 
+    logo_url = "F:\Graduation Project\Clone\Learnova-Smart-Study-Companion\Backend\assets\logo.png"
+    brand_year = 2026
+    support_email = "support@learnova.com"
+
     subject = "Learnova – Reset your password"
 
     text_body = f"""
@@ -402,71 +496,131 @@ def forget_password_request(payload, db):
 
     If you didn't request this, you can safely ignore this email.
     """
-
     html_body = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,sans-serif;">
-        <table width="100%" cellpadding="0" cellspacing="0">
+        <!-- Preheader -->
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+        Reset your Learnova password
+        </div>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;">
         <tr>
-            <td align="center" style="padding:24px;">
-            <table width="520" style="background:#ffffff;border-radius:12px;padding:24px;border:1px solid #e5e7eb;">
+            <td align="center" style="padding:28px 16px;">
+
+            <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;">
+
+                <!-- Brand -->
                 <tr>
-                <td>
-                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
-                    <div style="width:36px;height:36px;border-radius:10px;background:#EAF3FF;display:inline-flex;align-items:center;justify-content:center;">
-                        <span style="color:#137FEC;font-size:18px;font-weight:700;">L</span>
-                    </div>
-                    <div style="font-size:16px;font-weight:700;color:#111827;">Learnova</div>
-                    </div>
-
-                    <h2 style="margin:0 0 12px;color:#111827;">
-                    Reset your password 🔒
-                    </h2>
-
-                    <p style="margin:0 0 16px;color:#374151;line-height:1.6;">
-                    We received a request to reset your password. Click the button below to choose a new one.
-                    </p>
-
-                    <a href="{reset_link}"
-                    style="
-                        display:inline-block;
-                        background:#137FEC;
-                        color:#ffffff;
-                        text-decoration:none;
-                        padding:12px 20px;
-                        border-radius:8px;
-                        font-weight:600;
-                        margin-bottom:16px;
-                    ">
-                    Reset Password
-                    </a>
-
-                    <p style="margin:16px 0 0;color:#6b7280;font-size:13px;">
-                    This link expires in <strong>15 minutes</strong>.
-                    </p>
-
-                    <p style="margin:12px 0 0;color:#9ca3af;font-size:12px;line-height:1.5;">
-                    If you didn’t request a password reset, you can safely ignore this email.
-                    </p>
-
-                    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;">
-                    <p style="margin:0;color:#9ca3af;font-size:12px;">
-                        If the button doesn’t work, copy and paste this link:
-                    </p>
-                    <p style="margin:8px 0 0;color:#6b7280;font-size:12px;word-break:break-all;">
-                        {reset_link}
-                    </p>
-                    </div>
-
+                <td style="padding:0 8px 14px;">
+                    <table cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td>
+                        <img src="{logo_url}" width="40" height="40" alt="Learnova"
+                            style="display:block;border-radius:10px;" />
+                        </td>
+                        <td style="padding-left:10px;">
+                        <div style="font-size:16px;font-weight:800;color:#111827;">
+                            Learnova
+                        </div>
+                        <div style="font-size:12px;color:#6b7280;">
+                            Password Reset
+                        </div>
+                        </td>
+                    </tr>
+                    </table>
                 </td>
                 </tr>
+
+                <!-- Card -->
+                <tr>
+                <td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;">
+                    <div style="height:6px;background:#137FEC;border-radius:16px 16px 0 0;"></div>
+
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="padding:26px;">
+                        <h2 style="margin:0 0 12px;color:#111827;font-size:22px;">
+                            Reset your password 🔒
+                        </h2>
+
+                        <p style="margin:0 0 18px;color:#374151;line-height:1.7;font-size:14px;">
+                            We received a request to reset your password. Click the button
+                            below to choose a new one.
+                        </p>
+
+                        <!-- Button -->
+                        <table cellpadding="0" cellspacing="0">
+                            <tr>
+                            <td bgcolor="#137FEC" style="border-radius:10px;">
+                                <a href="{reset_link}"
+                                style="display:inline-block;padding:12px 18px;
+                                        font-size:14px;font-weight:700;
+                                        color:#ffffff;text-decoration:none;
+                                        border-radius:10px;">
+                                Reset Password
+                                </a>
+                            </td>
+                            </tr>
+                        </table>
+
+                        <!-- Info -->
+                        <table cellpadding="0" cellspacing="0" style="margin-top:16px;">
+                            <tr>
+                            <td style="background:#FFF7ED;border:1px solid #FED7AA;
+                                        border-radius:999px;padding:6px 10px;">
+                                <span style="font-size:12px;color:#9A3412;">
+                                ⏳ Expires in 15 minutes
+                                </span>
+                            </td>
+                            </tr>
+                        </table>
+
+                        <p style="margin:16px 0 0;color:#6b7280;font-size:12px;line-height:1.6;">
+                            If you didn’t request a password reset, you can safely ignore
+                            this email.
+                        </p>
+
+                        </td>
+                    </tr>
+
+                    <!-- Divider -->
+                    <tr>
+                        <td style="padding:0 26px;">
+                        <div style="height:1px;background:#e5e7eb;"></div>
+                        </td>
+                    </tr>
+
+                    <!-- Fallback -->
+                    <tr>
+                        <td style="padding:14px 26px 24px;">
+                        <p style="margin:0;color:#9ca3af;font-size:12px;">
+                            If the button doesn’t work, copy and paste this link:
+                        </p>
+                        <p style="margin:8px 0 0;font-size:12px;word-break:break-all;">
+                            <a href="{reset_link}"
+                            style="color:#137FEC;text-decoration:none;">
+                            {reset_link}
+                            </a>
+                        </p>
+                        </td>
+                    </tr>
+
+                    </table>
+                </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                <td align="center" style="padding:14px 10px 0;">
+                    <p style="margin:0;color:#9ca3af;font-size:12px;">
+                    © {datetime.now().year} Learnova. All rights reserved.
+                    </p>
+                </td>
+                </tr>
+
             </table>
-
-            <p style="margin:16px 0 0;color:#9ca3af;font-size:12px;">
-                © {datetime.now().year} Learnova. All rights reserved.
-            </p>
-
             </td>
         </tr>
         </table>
