@@ -388,22 +388,109 @@ def forget_password_request(payload, db):
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     reset_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={resetPass_token}"
 
-    subject = "Lernova - Reset your password"
-    body = (
-        f"hello {full_name or ''}\n\n"
-        f"Click this link to reset your passwoed:\n{reset_link}\n\n"
-        f"This link expires in 15 minutes.\n"
-        f"If you didn't request this ignore this email."
-    )
+    subject = "Learnova – Reset your password"
 
-    send_email(to=email, subject=subject, body=body)
+    text_body = f"""
+    Hello {full_name or ''}
+
+    We received a request to reset your Learnova password.
+
+    Reset your password:
+    {reset_link}
+
+    This link expires in 15 minutes.
+
+    If you didn't request this, you can safely ignore this email.
+    """
+
+    html_body = f"""
+    <!DOCTYPE html>
+    <html>
+    <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,sans-serif;">
+        <table width="100%" cellpadding="0" cellspacing="0">
+        <tr>
+            <td align="center" style="padding:24px;">
+            <table width="520" style="background:#ffffff;border-radius:12px;padding:24px;border:1px solid #e5e7eb;">
+                <tr>
+                <td>
+                    <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+                    <div style="width:36px;height:36px;border-radius:10px;background:#EAF3FF;display:inline-flex;align-items:center;justify-content:center;">
+                        <span style="color:#137FEC;font-size:18px;font-weight:700;">L</span>
+                    </div>
+                    <div style="font-size:16px;font-weight:700;color:#111827;">Learnova</div>
+                    </div>
+
+                    <h2 style="margin:0 0 12px;color:#111827;">
+                    Reset your password 🔒
+                    </h2>
+
+                    <p style="margin:0 0 16px;color:#374151;line-height:1.6;">
+                    We received a request to reset your password. Click the button below to choose a new one.
+                    </p>
+
+                    <a href="{reset_link}"
+                    style="
+                        display:inline-block;
+                        background:#137FEC;
+                        color:#ffffff;
+                        text-decoration:none;
+                        padding:12px 20px;
+                        border-radius:8px;
+                        font-weight:600;
+                        margin-bottom:16px;
+                    ">
+                    Reset Password
+                    </a>
+
+                    <p style="margin:16px 0 0;color:#6b7280;font-size:13px;">
+                    This link expires in <strong>15 minutes</strong>.
+                    </p>
+
+                    <p style="margin:12px 0 0;color:#9ca3af;font-size:12px;line-height:1.5;">
+                    If you didn’t request a password reset, you can safely ignore this email.
+                    </p>
+
+                    <div style="margin-top:16px;padding-top:16px;border-top:1px solid #e5e7eb;">
+                    <p style="margin:0;color:#9ca3af;font-size:12px;">
+                        If the button doesn’t work, copy and paste this link:
+                    </p>
+                    <p style="margin:8px 0 0;color:#6b7280;font-size:12px;word-break:break-all;">
+                        {reset_link}
+                    </p>
+                    </div>
+
+                </td>
+                </tr>
+            </table>
+
+            <p style="margin:16px 0 0;color:#9ca3af;font-size:12px;">
+                © {datetime.now().year} Learnova. All rights reserved.
+            </p>
+
+            </td>
+        </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+
+    try:
+        send_email(
+            to=email,
+            subject=subject,
+            body=text_body,
+            html=html_body,
+        )
+    except Exception:
+        pass
+
 
     return ok_response
 
     
 
 def reset_password(payload, db):
-    # 1) هات التوكن من DB لو صالح (مش مستخدم ولسه ما انتهيش)
     row = db.execute(
         text("""
             SELECT id, user_id, expires_at, used_at
