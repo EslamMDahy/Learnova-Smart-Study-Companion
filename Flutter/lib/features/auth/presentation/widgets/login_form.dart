@@ -94,7 +94,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
     if (!mounted) return;
 
-    if (ok) context.go(Routes.home);
+    if (ok) context.go(Routes.admin);
   }
 
   @override

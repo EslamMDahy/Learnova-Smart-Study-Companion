@@ -15,7 +15,8 @@ class AuthApi {
       data: request.toJson(),
     );
 
-    return LoginResponse.fromJson(res.data ?? const {});
+    final payload = (res.data ?? const {}).cast<String, dynamic>();
+    return LoginResponse.fromJson(payload);
   }
 
   Future<void> signup({
@@ -45,7 +46,6 @@ class AuthApi {
       Endpoints.verifyEmail,
       queryParameters: {"token": token.trim()},
     );
-
     return _readMessage(res.data);
   }
 
@@ -56,7 +56,6 @@ class AuthApi {
       Endpoints.forgotPassword,
       data: {"email": email.trim()},
     );
-
     return _readMessage(res.data);
   }
 
@@ -71,14 +70,20 @@ class AuthApi {
         "new_password": newPassword,
       },
     );
-
     return _readMessage(res.data);
+  }
+
+  // keep /me for later usage if you want, but DON'T use it in login flow
+  Future<Map<String, dynamic>> me() async {
+    final res = await _client.get<Map<String, dynamic>>(Endpoints.me);
+    final data = (res.data ?? const {}).cast<String, dynamic>();
+    return data;
   }
 
   // ---------------- Helpers ----------------
 
   String _readMessage(Map<String, dynamic>? data) {
-    final v = data?['message'];
+    final v = data?['message'] ?? data?['msg'];
     if (v == null) return '';
     return v.toString();
   }

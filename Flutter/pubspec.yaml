@@ -94,6 +94,12 @@ flutter:
         - asset: assets/fonts/Inter-Regular.ttf
         - asset: assets/fonts/Inter-Bold.ttf
           weight: 700
+
+    - family: Lexend
+      fonts:
+        - asset: assets/fonts/lexend/Lexend-Regular.ttf
+        - asset: assets/fonts/lexend/Lexend-Bold.ttf
+          weight: 700
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package

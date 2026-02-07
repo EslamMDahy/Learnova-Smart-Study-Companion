@@ -13,13 +13,11 @@ class App extends StatelessWidget {
       colorScheme: ColorScheme.fromSeed(seedColor: blue),
       scaffoldBackgroundColor: Colors.white,
 
-      // ✅ Global text style (اختياري بس بيظبط الدنيا)
       textTheme: const TextTheme(
         headlineSmall: TextStyle(fontWeight: FontWeight.w800),
         titleMedium: TextStyle(fontWeight: FontWeight.w700),
       ),
 
-      // ✅ Inputs style موحّد (كل TextFormField يبقى نفس الستايل)
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: const Color(0xFFF9FAFB),
@@ -43,7 +41,6 @@ class App extends StatelessWidget {
         ),
       ),
 
-      // ✅ Buttons style موحّد
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: blue,
