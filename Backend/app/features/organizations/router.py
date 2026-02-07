@@ -31,8 +31,7 @@ def list_join_requests(
         organization_id=organization_id,
         view=view,
         db=db,
-        current_user=current_user,
-    )
+        current_user=current_user,)
 
 @router.patch("/{organization_id}/members/{org_member_id}/status", response_model=UpdateMemberStatusResponse)
 def update_member_status(
@@ -40,13 +39,11 @@ def update_member_status(
     org_member_id: int,
     payload: UpdateMemberStatusRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
+    current_user=Depends(get_current_user),):
     return service.update_member_status(
         organization_id=organization_id,
         org_member_id=org_member_id,
         new_status=payload.new_status,
         db=db,
-        current_user=current_user,
-    )
+        current_user=current_user,)
 

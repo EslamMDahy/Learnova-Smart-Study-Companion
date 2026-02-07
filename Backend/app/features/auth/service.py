@@ -424,6 +424,22 @@ def login_user(payload: LoginRequest, db: Session):
             for r in org_rows
         ]
 
+    plan_name = None
+
+    if system_role != "owner":
+        plan_name = db.execute(
+            text("""
+                SELECT sp.name
+                FROM organization_members om
+                JOIN organizations o ON o.id = om.organization_id
+                JOIN subscription_plans sp ON sp.id = o.subscription_plan_id
+                WHERE om.user_id = :uid
+                LIMIT 1
+            """),
+            {"uid": user_id},
+        ).scalar()
+
+        user["subscription_plan_name"] = plan_name
 
     # 5) Cereating JWT
     access_token = create_access_token(
