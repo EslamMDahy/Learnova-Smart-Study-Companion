@@ -158,3 +158,13 @@ fastapi dev app\main.py
 flutter run -d chrome --web-port=5173
 ```
 > you can change `chrome` by the browser you use
+---
+
+## 👥 Team Members
+
+- **Project Manager:** **[Eslam Dahy](https://github.com/EslamMDahy)**
+- **Backend Lead:** **[Ahmed Waheed](https://github.com/Waheed7000)**
+- **QA & Testing:** **[Farouk Mohsen](https://github.com/faroukmohsen)**
+- **Flutter Lead:** **[Khaled Ibrahim](https://github.com/ikhalled)**
+
+---
