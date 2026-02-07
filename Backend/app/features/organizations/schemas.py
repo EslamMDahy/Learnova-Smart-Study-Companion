@@ -1,5 +1,5 @@
 from pydantic import BaseModel, Field, EmailStr
-from typing import Optional, List
+from typing import Optional, List, Literal
 
 
 class CreateOrganizationRequest(BaseModel):
@@ -24,6 +24,7 @@ class CreateOrganizationResponse(BaseModel):
 
 class JoinRequestUser(BaseModel):
     id: int
+    org_member_id: int
     full_name: str
     email: EmailStr
     avatar_url: Optional[str] = None
@@ -33,3 +34,17 @@ class JoinRequestUser(BaseModel):
 class JoinRequestsResponse(BaseModel):
     count: int
     users: List[JoinRequestUser]
+
+
+
+MembershipStatus = Literal["pending", "accepted", "suspended", "declinate"]
+
+class UpdateMemberStatusRequest(BaseModel):
+    new_status: MembershipStatus
+
+class UpdateMemberStatusResponse(BaseModel):
+    org_member_id: int
+    user_id: int
+    organization_id: int
+    old_status: MembershipStatus
+    new_status: MembershipStatus
