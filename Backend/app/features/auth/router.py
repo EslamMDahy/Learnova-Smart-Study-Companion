@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from app.db.session import get_db
+from app.core.deps import get_current_user
 
 from .schemas import RegisterRequest
 from .schemas import LoginRequest
@@ -11,7 +12,6 @@ from .schemas import ForgetPasswordResponse
 from .schemas import ResetPasswordRequest
 from .schemas import ResetPasswordResponse
 from . import service
-from app.core.deps import get_current_user
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 

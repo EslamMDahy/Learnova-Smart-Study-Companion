@@ -15,7 +15,7 @@ from app.core.security import hash_password
 from app.core.security import verify_password
 from app.core.emailer import send_email
 from app.core.jwt import create_access_token
-from app.core.token_store import mark_token_used
+# from app.core.token_store import mark_token_used
 
 def register_user(payload, db: Session):
     # 1) Check email unique
@@ -51,7 +51,9 @@ def register_user(payload, db: Session):
                 detail="Invalid organization code",
             )
 
-        # ✅ validate system role
+        org_code = org[0]
+
+        # validate system role
         if system_role not in ALLOWED_USER_ROLES:
             raise HTTPException(
                 status_code=400,
@@ -94,7 +96,24 @@ def register_user(payload, db: Session):
         raise HTTPException(status_code=500, detail="Failed to create user")
 
     user_id = row[0]
-    db.commit()
+
+    # 4.5) Insert organization_member for normal users (pending by default)
+    if account_type == "user":
+        db.execute(
+            text(
+                """
+                INSERT INTO organization_members (organization_id, user_id, role, status)
+                VALUES (:org_id, :user_id, :role, :status)
+                """
+            ),
+            {
+                "org_id": org_code, # type: ignore
+                "user_id": user_id,
+                "role": system_role,  # نفس users.system_role (انت أكدت)
+                "status": "pending",
+            },
+        )
+
 
     # 5) Create verification token
     verify_token = secrets.token_urlsafe(32)
@@ -116,9 +135,14 @@ def register_user(payload, db: Session):
     )
     db.commit()
 
+    
+
     # 6) Build verification link (fallback بدل RuntimeError)
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     verify_link = f"{frontend_url.rstrip('/')}/#/verify-email?token={verify_token}"
+    logo_url = ""
+    brand_year = 2026
+    support_email = "support@learnova.com"
 
     text_body = f"""
     Welcome to Learnova!
@@ -128,48 +152,133 @@ def register_user(payload, db: Session):
 
     This link expires in 24 hours.
     """
-
     html_body = f"""
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,sans-serif;">
-        <table width="100%" cellpadding="0" cellspacing="0">
+        <!-- Preheader (hidden) -->
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+        Verify your email to activate your Learnova account.
+        </div>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;">
         <tr>
-            <td align="center" style="padding:24px;">
-            <table width="520" style="background:#ffffff;border-radius:12px;padding:24px;border:1px solid #e5e7eb;">
+            <td align="center" style="padding:28px 16px;">
+
+            <!-- Outer container -->
+            <table width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:560px;">
+
+                <!-- Brand header -->
                 <tr>
-                <td>
-                    <h2 style="margin:0 0 12px;color:#111827;">
-                    Welcome to Learnova 👋
-                    </h2>
-                    <p style="margin:0 0 16px;color:#374151;line-height:1.6;">
-                    Please confirm your email address to activate your account.
+                <td align="left" style="padding:0 8px 14px;">
+                    <table cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="vertical-align:middle;">
+                        <img src="{logo_url}" width="40" height="40" alt="Learnova"
+                            style="display:block;border:0;outline:none;border-radius:10px;" />
+                        </td>
+                        <td style="vertical-align:middle;padding-left:10px;">
+                        <div style="font-size:16px;font-weight:800;color:#111827;line-height:1;">
+                            Learnova
+                        </div>
+                        <div style="font-size:12px;color:#6b7280;margin-top:2px;">
+                            Email Verification
+                        </div>
+                        </td>
+                    </tr>
+                    </table>
+                </td>
+                </tr>
+
+                <!-- Card -->
+                <tr>
+                <td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
+                    <!-- Top accent -->
+                    <div style="height:6px;background:#137FEC;"></div>
+
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="padding:26px 26px 10px;">
+                        <h2 style="margin:0;color:#111827;font-size:22px;line-height:1.25;">
+                            Welcome to Learnova 👋
+                        </h2>
+                        <p style="margin:10px 0 0;color:#374151;line-height:1.7;font-size:14px;">
+                            Please confirm your email address to activate your account.
+                        </p>
+
+                        <!-- Button -->
+                        <table cellpadding="0" cellspacing="0" style="margin-top:18px;">
+                            <tr>
+                            <td align="center" bgcolor="#137FEC" style="border-radius:10px;">
+                                <a href="{verify_link}"
+                                style="display:inline-block;padding:12px 18px;font-size:14px;font-weight:700;
+                                        color:#ffffff;text-decoration:none;border-radius:10px;">
+                                Verify Email
+                                </a>
+                            </td>
+                            </tr>
+                        </table>
+
+                        <!-- Info chips -->
+                        <table cellpadding="0" cellspacing="0" style="margin-top:16px;">
+                            <tr>
+                            <td style="background:#F3F4F6;border:1px solid #E5E7EB;border-radius:999px;padding:6px 10px;">
+                                <span style="font-size:12px;color:#374151;">
+                                ⏳ Expires in 24 hours
+                                </span>
+                            </td>
+                            <td style="width:10px;"></td>
+                            <td style="background:#EAF3FF;border:1px solid #BBD9FF;border-radius:999px;padding:6px 10px;">
+                                <span style="font-size:12px;color:#1F4B99;">
+                                🔒 Secure link
+                                </span>
+                            </td>
+                            </tr>
+                        </table>
+
+                        </td>
+                    </tr>
+
+                    <!-- Divider -->
+                    <tr>
+                        <td style="padding:0 26px;">
+                        <div style="height:1px;background:#E5E7EB;"></div>
+                        </td>
+                    </tr>
+
+                    <!-- Fallback link -->
+                    <tr>
+                        <td style="padding:14px 26px 24px;">
+                        <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.6;">
+                            If the button doesn’t work, copy and paste this link into your browser:
+                        </p>
+                        <p style="margin:10px 0 0;font-size:12px;line-height:1.6;">
+                            <a href="{verify_link}" style="color:#137FEC;text-decoration:none;word-break:break-all;">
+                            {verify_link}
+                            </a>
+                        </p>
+
+                        <p style="margin:16px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                            If you didn’t create an account, you can safely ignore this email.
+                        </p>
+                        </td>
+                    </tr>
+                    </table>
+                </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                <td align="center" style="padding:14px 10px 0;">
+                    <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                    © {brand_year} Learnova. All rights reserved.
                     </p>
-
-                    <a href="{verify_link}"
-                    style="
-                        display:inline-block;
-                        background:#137FEC;
-                        color:#ffffff;
-                        text-decoration:none;
-                        padding:12px 20px;
-                        border-radius:8px;
-                        font-weight:600;
-                        margin-bottom:16px;
-                    ">
-                    Verify Email
-                    </a>
-
-                    <p style="margin:16px 0 0;color:#6b7280;font-size:13px;">
-                    This link expires in 24 hours.
-                    </p>
-
-                    <p style="margin:12px 0 0;color:#9ca3af;font-size:12px;">
-                    If the button doesn’t work, copy and paste this link:<br>
-                    <span style="word-break:break-all;">{verify_link}</span>
+                    <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                    Need help? Contact us at <a href="mailto:{support_email}" style="color:#137FEC;text-decoration:none;">{support_email}</a>
                     </p>
                 </td>
                 </tr>
+
             </table>
             </td>
         </tr>
@@ -315,11 +424,27 @@ def login_user(payload: LoginRequest, db: Session):
             for r in org_rows
         ]
 
+    plan_name = None
+
+    if system_role != "owner":
+        plan_name = db.execute(
+            text("""
+                SELECT sp.name
+                FROM organization_members om
+                JOIN organizations o ON o.id = om.organization_id
+                JOIN subscription_plans sp ON sp.id = o.subscription_plan_id
+                WHERE om.user_id = :uid
+                LIMIT 1
+            """),
+            {"uid": user_id},
+        ).scalar()
+
+        user["subscription_plan_name"] = plan_name
 
     # 5) Cereating JWT
     access_token = create_access_token(
         subject=str(user_id),
-        extra={"email": email, "full_name": full_name, "tv": token_version},
+        extra={"email": email, "full_name": full_name, "tv": token_version, "system_role": system_role},
     )
 
     # 6) Sending the login response
@@ -388,22 +513,174 @@ def forget_password_request(payload, db):
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     reset_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={resetPass_token}"
 
-    subject = "Lernova - Reset your password"
-    body = (
-        f"hello {full_name or ''}\n\n"
-        f"Click this link to reset your passwoed:\n{reset_link}\n\n"
-        f"This link expires in 15 minutes.\n"
-        f"If you didn't request this ignore this email."
-    )
+    logo_url = ""
 
-    send_email(to=email, subject=subject, body=body)
+    brand_year = 2026
+    support_email = "support@learnova.com"
+
+    subject = "Learnova – Reset your password"
+
+    text_body = f"""
+    Hello {full_name or ''}
+
+    We received a request to reset your Learnova password.
+
+    Reset your password:
+    {reset_link}
+
+    This link expires in 15 minutes.
+
+    If you didn't request this, you can safely ignore this email.
+    """
+    html_body = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,sans-serif;">
+        <!-- Preheader -->
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+        Reset your Learnova password
+        </div>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;">
+        <tr>
+            <td align="center" style="padding:28px 16px;">
+
+            <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;">
+
+                <!-- Brand -->
+                <tr>
+                <td style="padding:0 8px 14px;">
+                    <table cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td>
+                        <img src="{logo_url}" width="40" height="40" alt="Learnova"
+                            style="display:block;border-radius:10px;" />
+                        </td>
+                        <td style="padding-left:10px;">
+                        <div style="font-size:16px;font-weight:800;color:#111827;">
+                            Learnova
+                        </div>
+                        <div style="font-size:12px;color:#6b7280;">
+                            Password Reset
+                        </div>
+                        </td>
+                    </tr>
+                    </table>
+                </td>
+                </tr>
+
+                <!-- Card -->
+                <tr>
+                <td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;">
+                    <div style="height:6px;background:#137FEC;border-radius:16px 16px 0 0;"></div>
+
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="padding:26px;">
+                        <h2 style="margin:0 0 12px;color:#111827;font-size:22px;">
+                            Reset your password 🔒
+                        </h2>
+
+                        <p style="margin:0 0 18px;color:#374151;line-height:1.7;font-size:14px;">
+                            We received a request to reset your password. Click the button
+                            below to choose a new one.
+                        </p>
+
+                        <!-- Button -->
+                        <table cellpadding="0" cellspacing="0">
+                            <tr>
+                            <td bgcolor="#137FEC" style="border-radius:10px;">
+                                <a href="{reset_link}"
+                                style="display:inline-block;padding:12px 18px;
+                                        font-size:14px;font-weight:700;
+                                        color:#ffffff;text-decoration:none;
+                                        border-radius:10px;">
+                                Reset Password
+                                </a>
+                            </td>
+                            </tr>
+                        </table>
+
+                        <!-- Info -->
+                        <table cellpadding="0" cellspacing="0" style="margin-top:16px;">
+                            <tr>
+                            <td style="background:#FFF7ED;border:1px solid #FED7AA;
+                                        border-radius:999px;padding:6px 10px;">
+                                <span style="font-size:12px;color:#9A3412;">
+                                ⏳ Expires in 15 minutes
+                                </span>
+                            </td>
+                            </tr>
+                        </table>
+
+                        <p style="margin:16px 0 0;color:#6b7280;font-size:12px;line-height:1.6;">
+                            If you didn’t request a password reset, you can safely ignore
+                            this email.
+                        </p>
+
+                        </td>
+                    </tr>
+
+                    <!-- Divider -->
+                    <tr>
+                        <td style="padding:0 26px;">
+                        <div style="height:1px;background:#e5e7eb;"></div>
+                        </td>
+                    </tr>
+
+                    <!-- Fallback -->
+                    <tr>
+                        <td style="padding:14px 26px 24px;">
+                        <p style="margin:0;color:#9ca3af;font-size:12px;">
+                            If the button doesn’t work, copy and paste this link:
+                        </p>
+                        <p style="margin:8px 0 0;font-size:12px;word-break:break-all;">
+                            <a href="{reset_link}"
+                            style="color:#137FEC;text-decoration:none;">
+                            {reset_link}
+                            </a>
+                        </p>
+                        </td>
+                    </tr>
+
+                    </table>
+                </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                <td align="center" style="padding:14px 10px 0;">
+                    <p style="margin:0;color:#9ca3af;font-size:12px;">
+                    © {datetime.now().year} Learnova. All rights reserved.
+                    </p>
+                </td>
+                </tr>
+
+            </table>
+            </td>
+        </tr>
+        </table>
+    </body>
+    </html>
+    """
+
+
+    try:
+        send_email(
+            to=email,
+            subject=subject,
+            body=text_body,
+            html=html_body,
+        )
+    except Exception:
+        pass
+
 
     return ok_response
 
     
 
 def reset_password(payload, db):
-    # 1) هات التوكن من DB لو صالح (مش مستخدم ولسه ما انتهيش)
     row = db.execute(
         text("""
             SELECT id, user_id, expires_at, used_at
