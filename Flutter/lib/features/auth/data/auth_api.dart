@@ -19,13 +19,13 @@ class AuthApi {
     return LoginResponse.fromJson(payload);
   }
 
+  /// ✅ Now matches backend RegisterRequest:
+  /// full_name, email, password, system_role
   Future<void> signup({
     required String fullName,
     required String email,
     required String password,
-    required String accountType,
     required String systemRole,
-    String? inviteCode,
   }) async {
     await _client.post(
       Endpoints.signup,
@@ -33,10 +33,7 @@ class AuthApi {
         "full_name": fullName.trim(),
         "email": email.trim(),
         "password": password,
-        "account_type": accountType.trim(),
         "system_role": systemRole.trim(),
-        if (inviteCode != null && inviteCode.trim().isNotEmpty)
-          "invite_code": inviteCode.trim(),
       },
     );
   }

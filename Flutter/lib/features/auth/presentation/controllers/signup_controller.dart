@@ -28,22 +28,19 @@ class SignupController extends StateNotifier<SignupState> {
     return s.isNotEmpty && s.contains('@') && s.contains('.');
   }
 
+  /// ✅ Now matches backend:
+  /// full_name, email, password, system_role
   Future<bool> signup({
     required String fullName,
     required String email,
     required String password,
-    required String accountType,
     required String systemRole,
-    String? inviteCode,
   }) async {
     state = state.copyWith(loading: true, error: null);
 
     final cleanFullName = fullName.trim();
     final cleanEmail = email.trim();
-    final cleanAccountType = accountType.trim().toLowerCase();
-    final cleanSystemRole = systemRole.trim();
-    final cleanInvite =
-        (inviteCode == null || inviteCode.trim().isEmpty) ? null : inviteCode.trim();
+    final cleanSystemRole = systemRole.trim().toLowerCase();
 
     // ✅ Local validation (خفيف واحترافي)
     if (cleanFullName.isEmpty) {
@@ -64,10 +61,12 @@ class SignupController extends StateNotifier<SignupState> {
       return false;
     }
 
-    if (cleanAccountType == 'user' && cleanInvite == null) {
+    // (اختياري) نعمل guard بسيط يوازي الباك
+    const allowed = {'student', 'instructor', 'assistant', 'owner'};
+    if (!allowed.contains(cleanSystemRole)) {
       state = state.copyWith(
         loading: false,
-        error: 'Invite code is required for user accounts.',
+        error: 'Invalid System Role.',
       );
       return false;
     }
@@ -77,9 +76,7 @@ class SignupController extends StateNotifier<SignupState> {
         fullName: cleanFullName,
         email: cleanEmail,
         password: password,
-        accountType: cleanAccountType,
         systemRole: cleanSystemRole,
-        inviteCode: cleanInvite,
       );
 
       state = state.copyWith(loading: false, error: null);

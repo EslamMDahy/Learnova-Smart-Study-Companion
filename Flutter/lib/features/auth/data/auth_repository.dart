@@ -65,21 +65,18 @@ class AuthRepository {
     return n ?? id;
   }
 
+  /// ✅ matches backend register (no account_type, no invite_code)
   Future<void> signup({
     required String fullName,
     required String email,
     required String password,
-    required String accountType,
     required String systemRole,
-    String? inviteCode,
   }) async {
     await _api.signup(
       fullName: fullName.trim(),
       email: email.trim(),
       password: password,
-      accountType: accountType,
       systemRole: systemRole,
-      inviteCode: inviteCode,
     );
   }
 

@@ -34,7 +34,6 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
   final firstNameController = TextEditingController();
   final lastNameController = TextEditingController();
   final emailController = TextEditingController();
-  final orgCodeController = TextEditingController();
   final passwordController = TextEditingController();
 
   @override
@@ -42,7 +41,6 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
     firstNameController.dispose();
     lastNameController.dispose();
     emailController.dispose();
-    orgCodeController.dispose();
     passwordController.dispose();
     super.dispose();
   }
@@ -57,10 +55,10 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
     setState(() {
       accountType = type;
       _localError = null;
-      // لو رايح Owner: امسح org code وارجع role default
+
+      // لو رايح Owner: role default مش مهم للـ owner لكن نخليه منظم
       if (type == AccountType.owner) {
-        orgCodeController.clear();
-        userKind = UserKind.student; // مش مهم للـ owner
+        userKind = UserKind.student; // irrelevant for owner
       }
     });
 
@@ -102,17 +100,15 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
         '${firstNameController.text.trim()} ${lastNameController.text.trim()}'
             .trim();
 
-    final role = accountType == AccountType.user ? userKind.name : 'owner';
+    // ✅ system_role matches backend allowed set
+    final systemRole =
+        accountType == AccountType.owner ? 'owner' : userKind.name;
 
     final ok = await ref.read(signupControllerProvider.notifier).signup(
           fullName: fullName,
           email: emailController.text.trim(),
           password: passwordController.text,
-          accountType: accountType.name,
-          systemRole: role,
-          inviteCode: accountType == AccountType.user
-              ? orgCodeController.text.trim()
-              : null,
+          systemRole: systemRole,
         );
 
     if (!mounted) return;
@@ -163,12 +159,17 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                     _ErrorBox(message: shownError),
                     const SizedBox(height: 14),
                   ],
+
                   _segmented(
                     leftText: 'User',
                     rightText: 'Owner',
                     leftSelected: accountType == AccountType.user,
-                    onLeft: state.loading ? null : () => _onSwitchAccountType(AccountType.user),
-                    onRight: state.loading ? null : () => _onSwitchAccountType(AccountType.owner),
+                    onLeft: state.loading
+                        ? null
+                        : () => _onSwitchAccountType(AccountType.user),
+                    onRight: state.loading
+                        ? null
+                        : () => _onSwitchAccountType(AccountType.owner),
                   ),
 
                   const SizedBox(height: 12),
@@ -186,7 +187,9 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                           child: TextFormField(
                             onChanged: (_) {
                               _clearLocalError();
-                              ref.read(signupControllerProvider.notifier).clearError();
+                              ref
+                                  .read(signupControllerProvider.notifier)
+                                  .clearError();
                             },
                             controller: firstNameController,
                             style: const TextStyle(
@@ -194,7 +197,8 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               fontSize: 15,
                               height: 1.4,
                             ),
-                            validator: (v) => (v ?? '').trim().isEmpty ? 'Required' : null,
+                            validator: (v) =>
+                                (v ?? '').trim().isEmpty ? 'Required' : null,
                             decoration: InputDecoration(
                               hintText: 'Enter first name',
                               hintStyle: const TextStyle(
@@ -253,7 +257,9 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                           child: TextFormField(
                             onChanged: (_) {
                               _clearLocalError();
-                              ref.read(signupControllerProvider.notifier).clearError();
+                              ref
+                                  .read(signupControllerProvider.notifier)
+                                  .clearError();
                             },
                             controller: lastNameController,
                             style: const TextStyle(
@@ -261,7 +267,8 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               fontSize: 15,
                               height: 1.4,
                             ),
-                            validator: (v) => (v ?? '').trim().isEmpty ? 'Required' : null,
+                            validator: (v) =>
+                                (v ?? '').trim().isEmpty ? 'Required' : null,
                             decoration: InputDecoration(
                               hintText: 'Enter last name',
                               hintStyle: const TextStyle(
@@ -391,74 +398,6 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
 
                   const SizedBox(height: 14),
 
-                  if (accountType == AccountType.user) ...[
-                    _labeledField(
-                      label: 'Organization Code',
-                      child: TextFormField(
-                        onChanged: (_) {
-                          _clearLocalError();
-                          ref.read(signupControllerProvider.notifier).clearError();
-                        },
-                        controller: orgCodeController,
-                        style: const TextStyle(
-                          color: Colors.black,
-                          fontSize: 15,
-                          height: 1.4,
-                        ),
-                        validator: (v) => (v ?? '').trim().isEmpty ? 'Required' : null,
-                        decoration: InputDecoration(
-                          hintText: 'Enter organization code',
-                          hintStyle: const TextStyle(
-                            color: Colors.black38,
-                            fontSize: 14,
-                          ),
-                          prefixIcon: const Icon(
-                            Icons.vpn_key_outlined,
-                            color: Colors.black45,
-                            size: 20,
-                          ),
-                          filled: true,
-                          fillColor: const Color(0xFFF9FAFB),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE5E7EB),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFF137FEC),
-                              width: 1.5,
-                            ),
-                          ),
-                          errorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE53935),
-                            ),
-                          ),
-                          focusedErrorBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: const BorderSide(
-                              color: Color(0xFFE53935),
-                              width: 1.5,
-                            ),
-                          ),
-                          errorStyle: const TextStyle(
-                            fontSize: 12,
-                            height: 1.2,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-
                   _labeledField(
                     label: 'Password',
                     child: Column(
@@ -498,8 +437,8 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                                 color: Colors.black45,
                                 size: 20,
                               ),
-                              onPressed: () =>
-                                  setState(() => _obscurePassword = !_obscurePassword),
+                              onPressed: () => setState(
+                                  () => _obscurePassword = !_obscurePassword),
                             ),
                             filled: true,
                             fillColor: const Color(0xFFF9FAFB),
@@ -565,8 +504,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                           children: [
                             const Text(
                               'I agree to the ',
-                              style:
-                                  TextStyle(color: Colors.black, fontSize: 14),
+                              style: TextStyle(color: Colors.black, fontSize: 14),
                             ),
                             InkWell(
                               onTap: state.loading ? null : () {},
@@ -581,8 +519,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                             ),
                             const Text(
                               ' and ',
-                              style:
-                                  TextStyle(color: Colors.black, fontSize: 14),
+                              style: TextStyle(color: Colors.black, fontSize: 14),
                             ),
                             InkWell(
                               onTap: state.loading ? null : () {},
@@ -625,8 +562,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                             )
                           : const Text(
                               'Create Account',
-                              style:
-                                  TextStyle(color: Colors.white, fontSize: 16),
+                              style: TextStyle(color: Colors.white, fontSize: 16),
                             ),
                     ),
                   ),
@@ -639,9 +575,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                       const Text("Already have an account? ",
                           style: TextStyle(color: Colors.black)),
                       InkWell(
-                        onTap: state.loading
-                            ? null
-                            : () => context.go(Routes.login),
+                        onTap: state.loading ? null : () => context.go(Routes.login),
                         child: Text(
                           "Log in",
                           style: TextStyle(
@@ -819,7 +753,6 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
       ],
     );
   }
-
 }
 
 class _ErrorBox extends StatelessWidget {

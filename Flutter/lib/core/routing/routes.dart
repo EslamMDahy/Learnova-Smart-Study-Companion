@@ -9,4 +9,5 @@ class Routes {
   static const verifyEmail = '/verify-email';
 
   static const admin = '/admin';
+  static const instructor = '/instructor';
 }

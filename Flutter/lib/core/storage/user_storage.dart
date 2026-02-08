@@ -41,6 +41,7 @@ class UserStorage {
       (userMap?['system_role'] ?? '').toString().toLowerCase();
 
   static bool get isOwner => role == 'owner';
+  static bool get isInstructor => role == 'instructor';
 
   /// Backend-aligned organizations list (from login for owner)
   static List<Map<String, dynamic>> get organizations {

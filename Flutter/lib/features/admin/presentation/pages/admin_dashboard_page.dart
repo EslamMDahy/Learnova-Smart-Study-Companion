@@ -4,15 +4,24 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../../core/storage/user_storage.dart';
 import '../../../../core/ui/toast.dart';
+import '../../../../core/ui/layout/base_dashboard_shell.dart';
+
+import '../../../../shared/pages/settings_page.dart';
+import '../../../../shared/pages/notifications_page.dart';
+
 import '../controllers/admin_dashboard_controller.dart';
 import '../controllers/admin_dashboard_state.dart';
+
 import '../widgets/create_org_dialog.dart';
-import '../../../../shared/widgets/sidebar.dart';
+import '../widgets/sidebar.dart';
 import '../../../../shared/widgets/top_header.dart';
 import '../widgets/empty_org_state.dart';
 import '../widgets/user_management_content.dart';
 import '../widgets/join_requests_content.dart';
 import '../widgets/upgrade_plans_content.dart';
+
+import 'package:go_router/go_router.dart';
+import '../../../../core/routing/routes.dart';
 
 class AdminDashboardPage extends ConsumerStatefulWidget {
   const AdminDashboardPage({super.key});
@@ -25,143 +34,161 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
   int selectedIndex = 0;
   String? _lastToastMsg;
 
-  static const double _asideWidth = 288; // ✅ Figma: 288
-  static const double _contentMaxWidth = 1400; // ✅ Figma: 1400
-  static const Color _mainBg = Color(0xFFF6F7F8); // ✅ Figma: #F6F7F8
-  static const Color _divider = Color(0xFFEDF2F7);
+  // Admin tabs indexes
+  static const int _idxUsers = 0;
+  static const int _idxUpgrade = 2;
+  static const int _idxSettingsTab = 3;
+  static const int _idxHelp = 4;
+
+  // Global views indexes inside ONE IndexedStack
+  static const int _viewAdminTabs = 0;
+  static const int _viewNotifications = 1;
+  static const int _viewSettings = 2;
+
+  int _viewIndex = _viewAdminTabs;
+
+  ProviderSubscription<AdminDashboardState>? _errSub;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _errSub = ref.listenManual<AdminDashboardState>(
+      adminDashboardControllerProvider,
+      (prev, next) {
+        final err = next.error;
+        if (err != null && err != _lastToastMsg) {
+          _lastToastMsg = err;
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+
+            AppToast.show(
+              context,
+              title: "Something went wrong",
+              message: err,
+              icon: Icons.warning_amber_rounded,
+            );
+
+            ref.read(adminDashboardControllerProvider.notifier).clearError();
+          });
+        }
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _errSub?.close();
+    super.dispose();
+  }
+
+  void _goToAdminTab(int index) {
+    // ✅ يقلل التأخير (خصوصًا لو فيه TextField واخد focus)
+    FocusScope.of(context).unfocus();
+
+    final state = ref.read(adminDashboardControllerProvider);
+    final orgId = _resolveOrgId(state);
+    final hasOrg = orgId.isNotEmpty;
+
+    if (!_canAccessTab(index, hasOrg)) {
+      AppToast.show(
+        context,
+        title: "Action needed",
+        message: "Create an organization first to unlock this section.",
+        icon: Icons.lock_outline_rounded,
+      );
+      return;
+    }
+
+    setState(() {
+      // ✅ لو كنت في notifications/settings ودوست نفس التاب، رجّعه للمحتوى
+      if (index == selectedIndex) {
+        _viewIndex = _viewAdminTabs;
+        return;
+      }
+
+      selectedIndex = index;
+      _viewIndex = _viewAdminTabs;
+    });
+  }
+
+  void _openNotifications() {
+    FocusScope.of(context).unfocus();
+    setState(() => _viewIndex = _viewNotifications);
+  }
+
+  void _openSettings() {
+    FocusScope.of(context).unfocus();
+    setState(() {
+      // اختياري: تخلي السايدبار يلمّح إنك على Settings tab
+      selectedIndex = _idxSettingsTab;
+      _viewIndex = _viewSettings;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(adminDashboardControllerProvider);
     final ctrl = ref.read(adminDashboardControllerProvider.notifier);
 
-    _handleErrorOnce(context, state, ctrl);
-
     final orgId = _resolveOrgId(state);
     final hasOrg = orgId.isNotEmpty;
 
     final displayName = _readDisplayName() ?? "Admin";
 
-    return Scaffold(
-      backgroundColor: _mainBg,
-      body: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    return BaseDashboardShell(
+      asideWidth: 288,
+      contentMaxWidth: 1400,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 116, vertical: 32),
+      backgroundColor: const Color(0xFFF6F7F8),
+      dividerColor: const Color(0xFFEDF2F7),
+
+      sidebar: SidebarWidget(
+        selectedIndex: selectedIndex,
+        onItemSelected: (index) => _goToAdminTab(index),
+      ),
+
+      header: TopHeaderWidget(
+        userName: displayName,
+        userSubtitle:
+            hasOrg ? "Organization Admin Portal" : "Setup your organization",
+        notificationsCount: 0,
+
+        onNotificationsTap: _openNotifications,
+        onSettings: _openSettings,
+        onLogout: () async => await _logout(context),
+      ),
+
+      // ✅ كل التنقل بقى مجرد تغيير index في IndexedStack واحد
+      child: IndexedStack(
+        index: _viewIndex,
         children: [
-          // ✅ Aside (Scrollable)
-          SizedBox(
-            width: _asideWidth,
-            child: SidebarWidget(
-              selectedIndex: selectedIndex,
-              onItemSelected: (index) {
-                if (!_canAccessTab(index, hasOrg)) {
-                  AppToast.show(
-                    context,
-                    title: "Action needed",
-                    message: "Create an organization first to unlock this section.",
-                    icon: Icons.lock_outline_rounded,
-                  );
-                  return;
-                }
-                setState(() => selectedIndex = index);
-              },
-            ),
-          ),
-
-          // ✅ Main
-          Expanded(
-            child: Container(
-              color: _mainBg,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Header ثابت
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      border: Border(bottom: BorderSide(color: _divider)),
-                    ),
-                    child: TopHeaderWidget(
-                      userName: displayName,
-                      userSubtitle: hasOrg ? "Organization Admin Portal" : "Setup your organization",
-                      notificationsCount: 0,
-                      onLogout: () async => await _logout(context),
-                    ),
-                  ),
-
-                  // ✅ Scroll area الرئيسي
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.symmetric(horizontal: 116, vertical: 32),
-                      child: Align(
-                        alignment: Alignment.topCenter,
-                        child: ConstrainedBox(
-                          constraints: const BoxConstraints(maxWidth: _contentMaxWidth),
-                          child: AnimatedSwitcher(
-                            duration: const Duration(milliseconds: 240),
-                            layoutBuilder: (currentChild, previousChildren) {
-                              return Stack(
-                                alignment: Alignment.topLeft,
-                                children: <Widget>[
-                                  ...previousChildren,
-                                  if (currentChild != null) currentChild,
-                                ],
-                              );
-                            },
-                            child: KeyedSubtree(
-                              key: ValueKey("${hasOrg}_${orgId}_$selectedIndex"),
-                              child: _buildMainBody(state, ctrl, orgId),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          _buildAdminTabsBody(state, ctrl, orgId),
+          const NotificationsPage(),
+          const SettingsPage(),
         ],
       ),
     );
   }
 
-  Future<void> _logout(BuildContext context) async {
-    try {
-      TokenStorage.clear();
-      UserStorage.clear();
-
-      if (!mounted) return;
-
-      // ✅ لو عندك GoRouter الأفضل: context.go('/login');
-      Navigator.of(context).pushNamedAndRemoveUntil(
-        '/login',
-        (route) => false,
-      );
-    } catch (e) {
-      if (!mounted) return;
-      AppToast.show(
-        context,
-        title: "Logout failed",
-        message: e.toString(),
-        icon: Icons.error_outline,
-      );
-    }
-  }
-
-  /* -------------------- Body -------------------- */
-
-  Widget _buildMainBody(
+  Widget _buildAdminTabsBody(
     AdminDashboardState state,
     AdminDashboardController ctrl,
     String orgId,
   ) {
     final hasOrg = orgId.isNotEmpty;
 
-    if (!hasOrg) {
+    final isAllowedWithoutOrg =
+        selectedIndex == _idxSettingsTab || selectedIndex == _idxHelp;
+
+    if (!hasOrg && !isAllowedWithoutOrg) {
       return Padding(
         padding: const EdgeInsets.only(top: 8),
         child: EmptyOrgState(
           onCreateOrganizationPressed: () async {
+            FocusScope.of(context).unfocus();
+
             final data = await showDialog<Map<String, dynamic>>(
               context: context,
               builder: (_) => const CreateOrgDialog(),
@@ -191,7 +218,11 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
 
             if (!mounted) return;
 
-            setState(() => selectedIndex = 0);
+            setState(() {
+              selectedIndex = _idxUsers;
+              _viewIndex = _viewAdminTabs;
+            });
+
             AppToast.show(
               context,
               title: "Done",
@@ -203,38 +234,51 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
       );
     }
 
-    switch (selectedIndex) {
-      case 0:
-        return UserManagementContent(organizationId: orgId);
+    return IndexedStack(
+      index: selectedIndex,
+      children: [
+        UserManagementContent(organizationId: orgId),
 
-      case 1:
-        return JoinRequestsContent(organizationId: orgId);
+        hasOrg
+            ? JoinRequestsContent(organizationId: orgId)
+            : _buildPlaceholder(
+                icon: Icons.lock_outline_rounded,
+                title: "Organization required",
+                subtitle: "Create an organization first to access Join Requests.",
+                hint: "Go back and create your organization.",
+              ),
 
-      case 2:
-        return const UpgradePlansContent();
+        const UpgradePlansContent(),
+        const SettingsPage(),
 
-      case 3:
-        return _buildPlaceholder(
-          icon: Icons.settings_suggest_outlined,
-          title: "Settings & Configuration",
-          subtitle: "Manage your institutional preferences here.",
-          hint: "Coming soon: permissions, security, integrations.",
-        );
-
-      case 4:
-        return _buildPlaceholder(
+        _buildPlaceholder(
           icon: Icons.help_outline_rounded,
           title: "Help & Support Center",
           subtitle: "Check documentation or contact our support team.",
           hint: "Coming soon: docs, ticketing, and live chat.",
-        );
-
-      default:
-        return UserManagementContent(organizationId: orgId);
-    }
+        ),
+      ],
+    );
   }
 
-  /* -------------------- Org resolution -------------------- */
+  Future<void> _logout(BuildContext context) async {
+    try {
+      TokenStorage.clear();
+      UserStorage.clear();
+
+      if (!mounted) return;
+
+      context.go(Routes.login);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.show(
+        context,
+        title: "Logout failed",
+        message: e.toString(),
+        icon: Icons.error_outline,
+      );
+    }
+  }
 
   String _resolveOrgId(AdminDashboardState state) {
     final s = (state.organizationId ?? '').trim();
@@ -269,30 +313,8 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
 
   bool _canAccessTab(int index, bool hasOrg) {
     if (hasOrg) return true;
-    return index == 2 || index == 3 || index == 4;
+    return index == _idxUpgrade || index == _idxSettingsTab || index == _idxHelp;
   }
-
-  void _handleErrorOnce(
-    BuildContext context,
-    AdminDashboardState state,
-    AdminDashboardController ctrl,
-  ) {
-    if (state.error != null && state.error != _lastToastMsg) {
-      _lastToastMsg = state.error;
-
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        AppToast.show(
-          context,
-          title: "Something went wrong",
-          message: state.error!,
-          icon: Icons.warning_amber_rounded,
-        );
-        ctrl.clearError();
-      });
-    }
-  }
-
-  /* -------------------- Placeholder -------------------- */
 
   Widget _buildPlaceholder({
     required IconData icon,

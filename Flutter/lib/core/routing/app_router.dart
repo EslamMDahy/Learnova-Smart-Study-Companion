@@ -11,6 +11,7 @@ import '../../features/auth/presentation/pages/signup_page.dart';
 import '../../features/auth/presentation/pages/verify_email_page.dart';
 
 import '../../features/admin/presentation/pages/admin_dashboard_page.dart';
+import '../../features/instructor/presentation/pages/instructor_dashboard_page.dart';
 import '../../shared/pages/home_page.dart';
 
 import 'routes.dart';
@@ -48,13 +49,25 @@ final appRouter = GoRouter(
     // and the user gets pushed to normal home.
     if (hasToken && isAuthRoute) {
       if (!UserStorage.hasMe) return null;
-      return UserStorage.isOwner ? Routes.admin : Routes.home;
+      if (UserStorage.isOwner) return Routes.admin;
+      if (UserStorage.isInstructor) return Routes.instructor;
+      return Routes.home;
     }
 
     // ✅ Admin guard (owner-only)
     if (path == Routes.admin) {
       if (!UserStorage.hasMe) return null;
       if (!UserStorage.isOwner) return Routes.home;
+    }
+
+    // ✅ Instructor guard (instructor-only)
+    if (path == Routes.instructor) {
+      if (!UserStorage.hasMe) return null;
+      if (!UserStorage.isInstructor) {
+        // Owners go to admin, others go home
+        if (UserStorage.isOwner) return Routes.admin;
+        return Routes.home;
+      }
     }
 
     return null;
@@ -68,6 +81,9 @@ final appRouter = GoRouter(
         // ✅ Decide landing based on stored login payload (no /me needed)
         if (UserStorage.isOwner) {
           return const AdminDashboardPage();
+        }
+        if (UserStorage.isInstructor) {
+          return const InstructorDashboardPage();
         }
         return const HomePage();
       },
@@ -114,6 +130,12 @@ final appRouter = GoRouter(
       name: RouteNames.admin,
       builder: (context, state) => const AdminDashboardPage(),
     ),
+
+    GoRoute(
+      path: Routes.instructor,
+      name: RouteNames.instructor,
+      builder: (context, state) => const InstructorDashboardPage(),
+    ),
   ],
 );
 
@@ -122,6 +144,7 @@ String _initialLocation() {
 
   // لو user data موجودة بالفعل (local/session) نحدد البداية صح.
   if (UserStorage.hasMe && UserStorage.isOwner) return Routes.admin;
+  if (UserStorage.hasMe && UserStorage.isInstructor) return Routes.instructor;
 
   return Routes.home;
 }
@@ -144,4 +167,5 @@ class RouteNames {
   static const verifyEmail = 'verifyEmail';
   static const resetPassword = 'resetPassword';
   static const admin = 'admin';
+  static const instructor = 'instructor';
 }
