@@ -17,6 +17,9 @@ from app.core.emailer import send_email
 from app.core.jwt import create_access_token
 # from app.core.token_store import mark_token_used
 
+email_logo_url = "https://raw.githubusercontent.com/EslamMDahy/Learnova-Smart-Study-Companion/refs/heads/backend/Backend/assets/logo.ico"
+
+
 def register_user(payload, db: Session):
     # 1) Check email unique
     existing = db.execute(
@@ -145,7 +148,7 @@ def register_user(payload, db: Session):
     # 6) Build verification link (fallback بدل RuntimeError)
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     verify_link = f"{frontend_url.rstrip('/')}/#/verify-email?token={verify_token}"
-    logo_url = "https://github.com/EslamMDahy/Learnova-Smart-Study-Companion/blob/main/Backend/assets/logo.png?raw=true"
+    # logo_url = "https://github.com/EslamMDahy/Learnova-Smart-Study-Companion/blob/main/Backend/assets/logo.png?raw=true"
     brand_year = 2026
     support_email = "support@learnova.com"
 
@@ -179,7 +182,7 @@ def register_user(payload, db: Session):
                     <table cellpadding="0" cellspacing="0">
                     <tr>
                         <td style="vertical-align:middle;">
-                        <img src="{logo_url}" width="40" height="40" alt="Learnova"
+                        <img src="{email_logo_url}" width="40" height="40" alt="Learnova"
                             style="display:block;border:0;outline:none;border-radius:10px;" />
                         </td>
                         <td style="vertical-align:middle;padding-left:10px;">
@@ -518,7 +521,7 @@ def forget_password_request(payload, db):
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     reset_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={resetPass_token}"
 
-    logo_url = ""
+    # logo_url = ""
 
     brand_year = 2026
     support_email = "support@learnova.com"
@@ -558,7 +561,7 @@ def forget_password_request(payload, db):
                     <table cellpadding="0" cellspacing="0">
                     <tr>
                         <td>
-                        <img src="{logo_url}" width="40" height="40" alt="Learnova"
+                        <img src="{email_logo_url}" width="40" height="40" alt="Learnova"
                             style="display:block;border-radius:10px;" />
                         </td>
                         <td style="padding-left:10px;">
