@@ -145,7 +145,7 @@ def register_user(payload, db: Session):
     # 6) Build verification link (fallback بدل RuntimeError)
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     verify_link = f"{frontend_url.rstrip('/')}/#/verify-email?token={verify_token}"
-    logo_url = ""
+    logo_url = "https://github.com/EslamMDahy/Learnova-Smart-Study-Companion/blob/main/Backend/assets/logo.png?raw=true"
     brand_year = 2026
     support_email = "support@learnova.com"
 
