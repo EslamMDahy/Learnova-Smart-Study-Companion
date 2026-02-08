@@ -18,7 +18,8 @@ from app.core.jwt import create_access_token
 # from app.core.token_store import mark_token_used
 
 email_logo_url = "https://raw.githubusercontent.com/EslamMDahy/Learnova-Smart-Study-Companion/refs/heads/backend/Backend/assets/logo.ico"
-
+email_brand_year = 2026
+email_support_email = "support@learnova.com"
 
 def register_user(payload, db: Session):
     # 1) Check email unique
@@ -30,7 +31,6 @@ def register_user(payload, db: Session):
         raise HTTPException(status_code=409, detail="Email already exists")
 
     # 2) Decide logic based on account_type
-    # account_type = (payload.account_type or "").strip().lower()
     system_role = (payload.system_role or "").strip().lower()
 
     ALLOWED_USER_ROLES: set[str] = {"student", "instructor", "assistant", "owner"}
@@ -40,44 +40,6 @@ def register_user(payload, db: Session):
                 status_code=400,
                 detail="Invalid System Role. Choose student, instructor, assistant, or owner",
             )
-        # invite_code is not required any more
-
-        # if not payload.invite_code or not str(payload.invite_code).strip():
-        #     raise HTTPException(
-        #         status_code=400,
-        #         detail="Organization code is required",
-        #     )
-
-        # org = db.execute(
-        #     text("SELECT id FROM organizations WHERE invite_code = :code"),
-        #     {"code": str(payload.invite_code).strip()},
-        # ).first()
-
-        # if not org:
-        #     raise HTTPException(
-        #         status_code=400,
-        #         detail="Invalid organization code",
-        #     )
-
-        # org_code = org[0]
-
-        # do not need to validate system role it will be validate in flutter
-        # if system_role not in ALLOWED_USER_ROLES:
-        #     raise HTTPException(
-        #         status_code=400,
-        #         detail="Invalid user role. Choose student, instructor, or assistant.",
-        #     )
-
-    # elif account_type == "owner":
-    #     # owner doesn't need invite_code or role from frontend
-    #     system_role = "owner"
-
-    # else:
-    #     raise HTTPException(
-    #         status_code=400,
-    #         detail="Invalid account type",
-    #     )
-
 
     # 3) Hash password
     hashed_pw = hash_password(payload.password)
@@ -105,23 +67,6 @@ def register_user(payload, db: Session):
 
     user_id = row[0]
 
-    # 4.5) Insert organization_member for normal users (pending by default)
-    # if account_type not "owner":
-    #     db.execute(
-    #         text(
-    #             """
-    #             INSERT INTO organization_members (organization_id, user_id, role, status)
-    #             VALUES (:org_id, :user_id, :role, :status)
-    #             """
-    #         ),
-    #         {
-    #             "org_id": org_code, # type: ignore
-    #             "user_id": user_id,
-    #             "role": system_role,  # نفس users.system_role (انت أكدت)
-    #             "status": "pending",
-    #         },
-    #     )
-
 
     # 5) Create verification token
     verify_token = secrets.token_urlsafe(32)
@@ -148,9 +93,7 @@ def register_user(payload, db: Session):
     # 6) Build verification link (fallback بدل RuntimeError)
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     verify_link = f"{frontend_url.rstrip('/')}/#/verify-email?token={verify_token}"
-    # logo_url = "https://github.com/EslamMDahy/Learnova-Smart-Study-Companion/blob/main/Backend/assets/logo.png?raw=true"
-    brand_year = 2026
-    support_email = "support@learnova.com"
+    
 
     text_body = f"""
     Welcome to Learnova!
@@ -279,10 +222,10 @@ def register_user(payload, db: Session):
                 <tr>
                 <td align="center" style="padding:14px 10px 0;">
                     <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                    © {brand_year} Learnova. All rights reserved.
+                    © {email_brand_year} Learnova. All rights reserved.
                     </p>
                     <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                    Need help? Contact us at <a href="mailto:{support_email}" style="color:#137FEC;text-decoration:none;">{support_email}</a>
+                    Need help? Contact us at <a href="mailto:{email_support_email}" style="color:#137FEC;text-decoration:none;">{email_support_email}</a>
                     </p>
                 </td>
                 </tr>
@@ -520,11 +463,6 @@ def forget_password_request(payload, db):
     
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
     reset_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={resetPass_token}"
-
-    # logo_url = ""
-
-    brand_year = 2026
-    support_email = "support@learnova.com"
 
     subject = "Learnova – Reset your password"
 
