@@ -27,48 +27,53 @@ def register_user(payload, db: Session):
         raise HTTPException(status_code=409, detail="Email already exists")
 
     # 2) Decide logic based on account_type
-    account_type = (payload.account_type or "").strip().lower()
+    # account_type = (payload.account_type or "").strip().lower()
     system_role = (payload.system_role or "").strip().lower()
 
-    ALLOWED_USER_ROLES = {"student", "instructor", "assistant"}
+    ALLOWED_USER_ROLES: set[str] = {"student", "instructor", "assistant", "owner"}
 
-    if account_type == "user":
-        # invite_code required
-        if not payload.invite_code or not str(payload.invite_code).strip():
-            raise HTTPException(
-                status_code=400,
-                detail="Organization code is required",
-            )
-
-        org = db.execute(
-            text("SELECT id FROM organizations WHERE invite_code = :code"),
-            {"code": str(payload.invite_code).strip()},
-        ).first()
-
-        if not org:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid organization code",
-            )
-
-        org_code = org[0]
-
-        # validate system role
-        if system_role not in ALLOWED_USER_ROLES:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid user role. Choose student, instructor, or assistant.",
-            )
-
-    elif account_type == "owner":
-        # owner doesn't need invite_code or role from frontend
-        system_role = "owner"
-
-    else:
+    if system_role not in ALLOWED_USER_ROLES:
         raise HTTPException(
-            status_code=400,
-            detail="Invalid account type",
-        )
+                status_code=400,
+                detail="Invalid System Role. Choose student, instructor, assistant, or owner",
+            )
+        # invite_code is not required any more
+
+        # if not payload.invite_code or not str(payload.invite_code).strip():
+        #     raise HTTPException(
+        #         status_code=400,
+        #         detail="Organization code is required",
+        #     )
+
+        # org = db.execute(
+        #     text("SELECT id FROM organizations WHERE invite_code = :code"),
+        #     {"code": str(payload.invite_code).strip()},
+        # ).first()
+
+        # if not org:
+        #     raise HTTPException(
+        #         status_code=400,
+        #         detail="Invalid organization code",
+        #     )
+
+        # org_code = org[0]
+
+        # do not need to validate system role it will be validate in flutter
+        # if system_role not in ALLOWED_USER_ROLES:
+        #     raise HTTPException(
+        #         status_code=400,
+        #         detail="Invalid user role. Choose student, instructor, or assistant.",
+        #     )
+
+    # elif account_type == "owner":
+    #     # owner doesn't need invite_code or role from frontend
+    #     system_role = "owner"
+
+    # else:
+    #     raise HTTPException(
+    #         status_code=400,
+    #         detail="Invalid account type",
+    #     )
 
 
     # 3) Hash password
@@ -98,21 +103,21 @@ def register_user(payload, db: Session):
     user_id = row[0]
 
     # 4.5) Insert organization_member for normal users (pending by default)
-    if account_type == "user":
-        db.execute(
-            text(
-                """
-                INSERT INTO organization_members (organization_id, user_id, role, status)
-                VALUES (:org_id, :user_id, :role, :status)
-                """
-            ),
-            {
-                "org_id": org_code, # type: ignore
-                "user_id": user_id,
-                "role": system_role,  # نفس users.system_role (انت أكدت)
-                "status": "pending",
-            },
-        )
+    # if account_type not "owner":
+    #     db.execute(
+    #         text(
+    #             """
+    #             INSERT INTO organization_members (organization_id, user_id, role, status)
+    #             VALUES (:org_id, :user_id, :role, :status)
+    #             """
+    #         ),
+    #         {
+    #             "org_id": org_code, # type: ignore
+    #             "user_id": user_id,
+    #             "role": system_role,  # نفس users.system_role (انت أكدت)
+    #             "status": "pending",
+    #         },
+    #     )
 
 
     # 5) Create verification token
@@ -302,7 +307,7 @@ def register_user(payload, db: Session):
     return {
         "message": "Registration successful. Please check your email.",
         "email_verification_required": True,
-        "account_type": account_type,
+        "system_type": system_role,
     }
 
 
