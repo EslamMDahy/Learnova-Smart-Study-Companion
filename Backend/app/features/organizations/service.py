@@ -160,8 +160,8 @@ def update_member_status(
     org_member_id: int,
     new_status: str,
     db: Session,
-    current_user,
-):
+    current_user,):
+    
     # 1) Owner-only
     if current_user.get("system_role") != "owner":
         raise HTTPException(status_code=403, detail="Only owners can update member status")

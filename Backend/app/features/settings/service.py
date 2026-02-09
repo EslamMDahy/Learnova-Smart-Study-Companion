@@ -12,7 +12,14 @@ from .schemas import UpdateProfileRequest
 
 from app.core.security import hash_password
 from app.core.security import verify_password  # عدّل import حسب مكانهم عندك
-from app.core.emailer import send_email  
+from app.core.emailer import send_email 
+
+# DELETE_OTP_TTL_MINUTES = 10
+# DELETE_OTP_TYPE = "delete_account_otp"
+
+
+def _generate_otp() -> str:
+    return secrets.token_hex(3)
 
 def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
     user_id = current_user.get("id")
@@ -175,3 +182,145 @@ def change_password(*, payload, db: Session, current_user):
         "message": "Password updated successfully",
         "email_notification_sent": sent,
     }
+
+
+def request_delete_account(*, payload, db: Session, current_user):
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    # 1) load user credentials
+    row = db.execute(
+        text("""
+            SELECT id, full_name, email, hashed_password, is_email_verified
+            FROM users
+            WHERE id = :uid
+            LIMIT 1
+             """),
+        {"uid": user_id},
+    ).first()
+
+    if not row:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    _, full_name, email, hashed_pw, _ = row
+
+    # 2) verify current password
+    if not payload.current_password or not verify_password(payload.current_password, hashed_pw):
+        raise HTTPException(status_code=401, detail="Invalid current password")
+
+    # 3) invalidate any previous delete OTPs (prevent multiple valid OTPs)
+    db.execute(
+        text("""
+            UPDATE user_tokens
+            SET used_at = NOW()
+            WHERE user_id = :uid
+              AND type = :type
+              AND used_at IS NULL
+             """),
+        {"uid": user_id, "type": "delete_account_otp"},
+    )
+
+    # 4) create OTP token
+    otp = _generate_otp()
+    expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
+
+    db.execute(
+        text("""
+            INSERT INTO user_tokens (user_id, type, token, expires_at, created_at)
+            VALUES (:uid, :type, :token, :expires_at, NOW())
+        """),
+        {"uid": user_id, "type": "delete_account_otp", "token": otp, "expires_at": expires_at},
+    )
+
+    db.commit()
+
+    # 5) send OTP email (best-effort)
+    subject = "Learnova – Confirm account deletion (OTP)"
+    text_body = f"""
+                Hello {full_name or ""}
+
+                You requested to delete your Learnova account.
+
+                Your OTP code is:
+                {otp}
+
+                This code expires in {10} minutes.
+
+                If you didn't request this, you can ignore this email.
+                """
+
+    sent = False
+    try:
+        send_email(to=email, subject=subject, body=text_body, html=None)
+        sent = True
+    except Exception:
+        pass
+
+    return {
+        "message": "Deletion OTP sent to your email.",
+        "email_sent": sent,
+    }
+
+
+def confirm_delete_account(*, payload, db: Session, current_user):
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    otp = (payload.otp or "").strip()
+    if not otp:
+        raise HTTPException(status_code=400, detail="OTP is required")
+
+    # OPTIONAL: enforce digits only + length
+    if not ( len(otp) == 6): # otp.isdigit() and
+        raise HTTPException(status_code=400, detail="Invalid OTP format")
+
+    # 1) find token row for this user + otp
+    row = db.execute(
+        text("""
+            SELECT id, expires_at, used_at
+            FROM user_tokens
+            WHERE user_id = :uid
+              AND type = :type
+              AND token = :token
+            LIMIT 1
+        """),
+        {"uid": user_id, "type": "delete_account_otp", "token": otp},
+    ).first()
+
+    if not row:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+
+    token_id, expires_at, used_at = row
+
+    # 2) used?
+    if used_at is not None:
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+
+    # 3) expired?
+    now = datetime.now(timezone.utc)
+    if expires_at <= now:
+        # mark used to close it (same style as your reset_password)
+        db.execute(
+            text("UPDATE user_tokens SET used_at = NOW() WHERE id = :tid"),
+            {"tid": token_id},
+        )
+        db.commit()
+        raise HTTPException(status_code=400, detail="Invalid or expired OTP")
+
+    # 4) mark OTP used FIRST (your requirement for history correctness)
+    db.execute(
+        text("UPDATE user_tokens SET used_at = NOW() WHERE id = :tid"),
+        {"tid": token_id},
+    )
+
+    # 5) delete user (CASCADE will remove dependent rows where configured)
+    db.execute(
+        text("DELETE FROM users WHERE id = :uid"),
+        {"uid": user_id},
+    )
+
+    db.commit()
+
+    return {"message": "Account deleted successfully"}

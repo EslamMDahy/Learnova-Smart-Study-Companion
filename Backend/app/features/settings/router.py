@@ -8,6 +8,11 @@ from .schemas import UpdateProfileRequest
 from .schemas import UpdateProfileResponse
 from .schemas import ChangePasswordRequest
 from .schemas import ChangePasswordResponse
+from .schemas import RequestDeleteAccountRequest
+from .schemas import RequestDeleteAccountResponse
+from .schemas import ConfirmDeleteAccountRequest
+from .schemas import ConfirmDeleteAccountResponse
+
 from . import service
 
 
@@ -30,6 +35,27 @@ def change_password(
     db: Session = Depends(get_db),
     current_user=Depends(get_current_user),):
     return service.change_password(
+        payload=payload, 
+        db=db, 
+        current_user=current_user)
+
+@router.post("/delete/request", response_model=RequestDeleteAccountResponse)
+def request_delete_account(
+    payload: RequestDeleteAccountRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),):
+    return service.request_delete_account(
+        payload=payload, 
+        db=db, 
+        current_user=current_user)
+
+
+@router.delete("/delete/confirm", response_model=ConfirmDeleteAccountResponse)
+def confirm_delete_account(
+    payload: ConfirmDeleteAccountRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),):
+    return service.confirm_delete_account(
         payload=payload, 
         db=db, 
         current_user=current_user)

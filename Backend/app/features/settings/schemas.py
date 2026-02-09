@@ -23,7 +23,23 @@ class ChangePasswordRequest(BaseModel):
     current_password: str
     new_password: str
 
-
 class ChangePasswordResponse(BaseModel):
     message: str
     email_notification_sent: bool
+
+
+
+class RequestDeleteAccountRequest(BaseModel):
+    current_password: str
+
+class RequestDeleteAccountResponse(BaseModel):
+    message: str
+    email_sent: bool
+
+
+
+class ConfirmDeleteAccountRequest(BaseModel):
+    otp: str
+
+class ConfirmDeleteAccountResponse(BaseModel):
+    message: str
