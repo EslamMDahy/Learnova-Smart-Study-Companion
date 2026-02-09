@@ -162,9 +162,9 @@ flutter run -d chrome --web-port=5173
 
 ## 👥 Team Members
 
-- **Project Manager:** **[Eslam Dahy](https://github.com/EslamMDahy)**
-- **Backend Lead:** **[Ahmed Waheed](https://github.com/Waheed7000)**
-- **QA & Testing:** **[Farouk Mohsen](https://github.com/faroukmohsen)**
-- **Flutter Lead:** **[Khaled Ibrahim](https://github.com/ikhalled)**
+- **[Eslam Dahy:](https://github.com/EslamMDahy)** **Technical Lead & Project Manager**
+- **[Ahmed Waheed: ](https://github.com/Waheed7000)** **Backend Engineer (FastAPI) – Service Owner** 
+- **[Farouk Mohsen:](https://github.com/faroukmohsen)** **QA & Testing**
+- **[Khaled Ibrahim:](https://github.com/ikhalled)** **Flutter Engineer & UI/UX Designer**
 
 ---

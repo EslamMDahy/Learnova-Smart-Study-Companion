@@ -50,7 +50,7 @@ pip install -r requirements.txt
 
 Notes:
 - `psycopg` / `psycopg-binary` is included in requirements and is used as the PostgreSQL driver. fileciteturn4file2L27-L29  
-<!-- - `passlib` / `bcrypt` are also in requirements (legacy). If your local hashing uses `app/core/security.py` (PBKDF2), you **do not need them**, but keeping them installed is harmless. fileciteturn4file2L5-L6L26-L26 -->
+<!-- - `passlib` / `bcrypt` are also in requirements (legacy). If your local hashing uses `app/core/security.py` (PBKDF2), you **do not need them**, but keeping them installed is harmless. -->
 
 ---
 
@@ -73,7 +73,6 @@ Skip if `C:\pgsql\data` already exists:
 ```bat
 C:\pgsql\bin\initdb -D C:\pgsql\data -U postgres -A password -W
 ```
-<!-- fileciteturn4file0L60-L66 -->
 
 ### Start / stop PostgreSQL
 
@@ -86,7 +85,6 @@ Stop:
 ```bat
 C:\pgsql\bin\pg_ctl -D C:\pgsql\data stop
 ```
-<!-- fileciteturn4file0L70-L80 -->
 
 ---
 
@@ -102,7 +100,6 @@ Create DB:
 CREATE DATABASE learnova;
 \q
 ```
-<!-- fileciteturn4file0L166-L175 -->
 
 ---
 
@@ -128,7 +125,7 @@ SMTP_FROM=your_email@gmail.com
 # App
 API_BASE_URL=http://127.0.0.1:8000
 ```
-<!-- This format matches the earlier README template. fileciteturn4file0L142-L160 -->
+<!-- This format matches the earlier README template.-->
 
 ### If you prefer setting env vars in CMD (Windows)
 
@@ -141,7 +138,6 @@ set SMTP_USER=your_email@gmail.com
 set SMTP_PASS=your_app_password
 set "API_BASE_URL=http://127.0.0.1:8000"
 ```
-<!-- fileciteturn4file1L110-L118 -->
 
 ---
 
@@ -151,14 +147,12 @@ Apply migrations:
 ```bat
 alembic upgrade head
 ```
-<!-- fileciteturn4file0L185-L190 -->
 
 Useful:
 ```bat
 alembic current
 alembic history
 ```
-<!-- fileciteturn4file0L192-L196 -->
 
 ---
 
@@ -168,7 +162,6 @@ Connect to DB:
 ```bat
 C:\pgsql\bin\psql -U postgres -d learnova
 ```
-<!-- fileciteturn4file1L27-L34 -->
 
 ### Generate a real password hash (recommended)
 Instead of using `TEMP_HASH`, generate a PBKDF2 hash using the project code:
@@ -227,7 +220,6 @@ VALUES
 )
 ON CONFLICT (invite_code) DO NOTHING;
 ```
-<!-- fileciteturn4file1L36-L82 -->
 
 ---
 
@@ -237,19 +229,16 @@ Option A (uvicorn):
 ```bat
 uvicorn app.main:app --reload
 ```
-<!-- fileciteturn4file0L222-L229 -->
 
 Option B (fastapi dev):
 ```bat
 fastapi dev app/main.py
 ```
-<!-- fileciteturn4file0L231-L234 -->
 
 Server:
 ```
 http://127.0.0.1:8000
 ```
-<!-- fileciteturn4file0L236-L239 -->
 
 ---
 
@@ -259,7 +248,6 @@ Delete a user by email:
 ```sql
 DELETE FROM users WHERE email = 'your@email.com';
 ```
-<!-- fileciteturn4file1L83-L86 -->
 
 > If you have related rows (tokens, memberships, etc.), make sure the FK rules are `ON DELETE CASCADE` where needed.
 
@@ -284,4 +272,4 @@ DELETE FROM users WHERE email = 'your@email.com';
 ## Security notes
 
 - Never commit `.env` or SMTP credentials. fileciteturn4file0L262-L265
-- Gmail needs **App Password** (not your normal password). fileciteturn4file0L162-L163
+- Gmail needs **App Password** (not your normal password). 

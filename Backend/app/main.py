@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.features.auth.router import router as auth_router
 from app.features.organizations.router import router as organizations_router
+from app.features.settings.router import router as settings_router
 
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
@@ -25,3 +26,4 @@ app.add_middleware(
 )
 app.include_router(auth_router)
 app.include_router(organizations_router)
+app.include_router(settings_router)
