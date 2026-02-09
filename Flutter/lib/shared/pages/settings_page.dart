@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../widgets/app_ui_components.dart';
 
 class SettingsPage extends StatefulWidget {
   const SettingsPage({super.key});
@@ -8,25 +9,21 @@ class SettingsPage extends StatefulWidget {
 }
 
 class _SettingsPageState extends State<SettingsPage> {
-  // right panel sections
-  int _sectionIndex = 0; // 0 personal, 1 security, 2 preferences, 3 notifications
+  int _sectionIndex = 0;
 
-  // sample controllers (UI only)
   final firstName = TextEditingController(text: "Alex");
   final lastName = TextEditingController(text: "Johnson");
   final bio = TextEditingController(
-    text:
-        "Interested in Artificial Intelligence, Machine Learning, and Human-Computer Interaction.",
+    text: "Interested in Artificial Intelligence, Machine Learning, and Human-Computer Interaction.",
   );
 
-  // read-only fields
+  final phoneNumber = TextEditingController(text: "+1 (555) 123-4567");
+
   final email = "alex.johnson@uni.edu";
   final studentId = "2021004592";
 
-  // toggles
   bool assignmentAlerts = true;
 
-  // security controllers (UI only)
   final currentPassword = TextEditingController();
   final newPassword = TextEditingController();
   final confirmPassword = TextEditingController();
@@ -36,6 +33,7 @@ class _SettingsPageState extends State<SettingsPage> {
     firstName.dispose();
     lastName.dispose();
     bio.dispose();
+    phoneNumber.dispose();
     currentPassword.dispose();
     newPassword.dispose();
     confirmPassword.dispose();
@@ -44,19 +42,14 @@ class _SettingsPageState extends State<SettingsPage> {
 
   @override
   Widget build(BuildContext context) {
-    const bg = Color(0xFFF6F7F8);
-    const textDark = Color(0xFF111418);
-    const textMuted = Color(0xFF617589);
-    const border = Color(0xFFE5E7EB);
-
     return Container(
-      color: bg,
+      color: AppColors.pageBg,
       width: double.infinity,
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(24, 40, 24, 40),
+          child: SingleChildScrollView(
+            padding: AppSpacing.page,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -68,27 +61,11 @@ class _SettingsPageState extends State<SettingsPage> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: const [
-                          Text(
-                            "Account Settings",
-                            style: TextStyle(
-                              fontFamily: "Manrope",
-                              fontSize: 36,
-                              fontWeight: FontWeight.w800,
-                              height: 40 / 36,
-                              letterSpacing: -0.9,
-                              color: textDark,
-                            ),
-                          ),
+                          Text("Account Settings", style: AppText.h1),
                           SizedBox(height: 6),
                           Text(
                             "Manage your personal information, security credentials, and system preferences.",
-                            style: TextStyle(
-                              fontFamily: "Manrope",
-                              fontSize: 16,
-                              fontWeight: FontWeight.w400,
-                              height: 24 / 16,
-                              color: textMuted,
-                            ),
+                            style: AppText.subtitle,
                           ),
                         ],
                       ),
@@ -96,12 +73,12 @@ class _SettingsPageState extends State<SettingsPage> {
                     const SizedBox(width: 16),
                     Row(
                       children: [
-                        _SoftButton(
+                        AppSoftButton(
                           label: "Cancel",
                           onTap: () => _toast(context, "Canceled (UI only)."),
                         ),
                         const SizedBox(width: 12),
-                        _PrimaryButton(
+                        AppPrimaryButton(
                           label: "Save Changes",
                           onTap: () => _toast(context, "Saved (UI only)."),
                         ),
@@ -119,7 +96,6 @@ class _SettingsPageState extends State<SettingsPage> {
 
                     final left = Column(
                       children: [
-                        // profile card
                         const _ProfileCard(
                           name: "Alex Johnson",
                           subtitle: "Student | Computer Science",
@@ -127,8 +103,6 @@ class _SettingsPageState extends State<SettingsPage> {
                           lastLogin: "2 hours ago",
                         ),
                         const SizedBox(height: 16),
-
-                        // nav card
                         _NavCard(
                           selectedIndex: _sectionIndex,
                           onSelect: (i) => setState(() => _sectionIndex = i),
@@ -138,12 +112,12 @@ class _SettingsPageState extends State<SettingsPage> {
 
                     final right = Column(
                       children: [
-                        if (_sectionIndex == 0) _buildPersonalInfoCard(border),
-                        if (_sectionIndex == 1) _buildSecurityCard(border),
-                        if (_sectionIndex == 2) _buildPreferencesCard(border),
-                        if (_sectionIndex == 3) _buildNotificationsCard(border),
+                        if (_sectionIndex == 0) _buildPersonalInfoCard(),
+                        if (_sectionIndex == 1) _buildSecurityCard(),
+                        if (_sectionIndex == 2) _buildPreferencesCard(),
+                        if (_sectionIndex == 3) _buildNotificationsCard(),
                         const SizedBox(height: 16),
-                        _buildDangerZone(border),
+                        _buildDangerZone(),
                       ],
                     );
 
@@ -175,27 +149,27 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildPersonalInfoCard(Color border) {
-    return _Card(
+  Widget _buildPersonalInfoCard() {
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(
+          const AppSectionHeader(
             title: "Personal Information",
             subtitle: "Update your personal details here.",
           ),
           const SizedBox(height: 24),
-
           LayoutBuilder(
             builder: (context, c) {
               final isWide = c.maxWidth >= 780;
 
-              final first = _LabeledInput(
+              final first = AppLabeledInput(
                 label: "First Name",
                 controller: firstName,
                 hint: "First name",
               );
-              final last = _LabeledInput(
+
+              final last = AppLabeledInput(
                 label: "Last Name",
                 controller: lastName,
                 hint: "Last name",
@@ -221,34 +195,28 @@ class _SettingsPageState extends State<SettingsPage> {
                 children: [
                   row,
                   const SizedBox(height: 16),
-
-                  _ReadOnlyInput(
+                  AppReadOnlyInput(
                     label: "University Email",
                     value: email,
                     rightTag: "Read Only",
                     icon: Icons.email_outlined,
                   ),
-
                   const SizedBox(height: 16),
-
                   LayoutBuilder(
                     builder: (context, c2) {
                       final wide2 = c2.maxWidth >= 780;
 
-                      final id = _ReadOnlyInput(
+                      final id = AppReadOnlyInput(
                         label: "Student ID",
                         value: studentId,
                         icon: Icons.badge_outlined,
                       );
 
-                      final phone = _LabeledInput(
+                      final phone = AppLabeledInput(
                         label: "Phone Number",
-                        controller: TextEditingController(text: "+1 (555) 123-4567"),
+                        controller: phoneNumber,
                         hint: "+1 ...",
                       );
-
-                      // avoid creating controller each build in real code; here UI only
-                      // ignore: unnecessary_null_comparison
 
                       return wide2
                           ? Row(
@@ -267,10 +235,8 @@ class _SettingsPageState extends State<SettingsPage> {
                             );
                     },
                   ),
-
                   const SizedBox(height: 16),
-
-                  _LabeledTextarea(
+                  AppLabeledTextarea(
                     label: "Bio / Academic Interests",
                     controller: bio,
                     hint: "Write something...",
@@ -284,43 +250,41 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildSecurityCard(Color border) {
-    return _Card(
+  Widget _buildSecurityCard() {
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(
+          const AppSectionHeader(
             title: "Security",
             subtitle: "Manage your password and authentication settings.",
           ),
           const SizedBox(height: 24),
-
           LayoutBuilder(
             builder: (context, c) {
               final isWide = c.maxWidth >= 780;
 
               final left = Column(
                 children: [
-                  _LabeledPassword(
+                  AppLabeledPassword(
                     label: "Current Password",
                     controller: currentPassword,
                   ),
                   const SizedBox(height: 20),
-                  _LabeledPassword(
+                  AppLabeledPassword(
                     label: "New Password",
                     controller: newPassword,
-                    helper:
-                        "Minimum 8 characters, at least one uppercase and one number.",
+                    helper: "Minimum 8 characters, at least one uppercase and one number.",
                   ),
                   const SizedBox(height: 20),
-                  _LabeledPassword(
+                  AppLabeledPassword(
                     label: "Confirm New Password",
                     controller: confirmPassword,
                   ),
                   const SizedBox(height: 16),
                   Align(
                     alignment: Alignment.centerLeft,
-                    child: _SoftButton(
+                    child: AppSoftButton(
                       label: "Update Password",
                       onTap: () => _toast(context, "Password updated (UI only)."),
                       compact: true,
@@ -342,20 +306,18 @@ class _SettingsPageState extends State<SettingsPage> {
                         Text(
                           "Tips",
                           style: TextStyle(
-                            fontFamily: "Manrope",
                             fontWeight: FontWeight.w700,
                             fontSize: 14,
-                            color: Color(0xFF111418),
+                            color: AppColors.title,
                           ),
                         ),
                         SizedBox(height: 8),
                         Text(
                           "Use a strong password and avoid reusing it across services.",
                           style: TextStyle(
-                            fontFamily: "Manrope",
                             fontWeight: FontWeight.w400,
                             fontSize: 14,
-                            color: Color(0xFF617589),
+                            color: AppColors.muted,
                             height: 20 / 14,
                           ),
                         ),
@@ -371,39 +333,34 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildPreferencesCard(Color border) {
-    return _Card(
+  Widget _buildPreferencesCard() {
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(
+          const AppSectionHeader(
             title: "Preferences",
             subtitle: "Customize your system experience.",
           ),
           const SizedBox(height: 24),
-
-          const _LabeledSelect(
+          const AppLabeledSelect(
             label: "Interface Language",
             value: "English (US)",
           ),
-
           const SizedBox(height: 24),
           const Divider(height: 1, color: Color(0xFFF0F2F4)),
           const SizedBox(height: 24),
-
           const Text(
             "NOTIFICATIONS",
             style: TextStyle(
-              fontFamily: "Manrope",
               fontWeight: FontWeight.w700,
               fontSize: 14,
               letterSpacing: 0.35,
-              color: Color(0xFF111418),
+              color: AppColors.title,
             ),
           ),
           const SizedBox(height: 16),
-
-          _ToggleRow(
+          AppToggleRow(
             title: "Assignment Alerts",
             subtitle: "Get notified when new assessments are posted.",
             value: assignmentAlerts,
@@ -414,17 +371,17 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildNotificationsCard(Color border) {
-    return _Card(
+  Widget _buildNotificationsCard() {
+    return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionHeader(
+          const AppSectionHeader(
             title: "Notifications",
             subtitle: "Control how and when you receive updates.",
           ),
           const SizedBox(height: 24),
-          _ToggleRow(
+          AppToggleRow(
             title: "Assignment Alerts",
             subtitle: "Get notified when new assessments are posted.",
             value: assignmentAlerts,
@@ -435,250 +392,78 @@ class _SettingsPageState extends State<SettingsPage> {
     );
   }
 
-  Widget _buildDangerZone(Color border) {
-    return Container(
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: const Color(0xFFFEF2F2),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFECACA)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  "Danger Zone",
-                  style: TextStyle(
-                    fontFamily: "Manrope",
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18,
-                    color: Color(0xFFB91C1C),
-                  ),
+  Widget _buildDangerZone() {
+    return LayoutBuilder(
+      builder: (context, c) {
+        final narrow = c.maxWidth < 560;
+
+        final textBlock = Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: const [
+              Text(
+                "Danger Zone",
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 18,
+                  color: AppColors.dangerTitle,
                 ),
-                SizedBox(height: 6),
-                Text(
-                  "Once you delete your account, there is no going back. Please be certain.",
-                  style: TextStyle(
-                    fontFamily: "Manrope",
-                    fontWeight: FontWeight.w400,
-                    fontSize: 14,
-                    color: Color(0xCCDC2626),
-                    height: 20 / 14,
-                  ),
+              ),
+              SizedBox(height: 6),
+              Text(
+                "Once you delete your account, there is no going back. Please be certain.",
+                style: TextStyle(
+                  fontWeight: FontWeight.w400,
+                  fontSize: 14,
+                  color: Color(0xCCDC2626),
+                  height: 20 / 14,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          _DangerButton(
-            label: "Delete Account",
-            onTap: () => _toast(context, "Delete (UI only)."),
+        );
+
+        final button = AppDangerButton(
+          label: "Delete Account",
+          onTap: () => _toast(context, "Delete (UI only)."),
+        );
+
+        return Container(
+          padding: AppSpacing.cardPadding,
+          decoration: BoxDecoration(
+            color: AppColors.dangerBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.dangerBorder),
           ),
-        ],
-      ),
+          child: narrow
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    textBlock,
+                    const SizedBox(height: 12),
+                    SizedBox(width: double.infinity, child: button),
+                  ],
+                )
+              : Row(
+                  children: [
+                    textBlock,
+                    const SizedBox(width: 16),
+                    button,
+                  ],
+                ),
+        );
+      },
     );
   }
 
-  void _toast(BuildContext context, String msg) {
+  static void _toast(BuildContext context, String msg) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
 }
 
-/* -------------------- Small UI pieces -------------------- */
-
-class _Card extends StatelessWidget {
-  final Widget child;
-  const _Card({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 2,
-            offset: Offset(0, 1),
-            color: Color(0x14000000),
-          ),
-        ],
-      ),
-      child: child,
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  const _SectionHeader({required this.title, required this.subtitle});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontFamily: "Manrope",
-                    fontWeight: FontWeight.w700,
-                    fontSize: 18,
-                    height: 28 / 18,
-                    color: Color(0xFF111418),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    fontFamily: "Manrope",
-                    fontWeight: FontWeight.w400,
-                    fontSize: 14,
-                    height: 20 / 14,
-                    color: Color(0xFF617589),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SoftButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  final bool compact;
-  const _SoftButton({
-    required this.label,
-    required this.onTap,
-    this.compact = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        height: compact ? 38 : 40,
-        padding: EdgeInsets.symmetric(horizontal: compact ? 16 : 16.75),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFDBE0E6)),
-          boxShadow: const [
-            BoxShadow(
-              blurRadius: 2,
-              offset: Offset(0, 1),
-              color: Color(0x14000000),
-            ),
-          ],
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontFamily: "Manrope",
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            height: 21 / 14,
-            color: Color(0xFF111418),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PrimaryButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _PrimaryButton({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        height: 40,
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        decoration: BoxDecoration(
-          color: const Color(0xFF137FEC),
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: const [
-            BoxShadow(
-              blurRadius: 2,
-              offset: Offset(0, 1),
-              color: Color(0xFFBFDBFE),
-            ),
-          ],
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontFamily: "Manrope",
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            height: 21 / 14,
-            color: Colors.white,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _DangerButton extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _DangerButton({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        height: 42,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xFFFECACA)),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontFamily: "Manrope",
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            height: 20 / 14,
-            color: Color(0xFFDC2626),
-          ),
-        ),
-      ),
-    );
-  }
-}
+/// ---------------------------------------------------------------------------
+/// Page-specific widgets (مش متكررة غالبًا) نخليها هنا
+/// ---------------------------------------------------------------------------
 
 class _ProfileCard extends StatelessWidget {
   final String name;
@@ -701,18 +486,17 @@ class _ProfileCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.borderSoft),
         boxShadow: const [
           BoxShadow(
             blurRadius: 2,
             offset: Offset(0, 1),
-            color: Color(0x14000000),
+            color: AppColors.shadowSoft,
           ),
         ],
       ),
       child: Stack(
         children: [
-          // Avatar
           Positioned(
             top: 25,
             left: 0,
@@ -723,7 +507,7 @@ class _ProfileCard extends StatelessWidget {
                   width: 128,
                   height: 128,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFE5E7EB),
+                    color: AppColors.borderSoft,
                     borderRadius: BorderRadius.circular(9999),
                     border: Border.all(color: Colors.white, width: 4),
                     boxShadow: const [
@@ -734,50 +518,47 @@ class _ProfileCard extends StatelessWidget {
                       ),
                     ],
                   ),
-                  child: const Icon(Icons.person, size: 54, color: Color(0xFF617589)),
+                  child: const Icon(Icons.person, size: 54, color: AppColors.muted),
                 ),
                 const SizedBox(height: 12),
                 Text(
                   name,
                   style: const TextStyle(
-                    fontFamily: "Manrope",
                     fontWeight: FontWeight.w700,
                     fontSize: 20,
                     height: 28 / 20,
-                    color: Color(0xFF111418),
+                    color: AppColors.title,
                   ),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   subtitle,
                   style: const TextStyle(
-                    fontFamily: "Manrope",
                     fontWeight: FontWeight.w400,
                     fontSize: 14,
                     height: 20 / 14,
-                    color: Color(0xFF617589),
+                    color: AppColors.muted,
                   ),
                 ),
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFDCFCE7),
+                    color: AppColors.successBg,
                     borderRadius: BorderRadius.circular(9999),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: const [
-                      _Dot(color: Color(0xFF22C55E)),
+                      _Dot(color: AppColors.successDot),
                       SizedBox(width: 6),
                       Text(
                         "Active Status",
                         style: TextStyle(
-                          fontFamily: "Manrope",
                           fontWeight: FontWeight.w500,
                           fontSize: 12,
                           height: 16 / 12,
-                          color: Color(0xFF166534),
+                          color: AppColors.successText,
                         ),
                       ),
                     ],
@@ -786,8 +567,6 @@ class _ProfileCard extends StatelessWidget {
               ],
             ),
           ),
-
-          // bottom stats
           Positioned(
             left: 25,
             right: 25,
@@ -815,9 +594,14 @@ class _ProfileCard extends StatelessWidget {
 class _Dot extends StatelessWidget {
   final Color color;
   const _Dot({required this.color});
+
   @override
   Widget build(BuildContext context) {
-    return Container(width: 6, height: 6, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
+    return Container(
+      width: 6,
+      height: 6,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
   }
 }
 
@@ -835,10 +619,9 @@ class _TwoColRow extends StatelessWidget {
             left,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontFamily: "Manrope",
               fontWeight: FontWeight.w400,
               fontSize: 14,
-              color: Color(0xFF617589),
+              color: AppColors.muted,
               height: 20 / 14,
             ),
           ),
@@ -848,10 +631,9 @@ class _TwoColRow extends StatelessWidget {
             right,
             textAlign: TextAlign.center,
             style: const TextStyle(
-              fontFamily: "Manrope",
               fontWeight: FontWeight.w500,
               fontSize: 14,
-              color: Color(0xFF111418),
+              color: AppColors.title,
               height: 20 / 14,
             ),
           ),
@@ -878,12 +660,12 @@ class _NavCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5E7EB)),
+        border: Border.all(color: AppColors.borderSoft),
         boxShadow: const [
           BoxShadow(
             blurRadius: 2,
             offset: Offset(0, 1),
-            color: Color(0x14000000),
+            color: AppColors.shadowSoft,
           ),
         ],
       ),
@@ -934,8 +716,8 @@ class _NavItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected ? const Color(0x0D137FEC) : Colors.transparent;
-    final color = selected ? const Color(0xFF137FEC) : const Color(0xFF617589);
+    final bg = selected ? AppColors.primarySoft : Colors.transparent;
+    final color = selected ? AppColors.primary : AppColors.muted;
     final weight = selected ? FontWeight.w700 : FontWeight.w500;
 
     return InkWell(
@@ -952,7 +734,6 @@ class _NavItem extends StatelessWidget {
             Text(
               label,
               style: TextStyle(
-                fontFamily: "Manrope",
                 fontWeight: weight,
                 fontSize: 14,
                 height: 20 / 14,
@@ -962,445 +743,6 @@ class _NavItem extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-class _LabeledInput extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final String hint;
-
-  const _LabeledInput({
-    required this.label,
-    required this.controller,
-    required this.hint,
-  });
-
-  InputDecoration _decoration(String hint) => InputDecoration(
-        hintText: hint,
-        isCollapsed: true, // ✅ يمنع أي padding داخلي افتراضي
-        contentPadding: EdgeInsets.zero,
-        border: InputBorder.none,
-        enabledBorder: InputBorder.none,
-        focusedBorder: InputBorder.none,
-        disabledBorder: InputBorder.none,
-        errorBorder: InputBorder.none,
-        focusedErrorBorder: InputBorder.none,
-
-        // ✅ الأهم: اقفل أي fill جاي من Theme
-        filled: false,
-        fillColor: Colors.transparent,
-
-        hintStyle: const TextStyle(
-          fontFamily: "Manrope",
-          fontWeight: FontWeight.w400,
-          fontSize: 14,
-          height: 19 / 14,
-          color: Color(0xFF9CA3AF),
-        ),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontFamily: "Manrope",
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            height: 20 / 14,
-            color: Color(0xFF111418),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          alignment: Alignment.centerLeft,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFDBE0E6)),
-          ),
-          child: TextFormField(
-            controller: controller,
-            maxLines: 1,
-            textAlignVertical: TextAlignVertical.center,
-            decoration: _decoration(hint),
-            style: const TextStyle(
-              fontFamily: "Manrope",
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-              height: 19 / 14,
-              color: Color(0xFF111418),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _LabeledPassword extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final String? helper;
-
-  const _LabeledPassword({
-    required this.label,
-    required this.controller,
-    this.helper,
-  });
-
-  InputDecoration _decoration() => const InputDecoration(
-        isCollapsed: true,
-        contentPadding: EdgeInsets.zero,
-        border: InputBorder.none,
-        enabledBorder: InputBorder.none,
-        focusedBorder: InputBorder.none,
-        disabledBorder: InputBorder.none,
-        errorBorder: InputBorder.none,
-        focusedErrorBorder: InputBorder.none,
-        filled: false,
-        fillColor: Colors.transparent,
-        hintText: "••••••••••••",
-        hintStyle: TextStyle(
-          fontFamily: "Manrope",
-          fontWeight: FontWeight.w400,
-          fontSize: 14,
-          height: 19 / 14,
-          color: Color(0xFF9CA3AF),
-        ),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontFamily: "Manrope",
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            height: 20 / 14,
-            color: Color(0xFF111418),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          height: 44,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          alignment: Alignment.centerLeft,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFDBE0E6)),
-          ),
-          child: TextFormField(
-            controller: controller,
-            obscureText: true,
-            maxLines: 1,
-            textAlignVertical: TextAlignVertical.center,
-            decoration: _decoration(),
-            style: const TextStyle(
-              fontFamily: "Manrope",
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-              height: 19 / 14,
-              color: Color(0xFF111418),
-            ),
-          ),
-        ),
-        if (helper != null) ...[
-          const SizedBox(height: 6),
-          Text(
-            helper!,
-            style: const TextStyle(
-              fontFamily: "Manrope",
-              fontWeight: FontWeight.w400,
-              fontSize: 12,
-              height: 16 / 12,
-              color: Color(0xFF617589),
-            ),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-class _LabeledTextarea extends StatelessWidget {
-  final String label;
-  final TextEditingController controller;
-  final String hint;
-
-  const _LabeledTextarea({
-    required this.label,
-    required this.controller,
-    required this.hint,
-  });
-
-  InputDecoration _decoration(String hint) => InputDecoration(
-        hintText: hint,
-        isCollapsed: true,
-        contentPadding: EdgeInsets.zero,
-        border: InputBorder.none,
-        enabledBorder: InputBorder.none,
-        focusedBorder: InputBorder.none,
-        disabledBorder: InputBorder.none,
-        errorBorder: InputBorder.none,
-        focusedErrorBorder: InputBorder.none,
-        filled: false,
-        fillColor: Colors.transparent,
-        hintStyle: const TextStyle(
-          fontFamily: "Manrope",
-          fontWeight: FontWeight.w400,
-          fontSize: 14,
-          height: 20 / 14,
-          color: Color(0xFF9CA3AF),
-        ),
-      );
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontFamily: "Manrope",
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            height: 20 / 14,
-            color: Color(0xFF111418),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          height: 100, // زي فيجما
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFDBE0E6)),
-          ),
-          child: TextFormField(
-            controller: controller,
-            expands: true, // ✅ يخلي الكلام من فوق وميلقّمش شكل غريب
-            maxLines: null,
-            minLines: null,
-            textAlignVertical: TextAlignVertical.top,
-            decoration: _decoration(hint),
-            style: const TextStyle(
-              fontFamily: "Manrope",
-              fontWeight: FontWeight.w400,
-              fontSize: 14,
-              height: 20 / 14,
-              color: Color(0xFF111418),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ReadOnlyInput extends StatelessWidget {
-  final String label;
-  final String value;
-  final String? rightTag;
-  final IconData icon;
-
-  const _ReadOnlyInput({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.rightTag,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontFamily: "Manrope",
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            height: 20 / 14,
-            color: Color(0xFF111418),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Stack(
-          children: [
-            Container(
-              height: 44,
-              padding: const EdgeInsets.only(left: 44, right: 16),
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: const Color(0xFFF6F7F8),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      value,
-                      style: const TextStyle(
-                        fontFamily: "Manrope",
-                        fontWeight: FontWeight.w500,
-                        fontSize: 14,
-                        height: 19 / 14,
-                        color: Color(0xFF617589),
-                      ),
-                    ),
-                  ),
-                  if (rightTag != null)
-                    Text(
-                      rightTag!.toUpperCase(),
-                      style: const TextStyle(
-                        fontFamily: "Manrope",
-                        fontWeight: FontWeight.w700,
-                        fontSize: 12,
-                        letterSpacing: 0.3,
-                        color: Color(0xFF617589),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Positioned(
-              left: 16,
-              top: 0,
-              bottom: 0,
-              child: Center(
-                child: Icon(icon, color: const Color(0xFF617589)),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ToggleRow extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-
-  const _ToggleRow({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: const TextStyle(
-                  fontFamily: "Manrope",
-                  fontWeight: FontWeight.w500,
-                  fontSize: 14,
-                  height: 20 / 14,
-                  color: Color(0xFF111418),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: const TextStyle(
-                  fontFamily: "Manrope",
-                  fontWeight: FontWeight.w400,
-                  fontSize: 12,
-                  height: 16 / 12,
-                  color: Color(0xFF617589),
-                ),
-              ),
-            ],
-          ),
-        ),
-        Switch(
-          value: value,
-          onChanged: onChanged,
-          activeColor: Colors.white,
-          activeTrackColor: const Color(0xFF137FEC),
-          inactiveThumbColor: Colors.white,
-          inactiveTrackColor: const Color(0xFFE5E7EB),
-        ),
-      ],
-    );
-  }
-}
-
-class _LabeledSelect extends StatelessWidget {
-  final String label;
-  final String value;
-  const _LabeledSelect({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontFamily: "Manrope",
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
-            height: 20 / 14,
-            color: Color(0xFF111418),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Container(
-          height: 44,
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: const Color(0xFFDBE0E6)),
-          ),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: const [
-              Expanded(
-                child: Text(
-                  "English (US)",
-                  style: TextStyle(
-                    fontFamily: "Manrope",
-                    fontWeight: FontWeight.w400,
-                    fontSize: 14,
-                    color: Color(0xFF111418),
-                    height: 20 / 14,
-                  ),
-                ),
-              ),
-              Icon(Icons.keyboard_arrow_down_rounded, color: Color(0xFF617589)),
-            ],
-          ),
-        ),
-      ],
     );
   }
 }

@@ -1,6 +1,8 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../data/organizations_providers.dart';
+
+import '../../data/dto/join_requests_response.dart';
 import '../../data/dto/join_request_user.dart';
+import '../../data/organizations_providers.dart';
 import 'user_management_state.dart';
 
 final userManagementControllerProvider =
@@ -12,25 +14,27 @@ class UserManagementController extends StateNotifier<UserManagementState> {
   UserManagementController(this.ref) : super(const UserManagementState());
 
   final Ref ref;
-
+  
   Future<void> loadUsers({
     required String organizationId,
     String view = 'accepted',
   }) async {
-    state = state.copyWith(loading: true);
+    state = state.copyWith(
+      loading: true,
+      clearError: true,
+    );
 
     try {
       final repo = ref.read(organizationsRepositoryProvider);
-      final raw = await repo.getJoinRequests(
-        organizationId: organizationId,
+
+      final res = await repo.getJoinRequests(
+        organizationId: organizationId.trim(),
         view: view,
       );
 
-      final users = raw.map(JoinRequestUser.fromJson).toList();
-
       state = state.copyWith(
         loading: false,
-        users: users,
+        users: res.users,
       );
     } catch (e) {
       state = state.copyWith(
@@ -38,5 +42,10 @@ class UserManagementController extends StateNotifier<UserManagementState> {
         error: e.toString(),
       );
     }
+  }
+
+
+  void clearError() {
+    state = state.copyWith(clearError: true);
   }
 }

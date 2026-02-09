@@ -22,8 +22,8 @@ class ResetPasswordState extends Equatable {
     return ResetPasswordState(
       loading: loading ?? this.loading,
       success: success ?? this.success,
-      message: message,
-      error: error,
+      message: message ?? this.message,
+      error: error ?? this.error,
     );
   }
 

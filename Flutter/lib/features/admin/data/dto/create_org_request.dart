@@ -4,20 +4,28 @@ class CreateOrganizationRequest {
   final String? logoUrl;
 
   CreateOrganizationRequest({
-    required this.name,
-    required this.description,
-    this.logoUrl,
-  });
+    required String name,
+    required String description,
+    String? logoUrl,
+  })  : name = name.trim(),
+        description = description.trim(),
+        logoUrl = logoUrl?.trim();
+
+  /// ✅ Use this before calling API
+  void validate() {
+    if (name.isEmpty) {
+      throw ArgumentError('Organization name is required.');
+    }
+    if (description.isEmpty) {
+      throw ArgumentError('Organization description is required.');
+    }
+  }
 
   Map<String, dynamic> toJson() {
-    final n = name.trim();
-    final d = description.trim();
-    final l = logoUrl?.trim();
-
     return {
-      "name": n,
-      "description": d,
-      if (l != null && l.isNotEmpty) "logo_url": l, // ✅ لا تبعته لو فاضي
+      "name": name,
+      "description": description,
+      if (logoUrl != null && logoUrl!.isNotEmpty) "logo_url": logoUrl,
     };
   }
 }

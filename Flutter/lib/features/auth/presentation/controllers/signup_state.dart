@@ -13,7 +13,7 @@ class SignupState {
   }) {
     return SignupState(
       loading: loading ?? this.loading,
-      error: error,
+      error: error ?? this.error,
     );
   }
 }

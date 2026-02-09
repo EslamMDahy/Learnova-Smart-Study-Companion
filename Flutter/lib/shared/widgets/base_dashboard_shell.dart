@@ -48,7 +48,7 @@ class BaseDashboardShell extends StatelessWidget {
                     child: header,
                   ),
                   Expanded(
-                    child: SingleChildScrollView(
+                    child: Padding(
                       padding: contentPadding,
                       child: Align(
                         alignment: Alignment.topCenter,

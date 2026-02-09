@@ -16,10 +16,18 @@ class OrganizationsApi {
     final d = description.trim();
     final l = logoUrl?.trim();
 
+    // ✅ final validation (prevents 422)
+    if (n.isEmpty) {
+      throw ArgumentError('Organization name is required.');
+    }
+    if (d.isEmpty) {
+      throw ArgumentError('Organization description is required.');
+    }
+
     final payload = <String, dynamic>{
       "name": n,
       "description": d,
-      if (l != null && l.isNotEmpty) "logo_url": l, // ✅
+      if (l != null && l.isNotEmpty) "logo_url": l,
     };
 
     final res = await _client.post<Map<String, dynamic>>(
@@ -27,7 +35,11 @@ class OrganizationsApi {
       data: payload,
     );
 
-    return (res.data ?? const <String, dynamic>{}).cast<String, dynamic>();
+    final data = res.data;
+    if (data is Map<String, dynamic>) return data;
+
+    // ✅ if backend returns invalid shape
+    throw const FormatException('Invalid response from createOrganization.');
   }
 
   /// GET /organizations/{id}/join-requests?view=pending|accepted
@@ -35,14 +47,24 @@ class OrganizationsApi {
     required String organizationId,
     String view = 'pending',
   }) async {
-    final safeView = (view == 'accepted') ? 'accepted' : 'pending';
+    final orgId = organizationId.trim();
+    if (orgId.isEmpty) {
+      throw ArgumentError('organizationId is required.');
+    }
+
+    final safeView = (view.trim().toLowerCase() == 'accepted')
+        ? 'accepted'
+        : 'pending';
 
     final res = await _client.get<Map<String, dynamic>>(
-      Endpoints.joinRequests(organizationId.trim()),
+      Endpoints.joinRequests(orgId),
       queryParameters: {"view": safeView},
     );
 
-    return (res.data ?? const <String, dynamic>{}).cast<String, dynamic>();
+    final data = res.data;
+    if (data is Map<String, dynamic>) return data;
+
+    throw const FormatException('Invalid response from joinRequests.');
   }
 
   /// PATCH /organizations/{id}/members/{org_member_id}/status
@@ -51,16 +73,34 @@ class OrganizationsApi {
     required String memberId,
     required String newStatus,
   }) async {
+    final orgId = organizationId.trim();
+    final mId = memberId.trim();
+    final status = newStatus.trim().toLowerCase();
+
+    if (orgId.isEmpty) {
+      throw ArgumentError('organizationId is required.');
+    }
+    if (mId.isEmpty) {
+      throw ArgumentError('memberId is required.');
+    }
+    if (status.isEmpty) {
+      throw ArgumentError('newStatus is required.');
+    }
+
+    // ✅ lock allowed values (prevents server validation errors)
+    const allowed = {'pending', 'accepted', 'rejected', 'approved'};
+    if (!allowed.contains(status)) {
+      throw ArgumentError('Invalid newStatus value: $status');
+    }
+
     final res = await _client.patch<Map<String, dynamic>>(
-      Endpoints.updateMemberStatus(
-        organizationId.trim(),
-        memberId.trim(),
-      ),
-      data: {
-        "new_status": newStatus,
-      },
+      Endpoints.updateMemberStatus(orgId, mId),
+      data: {"new_status": status},
     );
 
-    return (res.data ?? const <String, dynamic>{}).cast<String, dynamic>();
+    final data = res.data;
+    if (data is Map<String, dynamic>) return data;
+
+    throw const FormatException('Invalid response from updateMemberStatus.');
   }
 }

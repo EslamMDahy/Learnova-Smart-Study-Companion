@@ -2,8 +2,10 @@ import 'dart:developer';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/storage/token_storage.dart';
+import '../../../../core/error/app_error_bus.dart';
+import '../../../../core/network/error_mapper.dart';
 import '../../../../core/storage/user_storage.dart';
+
 import '../../data/organizations_providers.dart';
 import '../../data/dto/organization_out.dart';
 import 'admin_dashboard_state.dart';
@@ -53,17 +55,18 @@ class AdminDashboardController extends StateNotifier<AdminDashboardState> {
         description: description,
         logoUrl: (logoUrl != null && logoUrl.trim().isNotEmpty)
             ? logoUrl.trim()
-            : null, // ✅
+            : null,
       );
 
       final orgId = org.id.toString().trim();
 
+      // ✅ Update controller state
       state = state.copyWith(
         loading: false,
         organizationId: orgId,
       );
 
-      // ✅ Persist: organizations + selected_organization_id (front-only)
+      // ✅ Persist: organizations + selected_organization_id
       final current = UserStorage.meJson ?? <String, dynamic>{};
       final merged = <String, dynamic>{...current};
 
@@ -77,20 +80,23 @@ class AdminDashboardController extends StateNotifier<AdminDashboardState> {
       merged['organizations'] = orgs;
       merged['selected_organization_id'] = orgId;
 
-      // ✅ ما نعملش persist:true غصب — خليه حسب نوع تخزين التوكن
-      // لو عندك TokenStorage بيخزن في sessionStorage vs localStorage، استخدم نفس المنطق
-      final persist = true;
-
+      // keep your existing behavior
+      const persist = true;
       UserStorage.saveMe(merged, persist: persist);
 
       log('✅ Organization created and saved locally. orgId=$orgId');
     } catch (e, st) {
-      // ✅ اطبع التفاصيل
       log('❌ createOrganization error: $e', stackTrace: st);
 
+      final failure = mapApiFailure(e);
+
+      // ✅ Global toast (one system for the whole app)
+      AppErrorReporter.report(_ref, failure);
+
+      // ✅ Keep state.error if any UI depends on it (optional but safe)
       state = state.copyWith(
         loading: false,
-        error: e.toString(),
+        error: failure.message,
       );
     }
   }

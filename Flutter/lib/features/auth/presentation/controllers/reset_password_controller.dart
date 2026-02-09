@@ -17,7 +17,11 @@ class ResetPasswordController extends StateNotifier<ResetPasswordState> {
 
   AuthRepository get _repo => ref.read(authRepositoryProvider);
 
-  void reset() => state = const ResetPasswordState();
+  void reset() {
+    // لا نمسح error مباشرة
+    clearError();
+    state = const ResetPasswordState();
+  }
 
   void clearError() {
     if (state.error != null) {
@@ -31,11 +35,13 @@ class ResetPasswordController extends StateNotifier<ResetPasswordState> {
   }) async {
     final t = token.trim();
 
+    // امسح error فقط عبر clearError
+    clearError();
+
     state = state.copyWith(
       loading: true,
       success: false,
       message: null,
-      error: null,
     );
 
     if (t.isEmpty) {
@@ -60,7 +66,6 @@ class ResetPasswordController extends StateNotifier<ResetPasswordState> {
         message: msg.trim().isNotEmpty
             ? msg.trim()
             : "Password reset successfully. You can now log in.",
-        error: null,
       );
 
       return true;

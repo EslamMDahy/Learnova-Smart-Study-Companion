@@ -21,16 +21,15 @@ class AuthRepository {
       ),
     );
 
-    // 1) Save EXACT backend login shape parts we rely on:
-    // - user (with system_role)
-    // - organizations (only when owner, else empty)
-    //
-    // IMPORTANT: save user/session BEFORE saving token.
-    // TokenStorage.saveToken triggers GoRouter refresh immediately,
-    // so we must ensure UserStorage.isOwner is already correct.
+    // Ensure we store a valid user shape (avoid persisting null id).
+    final userId = res.user?.id;
+    if (userId == null || userId.trim().isEmpty) {
+      throw Exception('Missing user in login response');
+    }
+
     final meToStore = <String, dynamic>{
       'user': {
-        'id': res.user?.id,
+        'id': _toIntOrString(userId),
         // backend uses full_name
         'full_name': res.user?.name,
         'email': res.user?.email,
@@ -44,8 +43,7 @@ class AuthRepository {
           .toList(),
     };
 
-    // 2) OPTIONAL (Front-only): store selected org id if owner has orgs
-    // This is NOT from backend; it's just UI convenience.
+    // OPTIONAL (Front-only): store selected org id if owner has orgs
     if (res.organizations.isNotEmpty) {
       meToStore['selected_organization_id'] =
           _toIntOrString(res.organizations.first.id);
@@ -53,7 +51,7 @@ class AuthRepository {
 
     UserStorage.saveMe(meToStore, persist: persist);
 
-    // 3) save token (backend: access_token)
+    // save token (backend: access_token)
     TokenStorage.saveToken(
       res.accessToken,
       persist: persist,

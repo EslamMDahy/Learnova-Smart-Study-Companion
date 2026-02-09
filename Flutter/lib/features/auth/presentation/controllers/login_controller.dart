@@ -23,13 +23,15 @@ class LoginController extends StateNotifier<LoginState> {
     }
   }
 
-
   Future<bool> login(
     String email,
     String password, {
     required bool persist,
   }) async {
-    state = state.copyWith(loading: true, error: null);
+    // التزم بالـ pattern: امسح error فقط عبر clearError
+    clearError();
+
+    state = state.copyWith(loading: true);
 
     try {
       await _repo.login(

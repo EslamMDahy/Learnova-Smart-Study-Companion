@@ -2,6 +2,7 @@ import 'dart:developer';
 
 import 'organizations_api.dart';
 import 'dto/create_org_response.dart';
+import 'dto/join_requests_response.dart';
 import 'dto/organization_out.dart';
 
 class OrganizationsRepository {
@@ -22,66 +23,92 @@ class OrganizationsRepository {
 
       log('✅ createOrganization raw response: $raw');
 
-      // Backend: { "organization": { ... } }
       final dto = CreateOrganizationResponse.fromJson(raw);
       return dto.organization;
     } catch (e, st) {
-      // مهم: ده هيظهرلك في الكونسول السبب الحقيقي
+      // ✅ log for debugging only (do NOT toast here)
       log('❌ createOrganization failed: $e', stackTrace: st);
       rethrow;
     }
   }
 
-  Future<List<Map<String, dynamic>>> getJoinRequests({
+  /// ✅ Typed response (no List<Map> anymore)
+  Future<JoinRequestsResponse> getJoinRequests({
     required String organizationId,
     String view = 'pending',
   }) async {
-    final raw = await _api.joinRequests(
-      organizationId: organizationId.trim(),
-      view: view,
-    );
+    try {
+      final raw = await _api.joinRequests(
+        organizationId: organizationId.trim(),
+        view: view,
+      );
 
-    final list = raw['users'];
-    if (list is List) {
-      return list
-          .whereType<Map>()
-          .map((e) => e.cast<String, dynamic>())
-          .toList();
+      log('✅ getJoinRequests raw response: $raw');
+
+      return JoinRequestsResponse.fromJson(raw);
+    } catch (e, st) {
+      log('❌ getJoinRequests failed: $e', stackTrace: st);
+      rethrow;
     }
-
-    return const [];
   }
 
+  /// PATCH member status helpers
   Future<Map<String, dynamic>> acceptMember({
     required String organizationId,
     required String memberId,
-  }) {
-    return _api.updateMemberStatus(
-      organizationId: organizationId.trim(),
-      memberId: memberId.trim(),
-      newStatus: 'accepted',
-    );
+  }) async {
+    try {
+      final raw = await _api.updateMemberStatus(
+        organizationId: organizationId.trim(),
+        memberId: memberId.trim(),
+        newStatus: 'accepted',
+      );
+
+      log('✅ acceptMember raw response: $raw');
+      return raw;
+    } catch (e, st) {
+      log('❌ acceptMember failed: $e', stackTrace: st);
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> declineMember({
     required String organizationId,
     required String memberId,
-  }) {
-    return _api.updateMemberStatus(
-      organizationId: organizationId.trim(),
-      memberId: memberId.trim(),
-      newStatus: 'declinate',
-    );
+  }) async {
+    try {
+      // ✅ IMPORTANT: "declinate" is wrong.
+      // Most backends use "rejected" (or "declined"). We standardize to "rejected".
+      final raw = await _api.updateMemberStatus(
+        organizationId: organizationId.trim(),
+        memberId: memberId.trim(),
+        newStatus: 'rejected',
+      );
+
+      log('✅ declineMember raw response: $raw');
+      return raw;
+    } catch (e, st) {
+      log('❌ declineMember failed: $e', stackTrace: st);
+      rethrow;
+    }
   }
 
   Future<Map<String, dynamic>> suspendMember({
     required String organizationId,
     required String memberId,
-  }) {
-    return _api.updateMemberStatus(
-      organizationId: organizationId.trim(),
-      memberId: memberId.trim(),
-      newStatus: 'suspended',
-    );
+  }) async {
+    try {
+      final raw = await _api.updateMemberStatus(
+        organizationId: organizationId.trim(),
+        memberId: memberId.trim(),
+        newStatus: 'suspended',
+      );
+
+      log('✅ suspendMember raw response: $raw');
+      return raw;
+    } catch (e, st) {
+      log('❌ suspendMember failed: $e', stackTrace: st);
+      rethrow;
+    }
   }
 }

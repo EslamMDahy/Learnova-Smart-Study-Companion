@@ -38,11 +38,20 @@ class VerifyEmailController extends StateNotifier<VerifyEmailState> {
       return false;
     }
 
-    state = state.copyWith(loading: true, success: false, error: null);
+    // امسح error فقط عبر clearError
+    clearError();
+
+    state = state.copyWith(
+      loading: true,
+      success: false,
+    );
 
     try {
       await _repo.verifyEmail(t);
-      state = state.copyWith(loading: false, success: true, error: null);
+      state = state.copyWith(
+        loading: false,
+        success: true,
+      );
       return true;
     } catch (e) {
       state = state.copyWith(
@@ -54,5 +63,9 @@ class VerifyEmailController extends StateNotifier<VerifyEmailState> {
     }
   }
 
-  void reset() => state = const VerifyEmailState();
+  void reset() {
+    // لا نمسح error مباشرة
+    clearError();
+    state = const VerifyEmailState();
+  }
 }

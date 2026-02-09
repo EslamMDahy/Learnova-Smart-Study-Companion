@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error/app_error_bus.dart';
+import '../../../../core/network/error_mapper.dart';
 import '../../../../core/storage/user_storage.dart';
-import '../../data/dto/join_request_user.dart';
+
 import '../../data/organizations_providers.dart';
 import 'join_requests_state.dart';
 
@@ -21,7 +23,8 @@ class JoinRequestsController extends StateNotifier<JoinRequestsState> {
         : (UserStorage.organizationId ?? '').trim();
 
     if (orgId.isEmpty) {
-      throw Exception('Missing organizationId');
+      // ✅ validation-style error (not generic Exception)
+      throw ArgumentError('Missing organizationId.');
     }
     return orgId;
   }
@@ -30,24 +33,32 @@ class JoinRequestsController extends StateNotifier<JoinRequestsState> {
     String? organizationId,
     String view = 'pending',
   }) async {
+    // ✅ if your JoinRequestsState has sentinel like AdminDashboardState, this will clear error
     state = state.copyWith(loading: true, error: null);
 
     try {
       final repo = _ref.read(organizationsRepositoryProvider);
       final orgId = _resolveOrgId(organizationId);
 
-      final rawUsers = await repo.getJoinRequests(
+      final res = await repo.getJoinRequests(
         organizationId: orgId,
         view: view,
       );
 
-      final users = rawUsers
-          .map((e) => JoinRequestUser.fromJson(e))
-          .toList(growable: false);
-
-      state = state.copyWith(loading: false, users: users);
+      // ✅ res.users already parsed DTOs
+      state = state.copyWith(
+        loading: false,
+        users: res.users,
+        count: res.count,
+      );
     } catch (e) {
-      state = state.copyWith(loading: false, error: e.toString());
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+
+      state = state.copyWith(
+        loading: false,
+        error: failure.message,
+      );
     }
   }
 
@@ -64,7 +75,10 @@ class JoinRequestsController extends StateNotifier<JoinRequestsState> {
         memberId: orgMemberId.trim(),
       );
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+
+      state = state.copyWith(error: failure.message);
       rethrow;
     }
   }
@@ -82,7 +96,10 @@ class JoinRequestsController extends StateNotifier<JoinRequestsState> {
         memberId: orgMemberId.trim(),
       );
     } catch (e) {
-      state = state.copyWith(error: e.toString());
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+
+      state = state.copyWith(error: failure.message);
       rethrow;
     }
   }

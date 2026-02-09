@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../app_theme.dart';
+import '../../../shared/widgets/app_ui_components.dart';
 
 class AppCard extends StatelessWidget {
   final Widget child;

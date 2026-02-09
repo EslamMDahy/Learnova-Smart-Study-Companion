@@ -2,7 +2,7 @@ class MeResponse {
   final int id;
   final String email;
   final String fullName;
-  final String systemRole; // "owner" / "teacher" / "student" / "assistant" ... (حسب الباك)
+  final String systemRole; // normalized lower-case
 
   MeResponse({
     required this.id,
@@ -11,14 +11,25 @@ class MeResponse {
     required this.systemRole,
   });
 
-  bool get isOwner => systemRole.toLowerCase() == 'owner';
+  bool get isOwner => systemRole == 'owner';
 
   factory MeResponse.fromJson(Map<String, dynamic> json) {
     return MeResponse(
-      id: (json['id'] ?? 0) as int,
-      email: (json['email'] ?? '') as String,
-      fullName: (json['full_name'] ?? json['fullName'] ?? '') as String,
-      systemRole: (json['system_role'] ?? json['systemRole'] ?? '') as String,
+      id: _toInt(json['id']) ?? 0,
+      email: (json['email'] ?? '').toString().trim(),
+      fullName: (json['full_name'] ?? json['fullName'] ?? '').toString().trim(),
+      systemRole: (json['system_role'] ?? json['systemRole'] ?? '')
+          .toString()
+          .trim()
+          .toLowerCase(),
     );
+  }
+
+  static int? _toInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v.trim());
+    return null;
   }
 }

@@ -6,7 +6,13 @@ class CreateOrganizationResponse {
   CreateOrganizationResponse({required this.organization});
 
   factory CreateOrganizationResponse.fromJson(Map<String, dynamic> json) {
-    final orgJson = (json["organization"] as Map?)?.cast<String, dynamic>() ?? {};
+    final raw = json["organization"];
+
+    if (raw is! Map) {
+      throw const FormatException('Invalid response: "organization" is missing or not an object.');
+    }
+
+    final orgJson = raw.cast<String, dynamic>();
     return CreateOrganizationResponse(
       organization: OrganizationOut.fromJson(orgJson),
     );

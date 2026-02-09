@@ -17,7 +17,7 @@ class VerifyEmailState {
     return VerifyEmailState(
       loading: loading ?? this.loading,
       success: success ?? this.success,
-      error: error,
+      error: error ?? this.error,
     );
   }
 }

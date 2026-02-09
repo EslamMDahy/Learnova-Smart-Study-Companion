@@ -1,5 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter/foundation.dart';
+
 
 import '../../core/storage/token_storage.dart';
 import '../../core/storage/user_storage.dart';
@@ -17,7 +18,7 @@ import '../../shared/pages/home_page.dart';
 import 'routes.dart';
 
 final appRouter = GoRouter(
-  initialLocation: _initialLocation(),
+  initialLocation: _initialLocationSafe(),
 
   // ✅ Re-evaluate when token or stored session changes
   refreshListenable: Listenable.merge([
@@ -26,51 +27,56 @@ final appRouter = GoRouter(
   ]),
 
   redirect: (context, state) {
-    final hasToken = TokenStorage.hasToken;
-    final path = state.uri.path;
+    try {
+      final path = state.uri.path;
+      final isAuthRoute = _isAuthRoute(path);
 
-    // ✅ protect verify/reset: token query param required
-    if ((path == Routes.verifyEmail || path == Routes.resetPassword) &&
-        (state.uri.queryParameters['token'] == null ||
-            state.uri.queryParameters['token']!.trim().isEmpty)) {
-      return Routes.login;
-    }
+      // ✅ protect verify/reset: token query param required
+      if ((path == Routes.verifyEmail || path == Routes.resetPassword) &&
+          ((state.uri.queryParameters['token'] ?? '').trim().isEmpty)) {
+        return Routes.login;
+      }
 
-    final isAuthRoute = _isAuthRoute(path);
+      final hasToken = TokenStorage.hasToken;
 
-    // ❌ not logged in
-    if (!hasToken && !isAuthRoute) {
-      return Routes.login;
-    }
+      // ❌ not logged in
+      if (!hasToken && !isAuthRoute) {
+        return Routes.login;
+      }
 
-    // ❌ logged in and trying to access auth pages
-    // IMPORTANT: don't redirect away from /login until we have loaded `me`.
-    // Otherwise token save triggers a router refresh while role is still empty,
-    // and the user gets pushed to normal home.
-    if (hasToken && isAuthRoute) {
-      if (!UserStorage.hasMe) return null;
-      if (UserStorage.isOwner) return Routes.admin;
-      if (UserStorage.isInstructor) return Routes.instructor;
-      return Routes.home;
-    }
+      // ❌ logged in and trying to access auth pages
+      // IMPORTANT: don't redirect away from /login until we have loaded `me`.
+      if (hasToken && isAuthRoute) {
+        if (!UserStorage.hasMe) return null;
 
-    // ✅ Admin guard (owner-only)
-    if (path == Routes.admin) {
-      if (!UserStorage.hasMe) return null;
-      if (!UserStorage.isOwner) return Routes.home;
-    }
-
-    // ✅ Instructor guard (instructor-only)
-    if (path == Routes.instructor) {
-      if (!UserStorage.hasMe) return null;
-      if (!UserStorage.isInstructor) {
-        // Owners go to admin, others go home
         if (UserStorage.isOwner) return Routes.admin;
+        if (UserStorage.isInstructor) return Routes.instructor;
         return Routes.home;
       }
-    }
 
-    return null;
+      // ✅ Admin guard (owner-only)
+      if (path == Routes.admin) {
+        if (!UserStorage.hasMe) return null;
+        if (!UserStorage.isOwner) return Routes.home;
+      }
+
+      // ✅ Instructor guard (instructor-only)
+      if (path == Routes.instructor) {
+        if (!UserStorage.hasMe) return null;
+
+        if (!UserStorage.isInstructor) {
+          // Owners go to admin, others go home
+          if (UserStorage.isOwner) return Routes.admin;
+          return Routes.home;
+        }
+      }
+
+      return null;
+    } catch (_) {
+      // ✅ if storage parsing/reading failed -> treat as invalid session
+      _clearSessionSafe();
+      return Routes.login;
+    }
   },
 
   routes: [
@@ -139,14 +145,19 @@ final appRouter = GoRouter(
   ],
 );
 
-String _initialLocation() {
-  if (!TokenStorage.hasToken) return Routes.login;
+String _initialLocationSafe() {
+  try {
+    if (!TokenStorage.hasToken) return Routes.login;
 
-  // لو user data موجودة بالفعل (local/session) نحدد البداية صح.
-  if (UserStorage.hasMe && UserStorage.isOwner) return Routes.admin;
-  if (UserStorage.hasMe && UserStorage.isInstructor) return Routes.instructor;
+    // لو user data موجودة بالفعل (local/session) نحدد البداية صح.
+    if (UserStorage.hasMe && UserStorage.isOwner) return Routes.admin;
+    if (UserStorage.hasMe && UserStorage.isInstructor) return Routes.instructor;
 
-  return Routes.home;
+    return Routes.home;
+  } catch (_) {
+    _clearSessionSafe();
+    return Routes.login;
+  }
 }
 
 bool _isAuthRoute(String path) {
@@ -155,6 +166,15 @@ bool _isAuthRoute(String path) {
       path == Routes.forgotPassword ||
       path == Routes.resetPassword ||
       path == Routes.verifyEmail;
+}
+
+void _clearSessionSafe() {
+  try {
+    TokenStorage.clear();
+  } catch (_) {}
+  try {
+    UserStorage.clear();
+  } catch (_) {}
 }
 
 class RouteNames {

@@ -11,15 +11,18 @@ class UserManagementState {
     this.error,
   });
 
+
   UserManagementState copyWith({
     bool? loading,
     List<JoinRequestUser>? users,
     String? error,
+    bool clearError = false,
   }) {
     return UserManagementState(
       loading: loading ?? this.loading,
       users: users ?? this.users,
-      error: error,
+      error: clearError ? null : (error ?? this.error),
     );
   }
+
 }

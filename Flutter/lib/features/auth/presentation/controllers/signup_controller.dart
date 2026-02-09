@@ -21,7 +21,11 @@ class SignupController extends StateNotifier<SignupState> {
     }
   }
 
-  void reset() => state = const SignupState();
+  void reset() {
+    // لا نمسح error مباشرة
+    clearError();
+    state = const SignupState();
+  }
 
   bool _looksLikeEmail(String v) {
     final s = v.trim();
@@ -36,7 +40,10 @@ class SignupController extends StateNotifier<SignupState> {
     required String password,
     required String systemRole,
   }) async {
-    state = state.copyWith(loading: true, error: null);
+    // امسح error فقط عبر clearError
+    clearError();
+
+    state = state.copyWith(loading: true);
 
     final cleanFullName = fullName.trim();
     final cleanEmail = email.trim();
@@ -49,7 +56,10 @@ class SignupController extends StateNotifier<SignupState> {
     }
 
     if (!_looksLikeEmail(cleanEmail)) {
-      state = state.copyWith(loading: false, error: 'Please enter a valid email.');
+      state = state.copyWith(
+        loading: false,
+        error: 'Please enter a valid email.',
+      );
       return false;
     }
 
@@ -79,7 +89,7 @@ class SignupController extends StateNotifier<SignupState> {
         systemRole: cleanSystemRole,
       );
 
-      state = state.copyWith(loading: false, error: null);
+      state = state.copyWith(loading: false);
       return true;
     } catch (e) {
       state = state.copyWith(

@@ -27,8 +27,8 @@ class ForgotPasswordState extends Equatable {
     return ForgotPasswordState(
       loading: loading ?? this.loading,
       sent: sent ?? this.sent,
-      message: message,
-      error: error,
+      message: message ?? this.message,
+      error: error ?? this.error,
       lastEmail: lastEmail ?? this.lastEmail,
     );
   }

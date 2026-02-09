@@ -17,62 +17,53 @@ class ApiClient {
       },
     );
 
-    // ✅ Interceptors (Request + Error) in one place
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
           final token = TokenStorage.token;
-          if (token != null && token.isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer $token';
+          if (token != null && token.trim().isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer ${token.trim()}';
           }
           handler.next(options);
         },
+
         onError: (DioException e, handler) {
           final status = e.response?.statusCode;
           final data = e.response?.data;
 
-          // ✅ FastAPI commonly uses "detail"
-          String? serverMsg;
-          if (data is Map) {
-            if (data['message'] != null) serverMsg = data['message'].toString();
-            if (serverMsg == null && data['detail'] != null) {
-              final d = data['detail'];
-              if (d is String) {
-                serverMsg = d;
-              } else if (d is List && d.isNotEmpty) {
-                // validation errors: [{"loc":..,"msg":".."}]
-                final first = d.first;
-                if (first is Map && first['msg'] != null) {
-                  serverMsg = first['msg'].toString();
-                } else {
-                  serverMsg = d.toString();
-                }
-              } else {
-                serverMsg = d.toString();
-              }
-            }
-          }
-
+          final serverMsg = _extractServerMessage(data);
           final friendly = _friendlyNetworkMessage(e);
 
-          final msg = serverMsg ??
-              friendly ??
-              e.message ??
-              'Something went wrong. Please try again.';
+          // final message priority:
+          // serverMsg -> friendly -> dio message -> fallback
+          final msg = (serverMsg?.trim().isNotEmpty == true)
+              ? serverMsg!.trim()
+              : (friendly?.trim().isNotEmpty == true)
+                  ? friendly!.trim()
+                  : (e.message?.trim().isNotEmpty == true)
+                      ? e.message!.trim()
+                      : 'Something went wrong. Please try again.';
 
+          // OPTIONAL: لو 401 عايز تمسح التوكن
+          // (لو ده متفق عليه في مشروعك)
+          // if (status == 401) {
+          //   TokenStorage.clear();
+          // }
+
+          // ✅ رجّع DioException لكن جوّاه error = ApiException ثابت
           handler.reject(
             DioException(
               requestOptions: e.requestOptions,
               response: e.response,
               type: e.type,
               error: ApiException(msg, statusCode: status),
+              message: e.message,
             ),
           );
         },
       ),
     );
 
-    // ✅ Optional: logging in dev only
     if (!Env.isProd) {
       _dio.interceptors.add(
         LogInterceptor(
@@ -88,7 +79,71 @@ class ApiClient {
 
   final Dio _dio;
 
-  // ✅ Helper: map Dio types to friendly messages
+  /// ✅ Extract message from many backend shapes:
+  /// - {"message": "..."}
+  /// - {"detail": "..."}
+  /// - {"detail":[{"msg":".."}]}
+  /// - "plain string"
+  static String? _extractServerMessage(dynamic data) {
+    if (data == null) return null;
+
+    // plain string body
+    if (data is String) {
+      final s = data.trim();
+      return s.isEmpty ? null : s;
+    }
+
+    if (data is Map) {
+      final m = data.cast<dynamic, dynamic>();
+
+      // common keys
+      final direct = m['message'] ?? m['error'] ?? m['msg'];
+      if (direct != null) {
+        final s = direct.toString().trim();
+        if (s.isNotEmpty) return s;
+      }
+
+      // FastAPI: detail
+      if (m['detail'] != null) {
+        final d = m['detail'];
+
+        if (d is String) {
+          final s = d.trim();
+          return s.isEmpty ? null : s;
+        }
+
+        // validation errors list
+        if (d is List && d.isNotEmpty) {
+          final first = d.first;
+
+          if (first is Map && first['msg'] != null) {
+            final s = first['msg'].toString().trim();
+            return s.isEmpty ? null : s;
+          }
+
+          // fallback stringify
+          final s = d.toString().trim();
+          return s.isEmpty ? null : s;
+        }
+
+        final s = d.toString().trim();
+        return s.isEmpty ? null : s;
+      }
+
+      // sometimes backend nests: {"data": {"message": "..."}}
+      final inner = m['data'];
+      if (inner is Map) {
+        final s = _extractServerMessage(inner);
+        if (s != null && s.trim().isNotEmpty) return s.trim();
+      }
+    }
+
+    // fallback
+    final s = data.toString().trim();
+    return s.isEmpty ? null : s;
+  }
+
+  /// ✅ Friendly messages for network-level failures
   String? _friendlyNetworkMessage(DioException e) {
     switch (e.type) {
       case DioExceptionType.connectionTimeout:
@@ -102,7 +157,7 @@ class ApiClient {
       case DioExceptionType.badCertificate:
         return 'Bad certificate. Please contact support.';
       case DioExceptionType.badResponse:
-        // handled by serverMsg mostly
+        // غالبًا serverMsg هيمسكها
         return null;
       case DioExceptionType.unknown:
         return null;
@@ -176,5 +231,4 @@ class ApiClient {
       options: options,
     );
   }
-
 }

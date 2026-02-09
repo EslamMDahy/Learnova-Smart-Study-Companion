@@ -13,7 +13,7 @@ class LoginState {
   }) {
     return LoginState(
       loading: loading ?? this.loading,
-      error: error,
+      error: error ?? this.error,
     );
   }
 }

@@ -15,14 +15,16 @@ class AdminDashboardState {
   bool get hasOrganization =>
       organizationId != null && organizationId!.trim().isNotEmpty;
 
+  static const _unset = Object();
+
   AdminDashboardState copyWith({
     bool? loading,
-    String? error,
+    Object? error = _unset, // ✅ allows explicit null
     String? organizationId,
   }) {
     return AdminDashboardState(
       loading: loading ?? this.loading,
-      error: error ?? this.error,
+      error: identical(error, _unset) ? this.error : error as String?,
       organizationId: organizationId ?? this.organizationId,
     );
   }

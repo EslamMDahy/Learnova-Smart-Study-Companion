@@ -15,7 +15,7 @@ class AuthApi {
       data: request.toJson(),
     );
 
-    final payload = (res.data ?? const {}).cast<String, dynamic>();
+    final payload = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
     return LoginResponse.fromJson(payload);
   }
 
@@ -73,7 +73,7 @@ class AuthApi {
   // keep /me for later usage if you want, but DON'T use it in login flow
   Future<Map<String, dynamic>> me() async {
     final res = await _client.get<Map<String, dynamic>>(Endpoints.me);
-    final data = (res.data ?? const {}).cast<String, dynamic>();
+    final data = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
     return data;
   }
 

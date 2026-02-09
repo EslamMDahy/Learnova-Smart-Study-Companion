@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/routing/routes.dart';
 import '../../presentation/controllers/reset_password_controller.dart';
 
+import '../../../../shared/widgets/app_ui_components.dart';
+
 class SetNewPasswordForm extends ConsumerStatefulWidget {
   final String? token;
   final bool isMobile;
@@ -20,8 +22,6 @@ class SetNewPasswordForm extends ConsumerStatefulWidget {
 }
 
 class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
-  final blue = const Color(0xFF137FEC);
-
   bool showNewPass = false;
   bool showConfirmPass = false;
 
@@ -38,18 +38,27 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
     super.dispose();
   }
 
+  void _clearAllErrors() {
+    if (_localError != null) setState(() => _localError = null);
+    ref.read(resetPasswordControllerProvider.notifier).clearError();
+  }
+
   Future<void> _submit() async {
     setState(() => _localError = null);
 
     final token = widget.token?.trim();
     if (token == null || token.isEmpty) {
-      setState(() =>
-          _localError = "Invalid reset link. Please request a new one.");
+      setState(
+        () => _localError = "Invalid reset link. Please request a new one.",
+      );
       return;
     }
 
     final ok = _formKey.currentState?.validate() ?? false;
     if (!ok) return;
+
+    // ✅ كل محاولة جديدة: امسح error فقط عبر clearError
+    ref.read(resetPasswordControllerProvider.notifier).clearError();
 
     final newPass = _newPassCtrl.text.trim();
 
@@ -63,7 +72,6 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
     if (!mounted) return;
 
     if (success) {
-      // ✅ Redirect مباشر للوجين + رسالة نجاح تظهر هناك
       context.go('${Routes.login}?reset=1');
     }
   }
@@ -85,43 +93,18 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ICON
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFEAF3FF),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Center(
-                      child: Icon(Icons.security,
-                          color: Color(0xFF137FEC), size: 26),
-                    ),
-                  ),
-
-                  const SizedBox(height: 18),
-
-                  const Text(
-                    "Set new password",
-                    style: TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-
-                  const SizedBox(height: 8),
-
-                  const Text(
-                    "Please choose a strong password. It must be different from\npreviously used passwords.",
-                    style: TextStyle(color: Color(0xFF617589), height: 1.5),
+                  const AppAuthHeaderIcon(
+                    icon: Icons.security,
+                    title: "Set new password",
+                    subtitle:
+                        "Please choose a strong password. It must be different from\npreviously used passwords.",
                   ),
 
                   const SizedBox(height: 24),
 
                   if (_localError != null) ...[
-                    _InfoCard(
-                      type: _InfoType.error,
+                    AppInfoCard(
+                      type: AppInfoType.error,
                       title: "Invalid link",
                       message: _localError!,
                     ),
@@ -129,244 +112,89 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                   ],
 
                   if (state.error != null) ...[
-                    _InfoCard(
-                      type: _InfoType.error,
+                    AppInfoCard(
+                      type: AppInfoType.error,
                       title: "Reset failed",
                       message: state.error!,
                     ),
                     const SizedBox(height: 18),
                   ],
 
-                  const Text(
-                    "New Password",
-                    style: TextStyle(fontSize: 15, color: Colors.black),
-                  ),
-                  const SizedBox(height: 6),
-
-                    // NEW PASSWORD
-                    TextFormField(
-                      controller: _newPassCtrl,
-                      enabled: !state.loading,
-                      obscureText: !showNewPass,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 15,
-                        height: 1.4,
+                  AppLabeledIconField(
+                    label: "New Password",
+                    controller: _newPassCtrl,
+                    hint: "Enter new password",
+                    icon: Icons.lock_outline,
+                    obscureText: !showNewPass,
+                    onChanged: (_) => _clearAllErrors(),
+                    validator: (v) {
+                      final s = (v ?? "").trim();
+                      if (s.isEmpty) return "Password is required";
+                      if (s.length < 6) {
+                        return "Password must be at least 6 characters";
+                      }
+                      return null;
+                    },
+                    suffix: IconButton(
+                      splashRadius: 18,
+                      icon: Icon(
+                        showNewPass
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        color: AppColors.muted,
+                        size: 20,
                       ),
-                      validator: (v) {
-                        final s = (v ?? "").trim();
-                        if (s.isEmpty) return "Password is required";
-                        if (s.length < 6) {
-                          return "Password must be at least 6 characters";
-                        }
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        hintText: "Enter new password",
-                        hintStyle: const TextStyle(
-                          color: Colors.black38,
-                          fontSize: 14,
-                        ),
-
-                        prefixIcon: const Icon(
-                          Icons.lock_outline,
-                          color: Colors.black45,
-                          size: 20,
-                        ),
-
-                        suffixIcon: IconButton(
-                          splashRadius: 18,
-                          icon: Icon(
-                            showNewPass
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: Colors.black45,
-                            size: 20,
-                          ),
-                          onPressed: state.loading
-                              ? null
-                              : () => setState(() => showNewPass = !showNewPass),
-                        ),
-
-                        filled: true,
-                        fillColor: const Color(0xFFF9FAFB),
-
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE5E7EB),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF137FEC),
-                            width: 1.5,
-                          ),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE53935),
-                          ),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE53935),
-                            width: 1.5,
-                          ),
-                        ),
-                        errorStyle: const TextStyle(
-                          fontSize: 12,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // CONFIRM PASSWORD
-                    TextFormField(
-                      controller: _confirmCtrl,
-                      enabled: !state.loading,
-                      obscureText: !showConfirmPass,
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontSize: 15,
-                        height: 1.4,
-                      ),
-                      validator: (v) {
-                        final s = (v ?? "").trim();
-                        if (s.isEmpty) return "Confirm password is required";
-                        if (s != _newPassCtrl.text) return "Passwords do not match";
-                        return null;
-                      },
-                      decoration: InputDecoration(
-                        hintText: "Confirm password",
-                        hintStyle: const TextStyle(
-                          color: Colors.black38,
-                          fontSize: 14,
-                        ),
-
-                        prefixIcon: const Icon(
-                          Icons.lock_outline,
-                          color: Colors.black45,
-                          size: 20,
-                        ),
-
-                        suffixIcon: IconButton(
-                          splashRadius: 18,
-                          icon: Icon(
-                            showConfirmPass
-                                ? Icons.visibility_outlined
-                                : Icons.visibility_off_outlined,
-                            color: Colors.black45,
-                            size: 20,
-                          ),
-                          onPressed: state.loading
-                              ? null
-                              : () =>
-                                  setState(() => showConfirmPass = !showConfirmPass),
-                        ),
-
-                        filled: true,
-                        fillColor: const Color(0xFFF9FAFB),
-
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 14,
-                        ),
-
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE5E7EB),
-                          ),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFF137FEC),
-                            width: 1.5,
-                          ),
-                        ),
-                        errorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE53935),
-                          ),
-                        ),
-                        focusedErrorBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(10),
-                          borderSide: const BorderSide(
-                            color: Color(0xFFE53935),
-                            width: 1.5,
-                          ),
-                        ),
-                        errorStyle: const TextStyle(
-                          fontSize: 12,
-                          height: 1.2,
-                        ),
-                      ),
-                    ),
-
-
-                  const SizedBox(height: 20),
-
-                  SizedBox(
-                    width: double.infinity,
-                    height: 50,
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: blue,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                      ),
-                      onPressed: state.loading ? null : _submit,
-                      child: state.loading
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.white,
-                              ),
-                            )
-                          : const Text(
-                              "Reset Password",
-                              style: TextStyle(color: Colors.white, fontSize: 16),
-                            ),
+                      onPressed: state.loading
+                          ? null
+                          : () => setState(() => showNewPass = !showNewPass),
                     ),
                   ),
 
                   const SizedBox(height: 16),
 
-                  Center(
-                    child: InkWell(
-                      onTap: state.loading ? null : () => context.go(Routes.login),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
-                          Icon(Icons.arrow_back_ios_new,
-                              size: 16, color: Colors.black54),
-                          SizedBox(width: 6),
-                          Text(
-                            "Return to Log In",
-                            style: TextStyle(
-                              color: Colors.black54,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ],
+                  AppLabeledIconField(
+                    label: "Confirm Password",
+                    controller: _confirmCtrl,
+                    hint: "Confirm password",
+                    icon: Icons.lock_outline,
+                    obscureText: !showConfirmPass,
+                    onChanged: (_) => _clearAllErrors(),
+                    validator: (v) {
+                      final s = (v ?? "").trim();
+                      if (s.isEmpty) return "Confirm password is required";
+                      if (s != _newPassCtrl.text) return "Passwords do not match";
+                      return null;
+                    },
+                    suffix: IconButton(
+                      splashRadius: 18,
+                      icon: Icon(
+                        showConfirmPass
+                            ? Icons.visibility_outlined
+                            : Icons.visibility_off_outlined,
+                        color: AppColors.muted,
+                        size: 20,
                       ),
+                      onPressed: state.loading
+                          ? null
+                          : () => setState(() => showConfirmPass = !showConfirmPass),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  AppPrimaryLoadingButton(
+                    label: "Reset Password",
+                    loading: state.loading,
+                    onPressed: _submit,
+                    height: 50,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  Center(
+                    child: AppBackLinkLabeled(
+                      label: "Return to Log In",
+                      onTap: state.loading ? null : () => context.go(Routes.login),
                     ),
                   ),
 
@@ -376,75 +204,6 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
             ),
           ),
         ),
-      ),
-    );
-  }
-}
-
-enum _InfoType { success, error }
-
-class _InfoCard extends StatelessWidget {
-  final _InfoType type;
-  final String title;
-  final String message;
-
-  const _InfoCard({
-    required this.type,
-    required this.title,
-    required this.message,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isSuccess = type == _InfoType.success;
-
-    final bg = isSuccess ? const Color(0xFFEAF7EE) : const Color(0xFFFFF3F3);
-    final border =
-        isSuccess ? const Color(0xFFBEE6C7) : const Color(0xFFFFC7C7);
-    final icon = isSuccess ? Icons.check_circle_rounded : Icons.error_rounded;
-    final iconColor =
-        isSuccess ? const Color(0xFF1E7A36) : const Color(0xFFB00020);
-    final textColor =
-        isSuccess ? const Color(0xFF1E7A36) : const Color(0xFFB00020);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: iconColor, size: 20),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: TextStyle(
-                    color: textColor,
-                    fontSize: 13,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

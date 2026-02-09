@@ -16,12 +16,26 @@ class LoginResponse {
     return null;
   }
 
-  LoginResponse({
+  const LoginResponse({
     required this.accessToken,
     this.tokenType,
     this.user,
     this.organizations = const [],
   });
+
+  LoginResponse copyWith({
+    String? accessToken,
+    String? tokenType,
+    LoginUser? user,
+    List<LoginOrganization>? organizations,
+  }) {
+    return LoginResponse(
+      accessToken: accessToken ?? this.accessToken,
+      tokenType: tokenType ?? this.tokenType,
+      user: user ?? this.user,
+      organizations: organizations ?? this.organizations,
+    );
+  }
 
   factory LoginResponse.fromJson(Map<String, dynamic> json) {
     // support wrapped payloads
@@ -31,16 +45,16 @@ class LoginResponse {
             ? json['result'] as Map<String, dynamic>
             : json;
 
-    final token = (root['access_token'] ??
-            root['token'] ??
-            root['accessToken'])
-        ?.toString();
+    final token =
+        (root['access_token'] ?? root['token'] ?? root['accessToken'])
+            ?.toString();
 
     if (token == null || token.trim().isEmpty) {
       throw Exception('Missing access token in response');
     }
 
-    final tokenType = (root['token_type'] ?? root['tokenType'])?.toString();
+    final parsedTokenType =
+        (root['token_type'] ?? root['tokenType'])?.toString();
 
     // user
     LoginUser? parsedUser;
@@ -67,27 +81,61 @@ class LoginResponse {
 
     return LoginResponse(
       accessToken: token,
-      tokenType: tokenType,
+      tokenType: parsedTokenType,
       user: parsedUser,
       organizations: parsedOrgs,
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is LoginResponse &&
+        other.accessToken == accessToken &&
+        other.tokenType == tokenType &&
+        other.user == user &&
+        _listEquals(other.organizations, organizations);
+  }
+
+  @override
+  int get hashCode => Object.hash(
+        accessToken,
+        tokenType,
+        user,
+        Object.hashAll(organizations),
+      );
 }
 
 class LoginUser {
   final String id;
-  final String? name; // هنحط فيها full_name أو name
+  final String? name; // full_name أو name
   final String? email;
   final String? role;
   final String? avatarUrl;
 
-  LoginUser({
+  const LoginUser({
     required this.id,
     this.name,
     this.email,
     this.role,
     this.avatarUrl,
   });
+
+  LoginUser copyWith({
+    String? id,
+    String? name,
+    String? email,
+    String? role,
+    String? avatarUrl,
+  }) {
+    return LoginUser(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      email: email ?? this.email,
+      role: role ?? this.role,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
+    );
+  }
 
   factory LoginUser.fromJson(Map<String, dynamic> json) {
     final id = (json['id'] ?? json['_id'] ?? json['userId'])?.toString();
@@ -104,19 +152,32 @@ class LoginUser {
       role: (json['system_role'] ?? json['role'] ?? json['type'])?.toString(),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is LoginUser &&
+        other.id == id &&
+        other.name == name &&
+        other.email == email &&
+        other.role == role &&
+        other.avatarUrl == avatarUrl;
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, email, role, avatarUrl);
 }
 
 class LoginOrganization {
   final String id;
   final String? name;
 
-  // اختياري لو محتاجهم لاحقاً
   final String? description;
   final String? logoUrl;
   final String? inviteCode;
   final String? subscriptionStatus;
 
-  LoginOrganization({
+  const LoginOrganization({
     required this.id,
     this.name,
     this.description,
@@ -124,6 +185,24 @@ class LoginOrganization {
     this.inviteCode,
     this.subscriptionStatus,
   });
+
+  LoginOrganization copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? logoUrl,
+    String? inviteCode,
+    String? subscriptionStatus,
+  }) {
+    return LoginOrganization(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      logoUrl: logoUrl ?? this.logoUrl,
+      inviteCode: inviteCode ?? this.inviteCode,
+      subscriptionStatus: subscriptionStatus ?? this.subscriptionStatus,
+    );
+  }
 
   factory LoginOrganization.fromJson(Map<String, dynamic> json) {
     final id = (json['id'] ??
@@ -147,4 +226,29 @@ class LoginOrganization {
               ?.toString(),
     );
   }
+
+  @override
+  bool operator ==(Object other) {
+    if (identical(this, other)) return true;
+    return other is LoginOrganization &&
+        other.id == id &&
+        other.name == name &&
+        other.description == description &&
+        other.logoUrl == logoUrl &&
+        other.inviteCode == inviteCode &&
+        other.subscriptionStatus == subscriptionStatus;
+  }
+
+  @override
+  int get hashCode =>
+      Object.hash(id, name, description, logoUrl, inviteCode, subscriptionStatus);
+}
+
+bool _listEquals<T>(List<T> a, List<T> b) {
+  if (identical(a, b)) return true;
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }

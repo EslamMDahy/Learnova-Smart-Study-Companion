@@ -1,84 +1,186 @@
 import 'package:dio/dio.dart';
+
+import '../error/app_failure.dart';
 import 'api_exceptions.dart';
 
-String mapApiError(Object e) {
-  // 1) لو انت رامي ApiException جوه DioException.error
+AppFailure mapApiFailure(Object e) {
+  // 1) لو ApiClient لفّها في ApiException جوه DioException.error
   if (e is DioException && e.error is ApiException) {
-    return (e.error as ApiException).message;
+    final ex = e.error as ApiException;
+    return _fromStatus(
+      statusCode: ex.statusCode,
+      message: ex.message,
+      debug: ex.toString(),
+    );
   }
 
+  // 2) DioException مباشر
   if (e is DioException) {
     final status = e.response?.statusCode;
     final data = e.response?.data;
 
     final serverMsg = _extractServerMessage(data);
-    if (serverMsg != null) return serverMsg;
+    if (serverMsg != null && serverMsg.trim().isNotEmpty) {
+      return _fromStatus(
+        statusCode: status,
+        message: serverMsg.trim(),
+        debug: e.toString(),
+      );
+    }
 
-    // 2) Errors by Dio type (الأوضح قبل status أحيانًا)
+    // type-first mapping
     switch (e.type) {
       case DioExceptionType.cancel:
-        return 'Request cancelled.';
+        return const AppFailure(
+          type: AppFailureType.unknown,
+          message: 'Request cancelled.',
+        );
       case DioExceptionType.connectionTimeout:
       case DioExceptionType.receiveTimeout:
       case DioExceptionType.sendTimeout:
-        return 'Connection timeout. Please try again.';
+        return const AppFailure(
+          type: AppFailureType.timeout,
+          message: 'Connection timeout. Please try again.',
+        );
       case DioExceptionType.connectionError:
-        return 'No internet connection.';
+        return const AppFailure(
+          type: AppFailureType.network,
+          message: 'No internet connection.',
+        );
       case DioExceptionType.badCertificate:
-        return 'Secure connection failed. Please try again.';
+        return const AppFailure(
+          type: AppFailureType.unknown,
+          message: 'Secure connection failed. Please try again.',
+        );
       case DioExceptionType.badResponse:
-        // هنسيبها للـ status mapping تحت
+        // continue to status mapping
         break;
       case DioExceptionType.unknown:
-        // ممكن يكون SocketException أو غيره
         break;
     }
 
-    // 3) Fallback by status code
-    switch (status) {
-      case 400:
-        return 'Invalid request. Please check your input.';
-      case 401:
-        return 'Email or password is incorrect.';
-      case 403:
-        return 'Access denied. Please verify your email or permissions.';
-      case 404:
-        return 'Service not found. Please try again later.';
-      case 409:
-        return 'This email is already registered.';
-      case 422:
-        return 'Some fields are invalid. Please check your input.';
-      case 429:
-        return 'Too many requests. Please try again later.';
-      case 500:
-      case 502:
-      case 503:
-      case 504:
-        return 'Server error. Please try again later.';
-    }
-
-    return 'Something went wrong. Please try again.';
+    return _fromStatus(
+      statusCode: status,
+      message: 'Something went wrong. Please try again.',
+      debug: e.toString(),
+    );
   }
 
-  // لو exception تانية (غير dio)
+  // 3) ApiException (غير Dio)
   if (e is ApiException) {
-    return e.message;
+    return _fromStatus(
+      statusCode: e.statusCode,
+      message: e.message,
+      debug: e.toString(),
+    );
   }
 
-  return 'Unexpected error. Please try again.';
+  // 4) fallback
+  return AppFailure(
+    type: AppFailureType.unknown,
+    message: 'Unexpected error. Please try again.',
+    debugMessage: e.toString(),
+  );
+}
+
+// Backward compatibility (لو أي Controller/Widget لسه بيستخدم String)
+String mapApiError(Object e) => mapApiFailure(e).message;
+
+AppFailure _fromStatus({
+  required int? statusCode,
+  required String message,
+  required String debug,
+}) {
+  final sc = statusCode;
+
+  if (sc == null) {
+    return AppFailure(
+      type: AppFailureType.unknown,
+      message: message.isNotEmpty ? message : 'Something went wrong. Please try again.',
+      debugMessage: debug,
+      statusCode: sc,
+    );
+  }
+
+  switch (sc) {
+    case 400:
+      return AppFailure(
+        type: AppFailureType.validation,
+        message: message.isNotEmpty ? message : 'Invalid request. Please check your input.',
+        debugMessage: debug,
+        statusCode: sc,
+      );
+    case 401:
+      return AppFailure(
+        type: AppFailureType.unauthorized,
+        message: message.isNotEmpty ? message : 'Your session expired. Please login again.',
+        debugMessage: debug,
+        statusCode: sc,
+      );
+    case 403:
+      return AppFailure(
+        type: AppFailureType.forbidden,
+        message: message.isNotEmpty ? message : 'Access denied.',
+        debugMessage: debug,
+        statusCode: sc,
+      );
+    case 404:
+      return AppFailure(
+        type: AppFailureType.notFound,
+        message: message.isNotEmpty ? message : 'Service not found.',
+        debugMessage: debug,
+        statusCode: sc,
+      );
+    case 409:
+      return AppFailure(
+        type: AppFailureType.validation,
+        message: message.isNotEmpty ? message : 'Conflict. Please try again.',
+        debugMessage: debug,
+        statusCode: sc,
+      );
+    case 422:
+      return AppFailure(
+        type: AppFailureType.validation,
+        message: message.isNotEmpty ? message : 'Some fields are invalid. Please check your input.',
+        debugMessage: debug,
+        statusCode: sc,
+      );
+    case 429:
+      return AppFailure(
+        type: AppFailureType.server,
+        message: message.isNotEmpty ? message : 'Too many requests. Please try again later.',
+        debugMessage: debug,
+        statusCode: sc,
+      );
+    case 500:
+    case 502:
+    case 503:
+    case 504:
+      return AppFailure(
+        type: AppFailureType.server,
+        message: message.isNotEmpty ? message : 'Server error. Please try again later.',
+        debugMessage: debug,
+        statusCode: sc,
+      );
+    default:
+      return AppFailure(
+        type: AppFailureType.unknown,
+        message: message.isNotEmpty ? message : 'Something went wrong. Please try again.',
+        debugMessage: debug,
+        statusCode: sc,
+      );
+  }
 }
 
 String? _extractServerMessage(dynamic data) {
   if (data == null) return null;
 
-  // FastAPI sometimes returns string
   if (data is String && data.trim().isNotEmpty) {
     return data.trim();
   }
 
   if (data is! Map) return null;
 
-  // FastAPI "detail" could be string or list of validation errors
   final detail = data['detail'];
 
   if (detail is String && detail.trim().isNotEmpty) {
@@ -110,7 +212,6 @@ String? _extractServerMessage(dynamic data) {
     if (msgs.isNotEmpty) return msgs.join('\n');
   }
 
-  // Custom API message
   final message = data['message']?.toString().trim();
   if (message != null && message.isNotEmpty) return message;
 

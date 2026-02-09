@@ -1,27 +1,27 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/routing/routes.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../../core/storage/user_storage.dart';
 import '../../../../core/ui/toast.dart';
-import '../../../../core/ui/layout/base_dashboard_shell.dart';
 
-import '../../../../shared/pages/settings_page.dart';
 import '../../../../shared/pages/notifications_page.dart';
+import '../../../../shared/pages/settings_page.dart';
+import '../../../../shared/widgets/base_dashboard_shell.dart';
+import '../../../../shared/widgets/top_header.dart';
 
+import '../admin_tabs.dart';
 import '../controllers/admin_dashboard_controller.dart';
 import '../controllers/admin_dashboard_state.dart';
 
 import '../widgets/create_org_dialog.dart';
-import '../widgets/sidebar.dart';
-import '../../../../shared/widgets/top_header.dart';
 import '../widgets/empty_org_state.dart';
-import '../widgets/user_management_content.dart';
 import '../widgets/join_requests_content.dart';
+import '../widgets/sidebar.dart';
 import '../widgets/upgrade_plans_content.dart';
-
-import 'package:go_router/go_router.dart';
-import '../../../../core/routing/routes.dart';
+import '../widgets/user_management_content.dart';
 
 class AdminDashboardPage extends ConsumerStatefulWidget {
   const AdminDashboardPage({super.key});
@@ -31,61 +31,31 @@ class AdminDashboardPage extends ConsumerStatefulWidget {
 }
 
 class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
-  int selectedIndex = 0;
-  String? _lastToastMsg;
+  int selectedIndex = AdminTabs.users;
+  int _viewIndex = AdminViews.tabs;
 
-  // Admin tabs indexes
-  static const int _idxUsers = 0;
-  static const int _idxUpgrade = 2;
-  static const int _idxSettingsTab = 3;
-  static const int _idxHelp = 4;
-
-  // Global views indexes inside ONE IndexedStack
-  static const int _viewAdminTabs = 0;
-  static const int _viewNotifications = 1;
-  static const int _viewSettings = 2;
-
-  int _viewIndex = _viewAdminTabs;
-
-  ProviderSubscription<AdminDashboardState>? _errSub;
+  late final TextEditingController _search;
 
   @override
   void initState() {
     super.initState();
-
-    _errSub = ref.listenManual<AdminDashboardState>(
-      adminDashboardControllerProvider,
-      (prev, next) {
-        final err = next.error;
-        if (err != null && err != _lastToastMsg) {
-          _lastToastMsg = err;
-
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (!mounted) return;
-
-            AppToast.show(
-              context,
-              title: "Something went wrong",
-              message: err,
-              icon: Icons.warning_amber_rounded,
-            );
-
-            ref.read(adminDashboardControllerProvider.notifier).clearError();
-          });
-        }
-      },
-    );
+    _search = TextEditingController();
   }
 
   @override
   void dispose() {
-    _errSub?.close();
+    _search.dispose();
     super.dispose();
   }
 
   void _goToAdminTab(int index) {
-    // ✅ يقلل التأخير (خصوصًا لو فيه TextField واخد focus)
     FocusScope.of(context).unfocus();
+
+    // ✅ Settings from sidebar opens Settings VIEW (not inside tabs stack)
+    if (index == AdminTabs.settings) {
+      _openSettings();
+      return;
+    }
 
     final state = ref.read(adminDashboardControllerProvider);
     final orgId = _resolveOrgId(state);
@@ -102,28 +72,26 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
     }
 
     setState(() {
-      // ✅ لو كنت في notifications/settings ودوست نفس التاب، رجّعه للمحتوى
       if (index == selectedIndex) {
-        _viewIndex = _viewAdminTabs;
+        _viewIndex = AdminViews.tabs;
         return;
       }
 
       selectedIndex = index;
-      _viewIndex = _viewAdminTabs;
+      _viewIndex = AdminViews.tabs;
     });
   }
 
   void _openNotifications() {
     FocusScope.of(context).unfocus();
-    setState(() => _viewIndex = _viewNotifications);
+    setState(() => _viewIndex = AdminViews.notifications);
   }
 
   void _openSettings() {
     FocusScope.of(context).unfocus();
     setState(() {
-      // اختياري: تخلي السايدبار يلمّح إنك على Settings tab
-      selectedIndex = _idxSettingsTab;
-      _viewIndex = _viewSettings;
+      selectedIndex = AdminTabs.settings; // لمحة في السايدبار
+      _viewIndex = AdminViews.settings;
     });
   }
 
@@ -144,23 +112,24 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
       backgroundColor: const Color(0xFFF6F7F8),
       dividerColor: const Color(0xFFEDF2F7),
 
-      sidebar: SidebarWidget(
+      sidebar: AdminSidebarWidget(
         selectedIndex: selectedIndex,
-        onItemSelected: (index) => _goToAdminTab(index),
+        onItemSelected: _goToAdminTab,
       ),
 
       header: TopHeaderWidget(
+        searchController: _search,
+        onSearchChanged: (_) => setState(() {}),
+        searchHint: "Search users, join requests, or plans...",
         userName: displayName,
         userSubtitle:
             hasOrg ? "Organization Admin Portal" : "Setup your organization",
         notificationsCount: 0,
-
         onNotificationsTap: _openNotifications,
         onSettings: _openSettings,
         onLogout: () async => await _logout(context),
       ),
 
-      // ✅ كل التنقل بقى مجرد تغيير index في IndexedStack واحد
       child: IndexedStack(
         index: _viewIndex,
         children: [
@@ -179,8 +148,8 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
   ) {
     final hasOrg = orgId.isNotEmpty;
 
-    final isAllowedWithoutOrg =
-        selectedIndex == _idxSettingsTab || selectedIndex == _idxHelp;
+    // ✅ Settings مش جزء من tabs stack، لكن Help مسموح بدون org
+    final isAllowedWithoutOrg = selectedIndex == AdminTabs.help;
 
     if (!hasOrg && !isAllowedWithoutOrg) {
       return Padding(
@@ -218,9 +187,16 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
 
             if (!mounted) return;
 
+            // ✅ Show success only if organization is now available (no reliance on error listeners)
+            final latest = ref.read(adminDashboardControllerProvider);
+            final createdOrgId = _resolveOrgId(latest);
+            final ok = createdOrgId.isNotEmpty && latest.error == null;
+
+            if (!ok) return; // global toast already handled in controller
+
             setState(() {
-              selectedIndex = _idxUsers;
-              _viewIndex = _viewAdminTabs;
+              selectedIndex = AdminTabs.users;
+              _viewIndex = AdminViews.tabs;
             });
 
             AppToast.show(
@@ -234,8 +210,9 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
       );
     }
 
+    // ✅ نعرض Tabs (من غير SettingsPage هنا)
     return IndexedStack(
-      index: selectedIndex,
+      index: _effectiveAdminTabIndex(),
       children: [
         UserManagementContent(organizationId: orgId),
 
@@ -249,7 +226,6 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
               ),
 
         const UpgradePlansContent(),
-        const SettingsPage(),
 
         _buildPlaceholder(
           icon: Icons.help_outline_rounded,
@@ -261,13 +237,27 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
     );
   }
 
+  /// ✅ Map sidebar selectedIndex to the tabs stack index (0..3)
+  /// Sidebar indices:
+  /// users=0, join=1, upgrade=2, settings=3 (view), help=4
+  /// Tabs stack indices:
+  /// 0 users, 1 join, 2 upgrade, 3 help
+  int _effectiveAdminTabIndex() {
+    if (selectedIndex == AdminTabs.help) return 3;
+    if (selectedIndex >= AdminTabs.users &&
+        selectedIndex <= AdminTabs.upgradePlans) {
+      return selectedIndex; // 0..2 maps directly
+    }
+    // Settings selected: keep showing users
+    return 0;
+  }
+
   Future<void> _logout(BuildContext context) async {
     try {
       TokenStorage.clear();
       UserStorage.clear();
 
       if (!mounted) return;
-
       context.go(Routes.login);
     } catch (e) {
       if (!mounted) return;
@@ -313,7 +303,10 @@ class _AdminDashboardPageState extends ConsumerState<AdminDashboardPage> {
 
   bool _canAccessTab(int index, bool hasOrg) {
     if (hasOrg) return true;
-    return index == _idxUpgrade || index == _idxSettingsTab || index == _idxHelp;
+    // بدون org: Upgrade + Settings + Help مسموحين، والباقي مقفول
+    return index == AdminTabs.upgradePlans ||
+        index == AdminTabs.settings ||
+        index == AdminTabs.help;
   }
 
   Widget _buildPlaceholder({

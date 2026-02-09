@@ -5,16 +5,14 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/routing/routes.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../../core/storage/user_storage.dart';
-import '../../../../core/ui/layout/base_dashboard_shell.dart';
 import '../../../../core/ui/toast.dart';
 
 import '../../../../shared/pages/notifications_page.dart';
 import '../../../../shared/pages/settings_page.dart';
-
-// Re-use the nice header UI already built for shared.
+import '../../../../shared/widgets/base_dashboard_shell.dart';
 import '../../../../shared/widgets/top_header.dart';
 
-// ✅ NEW: Instructor sidebar like Figma
+import '../instructor_tabs.dart';
 import '../widgets/sidebar.dart';
 
 class InstructorDashboardPage extends ConsumerStatefulWidget {
@@ -25,51 +23,50 @@ class InstructorDashboardPage extends ConsumerStatefulWidget {
       _InstructorDashboardPageState();
 }
 
-class _InstructorDashboardPageState extends ConsumerState<InstructorDashboardPage> {
-  // Sidebar selected index (Figma)
-  // 0 Dashboard
-  // 1 Course
-  // 2 Question Bank
-  // 3 Quizzes
-  // 4 Settings  (opens settings view)
-  // 5 Help & Support (tab or route)
-  int _selectedIndex = 0;
+class _InstructorDashboardPageState
+    extends ConsumerState<InstructorDashboardPage> {
+  int _selectedIndex = InstructorTabs.dashboard;
+  int _viewIndex = InstructorViews.tabs;
 
-  // Global views indexes inside ONE IndexedStack
-  static const int _viewInstructorTabs = 0;
-  static const int _viewNotifications = 1;
-  static const int _viewSettings = 2;
+  late final TextEditingController _search;
 
-  int _viewIndex = _viewInstructorTabs;
+  @override
+  void initState() {
+    super.initState();
+    _search = TextEditingController();
+  }
+
+  @override
+  void dispose() {
+    _search.dispose();
+    super.dispose();
+  }
 
   void _goToTab(int index) {
     FocusScope.of(context).unfocus();
 
-    // ✅ Settings item should open settings view
-    if (index == 4) {
+    if (index == InstructorTabs.settings) {
       _openSettings();
       setState(() {
-        _selectedIndex = 4;
+        _selectedIndex = InstructorTabs.settings;
       });
       return;
     }
 
-    // ✅ Help item: keep it as tab index=5 (placeholder)
-    // (If you prefer to open a separate Help page/route later, do it here.)
     setState(() {
       _selectedIndex = index;
-      _viewIndex = _viewInstructorTabs;
+      _viewIndex = InstructorViews.tabs;
     });
   }
 
   void _openNotifications() {
     FocusScope.of(context).unfocus();
-    setState(() => _viewIndex = _viewNotifications);
+    setState(() => _viewIndex = InstructorViews.notifications);
   }
 
   void _openSettings() {
     FocusScope.of(context).unfocus();
-    setState(() => _viewIndex = _viewSettings);
+    setState(() => _viewIndex = InstructorViews.settings);
   }
 
   String _displayName() {
@@ -105,13 +102,14 @@ class _InstructorDashboardPageState extends ConsumerState<InstructorDashboardPag
       backgroundColor: const Color(0xFFF6F7F8),
       dividerColor: const Color(0xFFEDF2F7),
 
-      // ✅ Sidebar like Figma (same behavior hover/selected)
       sidebar: InstructorSidebarWidget(
         selectedIndex: _selectedIndex,
         onItemSelected: _goToTab,
       ),
 
       header: TopHeaderWidget(
+        searchController: _search,
+        onSearchChanged: (_) => setState(() {}),
         searchHint: "Search your courses, lessons, or students...",
         userName: displayName,
         userSubtitle: "Instructor",
@@ -124,13 +122,8 @@ class _InstructorDashboardPageState extends ConsumerState<InstructorDashboardPag
       child: IndexedStack(
         index: _viewIndex,
         children: [
-          // 0) Instructor main tabs
           _buildTabsContent(),
-
-          // 1) Notifications
           const NotificationsPage(),
-
-          // 2) Settings
           const SettingsPage(),
         ],
       ),
@@ -138,13 +131,6 @@ class _InstructorDashboardPageState extends ConsumerState<InstructorDashboardPag
   }
 
   Widget _buildTabsContent() {
-    // Tabs matched with sidebar indexes:
-    // 0 Dashboard
-    // 1 Course
-    // 2 Question Bank
-    // 3 Quizzes
-    // 4 Settings -> handled separately via _viewSettings
-    // 5 Help & Support
     return IndexedStack(
       index: _effectiveTabIndex(),
       children: const [
@@ -182,17 +168,17 @@ class _InstructorDashboardPageState extends ConsumerState<InstructorDashboardPag
     );
   }
 
-  /// ✅ Because Settings is not inside this IndexedStack.
-  /// If selectedIndex == 4, we keep showing last non-settings tab (or default to 0).
+  /// Sidebar indices:
+  /// 0 dashboard, 1 course, 2 questionBank, 3 quizzes, 4 settings(view), 5 help
+  /// Tabs stack indices:
+  /// 0 dashboard, 1 course, 2 questionBank, 3 quizzes, 4 help
   int _effectiveTabIndex() {
-    // Map sidebar selectedIndex to stack index:
-    // 0 -> 0
-    // 1 -> 1
-    // 2 -> 2
-    // 3 -> 3
-    // 5 -> 4 (Help view is last)
-    if (_selectedIndex == 5) return 4;
-    if (_selectedIndex >= 0 && _selectedIndex <= 3) return _selectedIndex;
+    if (_selectedIndex == InstructorTabs.help) return 4;
+
+    if (_selectedIndex >= InstructorTabs.dashboard &&
+        _selectedIndex <= InstructorTabs.quizzes) {
+      return _selectedIndex; // 0..3 maps directly
+    }
 
     // Settings selected: keep dashboard visible underneath (optional)
     return 0;

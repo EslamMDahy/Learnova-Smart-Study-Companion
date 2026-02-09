@@ -21,14 +21,15 @@ class OrganizationOut {
 
   factory OrganizationOut.fromJson(Map<String, dynamic> json) {
     return OrganizationOut(
-      id: (json["id"] ?? 0) as int,
-      name: (json["name"] ?? "") as String,
-      description: (json["description"] ?? "") as String,
-      logoUrl: json["logo_url"] as String?,
-      ownerId: (json["owner_id"] ?? 0) as int,
-      subscriptionPlanId: (json["subscription_plan_id"] ?? 0) as int,
-      inviteCode: (json["invite_code"] ?? "") as String,
-      subscriptionStatus: (json["subscription_status"] ?? "") as String,
+      id: _toInt(json["id"]) ?? 0,
+      name: (json["name"] ?? "").toString().trim(),
+      description: (json["description"] ?? "").toString().trim(),
+      logoUrl: _toNullableString(json["logo_url"]),
+      ownerId: _toInt(json["owner_id"]) ?? 0,
+      subscriptionPlanId: _toInt(json["subscription_plan_id"]) ?? 0,
+      inviteCode: (json["invite_code"] ?? "").toString().trim(),
+      subscriptionStatus:
+          (json["subscription_status"] ?? "").toString().trim().toLowerCase(),
     );
   }
 
@@ -36,10 +37,26 @@ class OrganizationOut {
         "id": id,
         "name": name,
         "description": description,
-        "logo_url": logoUrl,
+        if (logoUrl != null && logoUrl!.isNotEmpty) "logo_url": logoUrl,
         "owner_id": ownerId,
         "subscription_plan_id": subscriptionPlanId,
         "invite_code": inviteCode,
         "subscription_status": subscriptionStatus,
       };
+
+  // ---------------- helpers ----------------
+
+  static int? _toInt(dynamic v) {
+    if (v == null) return null;
+    if (v is int) return v;
+    if (v is double) return v.toInt();
+    if (v is String) return int.tryParse(v.trim());
+    return null;
+  }
+
+  static String? _toNullableString(dynamic v) {
+    if (v == null) return null;
+    final s = v.toString().trim();
+    return s.isEmpty ? null : s;
+  }
 }
