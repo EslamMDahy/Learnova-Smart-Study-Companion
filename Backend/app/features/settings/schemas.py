@@ -10,10 +10,20 @@ class UpdateProfileRequest(BaseModel):
     phone: Optional[str] = None
     bio: Optional[str] = None
 
-
 class UpdateProfileResponse(BaseModel):
     id: int
     full_name: str
     email: EmailStr
     avatar_url: Optional[str] = None
     system_role: str
+
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str
+
+
+class ChangePasswordResponse(BaseModel):
+    message: str
+    email_notification_sent: bool
