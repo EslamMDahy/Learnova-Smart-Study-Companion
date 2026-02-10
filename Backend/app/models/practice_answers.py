@@ -2,8 +2,8 @@ from sqlalchemy import (
     DateTime,
     Integer,
     Float,
-    Boolean,
     Text,
+    Boolean,
     ForeignKey,
     Index
 )
@@ -13,8 +13,8 @@ from datetime import datetime
 from app.db.base import Base
 
 
-class StudentAnswer(Base):
-    __tablename__ = "student_answers"
+class PracticeAnswer(Base):
+    __tablename__ = "practice_answers"
 
     id: Mapped[int] = mapped_column(
         Integer,
@@ -22,13 +22,13 @@ class StudentAnswer(Base):
         autoincrement=True
     )
 
-    attempt_id: Mapped[int] = mapped_column(
-        ForeignKey("student_exam_attempts.id", ondelete="CASCADE"),
+    session_id: Mapped[int] = mapped_column(
+        ForeignKey("practice_sessions.id", ondelete="CASCADE"),
         nullable=False
     )
 
-    exam_question_id: Mapped[int] = mapped_column(
-        ForeignKey("exam_questions.id", ondelete="CASCADE"),
+    question_id: Mapped[int] = mapped_column(
+        ForeignKey("questions.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
@@ -53,43 +53,27 @@ class StudentAnswer(Base):
         nullable=True
     )
 
-    auto_graded: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False
-    )
-
-    teacher_feedback: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True
-    )
-
-    teacher_reviewed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True
-    )
-
     time_taken_seconds: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True
     )
 
-    created_at: Mapped[datetime] = mapped_column(
+    confidence_level: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True
+    )
+
+    answered_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=datetime.utcnow
     )
 
-    updated_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        default=datetime.utcnow,
-        onupdate=datetime.utcnow
-    )
-
     __table_args__ = (
-        # unique (attempt_id, exam_question_id)
+        # unique (session_id, question_id)
         Index(
-            "uq_student_answers_attempt_exam_question",
-            "attempt_id",
-            "exam_question_id",
+            "uq_practice_answers_session_question",
+            "session_id",
+            "question_id",
             unique=True
         ),
     )

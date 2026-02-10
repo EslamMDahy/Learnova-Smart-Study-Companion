@@ -13,8 +13,8 @@ from datetime import datetime
 from app.db.base import Base
 
 
-class Topic(Base):
-    __tablename__ = "topics"
+class Module(Base):
+    __tablename__ = "modules"
 
     id: Mapped[int] = mapped_column(
         Integer,
@@ -22,8 +22,8 @@ class Topic(Base):
         autoincrement=True
     )
 
-    module_id: Mapped[int] = mapped_column(
-        ForeignKey("modules.id", ondelete="CASCADE"),
+    course_id: Mapped[int] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
@@ -44,20 +44,14 @@ class Topic(Base):
         default=0
     )
 
-    parent_topic_id: Mapped[int | None] = mapped_column(
-        ForeignKey("topics.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True
-    )
-
-    estimated_duration_minutes: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True
-    )
-
-    is_required: Mapped[bool] = mapped_column(
+    is_published: Mapped[bool] = mapped_column(
         Boolean,
         default=True
+    )
+
+    published_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -72,10 +66,10 @@ class Topic(Base):
     )
 
     __table_args__ = (
-        # unique (module_id, order_index)
+        # unique (course_id, order_index)
         Index(
-            "uq_topics_module_order",
-            "module_id",
+            "uq_modules_course_order",
+            "course_id",
             "order_index",
             unique=True
         ),
