@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/error_mapper.dart';
+import '../../../../core/storage/token_storage.dart';
 import '../../data/auth_providers.dart';
 import '../../data/auth_repository.dart';
 import 'login_state.dart';
@@ -28,7 +29,6 @@ class LoginController extends StateNotifier<LoginState> {
     String password, {
     required bool persist,
   }) async {
-    // التزم بالـ pattern: امسح error فقط عبر clearError
     clearError();
 
     state = state.copyWith(loading: true);
@@ -41,6 +41,7 @@ class LoginController extends StateNotifier<LoginState> {
       );
 
       state = state.copyWith(loading: false);
+      print("TOKEN=${TokenStorage.token}");
       return true;
     } catch (e) {
       state = state.copyWith(

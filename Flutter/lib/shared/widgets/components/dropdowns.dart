@@ -520,6 +520,80 @@ class _AppModernMenuItem extends StatelessWidget {
   }
 }
 
+class AppModernDropdown<T> extends StatelessWidget {
+  final String label;
+  final T value;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+  final IconData icon;
+
+  const AppModernDropdown({
+    super.key,
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+    this.icon = Icons.language_outlined,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+            color: AppColors.title,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 50,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.borderSoft),
+            boxShadow: const [
+              BoxShadow(
+                blurRadius: 2,
+                offset: Offset(0, 1),
+                color: AppColors.shadowSoft,
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.muted, size: 20),
+              const SizedBox(width: 10),
+              Expanded(
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<T>(
+                    isExpanded: true,
+                    value: value,
+                    items: items,
+                    onChanged: onChanged,
+                    icon: const Icon(Icons.expand_more_rounded),
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.title,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+
 // ===================== Sidebar components =====================
 
 /* -------------------- Models -------------------- */

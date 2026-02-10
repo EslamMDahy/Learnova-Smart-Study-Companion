@@ -1,7 +1,6 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter/foundation.dart';
 
-
 import '../../core/storage/token_storage.dart';
 import '../../core/storage/user_storage.dart';
 
@@ -11,16 +10,26 @@ import '../../features/auth/presentation/pages/set_new_password_page.dart';
 import '../../features/auth/presentation/pages/signup_page.dart';
 import '../../features/auth/presentation/pages/verify_email_page.dart';
 
-import '../../features/admin/presentation/pages/admin_dashboard_page.dart';
-import '../../features/instructor/presentation/pages/instructor_dashboard_page.dart';
 import '../../shared/pages/home_page.dart';
+
+import '../../features/settings/presentation/pages/settings_page.dart';
+
+// ✅ Admin shell + contents
+import '../../features/admin/presentation/pages/admin_shell.dart';
+import '../../features/admin/presentation/pages/admin_route_pages.dart';
+
+import '../../features/instructor/presentation/pages/instructor_shell.dart';
+import '../../features/instructor/presentation/pages/instructor_route_pages.dart';
+
+
+// لو عندك notifications page فعلاً:
+// import '../../shared/pages/notifications_page.dart';
 
 import 'routes.dart';
 
 final appRouter = GoRouter(
   initialLocation: _initialLocationSafe(),
 
-  // ✅ Re-evaluate when token or stored session changes
   refreshListenable: Listenable.merge([
     TokenStorage.listenable,
     UserStorage.listenable,
@@ -45,35 +54,39 @@ final appRouter = GoRouter(
       }
 
       // ❌ logged in and trying to access auth pages
-      // IMPORTANT: don't redirect away from /login until we have loaded `me`.
       if (hasToken && isAuthRoute) {
         if (!UserStorage.hasMe) return null;
 
-        if (UserStorage.isOwner) return Routes.admin;
-        if (UserStorage.isInstructor) return Routes.instructor;
+        if (UserStorage.isOwner) return Routes.adminUsers;
+        if (UserStorage.isInstructor) return Routes.instructorDashboard;
         return Routes.home;
       }
 
-      // ✅ Admin guard (owner-only)
-      if (path == Routes.admin) {
+      // ✅ Admin guard (owner-only) — IMPORTANT: protect /admin/*
+      if (path.startsWith(Routes.admin)) {
         if (!UserStorage.hasMe) return null;
         if (!UserStorage.isOwner) return Routes.home;
+
+        // ✅ /admin -> /admin/users
+        if (path == Routes.admin) return Routes.adminUsers;
       }
 
+
       // ✅ Instructor guard (instructor-only)
-      if (path == Routes.instructor) {
+      if (path.startsWith(Routes.instructor)) {
         if (!UserStorage.hasMe) return null;
 
         if (!UserStorage.isInstructor) {
-          // Owners go to admin, others go home
-          if (UserStorage.isOwner) return Routes.admin;
+          if (UserStorage.isOwner) return Routes.adminUsers;
           return Routes.home;
         }
+
+        if (path == Routes.instructor) return Routes.instructorDashboard;
       }
 
+  
       return null;
     } catch (_) {
-      // ✅ if storage parsing/reading failed -> treat as invalid session
       _clearSessionSafe();
       return Routes.login;
     }
@@ -81,38 +94,20 @@ final appRouter = GoRouter(
 
   routes: [
     GoRoute(
-      path: Routes.home,
-      name: RouteNames.home,
-      builder: (context, state) {
-        // ✅ Decide landing based on stored login payload (no /me needed)
-        if (UserStorage.isOwner) {
-          return const AdminDashboardPage();
-        }
-        if (UserStorage.isInstructor) {
-          return const InstructorDashboardPage();
-        }
-        return const HomePage();
-      },
-    ),
-
-    GoRoute(
       path: Routes.login,
       name: RouteNames.login,
       builder: (context, state) => const LoginPage(),
     ),
-
     GoRoute(
       path: Routes.signup,
       name: RouteNames.signup,
       builder: (context, state) => const SignUpPage(),
     ),
-
     GoRoute(
       path: Routes.forgotPassword,
       name: RouteNames.forgotPassword,
       builder: (context, state) => const ForgetPasswordPage(),
     ),
-
     GoRoute(
       path: Routes.verifyEmail,
       name: RouteNames.verifyEmail,
@@ -121,7 +116,6 @@ final appRouter = GoRouter(
         return VerifyEmailPage(token: token);
       },
     ),
-
     GoRoute(
       path: Routes.resetPassword,
       name: RouteNames.resetPassword,
@@ -131,17 +125,104 @@ final appRouter = GoRouter(
       },
     ),
 
+    // ✅ Global settings for all users (اختياري — لو عايزه موجودة)
     GoRoute(
-      path: Routes.admin,
-      name: RouteNames.admin,
-      builder: (context, state) => const AdminDashboardPage(),
+      path: Routes.settings,
+      name: RouteNames.settings,
+      builder: (context, state) => const SettingsPage(),
     ),
 
-    GoRoute(
-      path: Routes.instructor,
-      name: RouteNames.instructor,
-      builder: (context, state) => const InstructorDashboardPage(),
+    // ✅ Admin Shell + children (URL changes)
+    ShellRoute(
+      builder: (context, state, child) => AdminShell(child: child),
+      routes: [
+        GoRoute(
+          path: Routes.adminUsers,
+            pageBuilder: (context, state) => const NoTransitionPage(
+            child: AdminUsersRoutePage(),
+          ),
+        ),
+        GoRoute(
+          path: Routes.adminJoinRequests,
+            pageBuilder: (context, state) => const NoTransitionPage(
+            child: AdminJoinRequestsRoutePage(),
+          ),
+        ),
+        GoRoute(
+          path: Routes.adminUpgradePlans,
+            pageBuilder: (context, state) => const NoTransitionPage(
+            child: AdminUpgradePlansRoutePage(),
+          ),
+        ),
+        GoRoute(
+          path: Routes.adminSettings,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: AdminSettingsRoutePage(),
+          ),
+        ),
+        GoRoute(
+          path: Routes.adminHelp,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: AdminHelpRoutePage(),
+          ),
+        ),
+        GoRoute(
+          path: Routes.adminNotifications,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: AdminNotificationsRoutePage(),
+          ),
+        ),
+      ],
     ),
+
+    ShellRoute(
+      builder: (context, state, child) => InstructorShell(child: child),
+      routes: [
+        GoRoute(
+          path: Routes.instructorDashboard,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: InstructorDashboardRoutePage(),
+          ),
+        ),
+        GoRoute(
+          path: Routes.instructorCourse,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: InstructorCourseRoutePage(),
+          ),
+        ),
+        GoRoute(
+          path: Routes.instructorQuestionBank,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: InstructorQuestionBankRoutePage(),
+          ),
+        ),
+        GoRoute(
+          path: Routes.instructorQuizzes,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: InstructorQuizzesRoutePage(),
+          ),
+        ),
+        GoRoute(
+          path: Routes.instructorSettings,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: InstructorSettingsRoutePage(),
+          ),
+        ),
+        GoRoute(
+          path: Routes.instructorHelp,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: InstructorHelpRoutePage(),
+          ),
+        ),
+        GoRoute(
+          path: Routes.instructorNotifications,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: InstructorNotificationsRoutePage(),
+          ),
+        ),
+      ],
+    ),
+
   ],
 );
 
@@ -149,9 +230,9 @@ String _initialLocationSafe() {
   try {
     if (!TokenStorage.hasToken) return Routes.login;
 
-    // لو user data موجودة بالفعل (local/session) نحدد البداية صح.
-    if (UserStorage.hasMe && UserStorage.isOwner) return Routes.admin;
-    if (UserStorage.hasMe && UserStorage.isInstructor) return Routes.instructor;
+    if (UserStorage.hasMe && UserStorage.isOwner) return Routes.adminUsers;
+    if (UserStorage.hasMe && UserStorage.isInstructor) return Routes.instructorDashboard;
+
 
     return Routes.home;
   } catch (_) {
@@ -177,6 +258,26 @@ void _clearSessionSafe() {
   } catch (_) {}
 }
 
+  String _resolveOrgIdFromStorage() {
+    try {
+      final me = UserStorage.meJson;
+      if (me == null) return '';
+
+      // احتمالات شائعة
+      final direct = me['organization_id'] ?? me['organizationId'];
+      if (direct != null) return direct.toString().trim();
+
+      final org = me['organization'];
+      if (org is Map && org['id'] != null) return org['id'].toString().trim();
+
+      // عندك كمان selected_organization_id
+      final selected = me['selected_organization_id'];
+      if (selected != null) return selected.toString().trim();
+    } catch (_) {}
+
+    return '';
+  }
+
 class RouteNames {
   RouteNames._();
 
@@ -186,6 +287,17 @@ class RouteNames {
   static const forgotPassword = 'forgotPassword';
   static const verifyEmail = 'verifyEmail';
   static const resetPassword = 'resetPassword';
-  static const admin = 'admin';
+
   static const instructor = 'instructor';
+
+  static const settings = 'settings';
+
+  // ✅ admin children
+  static const adminUsers = 'adminUsers';
+  static const adminJoinRequests = 'adminJoinRequests';
+  static const adminUpgradePlans = 'adminUpgradePlans';
+  static const adminSettings = 'adminSettings';
+  static const adminHelp = 'adminHelp';
+  // static const adminNotifications = 'adminNotifications';
 }
+

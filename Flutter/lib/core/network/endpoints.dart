@@ -3,6 +3,7 @@ class Endpoints {
 
   static const _auth = '/auth';
   static const _orgs = '/organizations';
+  static const _settings = '/settings';
 
   // ================= AUTH =================
   static const login = '$_auth/login';
@@ -14,13 +15,17 @@ class Endpoints {
 
   // ============== ORGANIZATIONS ===========
   static const createOrganization = _orgs; // POST /organizations
-
   static String joinRequests(String organizationId) =>
       '$_orgs/$organizationId/join-requests'; // GET
-
   static String updateMemberStatus(
     String organizationId,
     String orgMemberId,
   ) =>
       '$_orgs/$organizationId/members/$orgMemberId/status'; // PATCH
+
+  // ================= SETTINGS =============
+  static const updateProfile = '$_settings/profile';          // PATCH
+  static const updatePassword = '$_settings/password';        // PATCH
+  static const deleteRequest = '$_settings/delete/request';   // POST
+  static const deleteConfirm = '$_settings/delete/confirm';   // DELETE (لو هتحتاجوه بعدين)
 }

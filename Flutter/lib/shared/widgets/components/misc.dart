@@ -862,12 +862,16 @@ class AppAuthHeaderIcon extends StatelessWidget {
     );
   }
 }
-
 class AppPrimaryLoadingButton extends StatelessWidget {
   final String label;
   final bool loading;
   final VoidCallback? onPressed;
   final double height;
+
+  // ✅ NEW
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+  final Color? borderColor;
 
   const AppPrimaryLoadingButton({
     super.key,
@@ -875,33 +879,48 @@ class AppPrimaryLoadingButton extends StatelessWidget {
     required this.loading,
     required this.onPressed,
     this.height = 50,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.borderColor,
   });
 
   @override
   Widget build(BuildContext context) {
+    final bg = backgroundColor ?? AppColors.primary;
+    final fg = foregroundColor ?? Colors.white;
+
+    final borderSide = borderColor == null
+        ? BorderSide.none
+        : BorderSide(color: borderColor!, width: 1);
+
     return SizedBox(
       width: double.infinity,
       height: height,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.primary,
+          backgroundColor: bg,
+          foregroundColor: fg,
+          disabledBackgroundColor: bg.withOpacity(0.6),
+          disabledForegroundColor: fg.withOpacity(0.85),
+          elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(10),
+            side: borderSide,
           ),
         ),
         onPressed: loading ? null : onPressed,
         child: loading
-            ? const SizedBox(
+            ? SizedBox(
                 width: 20,
                 height: 20,
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
-                  color: Colors.white,
+                  color: fg,
                 ),
               )
             : Text(
                 label,
-                style: const TextStyle(color: Colors.white, fontSize: 16),
+                style: TextStyle(color: fg, fontSize: 16, fontWeight: FontWeight.w700),
               ),
       ),
     );
