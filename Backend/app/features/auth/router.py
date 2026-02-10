@@ -11,6 +11,8 @@ from .schemas import ForgetPasswordRequest
 from .schemas import ForgetPasswordResponse
 from .schemas import ResetPasswordRequest
 from .schemas import ResetPasswordResponse
+from .schemas import SendVerificationEmailRequest
+from .schemas import SendVerificationEmailResponse
 from . import service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -19,6 +21,12 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 @router.post("/register", status_code=201)
 def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     return service.register_user(payload, db)
+
+@router.post("/send-verification-email",response_model=SendVerificationEmailResponse,)
+def send_verification_email(
+    payload: SendVerificationEmailRequest,
+    db: Session = Depends(get_db),):
+    return service.send_verification_email(payload, db)
 
 @router.get("/verify-email")
 def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
@@ -33,7 +41,9 @@ def me(user = Depends(get_current_user)):
     return {"user": user}
 
 @router.post("/forgot-password", response_model=ForgetPasswordResponse)
-def forget_password(payload:ForgetPasswordRequest, db: Session = Depends(get_db)):
+def forget_password(
+    payload:ForgetPasswordRequest, 
+    db: Session = Depends(get_db)):
     return service.forget_password_request(payload, db)
 
 @router.post("/reset-password", response_model=ResetPasswordResponse)

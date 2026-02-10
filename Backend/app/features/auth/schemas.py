@@ -10,9 +10,20 @@ class RegisterRequest(BaseModel):
     # invite_code: Optional[str] = None
     system_role: Optional[str] = None
 
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: str = Field(min_length=6)
+
+
+
+class SendVerificationEmailRequest(BaseModel):
+    email: EmailStr
+
+class SendVerificationEmailResponse(BaseModel):
+    message: str
+    email_sent: bool
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -20,11 +31,15 @@ class TokenResponse(BaseModel):
     full_name: str
     email: str
 
+
+
 class ForgetPasswordRequest(BaseModel):
     email: EmailStr
 
 class ForgetPasswordResponse(BaseModel):
     message: str
+
+
 
 class ResetPasswordRequest(BaseModel):
     token: str = Field(..., min_length=10)

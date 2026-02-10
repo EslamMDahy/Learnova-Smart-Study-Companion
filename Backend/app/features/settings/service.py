@@ -192,7 +192,7 @@ def request_delete_account(*, payload, db: Session, current_user):
     # 1) load user credentials
     row = db.execute(
         text("""
-            SELECT id, full_name, email, hashed_password, is_email_verified
+            SELECT id, full_name, email, hashed_password
             FROM users
             WHERE id = :uid
             LIMIT 1
@@ -203,7 +203,7 @@ def request_delete_account(*, payload, db: Session, current_user):
     if not row:
         raise HTTPException(status_code=401, detail="Invalid token")
 
-    _, full_name, email, hashed_pw, _ = row
+    _, full_name, email, hashed_pw = row
 
     # 2) verify current password
     if not payload.current_password or not verify_password(payload.current_password, hashed_pw):
