@@ -1,8 +1,8 @@
-"""initial models
+"""your message here
 
-Revision ID: 84dfbb9feaf0
+Revision ID: 22afff4a221b
 Revises: 
-Create Date: 2026-02-10 20:35:54.131715
+Create Date: 2026-02-10 23:56:23.721245
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '84dfbb9feaf0'
+revision: str = '22afff4a221b'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -62,7 +62,7 @@ def upgrade() -> None:
     sa.Column('student_id', sa.String(length=100), nullable=True),
     sa.Column('university_email', sa.String(length=255), nullable=True),
     sa.Column('language_preference', sa.String(length=20), nullable=False),
-    sa.Column('system_role', sa.Enum('USER', 'ADMIN', 'SUPPORT', name='system_role_enum'), nullable=False),
+    sa.Column('system_role', sa.Enum('owner', 'admin', 'instructor', 'assistant', 'student', name='system_role_enum'), nullable=False),
     sa.Column('is_email_verified', sa.Boolean(), nullable=False),
     sa.Column('email_verified_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('account_status', sa.Enum('active', 'suspended', 'deleted', 'pending_activation', name='account_status_enum'), nullable=False),

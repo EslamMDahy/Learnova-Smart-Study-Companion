@@ -48,8 +48,18 @@ def register_user(payload, db: Session):
     row = db.execute(
         text(
             """
-            INSERT INTO users (full_name, email, hashed_password, system_role, is_email_verified, created_at, updated_at)
-            VALUES (:full_name, :email, :hashed_password, :system_role, :is_email_verified, NOW(), NOW())
+            INSERT INTO users (
+                full_name, email, hashed_password,
+                system_role, language_preference, account_status,
+                is_email_verified, created_at, updated_at
+            )
+            VALUES (
+                :full_name, :email, :hashed_password,
+                CAST(:system_role AS system_role_enum),
+                :language_preference,
+                CAST(:account_status AS account_status_enum),
+                :is_email_verified, NOW(), NOW()
+            )
             RETURNING id
             """
         ),
@@ -58,9 +68,14 @@ def register_user(payload, db: Session):
             "email": payload.email,
             "hashed_password": hashed_pw,
             "system_role": system_role,
+            "language_preference": "en",
+            "account_status": "pending_activation",  # أو "active"
             "is_email_verified": False,
         },
     ).first()
+
+    db.commit()
+
 
     if not row:
         raise HTTPException(status_code=500, detail="Failed to create user")

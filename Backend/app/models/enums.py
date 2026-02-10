@@ -2,9 +2,11 @@ from enum import Enum
 
 
 class SystemRole(str, Enum):
-    USER = "USER"
-    ADMIN = "ADMIN"
-    SUPPORT = "SUPPORT"
+    owner = "owner"
+    admin = "admin"
+    instructor = "instructor"
+    assistant = "assistant"
+    student = "student"
 
 class AccountStatus(str, Enum):
     active = "active"

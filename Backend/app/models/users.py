@@ -72,7 +72,6 @@ class User(Base):
 
     system_role: Mapped[SystemRole] = mapped_column(
         SQLEnum(SystemRole, name="system_role_enum"),
-        default=SystemRole.USER
     )
 
     is_email_verified: Mapped[bool] = mapped_column(
