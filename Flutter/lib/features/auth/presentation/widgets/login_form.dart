@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:learnova/core/storage/user_storage.dart';
 import '../../../../core/routing/routes.dart';
 import '../controllers/login_controller.dart';
 import '../../../../shared/widgets/app_ui_components.dart';
@@ -89,7 +90,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
     if (!mounted) return;
 
-    if (ok) context.go(Routes.admin);
+    if (ok) {
+      if (UserStorage.isOwner) context.go(Routes.adminUsers);
+      // ignore: curly_braces_in_flow_control_structures
+      else if (UserStorage.isInstructor)context.go(Routes.instructorDashboard);
+      else context.go(Routes.home);
+    }
   }
 
   @override
