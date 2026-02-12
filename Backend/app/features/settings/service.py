@@ -13,10 +13,7 @@ from .schemas import UpdateProfileRequest
 from app.core.security import hash_password
 from app.core.security import verify_password  # عدّل import حسب مكانهم عندك
 from app.core.emailer import send_email 
-
-email_logo_url = "https://raw.githubusercontent.com/EslamMDahy/Learnova-Smart-Study-Companion/refs/heads/main/Backend/assets/logo.ico"
-email_brand_year = 2026
-email_support_email = "support@learnova.com"
+from app.core.config import settings
 
 
 def _generate_otp() -> str:
@@ -26,8 +23,6 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
     user_id = current_user.get("id")
     if not user_id:
         raise HTTPException(status_code=401, detail="Invalid token")
-
-    # NOTE: phone/bio intentionally ignored for now (no DB columns yet)
 
     update_fields = {}
     if payload.full_name != "":
@@ -166,7 +161,7 @@ def change_password(*, payload, db: Session, current_user):
     db.commit()
 
     # 7) send notification email (best-effort)
-    frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+    frontend_url = settings.frontend_base_url
     secure_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={reset_token}"
 
     subject = "Learnova – Password changed"
@@ -202,7 +197,7 @@ def change_password(*, payload, db: Session, current_user):
                     <table cellpadding="0" cellspacing="0">
                     <tr>
                         <td style="vertical-align:middle;">
-                        <img src="{email_logo_url}" width="40" height="40" alt="Learnova"
+                        <img src="{settings.email_logo_url}" width="40" height="40" alt="Learnova"
                             style="display:block;border:0;outline:none;border-radius:10px;" />
                         </td>
                         <td style="vertical-align:middle;padding-left:10px;">
@@ -304,10 +299,10 @@ def change_password(*, payload, db: Session, current_user):
                 <tr>
                 <td align="center" style="padding:14px 10px 0;">
                     <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                    © {email_brand_year} Learnova. All rights reserved.
+                    © {settings.email_brand_year} Learnova. All rights reserved.
                     </p>
                     <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                    Need help? Contact us at <a href="mailto:{email_support_email}" style="color:#137FEC;text-decoration:none;">{email_support_email}</a>
+                    Need help? Contact us at <a href="mailto:{settings.email_support_email}" style="color:#137FEC;text-decoration:none;">{settings.email_support_email}</a>
                     </p>
                 </td>
                 </tr>
@@ -425,7 +420,7 @@ def request_delete_account(*, payload, db: Session, current_user):
                     <table cellpadding="0" cellspacing="0">
                     <tr>
                         <td style="vertical-align:middle;">
-                        <img src="{email_logo_url}" width="40" height="40" alt="Learnova"
+                        <img src="{settings.email_logo_url}" width="40" height="40" alt="Learnova"
                             style="display:block;border:0;outline:none;border-radius:10px;" />
                         </td>
                         <td style="vertical-align:middle;padding-left:10px;">
@@ -520,10 +515,10 @@ def request_delete_account(*, payload, db: Session, current_user):
                 <tr>
                 <td align="center" style="padding:14px 10px 0;">
                     <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                    © {email_brand_year} Learnova. All rights reserved.
+                    © {settings.email_brand_year} Learnova. All rights reserved.
                     </p>
                     <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                    Need help? Contact us at <a href="mailto:{email_support_email}" style="color:#137FEC;text-decoration:none;">{email_support_email}</a>
+                    Need help? Contact us at <a href="mailto:{settings.email_support_email}" style="color:#137FEC;text-decoration:none;">{settings.email_support_email}</a>
                     </p>
                 </td>
                 </tr>

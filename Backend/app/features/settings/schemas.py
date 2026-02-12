@@ -11,7 +11,7 @@ class UpdateProfileRequest(BaseModel):
 
     # في DB اسمها phone_number
     # ولو Flutter/قديم بيبعت phone هنقبله alias
-    phone_number: Optional[str] = Field(default=None, alias="phone")
+    phone: Optional[str] = Field(default=None, alias="phone")
 
     bio: Optional[str] = None
     language_preference: Optional[str] = None

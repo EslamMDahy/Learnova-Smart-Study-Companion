@@ -7,7 +7,7 @@ from app.features.settings.router import router as settings_router
 from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
-load_dotenv("env.env")
+load_dotenv()
 
 app = FastAPI()
 origins = [

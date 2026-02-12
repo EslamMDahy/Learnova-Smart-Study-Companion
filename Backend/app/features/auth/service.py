@@ -15,11 +15,10 @@ from app.core.security import hash_password
 from app.core.security import verify_password
 from app.core.emailer import send_email
 from app.core.jwt import create_access_token
-# from app.core.token_store import mark_token_used
+from app.core.config import settings
 
-email_logo_url = "https://raw.githubusercontent.com/EslamMDahy/Learnova-Smart-Study-Companion/refs/heads/main/Backend/assets/logo.ico"
-email_brand_year = 2026
-email_support_email = "support@learnova.com"
+
+
 
 def register_user(payload, db: Session):
     # 1) Check email unique
@@ -150,7 +149,7 @@ def send_verification_email(payload, db: Session):
     
 
     # 4) Build verification link (fallback بدل RuntimeError)
-    frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+    frontend_url = settings.frontend_base_url
     verify_link = f"{frontend_url.rstrip('/')}/#/verify-email?token={verify_token}"
     
 
@@ -184,7 +183,7 @@ def send_verification_email(payload, db: Session):
                     <table cellpadding="0" cellspacing="0">
                     <tr>
                         <td style="vertical-align:middle;">
-                        <img src="{email_logo_url}" width="40" height="40" alt="Learnova"
+                        <img src="{settings.email_logo_url}" width="40" height="40" alt="Learnova"
                             style="display:block;border:0;outline:none;border-radius:10px;" />
                         </td>
                         <td style="vertical-align:middle;padding-left:10px;">
@@ -281,10 +280,10 @@ def send_verification_email(payload, db: Session):
                 <tr>
                 <td align="center" style="padding:14px 10px 0;">
                     <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                    © {email_brand_year} Learnova. All rights reserved.
+                    © {settings.email_brand_year} Learnova. All rights reserved.
                     </p>
                     <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                    Need help? Contact us at <a href="mailto:{email_support_email}" style="color:#137FEC;text-decoration:none;">{email_support_email}</a>
+                    Need help? Contact us at <a href="mailto:{settings.email_support_email}" style="color:#137FEC;text-decoration:none;">{settings.email_support_email}</a>
                     </p>
                 </td>
                 </tr>
@@ -525,7 +524,7 @@ def forget_password_request(payload, db):
     db.commit()
     
     
-    frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+    frontend_url = settings.frontend_base_url
     reset_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={resetPass_token}"
 
     subject = "Learnova – Reset your password"
@@ -563,7 +562,7 @@ def forget_password_request(payload, db):
                     <table cellpadding="0" cellspacing="0">
                     <tr>
                         <td>
-                        <img src="{email_logo_url}" width="40" height="40" alt="Learnova"
+                        <img src="{settings.email_logo_url}" width="40" height="40" alt="Learnova"
                             style="display:block;border-radius:10px;" />
                         </td>
                         <td style="padding-left:10px;">

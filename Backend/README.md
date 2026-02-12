@@ -145,13 +145,15 @@ set "API_BASE_URL=http://127.0.0.1:8000"
 
 Apply migrations:
 ```bat
-alembic upgrade head
+python -m alembic -c alembic.ini upgrade head
+
 ```
 
 Useful:
 ```bat
 alembic current
 alembic history
+
 ```
 
 ---
@@ -161,6 +163,7 @@ alembic history
 Connect to DB:
 ```bat
 C:\pgsql\bin\psql -U postgres -d learnova
+
 ```
 
 ### Generate a real password hash (recommended)
