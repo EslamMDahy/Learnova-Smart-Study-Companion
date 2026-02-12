@@ -15,6 +15,8 @@ class UpdateProfileResponse(BaseModel):
     full_name: str
     email: EmailStr
     avatar_url: Optional[str] = None
+    phone_number: Optional[str] = None
+    bio: Optional[str] = None
     system_role: str
 
 

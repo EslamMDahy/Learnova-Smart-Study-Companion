@@ -83,189 +83,7 @@ def register_user(payload, db: Session):
     user_id = row[0]
 
     send_verification_email(payload, db)
-
-    # # 5) Create verification token
-    # verify_token = secrets.token_urlsafe(32)
-    # expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
-
-    # db.execute(
-    #     text(
-    #         """
-    #         INSERT INTO user_tokens (user_id, type, token, expires_at, created_at)
-    #         VALUES (:user_id, :type, :token, :expires_at, NOW())
-    #         """
-    #     ),
-    #     {
-    #         "user_id": user_id,
-    #         "type": "verify_email",
-    #         "token": verify_token,
-    #         "expires_at": expires_at,
-    #     },
-    # )
-    # db.commit()
-
     
-
-    # # 6) Build verification link (fallback بدل RuntimeError)
-    # frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
-    # verify_link = f"{frontend_url.rstrip('/')}/#/verify-email?token={verify_token}"
-    
-
-    # text_body = f"""
-    # Welcome to Learnova!
-
-    # Verify your email:
-    # {verify_link}
-
-    # This link expires in 24 hours.
-    # """
-    # html_body = f"""
-    # <!DOCTYPE html>
-    # <html lang="en">
-    # <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,sans-serif;">
-    #     <!-- Preheader (hidden) -->
-    #     <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
-    #     Verify your email to activate your Learnova account.
-    #     </div>
-
-    #     <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;">
-    #     <tr>
-    #         <td align="center" style="padding:28px 16px;">
-
-    #         <!-- Outer container -->
-    #         <table width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:560px;">
-
-    #             <!-- Brand header -->
-    #             <tr>
-    #             <td align="left" style="padding:0 8px 14px;">
-    #                 <table cellpadding="0" cellspacing="0">
-    #                 <tr>
-    #                     <td style="vertical-align:middle;">
-    #                     <img src="{email_logo_url}" width="40" height="40" alt="Learnova"
-    #                         style="display:block;border:0;outline:none;border-radius:10px;" />
-    #                     </td>
-    #                     <td style="vertical-align:middle;padding-left:10px;">
-    #                     <div style="font-size:16px;font-weight:800;color:#111827;line-height:1;">
-    #                         Learnova
-    #                     </div>
-    #                     <div style="font-size:12px;color:#6b7280;margin-top:2px;">
-    #                         Email Verification
-    #                     </div>
-    #                     </td>
-    #                 </tr>
-    #                 </table>
-    #             </td>
-    #             </tr>
-
-    #             <!-- Card -->
-    #             <tr>
-    #             <td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
-    #                 <!-- Top accent -->
-    #                 <div style="height:6px;background:#137FEC;"></div>
-
-    #                 <table width="100%" cellpadding="0" cellspacing="0">
-    #                 <tr>
-    #                     <td style="padding:26px 26px 10px;">
-    #                     <h2 style="margin:0;color:#111827;font-size:22px;line-height:1.25;">
-    #                         Welcome to Learnova 👋
-    #                     </h2>
-    #                     <p style="margin:10px 0 0;color:#374151;line-height:1.7;font-size:14px;">
-    #                         Please confirm your email address to activate your account.
-    #                     </p>
-
-    #                     <!-- Button -->
-    #                     <table cellpadding="0" cellspacing="0" style="margin-top:18px;">
-    #                         <tr>
-    #                         <td align="center" bgcolor="#137FEC" style="border-radius:10px;">
-    #                             <a href="{verify_link}"
-    #                             style="display:inline-block;padding:12px 18px;font-size:14px;font-weight:700;
-    #                                     color:#ffffff;text-decoration:none;border-radius:10px;">
-    #                             Verify Email
-    #                             </a>
-    #                         </td>
-    #                         </tr>
-    #                     </table>
-
-    #                     <!-- Info chips -->
-    #                     <table cellpadding="0" cellspacing="0" style="margin-top:16px;">
-    #                         <tr>
-    #                         <td style="background:#F3F4F6;border:1px solid #E5E7EB;border-radius:999px;padding:6px 10px;">
-    #                             <span style="font-size:12px;color:#374151;">
-    #                             ⏳ Expires in 24 hours
-    #                             </span>
-    #                         </td>
-    #                         <td style="width:10px;"></td>
-    #                         <td style="background:#EAF3FF;border:1px solid #BBD9FF;border-radius:999px;padding:6px 10px;">
-    #                             <span style="font-size:12px;color:#1F4B99;">
-    #                             🔒 Secure link
-    #                             </span>
-    #                         </td>
-    #                         </tr>
-    #                     </table>
-
-    #                     </td>
-    #                 </tr>
-
-    #                 <!-- Divider -->
-    #                 <tr>
-    #                     <td style="padding:0 26px;">
-    #                     <div style="height:1px;background:#E5E7EB;"></div>
-    #                     </td>
-    #                 </tr>
-
-    #                 <!-- Fallback link -->
-    #                 <tr>
-    #                     <td style="padding:14px 26px 24px;">
-    #                     <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.6;">
-    #                         If the button doesn’t work, copy and paste this link into your browser:
-    #                     </p>
-    #                     <p style="margin:10px 0 0;font-size:12px;line-height:1.6;">
-    #                         <a href="{verify_link}" style="color:#137FEC;text-decoration:none;word-break:break-all;">
-    #                         {verify_link}
-    #                         </a>
-    #                     </p>
-
-    #                     <p style="margin:16px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
-    #                         If you didn’t create an account, you can safely ignore this email.
-    #                     </p>
-    #                     </td>
-    #                 </tr>
-    #                 </table>
-    #             </td>
-    #             </tr>
-
-    #             <!-- Footer -->
-    #             <tr>
-    #             <td align="center" style="padding:14px 10px 0;">
-    #                 <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
-    #                 © {email_brand_year} Learnova. All rights reserved.
-    #                 </p>
-    #                 <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
-    #                 Need help? Contact us at <a href="mailto:{email_support_email}" style="color:#137FEC;text-decoration:none;">{email_support_email}</a>
-    #                 </p>
-    #             </td>
-    #             </tr>
-
-    #         </table>
-    #         </td>
-    #     </tr>
-    #     </table>
-    # </body>
-    # </html>
-    # """
-
-
-    # # 7) Send verification email (متبوظش التسجيل لو الإيميل وقع)
-    # try:
-    #     send_email(
-    #         to=payload.email,
-    #         subject="Learnova – Verify your email",
-    #         body=text_body,
-    #         html=html_body,
-    #     )
-    # except Exception:
-    #     pass
-
     return {
         "message": "Registration successful. Please check your email.",
         "email_verification_required": True,
@@ -530,7 +348,7 @@ def verify_email_token(token: str, db: Session):
 
     # 4) mark user verified + mark token used
     db.execute(
-        text("UPDATE users SET is_email_verified = TRUE, updated_at = NOW() WHERE id = :uid"),
+        text("UPDATE users SET is_email_verified = TRUE, email_verified_at = NOW(), updated_at = NOW() WHERE id = :uid"),
         {"uid": user_id},
     )
 
@@ -551,7 +369,7 @@ def login_user(payload: LoginRequest, db: Session):
              SELECT
              id, full_name, email, avatar_url,
              system_role, hashed_password, 
-             is_email_verified, token_version
+             is_email_verified, last_password_change
              FROM users
              WHERE email = :email
              """
@@ -563,7 +381,7 @@ def login_user(payload: LoginRequest, db: Session):
     if not row:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    user_id, full_name, email, avatar_url, system_role, hashed_pw, is_verified, token_version = row
+    user_id, full_name, email, avatar_url, system_role, hashed_pw, is_verified, last_password_change = row
 
     # 2) باسورد غلط (قبل verification)
     if not verify_password(payload.password, hashed_pw):
@@ -572,7 +390,7 @@ def login_user(payload: LoginRequest, db: Session):
     # 3) هنا فقط نكشف أنه مش verified لأن credentials صح
     if not is_verified:
         raise HTTPException(status_code=403, detail="Email not verified")
-
+    
     # 4) preparing the login response data
     user = {
         "id": user_id,
@@ -635,7 +453,7 @@ def login_user(payload: LoginRequest, db: Session):
     # 5) Cereating JWT
     access_token = create_access_token(
         subject=str(user_id),
-        extra={"email": email, "full_name": full_name, "tv": token_version, "system_role": system_role},
+        extra={"email": email, "full_name": full_name, "last_password_change": int(last_password_change.timestamp()), "system_role": system_role},
     )
 
     # 6) Sending the login response
@@ -647,6 +465,12 @@ def login_user(payload: LoginRequest, db: Session):
 
     if system_role == "owner":
         resp["organizations"] = orgs
+
+    db.execute(
+        text("UPDATE users SET last_login_at = NOW() WHERE id = :uid"),
+        {"uid": user_id},
+    )
+    db.commit()
 
     return resp
 
@@ -908,7 +732,7 @@ def reset_password(payload, db):
             UPDATE users
             SET hashed_password = :hp, 
                 updated_at = NOW(),
-                token_version = token_version + 1
+                last_password_change = NOW()
             WHERE id = :uid
             """
         ),

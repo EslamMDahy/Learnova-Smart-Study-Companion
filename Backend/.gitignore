@@ -1,4 +1,45 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ---- Virtual env ----
+.venv/
+venv/
+ENV/
+env/
+
+# ---- Environment ----
+.env
+.env.*
+*.sqlite3
+
+# ---- Logs / temp ----
+*.log
+*.tmp
+*.swp
+.DS_Store
+Thumbs.db
+
+# ---- IDE ----
+.vscode/
+.idea/
+
+# ---- Project debug artifacts (بتوع اللي عملناهم) ----
+_crash_probe.py
+_alembic_sql_preview.sql
+
+
 MY_README.md
 old_requirements.txt
-__pycache__/
 env.env

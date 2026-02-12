@@ -14,8 +14,9 @@ from app.core.security import hash_password
 from app.core.security import verify_password  # عدّل import حسب مكانهم عندك
 from app.core.emailer import send_email 
 
-# DELETE_OTP_TTL_MINUTES = 10
-# DELETE_OTP_TYPE = "delete_account_otp"
+email_logo_url = "https://raw.githubusercontent.com/EslamMDahy/Learnova-Smart-Study-Companion/refs/heads/main/Backend/assets/logo.ico"
+email_brand_year = 2026
+email_support_email = "support@learnova.com"
 
 
 def _generate_otp() -> str:
@@ -35,6 +36,10 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
     # avatar url can be updated to nothing or "" (deleted)
     if payload.avatar_url is not None:
         update_fields["avatar_url"] = payload.avatar_url.strip()
+    if payload.phone is not None:
+        update_fields["phone_number"] = payload.phone.strip()
+    if payload.bio is not None:
+        update_fields["bio"] = payload.bio.strip()
 
     if not update_fields:
         # مفيش حاجة تتعمل
@@ -52,6 +57,14 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
         set_clauses.append("avatar_url = :avatar_url")
         params["avatar_url"] = update_fields["avatar_url"]
 
+    if "phone_number" in update_fields:
+        set_clauses.append("phone_number = :phone_number")
+        params["phone_number"] = update_fields["phone_number"]
+
+    if "bio" in update_fields:
+        set_clauses.append("bio = :bio")
+        params["bio"] = update_fields["bio"]
+
     set_clauses.append("updated_at = NOW()")
 
     row = db.execute(
@@ -59,7 +72,7 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
             UPDATE users
             SET {", ".join(set_clauses)}
             WHERE id = :uid
-            RETURNING id, full_name, email, avatar_url, system_role
+            RETURNING id, full_name, email, avatar_url, phone_number, bio, system_role
         """),
         params,
     ).first()
@@ -74,7 +87,9 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
         "full_name": row[1],
         "email": row[2],
         "avatar_url": row[3],
-        "system_role": row[4],
+        "phone_number": row[4],
+        "bio": row[5],
+        "system_role": row[6],
     }
 
 
@@ -118,7 +133,7 @@ def change_password(*, payload, db: Session, current_user):
             UPDATE users
             SET hashed_password = :hp,
                 updated_at = NOW(),
-                token_version = token_version + 1
+                last_password_change = NOW()
             WHERE id = :uid
         """),
         {"hp": new_hashed, "uid": user_id},
@@ -152,19 +167,158 @@ def change_password(*, payload, db: Session, current_user):
 
     # 7) send notification email (best-effort)
     frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
-    reset_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={reset_token}"
+    secure_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={reset_token}"
 
     subject = "Learnova – Password changed"
     text_body = f"""
-        Hello {full_name or ''}
+    Hello {full_name or ''}
 
-        Your Learnova password was just changed.
+    Your Learnova password was just changed.
 
-        If this wasn't you, secure your account immediately by setting a new password using this link:
-        {reset_link}
+    If this wasn't you, secure your account immediately by setting a new password using this link:
+    {secure_link}
 
-        This link expires in 15 minutes.
-        """
+    This link expires in 15 minutes.
+    """
+
+    html_body = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,sans-serif;">
+        <!-- Preheader -->
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+        Your Learnova password was changed. If this wasn’t you, secure your account now.
+        </div>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;">
+        <tr>
+            <td align="center" style="padding:28px 16px;">
+
+            <table width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:560px;">
+
+                <!-- Brand -->
+                <tr>
+                <td style="padding:0 8px 14px;">
+                    <table cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="vertical-align:middle;">
+                        <img src="{email_logo_url}" width="40" height="40" alt="Learnova"
+                            style="display:block;border:0;outline:none;border-radius:10px;" />
+                        </td>
+                        <td style="vertical-align:middle;padding-left:10px;">
+                        <div style="font-size:16px;font-weight:800;color:#111827;line-height:1;">
+                            Learnova
+                        </div>
+                        <div style="font-size:12px;color:#6b7280;margin-top:2px;">
+                            Security Alert
+                        </div>
+                        </td>
+                    </tr>
+                    </table>
+                </td>
+                </tr>
+
+                <!-- Card -->
+                <tr>
+                <td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
+                    <!-- Top accent -->
+                    <div style="height:6px;background:#137FEC;"></div>
+
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="padding:26px 26px 10px;">
+                        <h2 style="margin:0;color:#111827;font-size:22px;line-height:1.25;">
+                            Your password was changed 🔐
+                        </h2>
+
+                        <p style="margin:10px 0 0;color:#374151;line-height:1.7;font-size:14px;">
+                            Hello {full_name or ''}, your Learnova password was just changed.
+                        </p>
+
+                        <p style="margin:10px 0 0;color:#374151;line-height:1.7;font-size:14px;">
+                            If this wasn’t you, please secure your account immediately by setting a new password.
+                        </p>
+
+                        <!-- Button -->
+                        <table cellpadding="0" cellspacing="0" style="margin-top:18px;">
+                            <tr>
+                            <td align="center" bgcolor="#137FEC" style="border-radius:10px;">
+                                <a href="{secure_link}"
+                                style="display:inline-block;padding:12px 18px;font-size:14px;font-weight:700;
+                                        color:#ffffff;text-decoration:none;border-radius:10px;">
+                                Secure Account
+                                </a>
+                            </td>
+                            </tr>
+                        </table>
+
+                        <!-- Info chips -->
+                        <table cellpadding="0" cellspacing="0" style="margin-top:16px;">
+                            <tr>
+                            <td style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:999px;padding:6px 10px;">
+                                <span style="font-size:12px;color:#9A3412;">
+                                ⏳ Link expires in 15 minutes
+                                </span>
+                            </td>
+                            <td style="width:10px;"></td>
+                            <td style="background:#EAF3FF;border:1px solid #BBD9FF;border-radius:999px;padding:6px 10px;">
+                                <span style="font-size:12px;color:#1F4B99;">
+                                🔒 Security action
+                                </span>
+                            </td>
+                            </tr>
+                        </table>
+
+                        </td>
+                    </tr>
+
+                    <!-- Divider -->
+                    <tr>
+                        <td style="padding:0 26px;">
+                        <div style="height:1px;background:#E5E7EB;"></div>
+                        </td>
+                    </tr>
+
+                    <!-- Fallback -->
+                    <tr>
+                        <td style="padding:14px 26px 24px;">
+                        <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.6;">
+                            If the button doesn’t work, copy and paste this link into your browser:
+                        </p>
+                        <p style="margin:10px 0 0;font-size:12px;line-height:1.6;">
+                            <a href="{secure_link}" style="color:#137FEC;text-decoration:none;word-break:break-all;">
+                            {secure_link}
+                            </a>
+                        </p>
+
+                        <p style="margin:16px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                            If you changed your password, you can safely ignore this email.
+                        </p>
+                        </td>
+                    </tr>
+                    </table>
+                </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                <td align="center" style="padding:14px 10px 0;">
+                    <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                    © {email_brand_year} Learnova. All rights reserved.
+                    </p>
+                    <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                    Need help? Contact us at <a href="mailto:{email_support_email}" style="color:#137FEC;text-decoration:none;">{email_support_email}</a>
+                    </p>
+                </td>
+                </tr>
+
+            </table>
+            </td>
+        </tr>
+        </table>
+    </body>
+    </html>
+    """
 
     sent = False
     try:
@@ -172,7 +326,7 @@ def change_password(*, payload, db: Session, current_user):
             to=email,
             subject=subject,
             body=text_body,
-            html=None,
+            html=html_body,
         )
         sent = True
     except Exception:
@@ -238,24 +392,157 @@ def request_delete_account(*, payload, db: Session, current_user):
     # 5) send OTP email (best-effort)
     subject = "Learnova – Confirm account deletion (OTP)"
     text_body = f"""
-                Hello {full_name or ""}
+    Hello {full_name or ''}
 
-                You requested to delete your Learnova account.
+    You requested to delete your Learnova account.
 
-                Your OTP code is:
-                {otp}
+    Your OTP code is:
+    {otp}
 
-                This code expires in {10} minutes.
+    This code expires in 10 minutes.
 
-                If you didn't request this, you can ignore this email.
-                """
+    If you didn't request this, you can ignore this email.
+    """
+
+    html_body = f"""
+    <!DOCTYPE html>
+    <html lang="en">
+    <body style="margin:0;padding:0;background:#f6f7fb;font-family:Arial,sans-serif;">
+        <!-- Preheader -->
+        <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+        Your OTP code to confirm Learnova account deletion (expires in 10 minutes).
+        </div>
+
+        <table width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7fb;">
+        <tr>
+            <td align="center" style="padding:28px 16px;">
+
+            <table width="560" cellpadding="0" cellspacing="0" style="width:560px;max-width:560px;">
+
+                <!-- Brand -->
+                <tr>
+                <td style="padding:0 8px 14px;">
+                    <table cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="vertical-align:middle;">
+                        <img src="{email_logo_url}" width="40" height="40" alt="Learnova"
+                            style="display:block;border:0;outline:none;border-radius:10px;" />
+                        </td>
+                        <td style="vertical-align:middle;padding-left:10px;">
+                        <div style="font-size:16px;font-weight:800;color:#111827;line-height:1;">
+                            Learnova
+                        </div>
+                        <div style="font-size:12px;color:#6b7280;margin-top:2px;">
+                            Account Deletion (OTP)
+                        </div>
+                        </td>
+                    </tr>
+                    </table>
+                </td>
+                </tr>
+
+                <!-- Card -->
+                <tr>
+                <td style="background:#ffffff;border:1px solid #e5e7eb;border-radius:16px;overflow:hidden;">
+                    <!-- Top accent -->
+                    <div style="height:6px;background:#137FEC;"></div>
+
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="padding:26px 26px 10px;">
+                        <h2 style="margin:0;color:#111827;font-size:22px;line-height:1.25;">
+                            Confirm account deletion 🧾
+                        </h2>
+
+                        <p style="margin:10px 0 0;color:#374151;line-height:1.7;font-size:14px;">
+                            Hello {full_name or ''}, you requested to permanently delete your Learnova account.
+                        </p>
+
+                        <p style="margin:10px 0 0;color:#374151;line-height:1.7;font-size:14px;">
+                            Use the OTP code below to confirm. <strong style="color:#111827;">Do not share this code</strong> with anyone.
+                        </p>
+
+                        <!-- OTP Box -->
+                        <table width="100%" cellpadding="0" cellspacing="0" style="margin-top:16px;">
+                            <tr>
+                            <td align="center"
+                                style="background:#F9FAFB;border:1px solid #E5E7EB;border-radius:12px;padding:14px 12px;">
+                                <div style="font-size:26px;font-weight:800;letter-spacing:6px;color:#111827;line-height:1.2;">
+                                    {otp}
+                                </div>
+                                <div style="margin-top:6px;font-size:12px;color:#6b7280;line-height:1.4;">
+                                    OTP code
+                                </div>
+                            </td>
+                            </tr>
+                        </table>
+
+                        <!-- Info chips -->
+                        <table cellpadding="0" cellspacing="0" style="margin-top:16px;">
+                            <tr>
+                            <td style="background:#FFF7ED;border:1px solid #FED7AA;border-radius:999px;padding:6px 10px;">
+                                <span style="font-size:12px;color:#9A3412;">
+                                ⏳ Expires in 10 minutes
+                                </span>
+                            </td>
+                            <td style="width:10px;"></td>
+                            <td style="background:#FEE2E2;border:1px solid #FCA5A5;border-radius:999px;padding:6px 10px;">
+                                <span style="font-size:12px;color:#991B1B;">
+                                ⚠️ Irreversible action
+                                </span>
+                            </td>
+                            </tr>
+                        </table>
+
+                        </td>
+                    </tr>
+
+                    <!-- Divider -->
+                    <tr>
+                        <td style="padding:0 26px;">
+                        <div style="height:1px;background:#E5E7EB;"></div>
+                        </td>
+                    </tr>
+
+                    <!-- Footer note -->
+                    <tr>
+                        <td style="padding:14px 26px 24px;">
+                        <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                            If you didn’t request this, you can ignore this email. Your account will remain unchanged.
+                        </p>
+                        </td>
+                    </tr>
+                    </table>
+                </td>
+                </tr>
+
+                <!-- Footer -->
+                <tr>
+                <td align="center" style="padding:14px 10px 0;">
+                    <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                    © {email_brand_year} Learnova. All rights reserved.
+                    </p>
+                    <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
+                    Need help? Contact us at <a href="mailto:{email_support_email}" style="color:#137FEC;text-decoration:none;">{email_support_email}</a>
+                    </p>
+                </td>
+                </tr>
+
+            </table>
+            </td>
+        </tr>
+        </table>
+    </body>
+    </html>
+    """
 
     sent = False
     try:
-        send_email(to=email, subject=subject, body=text_body, html=None)
+        send_email(to=email, subject=subject, body=text_body, html=html_body)
         sent = True
     except Exception:
         pass
+
 
     return {
         "message": "Deletion OTP sent to your email.",

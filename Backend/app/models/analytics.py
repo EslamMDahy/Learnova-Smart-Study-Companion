@@ -38,7 +38,7 @@ class AnalyticsDashboard(Base):
         nullable=True
     )
 
-    date: Mapped[datetime.date] = mapped_column(
+    date: Mapped[datetime] = mapped_column(
         Date,
         nullable=False
     )

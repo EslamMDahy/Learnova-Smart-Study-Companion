@@ -9,7 +9,7 @@ from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 
 from app.db.base import Base
-from app.models.enums import UserTokenType
+# from app.models.enums import UserTokenType
 
 
 class UserToken(Base):
@@ -27,8 +27,8 @@ class UserToken(Base):
         index=True
     )
 
-    type: Mapped[UserTokenType] = mapped_column(
-        SQLEnum(UserTokenType, name="user_token_type_enum"),
+    type: Mapped[str] = mapped_column(
+        # SQLEnum(UserTokenType, name="user_token_type_enum"),
         nullable=False,
         index=True
     )

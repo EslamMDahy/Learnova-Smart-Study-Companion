@@ -100,11 +100,11 @@ class User(Base):
         nullable=True
     )
 
-    token_version: Mapped[int] = mapped_column(
-        Integer,
-        nullable=False,
-        server_default="1"
-    )
+    # token_version: Mapped[int] = mapped_column(
+    #     Integer,
+    #     nullable=False,
+    #     server_default="1"
+    # )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
