@@ -369,7 +369,7 @@ def login_user(payload: LoginRequest, db: Session):
              SELECT
              id, full_name, email, avatar_url,
              system_role, hashed_password, 
-             is_email_verified, token_version
+             is_email_verified, last_password_change
              FROM users
              WHERE email = :email
              """
@@ -381,7 +381,7 @@ def login_user(payload: LoginRequest, db: Session):
     if not row:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    user_id, full_name, email, avatar_url, system_role, hashed_pw, is_verified, token_version = row
+    user_id, full_name, email, avatar_url, system_role, hashed_pw, is_verified, last_password_change = row
 
     # 2) باسورد غلط (قبل verification)
     if not verify_password(payload.password, hashed_pw):
@@ -453,7 +453,7 @@ def login_user(payload: LoginRequest, db: Session):
     # 5) Cereating JWT
     access_token = create_access_token(
         subject=str(user_id),
-        extra={"email": email, "full_name": full_name, "tv": token_version, "system_role": system_role},
+        extra={"email": email, "full_name": full_name, "last_password_change": int(last_password_change.timestamp()), "system_role": system_role},
     )
 
     # 6) Sending the login response
@@ -470,7 +470,6 @@ def login_user(payload: LoginRequest, db: Session):
         text("UPDATE users SET last_login_at = NOW() WHERE id = :uid"),
         {"uid": user_id},
     )
-
     db.commit()
 
     return resp
@@ -733,7 +732,7 @@ def reset_password(payload, db):
             UPDATE users
             SET hashed_password = :hp, 
                 updated_at = NOW(),
-                token_version = token_version + 1
+                last_password_change = NOW()
             WHERE id = :uid
             """
         ),
