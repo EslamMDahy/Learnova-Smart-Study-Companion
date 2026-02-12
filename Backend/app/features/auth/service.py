@@ -453,7 +453,7 @@ def login_user(payload: LoginRequest, db: Session):
     # 5) Cereating JWT
     access_token = create_access_token(
         subject=str(user_id),
-        extra={"email": email, "full_name": full_name, "last_password_change": int(last_password_change.timestamp()), "system_role": system_role},
+        extra={"email": email, "full_name": full_name, "last_password_change": int(last_password_change.timestamp()) if last_password_change else None, "system_role": system_role},
     )
 
     # 6) Sending the login response
