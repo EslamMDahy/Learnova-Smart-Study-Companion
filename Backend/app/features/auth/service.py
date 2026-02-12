@@ -348,7 +348,7 @@ def verify_email_token(token: str, db: Session):
 
     # 4) mark user verified + mark token used
     db.execute(
-        text("UPDATE users SET is_email_verified = TRUE, updated_at = NOW() WHERE id = :uid"),
+        text("UPDATE users SET is_email_verified = TRUE, email_verified_at = NOW(), updated_at = NOW() WHERE id = :uid"),
         {"uid": user_id},
     )
 
