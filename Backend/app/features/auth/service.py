@@ -390,7 +390,7 @@ def login_user(payload: LoginRequest, db: Session):
     # 3) هنا فقط نكشف أنه مش verified لأن credentials صح
     if not is_verified:
         raise HTTPException(status_code=403, detail="Email not verified")
-
+    
     # 4) preparing the login response data
     user = {
         "id": user_id,
@@ -465,6 +465,13 @@ def login_user(payload: LoginRequest, db: Session):
 
     if system_role == "owner":
         resp["organizations"] = orgs
+
+    db.execute(
+        text("UPDATE users SET last_login_at = NOW() WHERE id = :uid"),
+        {"uid": user_id},
+    )
+
+    db.commit()
 
     return resp
 
