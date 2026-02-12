@@ -14,10 +14,10 @@ class AccountStatus(str, Enum):
     deleted = "deleted"
     pending_activation = "pending_activation"
 
-class UserTokenType(str, Enum):
-    verify_email = "verify_email"
-    reset_password = "reset_password"
-    magic_login = "magic_login"
+# class UserTokenType(str, Enum):
+#     verify_email = "verify_email"
+#     reset_password = "reset_password"
+#     magic_login = "magic_login"
 
 class ThemeMode(str, Enum):
     light = "light"

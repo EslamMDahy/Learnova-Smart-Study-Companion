@@ -35,6 +35,10 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
     # avatar url can be updated to nothing or "" (deleted)
     if payload.avatar_url is not None:
         update_fields["avatar_url"] = payload.avatar_url.strip()
+    if payload.phone is not None:
+        update_fields["phone_number"] = payload.phone.strip()
+    if payload.bio is not None:
+        update_fields["bio"] = payload.bio.strip()
 
     if not update_fields:
         # مفيش حاجة تتعمل
@@ -52,6 +56,14 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
         set_clauses.append("avatar_url = :avatar_url")
         params["avatar_url"] = update_fields["avatar_url"]
 
+    if "phone_number" in update_fields:
+        set_clauses.append("phone_number = :phone_number")
+        params["phone_number"] = update_fields["phone_number"]
+
+    if "bio" in update_fields:
+        set_clauses.append("bio = :bio")
+        params["bio"] = update_fields["bio"]
+
     set_clauses.append("updated_at = NOW()")
 
     row = db.execute(
@@ -59,7 +71,7 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
             UPDATE users
             SET {", ".join(set_clauses)}
             WHERE id = :uid
-            RETURNING id, full_name, email, avatar_url, system_role
+            RETURNING id, full_name, email, avatar_url, phone_number, bio, system_role
         """),
         params,
     ).first()
@@ -74,7 +86,9 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
         "full_name": row[1],
         "email": row[2],
         "avatar_url": row[3],
-        "system_role": row[4],
+        "phone_number": row[4],
+        "bio": row[5],
+        "system_role": row[6],
     }
 
 
