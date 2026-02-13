@@ -19,6 +19,7 @@ from app.core.config import settings
 def _generate_otp() -> str:
     return secrets.token_hex(3)
 
+
 def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
     user_id = current_user.get("id")
     if not user_id:

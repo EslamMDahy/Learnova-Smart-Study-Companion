@@ -5,6 +5,7 @@ from sqlalchemy import text
 from app.core.deps import get_current_user
 from app.db.session import get_db
 
+from . import service
 from .schemas import (
     UpdateProfileRequest,
     UpdateProfileResponse,
@@ -18,7 +19,6 @@ from .schemas import (
     UpdatePreferencesRequest,
 )
 
-from . import service
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 
@@ -27,37 +27,46 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 def update_profile(
     payload: UpdateProfileRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    return service.update_profile(payload=payload, db=db, current_user=current_user)
+    current_user=Depends(get_current_user),):
+    return service.update_profile(
+        payload=payload, 
+        db=db, 
+        current_user=current_user)
 
 
 @router.patch("/password", response_model=ChangePasswordResponse)
 def change_password(
     payload: ChangePasswordRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    return service.change_password(payload=payload, db=db, current_user=current_user)
+    current_user=Depends(get_current_user),):
+    return service.change_password(
+        payload=payload, 
+        db=db, 
+        current_user=current_user)
 
 
 @router.post("/delete/request", response_model=RequestDeleteAccountResponse)
 def request_delete_account(
     payload: RequestDeleteAccountRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    return service.request_delete_account(payload=payload, db=db, current_user=current_user)
+    current_user=Depends(get_current_user),):
+    return service.request_delete_account(
+        payload=payload, 
+        db=db, 
+        current_user=current_user)
 
 
 @router.delete("/delete/confirm", response_model=ConfirmDeleteAccountResponse)
 def confirm_delete_account(
     payload: ConfirmDeleteAccountRequest,
     db: Session = Depends(get_db),
-    current_user=Depends(get_current_user),
-):
-    return service.confirm_delete_account(payload=payload, db=db, current_user=current_user)
+    current_user=Depends(get_current_user),):
+    return service.confirm_delete_account(
+        payload=payload, 
+        db=db, 
+        current_user=current_user)
 
+# still under construction 
 @router.get("/preferences", response_model=PreferencesResponse)
 def get_preferences(
     current_user=Depends(get_current_user),

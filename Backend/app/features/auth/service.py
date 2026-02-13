@@ -315,6 +315,7 @@ def send_verification_email(payload, db: Session):
     }
 
 
+
 def verify_email_token(token: str, db: Session):
     # 1) fetch token row
     row = db.execute(
