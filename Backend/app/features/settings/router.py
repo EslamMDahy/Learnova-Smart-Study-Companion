@@ -14,7 +14,7 @@ from .schemas import (
     RequestDeleteAccountResponse,
     ConfirmDeleteAccountRequest,
     ConfirmDeleteAccountResponse,
-    PreferencesResponse,
+    UserPreferencesOut,
     UpdatePreferencesRequest,
 )
 
@@ -58,7 +58,8 @@ def confirm_delete_account(
 ):
     return service.confirm_delete_account(payload=payload, db=db, current_user=current_user)
 
-@router.get("/preferences", response_model=PreferencesResponse)
+
+@router.get("/preferences", response_model=UserPreferencesOut)
 def get_preferences(
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -85,9 +86,8 @@ def get_preferences(
         {"uid": uid},
     ).first()
 
-    # defaults لو مفيش row
     if not row:
-        return PreferencesResponse()
+        return UserPreferencesOut()  # defaults من الـ schema
 
     (
         email_notifications,
@@ -101,7 +101,7 @@ def get_preferences(
         show_online_status,
     ) = row
 
-    return PreferencesResponse(
+    return UserPreferencesOut(
         email_notifications=bool(email_notifications),
         assignment_alerts=bool(assignment_alerts),
         course_updates=bool(course_updates),
@@ -114,14 +114,13 @@ def get_preferences(
     )
 
 
-@router.patch("/preferences", response_model=PreferencesResponse)
+@router.patch("/preferences", response_model=UserPreferencesOut)
 def update_preferences(
     payload: UpdatePreferencesRequest,
     current_user=Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     uid = int(current_user["id"])
-    data = payload.model_dump()
 
     # Upsert
     exists = db.execute(
@@ -163,7 +162,18 @@ def update_preferences(
                 )
                 """
             ),
-            {"uid": uid, **data},
+            {
+                "uid": uid,
+                "email_notifications": payload.email_notifications,
+                "assignment_alerts": payload.assignment_alerts,
+                "course_updates": payload.course_updates,
+                "announcement_notifications": payload.announcement_notifications,
+                "grading_notifications": payload.grading_notifications,
+                "deadline_reminders": payload.deadline_reminders,
+                "theme_mode": payload.theme_mode,
+                "profile_visibility": payload.profile_visibility,
+                "show_online_status": payload.show_online_status,
+            },
         )
     else:
         db.execute(
@@ -184,9 +194,19 @@ def update_preferences(
                 WHERE user_id = :uid
                 """
             ),
-            {"uid": uid, **data},
+            {
+                "uid": uid,
+                "email_notifications": payload.email_notifications,
+                "assignment_alerts": payload.assignment_alerts,
+                "course_updates": payload.course_updates,
+                "announcement_notifications": payload.announcement_notifications,
+                "grading_notifications": payload.grading_notifications,
+                "deadline_reminders": payload.deadline_reminders,
+                "theme_mode": payload.theme_mode,
+                "profile_visibility": payload.profile_visibility,
+                "show_online_status": payload.show_online_status,
+            },
         )
 
     db.commit()
-
-    return PreferencesResponse(**data)
+    return UserPreferencesOut(**payload.model_dump())
