@@ -315,6 +315,7 @@ def send_verification_email(payload, db: Session):
     }
 
 
+
 def verify_email_token(token: str, db: Session):
     # 1) fetch token row
     row = db.execute(
@@ -366,9 +367,11 @@ def login_user(payload: LoginRequest, db: Session):
     row = db.execute(
         text("""
              SELECT
-             id, full_name, email, avatar_url,
-             system_role, hashed_password, 
-             is_email_verified, last_password_change
+             id, full_name, email, hashed_password,
+             avatar_url, phone_number,  bio, 
+             system_role, student_id, university_email, 
+             language_preference, is_email_verified, 
+             created_at, last_login_at, last_password_change
              FROM users
              WHERE email = :email
              """
@@ -380,7 +383,7 @@ def login_user(payload: LoginRequest, db: Session):
     if not row:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    user_id, full_name, email, avatar_url, system_role, hashed_pw, is_verified, last_password_change = row
+    user_id, full_name, email, hashed_pw, avatar_url, phone_number,  bio, system_role, student_id, university_email, language_preference, is_verified, created_at, last_login_at, last_password_change = row
 
     # 2) باسورد غلط (قبل verification)
     if not verify_password(payload.password, hashed_pw):
@@ -396,7 +399,14 @@ def login_user(payload: LoginRequest, db: Session):
         "full_name": full_name,
         "email": email,
         "avatar_url": avatar_url,
+        "phone_number": phone_number,
+        "bio": bio,
         "system_role": system_role,
+        "student_id": student_id,
+        "university_email": university_email,
+        "language_preference": language_preference,
+        "created_at": created_at,
+        "last_login_at": last_login_at,
     }
 
     orgs = []

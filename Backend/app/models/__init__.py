@@ -5,6 +5,7 @@ from .ai_question_generation_logs import AIQuestionGenerationLog
 from .analytics import AnalyticsDashboard
 
 from .course import Course
+from .course_invitations import CourseInvitation
 from .course_enrollments import CourseEnrollment
 from .course_instructors import CourseInstructor
 

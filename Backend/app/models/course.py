@@ -64,10 +64,10 @@ class Course(Base):
         index=True
     )
 
-    access_code: Mapped[str | None] = mapped_column(
-        String(50),
-        nullable=True
-    )
+    # access_code: Mapped[str | None] = mapped_column(
+    #     String(50),
+    #     nullable=True
+    # )
 
     visibility_level: Mapped[CourseVisibilityLevel] = mapped_column(
         SQLEnum(CourseVisibilityLevel, name="course_visibility_level_enum"),
