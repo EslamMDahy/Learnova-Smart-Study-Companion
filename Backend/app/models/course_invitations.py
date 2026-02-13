@@ -19,14 +19,14 @@ class CourseInvitation(Base):
     id = Column(Integer, primary_key=True)
 
     course_id = Column(Integer, ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
-    created_by = Column(Integer, ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
     invited_email = Column(String(320), nullable=False)   # 320 للـ RFC emails
     invited_user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     # نخزن HASH فقط
-    token_hash = Column(String(128), nullable=False, unique=True)
-    token_expires_at = Column(DateTime(timezone=True), nullable=False)
+    token_hash = Column(String(128), nullable=True, unique=True)
+    token_expires_at = Column(DateTime(timezone=True), nullable=True)
 
     status = Column(SAEnum(CourseInviteStatus, name="course_invite_status_enum"), nullable=False, server_default=text("'pending'"))
 

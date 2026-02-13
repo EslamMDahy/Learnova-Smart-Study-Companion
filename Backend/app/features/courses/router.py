@@ -1,10 +1,12 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, Form, status
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
 from app.core.deps import get_current_user
 from . import service
-from .schemas import CourseCreateRequest, CourseCreateResponse
+from .schemas import (CourseCreateRequest,
+                      CourseCreateResponse,
+                      CourseInvitesUploadResponse)
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -17,3 +19,23 @@ def create_course(
         payload=payload, 
         db=db, 
         current_user=current_user)
+
+@router.post(
+    "/{course_id}/invitations/upload",
+    response_model=CourseInvitesUploadResponse,
+    status_code=status.HTTP_201_CREATED,)
+def upload_course_invitations_excel(
+    course_id: int,
+    file: UploadFile = File(..., description="Excel file (.xlsx) containing invited emails"),
+    # optional: لو الفرونت محتاج يبعت حاجات زيادة مع الملف (مش ضروري غالبًا)
+    sheet_name: str | None = Form(default=None, description="Optional Excel sheet name"),
+    email_column: str = Form(default="email", description="Column name that contains emails"),
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.upload_course_invitations_excel(
+        course_id=course_id,
+        file=file,
+        sheet_name=sheet_name,
+        email_column=email_column,
+        db=db,
+        current_user=current_user,)

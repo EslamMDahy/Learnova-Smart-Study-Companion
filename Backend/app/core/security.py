@@ -27,3 +27,11 @@ def verify_password(password: str, stored: str) -> bool:
 
     dk = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, iterations, dklen=len(dk_expected))
     return hmac.compare_digest(dk, dk_expected)
+
+
+def hmac_sha256_hex(message: str, secret: str) -> str:
+    return hmac.new(
+        key=secret.encode("utf-8"),
+        msg=message.encode("utf-8"),
+        digestmod=hashlib.sha256,
+    ).hexdigest()

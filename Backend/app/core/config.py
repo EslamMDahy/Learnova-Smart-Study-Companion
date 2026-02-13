@@ -14,6 +14,10 @@ class Settings:
     jwt_alg: str = os.getenv("JWT_ALG", "HS256")
     jwt_expire_min: int = int(os.getenv("JWT_EXPIRE_MIN", "60"))
 
+    # Invite tokens (HMAC)
+    invite_token_secret: str = os.getenv("INVITE_TOKEN_SECRET", "")
+
+
     # SMTP
     smtp_host: str = os.getenv("SMTP_HOST", "")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))

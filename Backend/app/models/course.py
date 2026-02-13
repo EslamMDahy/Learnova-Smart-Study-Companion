@@ -34,8 +34,8 @@ class Course(Base):
     )
 
     created_by: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
     )
 
     title: Mapped[str] = mapped_column(

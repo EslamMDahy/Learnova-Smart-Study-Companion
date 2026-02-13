@@ -1,6 +1,11 @@
+from __future__ import annotations
+
 from enum import Enum
 from typing import Optional
 from pydantic import BaseModel, Field, ConfigDict, model_validator
+from datetime import datetime
+
+
 
 class CourseType(str, Enum):
     individual = "individual"
@@ -48,3 +53,23 @@ class CourseCreateResponse(BaseModel):
     requires_enrollment_approval: bool
 
     model_config = ConfigDict(extra="forbid", use_enum_values=True)
+
+
+
+class CourseInvitesUploadResponse(BaseModel):
+    course_id: int
+
+    total_rows: int = Field(..., ge=0, description="Total rows read from the Excel sheet (excluding header if any)")
+    extracted_emails: int = Field(..., ge=0, description="How many email-like values were extracted")
+    inserted: int = Field(..., ge=0, description="How many new invitations were created")
+    skipped_existing: int = Field(..., ge=0, description="How many were skipped because (course_id, invited_email) already exists")
+    invalid_emails: int = Field(..., ge=0, description="How many values were rejected as invalid emails")
+
+    token_expires_at: datetime = Field(..., description="Expiration timestamp used for newly created invitations (UTC)")
+
+    # useful for UI/debugging without returning huge lists
+    sample_invalid_emails: list[str] = Field(default_factory=list, max_length=20)
+    sample_existing_emails: list[str] = Field(default_factory=list, max_length=20)
+
+    model_config = ConfigDict(extra="forbid")
+
