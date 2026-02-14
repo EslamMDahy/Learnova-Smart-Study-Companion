@@ -56,6 +56,7 @@ class CourseCreateResponse(BaseModel):
 
 
 
+
 class CourseInvitesUploadResponse(BaseModel):
     course_id: int
 
@@ -65,7 +66,7 @@ class CourseInvitesUploadResponse(BaseModel):
     skipped_existing: int = Field(..., ge=0, description="How many were skipped because (course_id, invited_email) already exists")
     invalid_emails: int = Field(..., ge=0, description="How many values were rejected as invalid emails")
 
-    token_expires_at: datetime = Field(..., description="Expiration timestamp used for newly created invitations (UTC)")
+    # token_expires_at: datetime = Field(..., description="Expiration timestamp used for newly created invitations (UTC)")
 
     # useful for UI/debugging without returning huge lists
     sample_invalid_emails: list[str] = Field(default_factory=list, max_length=20)
@@ -73,3 +74,42 @@ class CourseInvitesUploadResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+
+
+
+class CourseInvitesSendRequest(BaseModel):
+    # لو موجود => resend لواحد معين
+    email: Optional[str] = Field(default=None, max_length=320, description="If provided, send invitation only to this email")
+
+    # افتراضيًا هنرسل pending + expired
+    include_expired: bool = Field(default=True, description="If true, also send to expired invitations by rotating token")
+
+    # TODO لاحقًا للrate limiting override
+    force: bool = Field(default=False, description="Future use: bypass rate limiting (admin/instructor)")
+
+    model_config = ConfigDict(extra="forbid")
+
+class CourseInvitesSendResponse(BaseModel):
+    course_id: int
+
+    # كم invite اتعمل له إرسال (نجح)
+    sent: int = Field(..., ge=0)
+
+    # كان فيه invites مش eligible (accepted/revoked) أو مش موجودة في حالة email واحدة
+    skipped_not_eligible: int = Field(..., ge=0)
+
+    # في حالة حصل fails أثناء الإرسال (SMTP… إلخ)
+    failed: int = Field(..., ge=0)
+
+    # معلومات مساعدة للـ UI
+    target_email: Optional[str] = None
+    attempted: int = Field(..., ge=0)
+
+    # آخر وقت إرسال
+    last_sent_at: Optional[datetime] = None
+
+    # samples للديباج/الواجهة
+    sample_failed_emails: list[str] = Field(default_factory=list, max_length=20)
+    sample_skipped_emails: list[str] = Field(default_factory=list, max_length=20)
+
+    model_config = ConfigDict(extra="forbid")

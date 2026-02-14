@@ -6,7 +6,9 @@ from app.core.deps import get_current_user
 from . import service
 from .schemas import (CourseCreateRequest,
                       CourseCreateResponse,
-                      CourseInvitesUploadResponse)
+                      CourseInvitesUploadResponse,
+                      CourseInvitesSendRequest, 
+                      CourseInvitesSendResponse)
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -37,5 +39,17 @@ def upload_course_invitations_excel(
         file=file,
         sheet_name=sheet_name,
         email_column=email_column,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/{course_id}/invitations/send",response_model=CourseInvitesSendResponse,status_code=status.HTTP_200_OK,)
+def send_course_invitations(
+    course_id: int,
+    payload: CourseInvitesSendRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.send_course_invitations(
+        course_id=course_id,
+        payload=payload,
         db=db,
         current_user=current_user,)
