@@ -8,7 +8,9 @@ from .schemas import (CourseCreateRequest,
                       CourseCreateResponse,
                       CourseInvitesUploadResponse,
                       CourseInvitesSendRequest, 
-                      CourseInvitesSendResponse)
+                      CourseInvitesSendResponse,
+                      CourseInviteAcceptRequest,
+                      CourseInviteAcceptResponse)
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -53,3 +55,10 @@ def send_course_invitations(
         payload=payload,
         db=db,
         current_user=current_user,)
+
+@router.post("/invitations/accept",response_model=CourseInviteAcceptResponse,status_code=status.HTTP_200_OK,)
+def accept_course_invitation(
+    payload: CourseInviteAcceptRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):# لو مش logged in => 401
+    return service.accept_course_invitation(payload=payload, db=db, current_user=current_user)

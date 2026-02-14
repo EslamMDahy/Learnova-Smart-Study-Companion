@@ -113,3 +113,19 @@ class CourseInvitesSendResponse(BaseModel):
     sample_skipped_emails: list[str] = Field(default_factory=list, max_length=20)
 
     model_config = ConfigDict(extra="forbid")
+
+
+
+
+class CourseInviteAcceptRequest(BaseModel):
+    token: str = Field(..., min_length=10, max_length=4096, description="Raw invitation token from email link")
+    model_config = ConfigDict(extra="forbid")
+
+class CourseInviteAcceptResponse(BaseModel):
+    message: str
+    course_id: int
+    enrollment_id: int | None = None
+    enrolled: bool = True
+    accepted_at: datetime | None = None
+
+    model_config = ConfigDict(extra="forbid")

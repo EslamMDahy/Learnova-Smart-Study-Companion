@@ -14,7 +14,9 @@ import secrets
 from .schemas import (CourseCreateRequest,
                       CourseInvitesUploadResponse,  # اللي عملناه
                       CourseInvitesSendRequest,  
-                      CourseInvitesSendResponse)
+                      CourseInvitesSendResponse,
+                      CourseInviteAcceptRequest, 
+                      CourseInviteAcceptResponse)
 
 
 from app.core.config import settings
@@ -110,8 +112,6 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
     return row
 
 
-
-
 # الأفضل تخليها في config.py بعدين (زي ما اتفقنا)
 COMMON_EMAIL_HEADERS = (
     "email",
@@ -124,13 +124,6 @@ COMMON_EMAIL_HEADERS = (
     "invitedemail",
     "user_email",
 )
-
-
-# TODO (Refactor لاحقاً):
-# انقل ده لملف core/tokens.py أو core/security.py كدالة generate_invite_token()
-def _generate_raw_invite_token() -> str:
-    # raw token URL-safe
-    return secrets.token_urlsafe(32)
 
 
 def upload_course_invitations_excel(*, course_id: int, file: UploadFile, sheet_name: str | None,
@@ -210,30 +203,14 @@ def upload_course_invitations_excel(*, course_id: int, file: UploadFile, sheet_n
         email_to_user_id = {r["email"].lower(): r["id"] for r in user_rows}
 
     # =========================
-    # 6) Token policy (keep it here for now)
-    # =========================
-    # TODO (Refactor لاحقاً):
-    # - انقل creation + hashing للتوكين لملف core/security.py أو core/tokens.py
-    # - وبعد ما نعمل endpoint الإرسال، ممكن نخلي token يتولد هناك بدل هنا
-    if not settings.invite_token_secret:
-        raise HTTPException(status_code=500, detail="Server misconfigured: INVITE_TOKEN_SECRET is missing")
-
-    # now = datetime.now(timezone.utc)
-    # expires_at = now + timedelta(days=7)
-
-    # =========================
     # 7) Insert invitations (bulk)
     # =========================
     inserted = 0
     try:
         for invited_email in to_insert:
-            # raw_token = _generate_raw_invite_token()
-            # token_hash = hmac_sha256_hex(raw_token, settings.invite_token_secret)
 
             invited_user_id = email_to_user_id.get(invited_email)
 
-                        # token_hash,
-                        # token_expires_at,
             db.execute(
                 text("""
                     INSERT INTO course_invitations (
@@ -255,15 +232,12 @@ def upload_course_invitations_excel(*, course_id: int, file: UploadFile, sheet_n
                         NOW()
                     )
                 """),
-                        # :token_hash,
-                        # :token_expires_at,
+                       
                 {
                     "course_id": course_id,
                     "created_by": instructor_id,
                     "invited_email": invited_email,
                     "invited_user_id": invited_user_id,
-                    # "token_hash": token_hash,
-                    # "token_expires_at": expires_at,
                 },
             )
             inserted += 1
@@ -294,7 +268,6 @@ def upload_course_invitations_excel(*, course_id: int, file: UploadFile, sheet_n
         # token_expires_at=expires_at,
         sample_invalid_emails=result.sample_invalid,
         sample_existing_emails=sample_existing,)
-
 
 
 
@@ -651,4 +624,202 @@ def send_course_invitations(*, course_id: int,
         last_sent_at=last_sent_at,
         sample_failed_emails=failed_emails,
         sample_skipped_emails=skipped_emails[:20],
+    )
+
+
+
+
+def accept_course_invitation(
+    *,
+    payload: CourseInviteAcceptRequest,
+    db: Session,
+    current_user: dict,
+) -> CourseInviteAcceptResponse:
+    # =========================
+    # 1) Auth + role check
+    # =========================
+    # get_current_user already ensures JWT exists, otherwise 401
+    user_id = current_user.get("id")
+    user_email = (current_user.get("email") or "").strip().lower()
+    role = (current_user.get("system_role") or "").strip().lower()
+
+    if not user_id or not user_email:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if role != "student":
+        raise HTTPException(status_code=403, detail="Only students can accept course invitations")
+
+    # =========================
+    # 2) Config check
+    # =========================
+    if not settings.invite_token_secret:
+        raise HTTPException(status_code=500, detail="Server misconfigured: INVITE_TOKEN_SECRET is missing")
+
+    raw_token = (payload.token or "").strip()
+    if not raw_token:
+        raise HTTPException(status_code=422, detail="Token is required")
+
+    token_hash = hmac_sha256_hex(raw_token, settings.invite_token_secret)
+
+    # =========================
+    # 3) Load invitation by token_hash
+    # =========================
+    inv = db.execute(
+        text("""
+            SELECT
+                id,
+                course_id,
+                invited_email,
+                invited_user_id,
+                token_expires_at,
+                status,
+                accepted_at,
+                revoked_at
+            FROM course_invitations
+            WHERE token_hash = :token_hash
+            LIMIT 1
+        """),
+        {"token_hash": token_hash},
+    ).mappings().first()
+
+    if not inv:
+        raise HTTPException(status_code=404, detail="Invalid invitation token")
+
+    invitation_id = inv["id"]
+    course_id = inv["course_id"]
+    invited_email = (inv["invited_email"] or "").strip().lower()
+    status = (inv["status"] or "").strip().lower()
+    expires_at = inv["token_expires_at"]
+    revoked_at = inv["revoked_at"]
+    accepted_at = inv["accepted_at"]
+
+    # =========================
+    # 4) Validate invitation state
+    # =========================
+    # email must match logged-in user
+    if invited_email and invited_email != user_email:
+        raise HTTPException(status_code=403, detail="This invitation is not for your account")
+
+    if revoked_at is not None or status == "revoked":
+        raise HTTPException(status_code=403, detail="Invitation has been revoked")
+
+    if status == "accepted" or accepted_at is not None:
+        # idempotent: already accepted -> return OK
+        return CourseInviteAcceptResponse(
+            message="Invitation already accepted",
+            course_id=course_id,
+            enrollment_id=None,
+            enrolled=True,
+            accepted_at=accepted_at,
+        )
+
+    now = datetime.now(timezone.utc)
+    if expires_at is not None and expires_at <= now:
+        # optional: mark as expired if not already
+        if status != "expired":
+            try:
+                db.execute(
+                    text("""
+                        UPDATE course_invitations
+                        SET status = 'expired', updated_at = NOW()
+                        WHERE id = :id
+                    """),
+                    {"id": invitation_id},
+                )
+                db.commit()
+            except Exception:
+                db.rollback()
+        raise HTTPException(status_code=410, detail="Invitation token expired. Please request a new invitation.")
+
+    if status not in ("pending", "expired"):
+        raise HTTPException(status_code=409, detail="Invitation is not in a valid state to be accepted")
+
+    # =========================
+    # 5) Ensure course exists
+    # =========================
+    course = db.execute(
+        text("SELECT id FROM courses WHERE id = :course_id"),
+        {"course_id": course_id},
+    ).first()
+
+    if not course:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    # =========================
+    # 6) Insert enrollment (idempotent with unique constraint)
+    # =========================
+    enrollment_id = None
+
+    try:
+        row = db.execute(
+            text("""
+                INSERT INTO course_enrollments (
+                    student_id,
+                    course_id,
+                    status,
+                    enrollment_type,
+                    enrolled_at
+                )
+                VALUES (
+                    :student_id,
+                    :course_id,
+                    CAST(:status AS course_enrollment_status_enum),
+                    CAST(:enrollment_type AS course_enrollment_type_enum),
+                    NOW()
+                )
+                ON CONFLICT (student_id, course_id) DO NOTHING
+                RETURNING id
+            """),
+            {
+                "student_id": user_id,
+                "course_id": course_id,
+                "status": "active",
+                "enrollment_type": "invited",
+            },
+        ).first()
+
+        if row:
+            enrollment_id = row[0]
+        else:
+            # already enrolled, fetch existing id
+            existing = db.execute(
+                text("""
+                    SELECT id
+                    FROM course_enrollments
+                    WHERE student_id = :student_id AND course_id = :course_id
+                    LIMIT 1
+                """),
+                {"student_id": user_id, "course_id": course_id},
+            ).first()
+            if existing:
+                enrollment_id = existing[0]
+
+        # =========================
+        # 7) Update invitation -> accepted
+        # =========================
+        db.execute(
+            text("""
+                UPDATE course_invitations
+                SET
+                    status = 'accepted',
+                    accepted_at = NOW(),
+                    invited_user_id = COALESCE(invited_user_id, :user_id),
+                    updated_at = NOW()
+                WHERE id = :id
+            """),
+            {"id": invitation_id, "user_id": user_id},
+        )
+
+        db.commit()
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error while accepting invitation") from e
+
+    return CourseInviteAcceptResponse(
+        message="Invitation accepted. You are now enrolled in the course.",
+        course_id=course_id,
+        enrollment_id=enrollment_id,
+        enrolled=True,
+        accepted_at=datetime.now(timezone.utc),
     )
