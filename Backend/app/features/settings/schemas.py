@@ -13,8 +13,8 @@ class UpdateProfileRequest(BaseModel):
     phone: Optional[str] = None
 
     bio: Optional[str] = None
-    student_id: Optional[str] = None
-    university_email: Optional[str] = None
+    # student_id: Optional[str] = None
+    # university_email: Optional[str] = None
     language_preference: Optional[str] = None
 
 

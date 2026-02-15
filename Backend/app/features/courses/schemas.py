@@ -129,3 +129,37 @@ class CourseInviteAcceptResponse(BaseModel):
     accepted_at: datetime | None = None
 
     model_config = ConfigDict(extra="forbid")
+
+
+
+
+class MyCourseItem(BaseModel):
+    id: int
+    title: str
+
+    course_type: str  # أو CourseType
+    organization_id: Optional[int] = None
+
+    is_public: bool
+    visibility_level: str  # أو CourseVisibilityLevel
+    status: str
+
+    cover_image_url: Optional[str] = None
+    banner_image_url: Optional[str] = None
+    category: Optional[str] = None
+
+    created_by: int
+    created_at: datetime
+    updated_at: datetime
+
+    # Useful counts for dashboard (اختياري، لو مش هتجيبهم دلوقتي خليهم None)
+    enrollment_count: Optional[int] = None
+    pending_invites: Optional[int] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+class MyCoursesResponse(BaseModel):
+    items: list[MyCourseItem] = Field(default_factory=list)
+    total: int = 0
+
+    model_config = ConfigDict(extra="forbid")

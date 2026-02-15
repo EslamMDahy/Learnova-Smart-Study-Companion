@@ -53,15 +53,18 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
     if payload.bio is not None:
         update_fields["bio"] = payload.bio.strip()
 
-    # ✅ NEW: احفظ student_id / university_email / language_preference
-    if getattr(payload, "student_id", None) is not None:
-        update_fields["student_id"] = payload.student_id.strip()
-
-    if getattr(payload, "university_email", None) is not None:
-        update_fields["university_email"] = payload.university_email.strip()
-
-    if getattr(payload, "language_preference", None) is not None:
+    if payload.language_preference is not None:
         update_fields["language_preference"] = payload.language_preference.strip()
+
+    # NOTE: `student_id` & `university_email` is a reed only data 
+    # wich means it get send in the login responce 
+    # ✅ NEW: احفظ student_id / university_email / language_preference
+    # if getattr(payload, "student_id", None) is not None:
+    #     update_fields["student_id"] = payload.student_id.strip()
+
+    # if getattr(payload, "university_email", None) is not None:
+    #     update_fields["university_email"] = payload.university_email.strip()
+
 
     if not update_fields:
         raise HTTPException(status_code=400, detail="No updatable fields provided")

@@ -807,7 +807,16 @@ def accept_course_invitation(
                     updated_at = NOW()
                 WHERE id = :id
             """),
-            {"id": invitation_id, "user_id": user_id},
+            {"id": invitation_id, "user_id": user_id},)
+        db.execute(
+            text("""
+                UPDATE courses
+                SET
+                    enrollment_count = enrollment_count + 1,
+                    updated_at = NOW()
+                WHERE course_id = :course_id
+                """),
+            {"course_id": course_id},
         )
 
         db.commit()
@@ -823,3 +832,116 @@ def accept_course_invitation(
         enrolled=True,
         accepted_at=datetime.now(timezone.utc),
     )
+
+
+
+# app/features/courses/service.py
+
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+
+
+def get_my_courses(*, db: Session, current_user: dict):
+    user_id = current_user.get("id")
+    role = (current_user.get("system_role") or "").strip().lower()
+
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # =========================
+    # Instructor: courses created by me
+    # =========================
+    if role == "instructor":
+        rows = db.execute(
+            text("""
+                SELECT
+                    c.id,
+                    c.title,
+                    c.course_type::text AS course_type,
+                    c.organization_id,
+                    c.is_public,
+                    c.visibility_level::text AS visibility_level,
+                    c.status::text AS status,
+                    c.cover_image_url,
+                    c.banner_image_url,
+                    c.category,
+                    c.created_by,
+                    c.created_at,
+                    c.updated_at,
+                    c.enrollment_count,
+                    COALESCE(inv.pending_invites, 0) AS pending_invites
+                FROM courses c
+                LEFT JOIN (
+                    SELECT course_id, COUNT(*)::int AS pending_invites
+                    FROM course_invitations
+                    WHERE status = 'pending'
+                    GROUP BY course_id
+                ) inv ON inv.course_id = c.id
+                WHERE c.created_by = :uid
+                ORDER BY c.created_at DESC
+            """),
+            {"uid": user_id},
+        ).mappings().all()
+
+    # =========================
+    # Student: courses I'm enrolled in
+    # =========================
+    elif role == "student":
+        rows = db.execute(
+            text("""
+                SELECT
+                    c.id,
+                    c.title,
+                    c.course_type::text AS course_type,
+                    c.organization_id,
+                    c.is_public,
+                    c.visibility_level::text AS visibility_level,
+                    c.status::text AS status,
+                    c.cover_image_url,
+                    c.banner_image_url,
+                    c.category,
+                    c.created_by,
+                    c.created_at,
+                    c.updated_at,
+                    c.enrollment_count,
+                    NULL::int AS pending_invites
+                FROM course_enrollments e
+                JOIN courses c ON c.id = e.course_id
+                WHERE e.student_id = :uid
+                  AND e.status IN ('active', 'pending', 'suspended', 'completed')
+                ORDER BY e.enrolled_at DESC
+            """),
+            {"uid": user_id},
+        ).mappings().all()
+
+    else:
+        # لو عندك assistant/owner، ممكن تعمل logic هنا
+        raise HTTPException(status_code=403, detail="Unsupported role for this endpoint")
+
+    items = []
+    for r in rows:
+        items.append(
+            {
+                "id": r["id"],
+                "title": r["title"],
+                "course_type": r["course_type"],
+                "organization_id": r["organization_id"],
+                "is_public": r["is_public"],
+                "visibility_level": r["visibility_level"],
+                "status": r["status"],
+                "cover_image_url": r["cover_image_url"],
+                "banner_image_url": r["banner_image_url"],
+                "category": r["category"],
+                "created_by": r["created_by"],
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"],
+                "enrollment_count": r["enrollment_count"],
+                "pending_invites": r["pending_invites"],
+            }
+        )
+
+    return {
+        "items": items,
+        "total": len(items),
+    }

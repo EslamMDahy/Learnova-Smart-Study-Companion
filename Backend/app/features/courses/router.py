@@ -10,7 +10,8 @@ from .schemas import (CourseCreateRequest,
                       CourseInvitesSendRequest, 
                       CourseInvitesSendResponse,
                       CourseInviteAcceptRequest,
-                      CourseInviteAcceptResponse)
+                      CourseInviteAcceptResponse,
+                      MyCoursesResponse)
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -62,3 +63,9 @@ def accept_course_invitation(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):# لو مش logged in => 401
     return service.accept_course_invitation(payload=payload, db=db, current_user=current_user)
+
+@router.get("/my", response_model=MyCoursesResponse, status_code=status.HTTP_200_OK,)
+def get_my_courses(
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.get_my_courses(db=db, current_user=current_user)
