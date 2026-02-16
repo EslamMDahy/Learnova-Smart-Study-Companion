@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -28,6 +29,18 @@ class Settings:
     email_logo_url: str = os.getenv("EMAIL_LOGO_URL", "")
     email_support_email: str = os.getenv("EMAIL_SUPPORT_EMAIL", "support@learnova.com")
     email_brand_year: int = int(os.getenv("EMAIL_BRAND_YEAR", str(datetime.now().year)))
+
+    # Refresh token
+    refresh_token_secret: str = os.getenv("REFRESH_TOKEN_SECRET", "")
+    refresh_cookie_name: str = os.getenv("REFRESH_COOKIE_NAME", "refresh_token")
+    refresh_token_expire_days_short: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS_SHORT", "1"))
+    refresh_token_expire_days_remember: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS_REMEMBER", "30"))
+
+    # Cookies
+    cookie_secure: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+    cookie_samesite: Literal["lax", "strict", "none"] = os.getenv("COOKIE_SAMESITE", "lax")  # type: ignore
+    cookie_path: str = os.getenv("COOKIE_PATH", "/auth/refresh")
+
 
 
 settings = Settings()

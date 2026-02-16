@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Response, Request, Depends, Query
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
@@ -33,8 +33,16 @@ def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
     return service.verify_email_token(token, db)
 
 @router.post("/login")
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
-    return service.login_user(payload, db)
+def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
+    return service.login_user(payload, db, response=response)
+
+@router.post("/refresh")
+def refresh_token(request: Request, response: Response, db: Session = Depends(get_db)):
+    return service.refresh_access_token(db=db, request=request, response=response)
+
+@router.post("/logout")
+def logout(request: Request, response: Response, db: Session = Depends(get_db)):
+    return service.logout_user(db=db, request=request, response=response)
 
 @router.get("/me")
 def me(user = Depends(get_current_user)):

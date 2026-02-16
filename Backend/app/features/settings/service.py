@@ -20,17 +20,17 @@ def _generate_otp() -> str:
     return secrets.token_hex(3)
 
 
-def _to_nullable_str(v):
-    """
-    - None => None (no change decision handled outside)
-    - "   " => None
-    - "" => None
-    - otherwise => stripped string
-    """
-    if v is None:
-        return None
-    s = str(v).strip()
-    return None if s == "" else s
+# def _to_nullable_str(v):
+#     """
+#     - None => None (no change decision handled outside)
+#     - "   " => None
+#     - "" => None
+#     - otherwise => stripped string
+#     """
+#     if v is None:
+#         return None
+#     s = str(v).strip()
+#     return None if s == "" else s
 
 
 def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):

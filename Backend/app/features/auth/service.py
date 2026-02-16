@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, Response, Request
 
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -13,10 +13,10 @@ from .schemas import LoginRequest
 
 from app.core.security import hash_password
 from app.core.security import verify_password
+from app.core.security import hmac_sha256_hex
 from app.core.emailer import send_email
 from app.core.jwt import create_access_token
 from app.core.config import settings
-
 
 
 
@@ -363,7 +363,7 @@ def verify_email_token(token: str, db: Session):
 
 
 
-def login_user(payload: LoginRequest, db: Session):
+def login_user(payload: LoginRequest, db: Session, response: Response):
     row = db.execute(
         text("""
              SELECT
@@ -464,6 +464,58 @@ def login_user(payload: LoginRequest, db: Session):
         subject=str(user_id),
         extra={"email": email, "full_name": full_name, "last_password_change": int(last_password_change.timestamp()) if last_password_change else None, "system_role": system_role},
     )
+    
+    # =========================
+    # Refresh token (HttpOnly cookie)
+    # =========================
+    if not settings.refresh_token_secret:
+        raise HTTPException(status_code=500, detail="Server misconfigured: REFRESH_TOKEN_SECRET is missing")
+
+    # remember_me => مدة أطول
+    days = settings.refresh_token_expire_days_remember if payload.remember_me else settings.refresh_token_expire_days_short
+
+    now = datetime.now(timezone.utc)
+    refresh_expires_at = now + timedelta(days=days)
+
+    # raw refresh token (ده اللي هيتحط في cookie)
+    refresh_raw = secrets.token_urlsafe(48)
+
+    # store only HMAC hash in DB
+    refresh_hash = hmac_sha256_hex(refresh_raw, settings.refresh_token_secret)
+
+    # (اختياري) إبطال refresh tokens القديمة لليوزر (جلسة واحدة فقط)
+    # لو عايز multi-device شيل الجزء ده
+    db.execute(
+        text("""
+            UPDATE user_tokens
+            SET used_at = NOW()
+            WHERE user_id = :uid
+              AND type = 'refresh'
+              AND used_at IS NULL
+        """),
+        {"uid": user_id},
+    )
+
+    # insert refresh token hash
+    db.execute(
+        text("""
+            INSERT INTO user_tokens (user_id, type, token, expires_at, used_at, created_at)
+            VALUES (:uid, 'refresh', :token, :expires_at, NULL, NOW())
+        """),
+        {"uid": user_id, "token": refresh_hash, "expires_at": refresh_expires_at},
+    )
+
+    # set cookie
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=refresh_raw,
+        httponly=True,
+        secure=settings.cookie_secure,     # false في dev, true في prod
+        samesite=settings.cookie_samesite, # "lax" غالبًا
+        path=settings.cookie_path,         # "/auth/refresh" أفضل
+        expires=int(refresh_expires_at.timestamp()),
+    )
+
 
     # 6) Sending the login response
     resp = {
@@ -482,6 +534,170 @@ def login_user(payload: LoginRequest, db: Session):
     db.commit()
 
     return resp
+
+
+
+def refresh_access_token(*, db: Session, request: Request, response: Response):
+    if not settings.refresh_token_secret:
+        raise HTTPException(status_code=500, detail="Server misconfigured: REFRESH_TOKEN_SECRET is missing")
+
+    # 1) read refresh cookie
+    refresh_raw = request.cookies.get(settings.refresh_cookie_name)
+    if not refresh_raw:
+        raise HTTPException(status_code=401, detail="Missing refresh token")
+
+    now = datetime.now(timezone.utc)
+    refresh_hash = hmac_sha256_hex(refresh_raw, settings.refresh_token_secret)
+
+    # 2) validate token in DB
+    row = db.execute(
+        text("""
+            SELECT ut.user_id
+            FROM user_tokens ut
+            WHERE ut.type = 'refresh'
+              AND ut.token = :token
+              AND ut.used_at IS NULL
+              AND ut.expires_at > NOW()
+            LIMIT 1
+        """),
+        {"token": refresh_hash},
+    ).first()
+
+    if not row:
+        # refresh invalid/expired/reused
+        # امسح cookie احتياطيًا
+        response.delete_cookie(
+            key=settings.refresh_cookie_name,
+            path=settings.cookie_path,
+        )
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    user_id = row[0]
+
+    # 3) get user claims (عشان نطلع access token)
+    user_row = db.execute(
+        text("""
+            SELECT id, email, full_name, system_role, last_password_change
+            FROM users
+            WHERE id = :uid
+            LIMIT 1
+        """),
+        {"uid": user_id},
+    ).first()
+
+    if not user_row:
+        response.delete_cookie(key=settings.refresh_cookie_name, path=settings.cookie_path)
+        raise HTTPException(status_code=401, detail="User not found")
+
+    uid, email, full_name, system_role, last_password_change = user_row
+
+    # 4) invalidate ALL old refresh tokens (single-session strategy)
+    db.execute(
+        text("""
+            UPDATE user_tokens
+            SET used_at = NOW()
+            WHERE user_id = :uid
+              AND type = 'refresh'
+              AND used_at IS NULL
+        """),
+        {"uid": uid},
+    )
+
+    # 5) mint new refresh token (rotation)
+    # هنا هنمشي على مدة "short" دائمًا للـ refresh endpoint
+    # لأن remember_me بيتحدد وقت login (الكوكي موجودة بالفعل بمدتها)
+    # فهنطلع refresh جديدة بنفس منطق: لو عايز طولها حسب remember_me لازم نخزن ذلك في DB.
+    # حاليًا: نخليها short افتراضيًا (1 day) أو اعملها remember افتراضيًا (30 day).
+    days = settings.refresh_token_expire_days_short
+    refresh_expires_at = now + timedelta(days=days)
+
+    new_refresh_raw = secrets.token_urlsafe(48)
+    new_refresh_hash = hmac_sha256_hex(new_refresh_raw, settings.refresh_token_secret)
+
+    db.execute(
+        text("""
+            INSERT INTO user_tokens (user_id, type, token, expires_at, used_at, created_at)
+            VALUES (:uid, 'refresh', :token, :expires_at, NULL, NOW())
+        """),
+        {"uid": uid, "token": new_refresh_hash, "expires_at": refresh_expires_at},
+    )
+
+    # 6) set cookie with new refresh
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=new_refresh_raw,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        path=settings.cookie_path,
+        expires=int(refresh_expires_at.timestamp()),
+    )
+
+    # 7) mint new access token (15 min)
+    access_token = create_access_token(
+        subject=str(uid),
+        extra={
+            "email": email,
+            "full_name": full_name,
+            "system_role": system_role,
+            "last_password_change": int(last_password_change.timestamp()) if last_password_change else None,
+        },
+    )
+
+    db.commit()
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+    }
+
+
+
+def logout_user(*, db: Session, request: Request, response: Response):
+    if not settings.refresh_token_secret:
+        raise HTTPException(status_code=500, detail="Server misconfigured: REFRESH_TOKEN_SECRET is missing")
+
+    refresh_raw = request.cookies.get(settings.refresh_cookie_name)
+
+    # امسح cookie دائمًا حتى لو مفيش token
+    response.delete_cookie(
+        key=settings.refresh_cookie_name,
+        path=settings.cookie_path,
+    )
+
+    if not refresh_raw:
+        return {"message": "Logged out"}
+
+    refresh_hash = hmac_sha256_hex(refresh_raw, settings.refresh_token_secret)
+
+    # لو token موجود وصالح نجيب user_id ونبطل كل refresh
+    row = db.execute(
+        text("""
+            SELECT user_id
+            FROM user_tokens
+            WHERE type = 'refresh'
+              AND token = :token
+              AND used_at IS NULL
+            LIMIT 1
+        """),
+        {"token": refresh_hash},
+    ).first()
+
+    if row:
+        uid = row[0]
+        db.execute(
+            text("""
+                UPDATE user_tokens
+                SET used_at = NOW()
+                WHERE user_id = :uid
+                  AND type = 'refresh'
+                  AND used_at IS NULL
+            """),
+            {"uid": uid},
+        )
+        db.commit()
+
+    return {"message": "Logged out"}
 
 
 
