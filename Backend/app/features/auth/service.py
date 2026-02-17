@@ -552,7 +552,7 @@ def refresh_access_token(*, db: Session, request: Request, response: Response):
     # 2) validate token in DB
     row = db.execute(
         text("""
-            SELECT ut.user_id
+            SELECT ut.user_id, expires_at, created_at 
             FROM user_tokens ut
             WHERE ut.type = 'refresh'
               AND ut.token = :token
@@ -573,6 +573,8 @@ def refresh_access_token(*, db: Session, request: Request, response: Response):
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
     user_id = row[0]
+    expires_at = row[1]
+    created_at= row[2]
 
     # 3) get user claims (عشان نطلع access token)
     user_row = db.execute(
@@ -604,12 +606,11 @@ def refresh_access_token(*, db: Session, request: Request, response: Response):
     )
 
     # 5) mint new refresh token (rotation)
-    # هنا هنمشي على مدة "short" دائمًا للـ refresh endpoint
-    # لأن remember_me بيتحدد وقت login (الكوكي موجودة بالفعل بمدتها)
-    # فهنطلع refresh جديدة بنفس منطق: لو عايز طولها حسب remember_me لازم نخزن ذلك في DB.
-    # حاليًا: نخليها short افتراضيًا (1 day) أو اعملها remember افتراضيًا (30 day).
-    days = settings.refresh_token_expire_days_short
-    refresh_expires_at = now + timedelta(days=days)
+    ttl = expires_at - created_at
+    if ttl.total_seconds() <= 0:
+        ttl = timedelta(days=settings.refresh_token_expire_days_short) 
+    now = datetime.now(timezone.utc)
+    refresh_expires_at = now + ttl
 
     new_refresh_raw = secrets.token_urlsafe(48)
     new_refresh_hash = hmac_sha256_hex(new_refresh_raw, settings.refresh_token_secret)
