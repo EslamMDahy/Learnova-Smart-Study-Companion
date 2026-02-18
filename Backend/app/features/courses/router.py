@@ -76,12 +76,10 @@ def list_course_invitations(
     limit: int = 200,
     offset: int = 0,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user),):
     return service.list_course_invitations(
         course_id=course_id,
         limit=limit,
         offset=offset,
         db=db,
-        current_user=current_user,
-    )
+        current_user=current_user,)

@@ -273,6 +273,7 @@ def upload_course_invitations_excel(*, course_id: int, file: UploadFile, sheet_n
 
 
 
+
 def send_course_invitations(*, course_id: int,
                             payload: Optional[CourseInvitesSendRequest],  # لو None => send all (pending+expired)
                             db: Session, current_user: dict,) -> CourseInvitesSendResponse:
@@ -937,9 +938,6 @@ def get_my_courses(*, db: Session, current_user: dict):
         "items": items,
         "total": len(items),
     }
-
-
-
 
 
 
