@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional
+from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import datetime
 
@@ -15,6 +15,15 @@ class CourseVisibilityLevel(str, Enum):
     private = "private"
     public = "public"
     unlisted = "unlisted"
+
+class CourseInviteStatus(str, Enum):
+    pending = "pending"
+    accepted = "accepted"
+    revoked = "revoked"
+    expired = "expired"
+
+
+
 
 class CourseCreateRequest(BaseModel):
     course_type: CourseType = Field(..., description="organization | individual")
@@ -161,5 +170,36 @@ class MyCourseItem(BaseModel):
 class MyCoursesResponse(BaseModel):
     items: list[MyCourseItem] = Field(default_factory=list)
     total: int = 0
+
+    model_config = ConfigDict(extra="forbid")
+
+
+
+
+class CourseInvitationItem(BaseModel):
+    id: int
+    course_id: int
+    created_by: int
+    invited_email: str
+    invited_user_id: Optional[int]
+    status: CourseInviteStatus
+
+    token_expires_at: datetime
+    sent_at: Optional[datetime]
+    last_sent_at: Optional[datetime]
+    send_count: int
+    accepted_at: Optional[datetime]
+    revoked_at: Optional[datetime]
+    created_at: datetime
+    updated_at: datetime
+
+    invited_user_exists: bool  # helper للفرونت
+
+    model_config = ConfigDict(extra="forbid")
+
+class CourseInvitationsListResponse(BaseModel):
+    course_id: int
+    total: int
+    items: List[CourseInvitationItem]
 
     model_config = ConfigDict(extra="forbid")

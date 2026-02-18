@@ -11,7 +11,9 @@ from .schemas import (CourseCreateRequest,
                       CourseInvitesSendResponse,
                       CourseInviteAcceptRequest,
                       CourseInviteAcceptResponse,
-                      MyCoursesResponse)
+                      MyCoursesResponse,
+                      CourseInvitationsListResponse,
+                      CourseInviteStatus)
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -25,10 +27,8 @@ def create_course(
         db=db, 
         current_user=current_user)
 
-@router.post(
-    "/{course_id}/invitations/upload",
-    response_model=CourseInvitesUploadResponse,
-    status_code=status.HTTP_201_CREATED,)
+@router.post("/{course_id}/invitations/upload", response_model=CourseInvitesUploadResponse,
+              status_code=status.HTTP_201_CREATED,)
 def upload_course_invitations_excel(
     course_id: int,
     file: UploadFile = File(..., description="Excel file (.xlsx) containing invited emails"),
@@ -69,3 +69,19 @@ def get_my_courses(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):
     return service.get_my_courses(db=db, current_user=current_user)
+
+@router.get("/{course_id}/invitations", response_model=CourseInvitationsListResponse)
+def list_course_invitations(
+    course_id: int,
+    limit: int = 200,
+    offset: int = 0,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    return service.list_course_invitations(
+        course_id=course_id,
+        limit=limit,
+        offset=offset,
+        db=db,
+        current_user=current_user,
+    )

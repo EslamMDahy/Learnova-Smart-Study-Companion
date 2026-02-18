@@ -16,7 +16,9 @@ from .schemas import (CourseCreateRequest,
                       CourseInvitesSendRequest,  
                       CourseInvitesSendResponse,
                       CourseInviteAcceptRequest, 
-                      CourseInviteAcceptResponse)
+                      CourseInviteAcceptResponse,
+                      CourseInvitationsListResponse, 
+                      CourseInviteStatus)
 
 
 from app.core.config import settings
@@ -629,12 +631,8 @@ def send_course_invitations(*, course_id: int,
 
 
 
-def accept_course_invitation(
-    *,
-    payload: CourseInviteAcceptRequest,
-    db: Session,
-    current_user: dict,
-) -> CourseInviteAcceptResponse:
+def accept_course_invitation(*, payload: CourseInviteAcceptRequest, db: Session,
+                                current_user: dict,) -> CourseInviteAcceptResponse:
     # =========================
     # 1) Auth + role check
     # =========================
@@ -835,12 +833,6 @@ def accept_course_invitation(
 
 
 
-# app/features/courses/service.py
-
-from fastapi import HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import text
-
 
 def get_my_courses(*, db: Session, current_user: dict):
     user_id = current_user.get("id")
@@ -945,3 +937,113 @@ def get_my_courses(*, db: Session, current_user: dict):
         "items": items,
         "total": len(items),
     }
+
+
+
+
+
+
+
+def list_course_invitations(*,course_id: int, limit: int, offset: int,db: Session,
+                            current_user: dict,) -> CourseInvitationsListResponse:
+
+    # 1) Auth: instructor only
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can view invitations")
+
+    instructor_id = current_user["id"]
+
+    # 2) Validate course exists + ownership + private
+    course_row = db.execute(
+        text("""
+            SELECT id, created_by, is_public
+            FROM courses
+            WHERE id = :course_id
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if course_row["created_by"] != instructor_id:
+        raise HTTPException(status_code=403, detail="You can only view invitations for your own course")
+
+    if course_row["is_public"] is True:
+        raise HTTPException(status_code=409, detail="This course is public and has no invitations")
+
+    params: dict = {"course_id": course_id}
+
+    # 3) Fetch total + items (pagination)
+    total = db.execute(
+        text("""
+            SELECT COUNT(*)
+            FROM course_invitations ci
+            WHERE ci.course_id = :course_id
+        """),
+        params,
+    ).scalar() or 0
+
+    rows = db.execute(
+        text("""
+            SELECT
+                ci.id,
+                ci.course_id,
+                ci.created_by,
+                ci.invited_email,
+                ci.invited_user_id,
+                ci.token_expires_at,
+                ci.status,
+                ci.sent_at,
+                ci.last_sent_at,
+                ci.send_count,
+                ci.accepted_at,
+                ci.revoked_at,
+                ci.created_at,
+                ci.updated_at
+            FROM course_invitations ci
+            WHERE ci.course_id = :course_id
+            ORDER BY ci.created_at DESC
+            LIMIT :limit OFFSET :offset
+        """),
+        {"course_id": course_id, "limit": limit, "offset": offset},
+    ).mappings().all()
+
+    now = datetime.now(timezone.utc)
+
+    items = []
+    for r in rows:
+        # runtime status override (only for pending)
+        status_val = str(r["status"])  # e.g. "pending"
+        token_expires_at = r["token_expires_at"]
+
+        if status_val == "pending" and token_expires_at is not None:
+            # token_expires_at is timestamptz from Postgres; usually tz-aware already
+            if token_expires_at < now:
+                status_val = "expired"
+
+        items.append({
+            "id": r["id"],
+            "course_id": r["course_id"],
+            "created_by": r["created_by"],
+            "invited_email": r["invited_email"],
+            "invited_user_id": r["invited_user_id"],
+            "status": status_val,  # <- هنا بنرجّع القيمة المعدلة (string) لكنها هتتعمل validate على enum
+            "token_expires_at": r["token_expires_at"],
+            "sent_at": r["sent_at"],
+            "last_sent_at": r["last_sent_at"],
+            "send_count": r["send_count"],
+            "accepted_at": r["accepted_at"],
+            "revoked_at": r["revoked_at"],
+            "created_at": r["created_at"],
+            "updated_at": r["updated_at"],
+            "invited_user_exists": (r["invited_user_id"] is not None),
+        })
+
+    return CourseInvitationsListResponse(
+        course_id=course_id,
+        total=int(total),
+        items=items,
+    )
+
