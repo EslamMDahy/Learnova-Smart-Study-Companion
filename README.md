@@ -15,6 +15,7 @@ Graduation Project
 ```bat
 git clone "https://github.com/EslamMDahy/Learnova-Smart-Study-Companion"
 cd Learnova-Smart-Study-Companion
+
 ```
 
 ---
@@ -24,10 +25,12 @@ cd Learnova-Smart-Study-Companion
 ```bat
 cd Learnova-Smart-Study-Companion\Backend
 python -m venv .venv
+
 ```
 - Activate the `venv`
 ```bat
 .venv\Scripts\activate.bat
+
 ```
 >Notes: every time you open the terminal you will activate the `venv`.
 
@@ -37,6 +40,7 @@ python -m venv .venv
 
 ```bat
 pip install -r requirements.txt
+
 ```
 >Notes: `psycopg` / `psycopg-binary` is included in requirements and is used as the PostgreSQL driver. 
 
@@ -50,11 +54,13 @@ pip install -r requirements.txt
 - Make sure Flutter is instaled
 ```bat
 flutter doctor
+
 ```
 - Get Flutter dependencies
 ```bat
 cd Flutter
 flutter pub get
+
 ```
 
 ---
@@ -75,17 +81,20 @@ C:\pgsql\bin\initdb -D C:\pgsql\data -U postgres -A password -W
 Start:
 ```bat
 C:\pgsql\bin\pg_ctl -D C:\pgsql\data -l C:\pgsql\logfile.log start
+
 ```
 
 Open psql:
 ```bat
 C:\pgsql\bin\psql -U postgres
+
 ```
 
 Create DB:
 ```sql
 CREATE DATABASE learnova;
 \q
+
 ```
 - Connect the DB to FastAPI
 
@@ -108,7 +117,8 @@ alembic revision --autogenerate -m "initialize the DB"
 ``` -->
 - Apply migrations to DB
 ```bat
-alembic upgrade head
+python -m alembic -c alembic.ini upgrade head
+
 ```
 > Note: migrations are already included in the repo. Do NOT run `alembic revision --autogenerate` during setup.
 ---
@@ -141,6 +151,7 @@ set JWT_EXPIRE_MIN=60
 ### 2) Start the PostgreSQL DB server
 ```bat
 C:\pgsql\bin\pg_ctl -D C:\pgsql\data -l C:\pgsql\logfile.log start
+
 ```
 
 ---
@@ -148,6 +159,7 @@ C:\pgsql\bin\pg_ctl -D C:\pgsql\data -l C:\pgsql\logfile.log start
 ### 3) Run the FastAPI server
 ```bat
 fastapi dev app\main.py
+
 ```
 
 ---
@@ -156,6 +168,7 @@ fastapi dev app\main.py
 
 ```bat
 flutter run -d chrome --web-port=5173
+
 ```
 > you can change `chrome` by the browser you use
 ---

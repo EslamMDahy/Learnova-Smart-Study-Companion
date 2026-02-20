@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.core.jwt import decode_access_token
-from app.db.session import get_db  # <-- عدّل المسار لو مختلف عندك
+from app.db.session import get_db
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -22,34 +22,55 @@ def get_current_user(
     payload = decode_access_token(token)
 
     user_id = payload.get("sub")
-    token_version = int(payload.get("tv", -1))
+    last_password_change = payload.get("last_password_change")
 
-    if not user_id:
+    if user_id is None:
+        raise HTTPException(status_code=401, detail="Invalid token payload")
+
+    try:
+        user_id_int = int(user_id)
+    except (TypeError, ValueError):
         raise HTTPException(status_code=401, detail="Invalid token payload")
 
     # 3) هات اليوزر من DB
     row = db.execute(
         text(
             """
-            SELECT id, email, full_name, system_role, is_email_verified, token_version
+            SELECT id, email, full_name, system_role, is_email_verified, last_password_change
             FROM users
             WHERE id = :id
             """
         ),
-        {"id": int(user_id)},
+        {"id": user_id_int},
     ).first()
 
     if not row:
         raise HTTPException(status_code=401, detail="User not found")
 
-    uid, email, full_name, system_role, is_verified, db_tv = row
+    uid, email, full_name, system_role, is_verified, last_password_change_db = row
 
-    # (اختياري لكن بروفيشنال): لو حد اتسربتله توكين قديم قبل التفعيل
+    # (اختياري): لو عايز تمنع غير المفعّلين من استخدام النظام كله
     if not is_verified:
         raise HTTPException(status_code=403, detail="Email not verified")
-    
-    if token_version != db_tv:
-        raise HTTPException(401, "Token revoked")
 
-    # رجّع dict بسيط
-    return {"id": uid, "email": email, "full_name": full_name, "system_role": system_role}
+    # ✅ مهم: قارن بس لو الاتنين موجودين
+    if last_password_change_db is not None and last_password_change is not None:
+        try:
+            token_ts = int(last_password_change)
+        except (TypeError, ValueError):
+            token_ts = None
+
+        if token_ts is None:
+            raise HTTPException(status_code=401, detail="Invalid token payload")
+
+        db_ts = int(last_password_change_db.timestamp())
+
+        if token_ts != db_ts:
+            raise HTTPException(status_code=401, detail="Token revoked")
+
+    return {
+        "id": uid,
+        "email": email,
+        "full_name": full_name,
+        "system_role": system_role,
+    }

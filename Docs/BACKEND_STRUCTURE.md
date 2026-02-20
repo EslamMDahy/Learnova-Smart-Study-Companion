@@ -9,6 +9,7 @@ Backend/
 |
 ├─ app/
 │  ├─ core/
+|  |  ├─ config.py
 |  |  ├─ deps.py
 |  |  ├─ emailer.py
 |  |  ├─ jwt.py
@@ -25,7 +26,12 @@ Backend/
 |  |  |  ├─ schemas.py
 |  |  |  └─ service.py
 |  |  |
-|  |  └─ organizations/
+|  |  ├─ organizations/
+|  |  |  ├─ router.py
+|  |  |  ├─ schemas.py
+|  |  |  └─ service.py
+|  |  |
+|  |  └─ settings/
 |  |     ├─ router.py
 |  |     ├─ schemas.py
 |  |     └─ service.py

@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from fastapi import HTTPException, Response, Request
 
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -13,13 +13,12 @@ from .schemas import LoginRequest
 
 from app.core.security import hash_password
 from app.core.security import verify_password
+from app.core.security import hmac_sha256_hex
 from app.core.emailer import send_email
 from app.core.jwt import create_access_token
-# from app.core.token_store import mark_token_used
+from app.core.config import settings
 
-email_logo_url = "https://raw.githubusercontent.com/EslamMDahy/Learnova-Smart-Study-Companion/refs/heads/backend/Backend/assets/logo.ico"
-email_brand_year = 2026
-email_support_email = "support@learnova.com"
+
 
 def register_user(payload, db: Session):
     # 1) Check email unique
@@ -48,8 +47,18 @@ def register_user(payload, db: Session):
     row = db.execute(
         text(
             """
-            INSERT INTO users (full_name, email, hashed_password, system_role, is_email_verified, created_at, updated_at)
-            VALUES (:full_name, :email, :hashed_password, :system_role, :is_email_verified, NOW(), NOW())
+            INSERT INTO users (
+                full_name, email, hashed_password,
+                system_role, language_preference, account_status,
+                is_email_verified, created_at, updated_at
+            )
+            VALUES (
+                :full_name, :email, :hashed_password,
+                CAST(:system_role AS system_role_enum),
+                :language_preference,
+                CAST(:account_status AS account_status_enum),
+                :is_email_verified, NOW(), NOW()
+            )
             RETURNING id
             """
         ),
@@ -58,17 +67,66 @@ def register_user(payload, db: Session):
             "email": payload.email,
             "hashed_password": hashed_pw,
             "system_role": system_role,
+            "language_preference": "en",
+            "account_status": "pending_activation",  # أو "active"
             "is_email_verified": False,
         },
     ).first()
+
+    db.commit()
+
 
     if not row:
         raise HTTPException(status_code=500, detail="Failed to create user")
 
     user_id = row[0]
 
+    send_verification_email(payload, db)
+    
+    return {
+        "message": "Registration successful. Please check your email.",
+        "email_verification_required": True,
+        "system_type": system_role,
+    }
+    
 
-    # 5) Create verification token
+
+def send_verification_email(payload, db: Session):
+    row = db.execute(
+        text("""
+             SELECT
+             id, full_name, 
+             email, is_email_verified
+             FROM users
+             WHERE email = :email
+             """
+        ),
+        {"email": payload.email},
+    ).first()
+
+    # 1) email مش موجود
+    if not row:
+        raise HTTPException(status_code=400, detail="Bad Request")
+    
+    user_id, full_name, email, is_verified = row
+    
+    # 2) لو الايميل موجود بس معموله فيريفاي
+    if is_verified:
+        raise HTTPException(status_code=400, detail="Bad Request")
+
+    # 3) نبطل اي ريسيت توكين قديمه لليوزر
+    db.execute(
+        text(
+            """
+            UPDATE user_tokens
+            SET used_at = NOW()
+            WHERE user_id = :uid AND type = 'verify_email' AND used_at IS NULL
+            """
+        ),
+        {"uid": user_id}
+    )
+
+    # 3) Create verification token
     verify_token = secrets.token_urlsafe(32)
     expires_at = datetime.now(timezone.utc) + timedelta(hours=24)
 
@@ -90,8 +148,8 @@ def register_user(payload, db: Session):
 
     
 
-    # 6) Build verification link (fallback بدل RuntimeError)
-    frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+    # 4) Build verification link (fallback بدل RuntimeError)
+    frontend_url = settings.frontend_base_url
     verify_link = f"{frontend_url.rstrip('/')}/#/verify-email?token={verify_token}"
     
 
@@ -125,7 +183,7 @@ def register_user(payload, db: Session):
                     <table cellpadding="0" cellspacing="0">
                     <tr>
                         <td style="vertical-align:middle;">
-                        <img src="{email_logo_url}" width="40" height="40" alt="Learnova"
+                        <img src="{settings.email_logo_url}" width="40" height="40" alt="Learnova"
                             style="display:block;border:0;outline:none;border-radius:10px;" />
                         </td>
                         <td style="vertical-align:middle;padding-left:10px;">
@@ -222,10 +280,10 @@ def register_user(payload, db: Session):
                 <tr>
                 <td align="center" style="padding:14px 10px 0;">
                     <p style="margin:0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                    © {email_brand_year} Learnova. All rights reserved.
+                    © {settings.email_brand_year} Learnova. All rights reserved.
                     </p>
                     <p style="margin:6px 0 0;color:#9ca3af;font-size:12px;line-height:1.6;">
-                    Need help? Contact us at <a href="mailto:{email_support_email}" style="color:#137FEC;text-decoration:none;">{email_support_email}</a>
+                    Need help? Contact us at <a href="mailto:{settings.email_support_email}" style="color:#137FEC;text-decoration:none;">{settings.email_support_email}</a>
                     </p>
                 </td>
                 </tr>
@@ -238,8 +296,8 @@ def register_user(payload, db: Session):
     </html>
     """
 
-
-    # 7) Send verification email (متبوظش التسجيل لو الإيميل وقع)
+    sent = False
+    # 5) Send verification email (متبوظش التسجيل لو الإيميل وقع)
     try:
         send_email(
             to=payload.email,
@@ -247,13 +305,13 @@ def register_user(payload, db: Session):
             body=text_body,
             html=html_body,
         )
+        sent = True
     except Exception:
-        pass
+        HTTPException(status_code=503, detail="Service Unavailable")
 
     return {
-        "message": "Registration successful. Please check your email.",
-        "email_verification_required": True,
-        "system_type": system_role,
+        "message": "Chick your email",
+        "email_sent": sent,
     }
 
 
@@ -290,7 +348,7 @@ def verify_email_token(token: str, db: Session):
 
     # 4) mark user verified + mark token used
     db.execute(
-        text("UPDATE users SET is_email_verified = TRUE, updated_at = NOW() WHERE id = :uid"),
+        text("UPDATE users SET is_email_verified = TRUE, email_verified_at = NOW(), updated_at = NOW() WHERE id = :uid"),
         {"uid": user_id},
     )
 
@@ -305,13 +363,15 @@ def verify_email_token(token: str, db: Session):
 
 
 
-def login_user(payload: LoginRequest, db: Session):
+def login_user(payload: LoginRequest, db: Session, response: Response):
     row = db.execute(
         text("""
              SELECT
-             id, full_name, email, avatar_url,
-             system_role, hashed_password, 
-             is_email_verified, token_version
+             id, full_name, email, hashed_password,
+             avatar_url, phone_number,  bio, 
+             system_role, student_id, university_email, 
+             language_preference, is_email_verified, 
+             created_at, last_login_at, last_password_change
              FROM users
              WHERE email = :email
              """
@@ -323,7 +383,7 @@ def login_user(payload: LoginRequest, db: Session):
     if not row:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    user_id, full_name, email, avatar_url, system_role, hashed_pw, is_verified, token_version = row
+    user_id, full_name, email, hashed_pw, avatar_url, phone_number,  bio, system_role, student_id, university_email, language_preference, is_verified, created_at, last_login_at, last_password_change = row
 
     # 2) باسورد غلط (قبل verification)
     if not verify_password(payload.password, hashed_pw):
@@ -332,14 +392,21 @@ def login_user(payload: LoginRequest, db: Session):
     # 3) هنا فقط نكشف أنه مش verified لأن credentials صح
     if not is_verified:
         raise HTTPException(status_code=403, detail="Email not verified")
-
+    
     # 4) preparing the login response data
     user = {
         "id": user_id,
         "full_name": full_name,
         "email": email,
         "avatar_url": avatar_url,
+        "phone_number": phone_number,
+        "bio": bio,
         "system_role": system_role,
+        "student_id": student_id,
+        "university_email": university_email,
+        "language_preference": language_preference,
+        "created_at": created_at,
+        "last_login_at": last_login_at,
     }
 
     orgs = []
@@ -395,8 +462,60 @@ def login_user(payload: LoginRequest, db: Session):
     # 5) Cereating JWT
     access_token = create_access_token(
         subject=str(user_id),
-        extra={"email": email, "full_name": full_name, "tv": token_version, "system_role": system_role},
+        extra={"email": email, "full_name": full_name, "last_password_change": int(last_password_change.timestamp()) if last_password_change else None, "system_role": system_role},
     )
+    
+    # =========================
+    # Refresh token (HttpOnly cookie)
+    # =========================
+    if not settings.refresh_token_secret:
+        raise HTTPException(status_code=500, detail="Server misconfigured: REFRESH_TOKEN_SECRET is missing")
+
+    # remember_me => مدة أطول
+    days = settings.refresh_token_expire_days_remember if payload.remember_me else settings.refresh_token_expire_days_short
+
+    now = datetime.now(timezone.utc)
+    refresh_expires_at = now + timedelta(days=days)
+
+    # raw refresh token (ده اللي هيتحط في cookie)
+    refresh_raw = secrets.token_urlsafe(48)
+
+    # store only HMAC hash in DB
+    refresh_hash = hmac_sha256_hex(refresh_raw, settings.refresh_token_secret)
+
+    # (اختياري) إبطال refresh tokens القديمة لليوزر (جلسة واحدة فقط)
+    # لو عايز multi-device شيل الجزء ده
+    db.execute(
+        text("""
+            UPDATE user_tokens
+            SET used_at = NOW()
+            WHERE user_id = :uid
+              AND type = 'refresh'
+              AND used_at IS NULL
+        """),
+        {"uid": user_id},
+    )
+
+    # insert refresh token hash
+    db.execute(
+        text("""
+            INSERT INTO user_tokens (user_id, type, token, expires_at, used_at, created_at)
+            VALUES (:uid, 'refresh', :token, :expires_at, NULL, NOW())
+        """),
+        {"uid": user_id, "token": refresh_hash, "expires_at": refresh_expires_at},
+    )
+
+    # set cookie
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=refresh_raw,
+        httponly=True,
+        secure=settings.cookie_secure,     # false في dev, true في prod
+        samesite=settings.cookie_samesite, # "lax" غالبًا
+        path=settings.cookie_path,         # "/auth/refresh" أفضل
+        expires=int(refresh_expires_at.timestamp()),
+    )
+
 
     # 6) Sending the login response
     resp = {
@@ -408,7 +527,178 @@ def login_user(payload: LoginRequest, db: Session):
     if system_role == "owner":
         resp["organizations"] = orgs
 
+    db.execute(
+        text("UPDATE users SET last_login_at = NOW() WHERE id = :uid"),
+        {"uid": user_id},
+    )
+    db.commit()
+
     return resp
+
+
+
+def refresh_access_token(*, db: Session, request: Request, response: Response):
+    if not settings.refresh_token_secret:
+        raise HTTPException(status_code=500, detail="Server misconfigured: REFRESH_TOKEN_SECRET is missing")
+
+    # 1) read refresh cookie
+    refresh_raw = request.cookies.get(settings.refresh_cookie_name)
+    if not refresh_raw:
+        raise HTTPException(status_code=401, detail="Missing refresh token")
+
+    now = datetime.now(timezone.utc)
+    refresh_hash = hmac_sha256_hex(refresh_raw, settings.refresh_token_secret)
+
+    # 2) validate token in DB
+    row = db.execute(
+        text("""
+            SELECT ut.user_id, expires_at, created_at 
+            FROM user_tokens ut
+            WHERE ut.type = 'refresh'
+              AND ut.token = :token
+              AND ut.used_at IS NULL
+              AND ut.expires_at > NOW()
+            LIMIT 1
+        """),
+        {"token": refresh_hash},
+    ).first()
+
+    if not row:
+        # refresh invalid/expired/reused
+        # امسح cookie احتياطيًا
+        response.delete_cookie(
+            key=settings.refresh_cookie_name,
+            path=settings.cookie_path,
+        )
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    user_id = row[0]
+    expires_at = row[1]
+    created_at= row[2]
+
+    # 3) get user claims (عشان نطلع access token)
+    user_row = db.execute(
+        text("""
+            SELECT id, email, full_name, system_role, last_password_change
+            FROM users
+            WHERE id = :uid
+            LIMIT 1
+        """),
+        {"uid": user_id},
+    ).first()
+
+    if not user_row:
+        response.delete_cookie(key=settings.refresh_cookie_name, path=settings.cookie_path)
+        raise HTTPException(status_code=401, detail="User not found")
+
+    uid, email, full_name, system_role, last_password_change = user_row
+
+    # 4) invalidate ALL old refresh tokens (single-session strategy)
+    db.execute(
+        text("""
+            UPDATE user_tokens
+            SET used_at = NOW()
+            WHERE user_id = :uid
+              AND type = 'refresh'
+              AND used_at IS NULL
+        """),
+        {"uid": uid},
+    )
+
+    # 5) mint new refresh token (rotation)
+    ttl = expires_at - created_at
+    if ttl.total_seconds() <= 0:
+        ttl = timedelta(days=settings.refresh_token_expire_days_short) 
+    now = datetime.now(timezone.utc)
+    refresh_expires_at = now + ttl
+
+    new_refresh_raw = secrets.token_urlsafe(48)
+    new_refresh_hash = hmac_sha256_hex(new_refresh_raw, settings.refresh_token_secret)
+
+    db.execute(
+        text("""
+            INSERT INTO user_tokens (user_id, type, token, expires_at, used_at, created_at)
+            VALUES (:uid, 'refresh', :token, :expires_at, NULL, NOW())
+        """),
+        {"uid": uid, "token": new_refresh_hash, "expires_at": refresh_expires_at},
+    )
+
+    # 6) set cookie with new refresh
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=new_refresh_raw,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        path=settings.cookie_path,
+        expires=int(refresh_expires_at.timestamp()),
+    )
+
+    # 7) mint new access token (15 min)
+    access_token = create_access_token(
+        subject=str(uid),
+        extra={
+            "email": email,
+            "full_name": full_name,
+            "system_role": system_role,
+            "last_password_change": int(last_password_change.timestamp()) if last_password_change else None,
+        },
+    )
+
+    db.commit()
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+    }
+
+
+
+def logout_user(*, db: Session, request: Request, response: Response):
+    if not settings.refresh_token_secret:
+        raise HTTPException(status_code=500, detail="Server misconfigured: REFRESH_TOKEN_SECRET is missing")
+
+    refresh_raw = request.cookies.get(settings.refresh_cookie_name)
+
+    # امسح cookie دائمًا حتى لو مفيش token
+    response.delete_cookie(
+        key=settings.refresh_cookie_name,
+        path=settings.cookie_path,
+    )
+
+    if not refresh_raw:
+        return {"message": "Logged out"}
+
+    refresh_hash = hmac_sha256_hex(refresh_raw, settings.refresh_token_secret)
+
+    # لو token موجود وصالح نجيب user_id ونبطل كل refresh
+    row = db.execute(
+        text("""
+            SELECT user_id
+            FROM user_tokens
+            WHERE type = 'refresh'
+              AND token = :token
+              AND used_at IS NULL
+            LIMIT 1
+        """),
+        {"token": refresh_hash},
+    ).first()
+
+    if row:
+        uid = row[0]
+        db.execute(
+            text("""
+                UPDATE user_tokens
+                SET used_at = NOW()
+                WHERE user_id = :uid
+                  AND type = 'refresh'
+                  AND used_at IS NULL
+            """),
+            {"uid": uid},
+        )
+        db.commit()
+
+    return {"message": "Logged out"}
 
 
 
@@ -461,7 +751,7 @@ def forget_password_request(payload, db):
     db.commit()
     
     
-    frontend_url = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+    frontend_url = settings.frontend_base_url
     reset_link = f"{frontend_url.rstrip('/')}/#/reset-password?token={resetPass_token}"
 
     subject = "Learnova – Reset your password"
@@ -499,7 +789,7 @@ def forget_password_request(payload, db):
                     <table cellpadding="0" cellspacing="0">
                     <tr>
                         <td>
-                        <img src="{email_logo_url}" width="40" height="40" alt="Learnova"
+                        <img src="{settings.email_logo_url}" width="40" height="40" alt="Learnova"
                             style="display:block;border-radius:10px;" />
                         </td>
                         <td style="padding-left:10px;">
@@ -619,7 +909,7 @@ def forget_password_request(payload, db):
             html=html_body,
         )
     except Exception:
-        pass
+        HTTPException(status_code=503, detail="Service Unavailable")
 
 
     return ok_response
@@ -668,7 +958,7 @@ def reset_password(payload, db):
             UPDATE users
             SET hashed_password = :hp, 
                 updated_at = NOW(),
-                token_version = token_version + 1
+                last_password_change = NOW()
             WHERE id = :uid
             """
         ),
