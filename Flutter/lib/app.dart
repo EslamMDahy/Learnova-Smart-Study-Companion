@@ -5,6 +5,8 @@ import 'core/routing/app_router.dart';
 import 'core/session/session_bootstrapper.dart';
 import 'core/ui/global_loading_overlay.dart';
 
+import 'core/ui/global_loading_bus_binder.dart';
+
 class App extends ConsumerWidget {
   const App({super.key});
 
@@ -14,12 +16,14 @@ class App extends ConsumerWidget {
       debugShowCheckedModeBanner: false,
       routerConfig: appRouter,
       builder: (context, child) {
-        return SessionBootstrapper(
-          child: Stack(
-            children: [
-              child ?? const SizedBox.shrink(),
-              const GlobalLoadingOverlay(), // ✅ فوق كل حاجة
-            ],
+        return GlobalLoadingBusBinder( // ✅ ده اللي كان ناقص
+          child: SessionBootstrapper(
+            child: Stack(
+              children: [
+                child ?? const SizedBox.shrink(),
+                const GlobalLoadingOverlay(),
+              ],
+            ),
           ),
         );
       },

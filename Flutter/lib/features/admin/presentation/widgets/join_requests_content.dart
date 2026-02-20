@@ -309,7 +309,7 @@ class _JoinRequestsTableFigma extends StatelessWidget {
 
           AsyncStateView(
             loading: loading,
-            error: errorMessage,
+            errorMessage: errorMessage,
             onRetry: orgId.isEmpty ? null : onRetry,
             isEmpty: users.isEmpty,
             child: ListView.separated(
