@@ -91,10 +91,13 @@ class _LoginFormState extends ConsumerState<LoginForm> {
     if (!mounted) return;
 
     if (ok) {
-      if (UserStorage.isOwner) context.go(Routes.adminUsers);
-      // ignore: curly_braces_in_flow_control_structures
-      else if (UserStorage.isInstructor)context.go(Routes.instructorDashboard);
-      else context.go(Routes.home);
+      if (UserStorage.isOwner) {
+        context.go(Routes.adminUsers);
+      } else if (UserStorage.isInstructor) {
+        context.go(Routes.instructorDashboard);
+      } else {
+        context.go(Routes.home);
+      }
     }
   }
 

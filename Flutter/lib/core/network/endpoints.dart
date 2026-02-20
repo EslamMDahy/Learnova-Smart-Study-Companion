@@ -12,6 +12,7 @@ class Endpoints {
   static const resetPassword = '$_auth/reset-password';
   static const verifyEmail = '$_auth/verify-email';
   static const me = '$_auth/me';
+  static const refresh = '$_auth/refresh';
 
   // ============== ORGANIZATIONS ===========
   static const createOrganization = _orgs; // POST /organizations
@@ -27,5 +28,9 @@ class Endpoints {
   static const updateProfile = '$_settings/profile';          // PATCH
   static const updatePassword = '$_settings/password';        // PATCH
   static const deleteRequest = '$_settings/delete/request';   // POST
-  static const deleteConfirm = '$_settings/delete/confirm';   // DELETE (لو هتحتاجوه بعدين)
+  static const deleteConfirm = '$_settings/delete/confirm';   // DELETE
+
+  // ✅ NEW (user_preferences)
+  static const getPreferences = '$_settings/preferences';     // GET
+  static const updatePreferences = '$_settings/preferences';  // PATCH
 }

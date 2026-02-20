@@ -1,38 +1,83 @@
+import 'package:dio/dio.dart';
+
+import '../../../core/storage/user_storage.dart';
+import 'dto/user_profile.dart';
+import 'dto/user_preferences.dart';
 import 'settings_api.dart';
 
 class SettingsRepository {
   final SettingsApi _api;
   SettingsRepository(this._api);
 
-  Future<String> updateProfile({
-    required String firstName,
-    required String lastName,
-    required String phoneNumber,
-    required String bio,
-    required String language,
-    required bool assignmentAlerts,
-  }) {
-    return _api.updateProfile(
-      firstName: firstName,
-      lastName: lastName,
-      phoneNumber: phoneNumber,
-      bio: bio,
-      language: language,
-      assignmentAlerts: assignmentAlerts,
-    );
+  Future<UserProfile> me({CancelToken? cancelToken}) async {
+    // ✅ cached-first from login stored user
+    final u = UserStorage.userMap;
+    if (u != null && (u['id']?.toString().trim().isNotEmpty ?? false)) {
+      try {
+        return UserProfile.fromJson(u);
+      } catch (_) {
+        // ignore & fallback to API
+      }
+    }
+
+    // fallback
+    return _api.me(cancelToken: cancelToken);
   }
+
+  Future<UserProfile> updateProfile({
+    required String fullName,
+    String? phoneNumber,
+    String? bio,
+    String? studentId,
+    String? universityEmail,
+    required String languagePreference,
+    CancelToken? cancelToken,
+  }) =>
+      _api.updateProfile(
+        fullName: fullName,
+        phoneNumber: phoneNumber,
+        bio: bio,
+        studentId: studentId,
+        universityEmail: universityEmail,
+        languagePreference: languagePreference,
+        cancelToken: cancelToken,
+      );
 
   Future<String> updatePassword({
     required String currentPassword,
     required String newPassword,
-  }) {
-    return _api.updatePassword(
-      currentPassword: currentPassword,
-      newPassword: newPassword,
-    );
-  }
+    CancelToken? cancelToken,
+  }) =>
+      _api.updatePassword(
+        currentPassword: currentPassword,
+        newPassword: newPassword,
+        cancelToken: cancelToken,
+      );
 
-  Future<String> requestAccountDelete() {
-    return _api.requestAccountDelete();
-  }
+  Future<String> requestAccountDelete({
+    required String currentPassword,
+    CancelToken? cancelToken,
+  }) =>
+      _api.requestAccountDelete(
+        currentPassword: currentPassword,
+        cancelToken: cancelToken,
+      );
+
+  Future<String> confirmDeleteAccount({
+    required String otp,
+    CancelToken? cancelToken,
+  }) =>
+      _api.confirmDeleteAccount(
+        otp: otp,
+        cancelToken: cancelToken,
+      );
+
+  Future<UserPreferences> getPreferences({CancelToken? cancelToken}) =>
+      _api.getPreferences(cancelToken: cancelToken);
+
+  Future<UserPreferences> updatePreferences(
+    UserPreferences prefs, {
+    CancelToken? cancelToken,
+  }) =>
+      _api.updatePreferences(prefs, cancelToken: cancelToken);
 }

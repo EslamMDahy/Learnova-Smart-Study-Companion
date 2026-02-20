@@ -6,6 +6,7 @@ import '../controllers/join_requests_controller.dart';
 import '../../data/dto/join_request_user.dart';
 
 import '../../../../shared/widgets/app_ui_components.dart';
+import '../../../../shared/widgets/async_state_view.dart';
 
 /* ============================================================
    SAME TABLE CONSTANTS (from UserManagement)
@@ -19,8 +20,9 @@ class JoinRequestsContent extends ConsumerStatefulWidget {
 
   const JoinRequestsContent({
     super.key,
-    required this.organizationId,
-  });
+    String? organizationId,
+    String? orgId, // ✅ backward compatible
+  }) : organizationId = (organizationId ?? orgId);
 
   @override
   ConsumerState<JoinRequestsContent> createState() => _JoinRequestsContentState();
@@ -43,7 +45,7 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (_orgId.isEmpty) return;
-      await ref.read(joinRequestsControllerProvider.notifier).load(
+      await ref.read(joinRequestsControllerProvider.notifier).init(
             organizationId: _orgId,
             view: 'pending',
           );
@@ -59,10 +61,7 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
   Future<void> _refresh() async {
     if (_orgId.isEmpty) return;
     FocusScope.of(context).unfocus();
-    await ref.read(joinRequestsControllerProvider.notifier).load(
-          organizationId: _orgId,
-          view: 'pending',
-        );
+    await ref.read(joinRequestsControllerProvider.notifier).refresh();
   }
 
   @override
@@ -75,14 +74,8 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
         final isNarrow = c.maxWidth < 1100;
 
         return SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isNarrow ? 16 : 116,
-            vertical: 32,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1400),
-              child: Column(
+          padding: EdgeInsets.zero,
+          child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const FigmaUmPageHeader(
@@ -102,7 +95,9 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
                     selectedRole: selectedRole,
                     selectedStatus: selectedStatus,
                     isNarrow: isNarrow,
-                    onSearchChanged: (_) => setState(() {}),
+                    onSearchChanged: (v) {
+                      ref.read(joinRequestsControllerProvider.notifier).search(v);
+                    },
                     onRoleChanged: (v) => setState(() => selectedRole = v),
                     onStatusChanged: (v) => setState(() => selectedStatus = v),
                     onMoreFilters: () {}, // keep UI behavior (optional)
@@ -111,16 +106,28 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
 
                   const SizedBox(height: 16),
 
-                  _JoinRequestsTableFigma(
-                    isNarrow: isNarrow,
-                    loading: state.loading,
-                    orgId: _orgId,
-                    users: users,
-                  ),
+                _JoinRequestsTableFigma(
+                  isNarrow: isNarrow,
+                  loading: state.loading,
+                  orgId: _orgId,
+                  users: users,
+                  errorMessage: state.error,
+                  page: state.page,
+                  pageSize: state.pageSize,
+                  totalCount: state.count,
+                  onPrev: (state.page > 1 && !state.loading)
+                      ? () => ref.read(joinRequestsControllerProvider.notifier).changePage(state.page - 1)
+                      : null,
+                  onNext: (state.page < state.totalPages && !state.loading)
+                      ? () => ref.read(joinRequestsControllerProvider.notifier).changePage(state.page + 1)
+                      : null,
+                  onRetry: _orgId.isEmpty
+                      ? null
+                      : () => ref.read(joinRequestsControllerProvider.notifier).refresh(),
+                ),
+
                 ],
               ),
-            ),
-          ),
         );
       },
     );
@@ -151,8 +158,10 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
 class _StatsRow extends StatelessWidget {
   final bool isNarrow;
   final List<JoinRequestUser> users;
+  final String? error;
+  final VoidCallback? onRetry;
 
-  const _StatsRow({required this.isNarrow, required this.users});
+  const _StatsRow({required this.isNarrow, required this.users, this.error, this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -233,54 +242,77 @@ class _JoinRequestsTableFigma extends StatelessWidget {
   final bool loading;
   final String orgId;
   final List<JoinRequestUser> users;
+  final String? errorMessage;
+
+  final int page;
+  final int pageSize;
+  final int totalCount;
+
+  final VoidCallback? onRetry;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
 
   const _JoinRequestsTableFigma({
     required this.isNarrow,
     required this.loading,
     required this.orgId,
     required this.users,
+    required this.errorMessage,
+    required this.page,
+    required this.pageSize,
+    required this.totalCount,
+    required this.onPrev,
+    required this.onNext,
+    this.onRetry,
   });
 
   @override
   Widget build(BuildContext context) {
-    final showingTo = users.isEmpty ? 0 : (users.length < 5 ? users.length : 5);
+    final total = totalCount <= 0 ? users.length : totalCount;
+    final from = users.isEmpty ? 0 : ((page - 1) * pageSize + 1);
+    final to = users.isEmpty ? 0 : (from + users.length - 1);
+    final safeTo = to > total ? total : to;
 
     return Container(
       decoration: BoxDecoration(
-        color: AppColors.cBg,
-        borderRadius: BorderRadius.circular(12),
+        color: AppColors.cSurface,
         border: Border.all(color: AppColors.cBorder),
-        boxShadow: const [
-          BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
-        ],
+        borderRadius: BorderRadius.circular(12),
       ),
-      clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          FigmaUmTableHeader(
-            isNarrow: isNarrow,
-            actionsColWidth: _kActionsColW,
-            cellLeftPad: _kCellLeftPad,
-            rowHPad: _kRowHPad,
+          // Table head
+          Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: const BoxDecoration(
+              color: AppColors.cSurface,
+              border: Border(bottom: BorderSide(color: AppColors.cBorderSoft)),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    "Join Requests",
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontFamily: "Manrope",
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.cText,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
 
-          if (orgId.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: FigmaUmEmptyTableState(),
-            )
-          else if (loading)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (users.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: FigmaUmEmptyTableState(),
-            )
-          else
-            ListView.separated(
+          AsyncStateView(
+            loading: loading,
+            error: errorMessage,
+            onRetry: orgId.isEmpty ? null : onRetry,
+            isEmpty: users.isEmpty,
+            child: ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: users.length,
@@ -292,11 +324,12 @@ class _JoinRequestsTableFigma extends StatelessWidget {
                 orgId: orgId,
               ),
             ),
+          ), // ✅ مهم: قفلة AsyncStateView
 
           FigmaUmTableFooter(
-            showingText: "Showing 1-$showingTo of ${users.length} requests",
-            onPrev: null,
-            onNext: users.length > 5 ? () {} : null,
+            showingText: "Showing $from-$safeTo of $total requests",
+            onPrev: onPrev,
+            onNext: onNext,
           ),
         ],
       ),

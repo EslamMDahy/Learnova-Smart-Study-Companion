@@ -43,13 +43,12 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
 
   int _selectedIndexFromPath(String path) {
     if (path.startsWith(Routes.instructorDashboard)) return InstructorTabs.dashboard;
-    if (path.startsWith(Routes.instructorCourse)) return InstructorTabs.course;
+    if (path.startsWith(Routes.instructorCourses)) return InstructorTabs.course;
     if (path.startsWith(Routes.instructorQuestionBank)) return InstructorTabs.questionBank;
     if (path.startsWith(Routes.instructorQuizzes)) return InstructorTabs.quizzes;
     if (path.startsWith(Routes.instructorSettings)) return InstructorTabs.settings;
     if (path.startsWith(Routes.instructorHelp)) return InstructorTabs.help;
 
-    // fallback
     return InstructorTabs.dashboard;
   }
 
@@ -59,7 +58,7 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
         context.go(Routes.instructorDashboard);
         return;
       case InstructorTabs.course:
-        context.go(Routes.instructorCourse);
+        context.go(Routes.instructorCourses);
         return;
       case InstructorTabs.questionBank:
         context.go(Routes.instructorQuestionBank);
@@ -99,10 +98,11 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
 
     return BaseDashboardShell(
       asideWidth: 288,
-      contentMaxWidth: 1400,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 116, vertical: 32),
       backgroundColor: const Color(0xFFF6F7F8),
       dividerColor: const Color(0xFFEDF2F7),
+
+      /// ✅ هنا التغيير الأساسي
+      wrapChild: false,
 
       sidebar: InstructorSidebarWidget(
         selectedIndex: _selectedIndexFromPath(path),

@@ -120,7 +120,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
               const SizedBox(height: 16),
             ] else ...[
               // ✅ بعد الإرسال: زر resend فقط (يعتمد على lastEmail)
-              AppOutlinedLoadingButton(
+              AppPrimaryLoadingButton(
                 label: "Resend email",
                 loading: state.loading,
                 onPressed: () => ref

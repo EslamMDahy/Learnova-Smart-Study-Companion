@@ -185,7 +185,6 @@ class AppSidebar extends StatelessWidget {
   });
 
   static const double _asideWidth = 288;
-  static const double _innerWidth = 255;
 
   static const Color _border = Color(0xFFF0F2F4);
 
@@ -200,8 +199,6 @@ class AppSidebar extends StatelessWidget {
           bottom: true,
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: SizedBox(
-              width: _innerWidth,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -238,7 +235,7 @@ class AppSidebar extends StatelessWidget {
                   ),
 
                   Container(
-                    width: _innerWidth,
+                    width: double.infinity,
                     padding: const EdgeInsets.only(top: 16),
                     decoration: const BoxDecoration(
                       border: Border(top: BorderSide(color: _border)),
@@ -262,7 +259,6 @@ class AppSidebar extends StatelessWidget {
                   ),
                 ],
               ),
-            ),
           ),
         ),
       ),
@@ -382,7 +378,7 @@ class _AppSidebarBrandHeader extends StatelessWidget {
 
 /* -------------------- Nav Link (Figma hover + selected) -------------------- */
 
-class _AppSidebarNavLink extends StatelessWidget {
+class _AppSidebarNavLink extends StatefulWidget {
   final IconData icon;
   final String title;
   final int index;
@@ -397,84 +393,103 @@ class _AppSidebarNavLink extends StatelessWidget {
     required this.onTap,
   });
 
+  @override
+  State<_AppSidebarNavLink> createState() => _AppSidebarNavLinkState();
+}
+
+class _AppSidebarNavLinkState extends State<_AppSidebarNavLink> {
+  bool _isFocused = false;
+
   static const Color _muted = Color(0xFF617589);
   static const Color _primary = Color(0xFF137FEC);
 
-  static const Color _pill = Color(0x1A137FEC); // hover + selected
+  static const Color _pill = Color(0x1A137FEC); // hover + selected + focused
   static const Color _pressed = Color(0x33137FEC); // pressed darker
 
   static const double _radius = 12;
 
   @override
   Widget build(BuildContext context) {
-    final isSelected = selectedIndex == index;
+    final isSelected = widget.selectedIndex == widget.index;
 
-    final bg = MaterialStateProperty.resolveWith<Color?>((states) {
+    // InkWell overlay (hover/pressed/focus/selected)
+    final overlay = MaterialStateProperty.resolveWith<Color?>((states) {
       if (isSelected) return _pill;
       if (states.contains(MaterialState.pressed)) return _pressed;
       if (states.contains(MaterialState.hovered)) return _pill;
+      if (states.contains(MaterialState.focused)) return _pill;
       return Colors.transparent;
     });
 
+    // Foreground (icon/text)
     final fg = MaterialStateProperty.resolveWith<Color>((states) {
       if (isSelected) return _primary;
       if (states.contains(MaterialState.hovered)) return _primary;
+      if (states.contains(MaterialState.focused)) return _primary;
       return _muted;
     });
 
-    return RepaintBoundary(
-      child: SizedBox(
-        width: 255,
-        height: 44,
-        child: Material(
-          color: Colors.transparent,
-          child: InkWell(
-            onTap: () => onTap(index),
-            borderRadius: BorderRadius.circular(_radius),
-            overlayColor: bg,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 24.02,
-                    height: 28,
-                    child: Center(
-                      child: Builder(
-                        builder: (context) {
-                          return Icon(
-                            icon,
+    // Focus ring (keyboard accessibility)
+    final focusBorder = _isFocused
+        ? Border.all(color: _primary.withOpacity(0.65), width: 1.5)
+        : null;
+
+    return Semantics(
+      button: true,
+      selected: isSelected,
+      label: widget.title,
+      child: Focus(
+        onFocusChange: (v) => setState(() => _isFocused = v),
+        child: SizedBox(
+          width: 255,
+          height: 44,
+          child: Material(
+            color: Colors.transparent,
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(_radius),
+                border: focusBorder,
+              ),
+              child: InkWell(
+                onTap: () => widget.onTap(widget.index),
+                borderRadius: BorderRadius.circular(_radius),
+                overlayColor: overlay,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  child: Row(
+                    children: [
+                      SizedBox(
+                        width: 24,
+                        height: 28,
+                        child: Center(
+                          child: Icon(
+                            widget.icon,
                             size: 22,
                             color: MaterialStateColor.resolveWith(
                               (states) => fg.resolve(states),
                             ),
-                          );
-                        },
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Builder(
-                      builder: (context) {
-                        return Text(
-                          title,
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          widget.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 14,
                             height: 20 / 14,
-                            fontWeight:
-                                isSelected ? FontWeight.w700 : FontWeight.w500,
+                            fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                             color: MaterialStateColor.resolveWith(
                               (states) => fg.resolve(states),
                             ),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -868,7 +883,6 @@ class AppPrimaryLoadingButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final double height;
 
-  // ✅ NEW
   final Color? backgroundColor;
   final Color? foregroundColor;
   final Color? borderColor;
@@ -883,6 +897,32 @@ class AppPrimaryLoadingButton extends StatelessWidget {
     this.foregroundColor,
     this.borderColor,
   });
+
+  TextStyle _autoTextStyle(Color fg) {
+    if (height <= 36) {
+      return TextStyle(color: fg, fontSize: 12, fontWeight: FontWeight.w600);
+    }
+    if (height <= 40) {
+      return TextStyle(color: fg, fontSize: 13, fontWeight: FontWeight.w600);
+    }
+    if (height <= 48) {
+      return TextStyle(color: fg, fontSize: 14, fontWeight: FontWeight.w700);
+    }
+    return TextStyle(color: fg, fontSize: 16, fontWeight: FontWeight.w700);
+  }
+
+  EdgeInsets _autoPadding() {
+    // كل ما الزرار يصغر نقلل padding عشان النص ياخد مساحة
+    if (height <= 36) return const EdgeInsets.symmetric(horizontal: 10);
+    if (height <= 40) return const EdgeInsets.symmetric(horizontal: 12);
+    return const EdgeInsets.symmetric(horizontal: 16);
+  }
+
+  double _loaderSize() {
+    if (height <= 36) return 14;
+    if (height <= 40) return 16;
+    return 20;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -903,6 +943,7 @@ class AppPrimaryLoadingButton extends StatelessWidget {
           disabledBackgroundColor: bg.withOpacity(0.6),
           disabledForegroundColor: fg.withOpacity(0.85),
           elevation: 0,
+          padding: _autoPadding(),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(10),
             side: borderSide,
@@ -911,16 +952,21 @@ class AppPrimaryLoadingButton extends StatelessWidget {
         onPressed: loading ? null : onPressed,
         child: loading
             ? SizedBox(
-                width: 20,
-                height: 20,
+                width: _loaderSize(),
+                height: _loaderSize(),
                 child: CircularProgressIndicator(
                   strokeWidth: 2,
                   color: fg,
                 ),
               )
-            : Text(
-                label,
-                style: TextStyle(color: fg, fontSize: 16, fontWeight: FontWeight.w700),
+            : FittedBox(
+                fit: BoxFit.scaleDown, // ✅ لو النص طويل هيصغر بدل ما يقطع
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: _autoTextStyle(fg),
+                ),
               ),
       ),
     );

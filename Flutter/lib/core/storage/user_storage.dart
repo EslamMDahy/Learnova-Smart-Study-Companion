@@ -37,11 +37,35 @@ class UserStorage {
     return null; // don't guess shape
   }
 
+  // ---------------- Basic getters ----------------
+
   static String get role =>
       (userMap?['system_role'] ?? '').toString().toLowerCase();
 
   static bool get isOwner => role == 'owner';
   static bool get isInstructor => role == 'instructor';
+
+  static String? get userId => userMap?['id']?.toString();
+  static String? get email => userMap?['email']?.toString();
+  static String? get fullName => userMap?['full_name']?.toString();
+
+  static String? get avatarUrl => userMap?['avatar_url']?.toString();
+  static String? get phoneNumber => userMap?['phone_number']?.toString();
+  static String? get bio => userMap?['bio']?.toString();
+
+  static String? get studentId => userMap?['student_id']?.toString();
+  static String? get universityEmail => userMap?['university_email']?.toString();
+
+  static String? get languagePreference =>
+      userMap?['language_preference']?.toString();
+
+  static String? get createdAt => userMap?['created_at']?.toString();
+  static String? get lastLoginAt => userMap?['last_login_at']?.toString();
+
+  static String? get subscriptionPlanName =>
+      userMap?['subscription_plan_name']?.toString();
+
+  // ---------------- Organizations ----------------
 
   /// Backend-aligned organizations list (from login for owner)
   static List<Map<String, dynamic>> get organizations {

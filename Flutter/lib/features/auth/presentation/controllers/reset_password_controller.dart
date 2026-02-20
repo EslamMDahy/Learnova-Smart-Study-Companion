@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error/app_error_bus.dart';
+import '../../../../core/storage/token_storage.dart';
 import '../../../../core/network/error_mapper.dart';
 import '../../data/auth_providers.dart';
 import '../../data/auth_repository.dart';
@@ -70,11 +72,18 @@ class ResetPasswordController extends StateNotifier<ResetPasswordState> {
 
       return true;
     } catch (err) {
+      final failure = mapApiFailure(err);
+
+      if (TokenStorage.hasToken && failure.isAuthIssue) {
+        state = state.copyWith(loading: false, message: null);
+        AppErrorReporter.report(ref, failure);
+        return false;
+      }
+
       state = state.copyWith(
         loading: false,
-        success: false,
         message: null,
-        error: mapApiError(err),
+        error: failure.message,
       );
       return false;
     }

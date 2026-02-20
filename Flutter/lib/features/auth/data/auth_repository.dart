@@ -18,6 +18,7 @@ class AuthRepository {
       LoginRequest(
         email: email.trim(),
         password: password,
+        rememberMe: persist, // ✅ NEW: map persist -> remember_me (backend)
       ),
     );
 
@@ -27,18 +28,17 @@ class AuthRepository {
       throw Exception('Missing user in login response');
     }
 
+    // ✅ Store full user payload (expanded) from login response
     final meToStore = <String, dynamic>{
-      'user': {
-        'id': _toIntOrString(userId),
-        // backend uses full_name
-        'full_name': res.user?.name,
-        'email': res.user?.email,
-        'system_role': res.user?.role,
-      },
+      'user': res.user!.toJson(),
       'organizations': res.organizations
           .map((o) => {
                 'id': _toIntOrString(o.id),
                 'name': o.name,
+                'description': o.description,
+                'logo_url': o.logoUrl,
+                'invite_code': o.inviteCode,
+                'subscription_status': o.subscriptionStatus,
               })
           .toList(),
     };
@@ -52,8 +52,9 @@ class AuthRepository {
     UserStorage.saveMe(meToStore, persist: persist);
 
     // save token (backend: access_token)
-    TokenStorage.saveToken(
-      res.accessToken,
+    TokenStorage.saveSession(
+      accessToken: res.accessToken,
+      refreshToken: res.refreshToken,
       persist: persist,
     );
   }

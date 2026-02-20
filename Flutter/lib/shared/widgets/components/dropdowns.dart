@@ -192,14 +192,15 @@ class AppProfileDropdown extends StatelessWidget {
   static const Color _text = Color(0xFF111418);
 
   @override
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 212.02,
-      height: 36,
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 36, maxHeight: 36),
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => _openMenu(context),
         child: Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
             // Avatar
             Container(
@@ -214,65 +215,46 @@ class AppProfileDropdown extends StatelessWidget {
             ),
             const SizedBox(width: 12),
 
-            // Name + subtitle
-            SizedBox(
-              width: 138,
-              height: 30,
+            // Name + subtitle (flexible بدل widths ثابتة)
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 260),
               child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  SizedBox(
-                    height: 14,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        name,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          height: 1.0,
-                          color: _text,
-                        ),
-                      ),
+                  Text(
+                    name,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      height: 1.0,
+                      color: _text,
                     ),
                   ),
-                  SizedBox(
-                    height: 16,
-                    child: Align(
-                      alignment: Alignment.centerLeft,
-                      child: Text(
-                        subtitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          height: 16 / 12,
-                          color: _muted,
-                        ),
-                      ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      height: 16 / 12,
+                      color: _muted,
                     ),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
 
-            // Arrow
-            const SizedBox(
-              width: 14.02,
-              height: 20,
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: 2),
-                child: Icon(
-                  Icons.expand_more_rounded,
-                  size: 16,
-                  color: _muted,
-                ),
-              ),
+            const Icon(
+              Icons.expand_more_rounded,
+              size: 18,
+              color: _muted,
             ),
           ],
         ),

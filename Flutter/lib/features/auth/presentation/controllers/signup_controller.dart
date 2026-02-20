@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error/app_error_bus.dart';
+import '../../../../core/storage/token_storage.dart';
 import '../../../../core/network/error_mapper.dart';
 import '../../data/auth_providers.dart';
 import '../../data/auth_repository.dart';
@@ -7,13 +9,14 @@ import 'signup_state.dart';
 
 final signupControllerProvider =
     StateNotifierProvider<SignupController, SignupState>(
-  (ref) => SignupController(ref.read(authRepositoryProvider)),
+  (ref) => SignupController(ref),
 );
 
 class SignupController extends StateNotifier<SignupState> {
-  SignupController(this._repo) : super(const SignupState());
+  SignupController(this.ref) : super(const SignupState());
 
-  final AuthRepository _repo;
+  final Ref ref;
+  AuthRepository get _repo => ref.read(authRepositoryProvider);
 
   void clearError() {
     if (state.error != null) {
@@ -92,9 +95,17 @@ class SignupController extends StateNotifier<SignupState> {
       state = state.copyWith(loading: false);
       return true;
     } catch (e) {
+      final failure = mapApiFailure(e);
+
+      if (TokenStorage.hasToken && failure.isAuthIssue) {
+        state = state.copyWith(loading: false);
+        AppErrorReporter.report(ref, failure);
+        return false;
+      }
+
       state = state.copyWith(
         loading: false,
-        error: mapApiError(e),
+        error: failure.message,
       );
       return false;
     }

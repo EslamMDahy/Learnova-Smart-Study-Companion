@@ -1,9 +1,12 @@
+/// App-level exception used across the data layer.
+///
+/// We wrap Dio errors into this so UI & controllers can behave consistently.
 class ApiException implements Exception {
   final String message;
   final int? statusCode;
 
   /// Optional app-level code (useful for UI decisions)
-  /// e.g. UNAUTHORIZED, VALIDATION_ERROR, SERVER_ERROR
+  /// e.g. TOKEN_EXPIRED, VALIDATION_ERROR, SERVER_ERROR
   final String? code;
 
   ApiException(

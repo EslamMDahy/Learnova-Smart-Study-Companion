@@ -1,3 +1,5 @@
+import 'package:dio/dio.dart';
+
 import '../../../core/network/api_client.dart';
 import '../../../core/network/endpoints.dart';
 import 'dto/login_request.dart';
@@ -71,10 +73,36 @@ class AuthApi {
   }
 
   // keep /me for later usage if you want, but DON'T use it in login flow
-  Future<Map<String, dynamic>> me() async {
-    final res = await _client.get<Map<String, dynamic>>(Endpoints.me);
+  // ✅ Added CancelToken support for Session Bootstrap (Batch 10)
+  Future<Map<String, dynamic>> me({CancelToken? cancelToken}) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.me,
+      cancelToken: cancelToken,
+    );
     final data = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
     return data;
+  }
+
+  Future<String> refresh(String refreshToken) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.refresh,
+      data: {"refresh_token": refreshToken},
+    );
+
+    final payload = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
+    final root = (payload['data'] is Map<String, dynamic>)
+        ? (payload['data'] as Map<String, dynamic>)
+        : payload;
+
+    final newToken =
+        (root['access_token'] ?? root['token'] ?? root['accessToken'])
+            ?.toString();
+
+    if (newToken == null || newToken.trim().isEmpty) {
+      throw Exception('Missing access token in refresh response');
+    }
+
+    return newToken.trim();
   }
 
   // ---------------- Helpers ----------------

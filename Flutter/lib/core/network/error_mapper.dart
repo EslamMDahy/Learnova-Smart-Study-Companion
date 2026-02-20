@@ -4,17 +4,18 @@ import '../error/app_failure.dart';
 import 'api_exceptions.dart';
 
 AppFailure mapApiFailure(Object e) {
-  // 1) لو ApiClient لفّها في ApiException جوه DioException.error
+  // 1) ApiClient wraps into DioException.error as ApiException
   if (e is DioException && e.error is ApiException) {
     final ex = e.error as ApiException;
     return _fromStatus(
       statusCode: ex.statusCode,
       message: ex.message,
       debug: ex.toString(),
+      code: ex.cleanCode,
     );
   }
 
-  // 2) DioException مباشر
+  // 2) Direct DioException
   if (e is DioException) {
     final status = e.response?.statusCode;
     final data = e.response?.data;
@@ -28,7 +29,7 @@ AppFailure mapApiFailure(Object e) {
       );
     }
 
-    // type-first mapping
+    // Type-first mapping
     switch (e.type) {
       case DioExceptionType.cancel:
         return const AppFailure(
@@ -66,12 +67,13 @@ AppFailure mapApiFailure(Object e) {
     );
   }
 
-  // 3) ApiException (غير Dio)
+  // 3) ApiException (non-dio)
   if (e is ApiException) {
     return _fromStatus(
       statusCode: e.statusCode,
       message: e.message,
       debug: e.toString(),
+      code: e.cleanCode,
     );
   }
 
@@ -83,15 +85,27 @@ AppFailure mapApiFailure(Object e) {
   );
 }
 
-// Backward compatibility (لو أي Controller/Widget لسه بيستخدم String)
+// Backward compatibility (if any old code expects String)
 String mapApiError(Object e) => mapApiFailure(e).message;
 
 AppFailure _fromStatus({
   required int? statusCode,
   required String message,
   required String debug,
+  String? code,
 }) {
   final sc = statusCode;
+
+  // TOKEN_EXPIRED custom code (optional)
+  if (code == 'TOKEN_EXPIRED') {
+    return AppFailure(
+      type: AppFailureType.unauthorized,
+      message: 'Your session expired. Please login again.',
+      debugMessage: debug,
+      statusCode: sc,
+      code: code,
+    );
+  }
 
   if (sc == null) {
     return AppFailure(
@@ -99,6 +113,7 @@ AppFailure _fromStatus({
       message: message.isNotEmpty ? message : 'Something went wrong. Please try again.',
       debugMessage: debug,
       statusCode: sc,
+      code: code,
     );
   }
 
@@ -109,6 +124,7 @@ AppFailure _fromStatus({
         message: message.isNotEmpty ? message : 'Invalid request. Please check your input.',
         debugMessage: debug,
         statusCode: sc,
+        code: code,
       );
     case 401:
       return AppFailure(
@@ -116,6 +132,8 @@ AppFailure _fromStatus({
         message: message.isNotEmpty ? message : 'Your session expired. Please login again.',
         debugMessage: debug,
         statusCode: sc,
+        code: code,
+        
       );
     case 403:
       return AppFailure(
@@ -123,6 +141,7 @@ AppFailure _fromStatus({
         message: message.isNotEmpty ? message : 'Access denied.',
         debugMessage: debug,
         statusCode: sc,
+        code: code,
       );
     case 404:
       return AppFailure(
@@ -130,6 +149,7 @@ AppFailure _fromStatus({
         message: message.isNotEmpty ? message : 'Service not found.',
         debugMessage: debug,
         statusCode: sc,
+        code: code,
       );
     case 409:
       return AppFailure(
@@ -137,6 +157,7 @@ AppFailure _fromStatus({
         message: message.isNotEmpty ? message : 'Conflict. Please try again.',
         debugMessage: debug,
         statusCode: sc,
+        code: code,
       );
     case 422:
       return AppFailure(
@@ -144,6 +165,7 @@ AppFailure _fromStatus({
         message: message.isNotEmpty ? message : 'Some fields are invalid. Please check your input.',
         debugMessage: debug,
         statusCode: sc,
+        code: code,
       );
     case 429:
       return AppFailure(
@@ -151,6 +173,7 @@ AppFailure _fromStatus({
         message: message.isNotEmpty ? message : 'Too many requests. Please try again later.',
         debugMessage: debug,
         statusCode: sc,
+        code: code,
       );
     case 500:
     case 502:
@@ -161,6 +184,7 @@ AppFailure _fromStatus({
         message: message.isNotEmpty ? message : 'Server error. Please try again later.',
         debugMessage: debug,
         statusCode: sc,
+        code: code,
       );
     default:
       return AppFailure(
@@ -168,6 +192,7 @@ AppFailure _fromStatus({
         message: message.isNotEmpty ? message : 'Something went wrong. Please try again.',
         debugMessage: debug,
         statusCode: sc,
+        code: code,
       );
   }
 }
@@ -175,17 +200,13 @@ AppFailure _fromStatus({
 String? _extractServerMessage(dynamic data) {
   if (data == null) return null;
 
-  if (data is String && data.trim().isNotEmpty) {
-    return data.trim();
-  }
+  if (data is String && data.trim().isNotEmpty) return data.trim();
 
   if (data is! Map) return null;
 
   final detail = data['detail'];
 
-  if (detail is String && detail.trim().isNotEmpty) {
-    return detail.trim();
-  }
+  if (detail is String && detail.trim().isNotEmpty) return detail.trim();
 
   if (detail is List) {
     final msgs = <String>[];
@@ -196,9 +217,7 @@ String? _extractServerMessage(dynamic data) {
         final loc = item['loc'];
 
         String? field;
-        if (loc is List && loc.isNotEmpty) {
-          field = loc.last?.toString();
-        }
+        if (loc is List && loc.isNotEmpty) field = loc.last?.toString();
 
         if (msg != null && msg.isNotEmpty) {
           msgs.add((field != null && field.isNotEmpty) ? '$field: $msg' : msg);

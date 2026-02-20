@@ -1,5 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/error/app_error_bus.dart';
+import '../../../../core/storage/token_storage.dart';
 import '../../../../core/network/error_mapper.dart';
 import '../../data/auth_providers.dart';
 import '../../data/auth_repository.dart';
@@ -57,7 +59,7 @@ class VerifyEmailController extends StateNotifier<VerifyEmailState> {
       state = state.copyWith(
         loading: false,
         success: false,
-        error: mapApiError(e),
+        error: mapApiFailure(e).message,
       );
       return false;
     }

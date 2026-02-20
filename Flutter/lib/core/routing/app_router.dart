@@ -12,6 +12,7 @@ import '../../features/auth/presentation/pages/signup_page.dart';
 import '../../features/auth/presentation/pages/verify_email_page.dart';
 
 import '../../shared/pages/home_page.dart';
+import '../../shared/pages/notifications_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 
 // ✅ Admin shell + contents
@@ -21,18 +22,20 @@ import '../../features/admin/presentation/pages/admin_route_pages.dart';
 // ✅ Instructor shell + contents
 import '../../features/instructor/presentation/pages/instructor_shell.dart';
 import '../../features/instructor/presentation/pages/instructor_route_pages.dart';
+import '../../features/instructor/presentation/widgets/materials_explorer_page.dart';
 
 import 'routes.dart';
 
-final appRouter = GoRouter(
-  // 💡 نصيحة: غيرها لـ Routes.instructorDashboard مؤقتاً لو عايز تفتح عليها علطول للتيست
-  initialLocation: _initialLocationSafe(),
+/// ✅ Global navigator key (used by GlobalErrorToastListener for dialogs/navigation)
+final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
+final appRouter = GoRouter(
+  navigatorKey: rootNavigatorKey,
+  initialLocation: _initialLocationSafe(),
   refreshListenable: Listenable.merge([
     TokenStorage.listenable,
     UserStorage.listenable,
   ]),
-
   redirect: (context, state) {
     try {
       final path = state.uri.path;
@@ -53,7 +56,8 @@ final appRouter = GoRouter(
 
       // ❌ logged in and trying to access auth pages
       if (hasToken && isAuthRoute) {
-        if (!UserStorage.hasMe) return null;
+        // لو لسه me ما وصلتش، امنع صفحات auth عشان مايبانش login وهو عنده session
+        if (!UserStorage.hasMe) return Routes.home;
 
         if (UserStorage.isOwner) return Routes.adminUsers;
         if (UserStorage.isInstructor) return Routes.instructorDashboard;
@@ -85,8 +89,19 @@ final appRouter = GoRouter(
       return Routes.login;
     }
   },
-
   routes: [
+    // --- Common Routes ---
+    GoRoute(
+      path: Routes.home,
+      name: RouteNames.home,
+      builder: (context, state) => const HomePage(),
+    ),
+    GoRoute(
+      path: Routes.settings,
+      name: RouteNames.settings,
+      builder: (context, state) => const SettingsPage(),
+    ),
+
     // --- Auth Routes ---
     GoRoute(
       path: Routes.login,
@@ -118,13 +133,6 @@ final appRouter = GoRouter(
         final token = state.uri.queryParameters['token'];
         return SetNewPasswordPage(token: token);
       },
-    ),
-
-    // --- Common Routes ---
-    GoRoute(
-      path: Routes.settings,
-      name: RouteNames.settings,
-      builder: (context, state) => const SettingsPage(),
     ),
 
     // --- Admin Shell ---
@@ -181,40 +189,61 @@ final appRouter = GoRouter(
               const NoTransitionPage(child: InstructorDashboardRoutePage()),
         ),
         GoRoute(
-          path: Routes.instructorCourse,
-          name: RouteNames.instructorCourse,
+          path: Routes.instructorCourses,
+          name: RouteNames.instructorCourses,
           pageBuilder: (context, state) =>
               const NoTransitionPage(child: InstructorCourseRoutePage()),
         ),
+
+        // ✅ Course details (Materials Explorer)
         GoRoute(
-          path: Routes.instructorQuestionBank,
-          name: RouteNames.instructorQuestionBank,
-          pageBuilder: (context, state) =>
-              const NoTransitionPage(child: InstructorQuestionBankRoutePage()),
+          path: Routes.instructorCourseDetails,
+          name: RouteNames.instructorCourseDetails,
+          pageBuilder: (context, state) {
+            final slug = state.pathParameters['courseSlug']!;
+            return NoTransitionPage(
+              child: MaterialsExplorerPage(courseSlug: slug),
+            );
+          },
         ),
-        GoRoute(
-          path: Routes.instructorQuizzes,
-          name: RouteNames.instructorQuizzes,
-          pageBuilder: (context, state) =>
-              const NoTransitionPage(child: InstructorQuizzesRoutePage()),
-        ),
-        GoRoute(
-          path: Routes.instructorSettings,
-          name: RouteNames.instructorSettings,
-          pageBuilder: (context, state) =>
-              const NoTransitionPage(child: InstructorSettingsRoutePage()),
-        ),
-        GoRoute(
-          path: Routes.instructorHelp,
-          name: RouteNames.instructorHelp,
-          pageBuilder: (context, state) =>
-              const NoTransitionPage(child: InstructorHelpRoutePage()),
-        ),
+
+        // ✅ Instructor Notifications (موجودة)
         GoRoute(
           path: Routes.instructorNotifications,
           name: RouteNames.instructorNotifications,
           pageBuilder: (context, state) =>
-              const NoTransitionPage(child: InstructorNotificationsRoutePage()),
+              const NoTransitionPage(child: NotificationsPage()),
+        ),
+
+        // ✅ Instructor Settings (هنستخدم SettingsPage مؤقتاً)
+        GoRoute(
+          path: Routes.instructorSettings,
+          name: RouteNames.instructorSettings,
+          pageBuilder: (context, state) =>
+              const NoTransitionPage(child: SettingsPage()),
+        ),
+
+        // ✅ placeholders للصفحات اللي لسه بتتكمل (بدون ما تكسر build)
+        GoRoute(
+          path: Routes.instructorQuestionBank,
+          name: RouteNames.instructorQuestionBank,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: _ComingSoonPage(title: "Question Bank"),
+          ),
+        ),
+        GoRoute(
+          path: Routes.instructorQuizzes,
+          name: RouteNames.instructorQuizzes,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: _ComingSoonPage(title: "Quizzes"),
+          ),
+        ),
+        GoRoute(
+          path: Routes.instructorHelp,
+          name: RouteNames.instructorHelp,
+          pageBuilder: (context, state) => const NoTransitionPage(
+            child: _ComingSoonPage(title: "Help"),
+          ),
         ),
       ],
     ),
@@ -224,7 +253,6 @@ final appRouter = GoRouter(
 // --- Helpers ---
 
 String _initialLocationSafe() {
-  
   try {
     if (!TokenStorage.hasToken) return Routes.login;
     if (UserStorage.hasMe && UserStorage.isOwner) return Routes.adminUsers;
@@ -265,7 +293,8 @@ class RouteNames {
 
   // instructor
   static const instructorDashboard = 'instructorDashboard';
-  static const instructorCourse = 'instructorCourse';
+  static const instructorCourses = 'instructorCourses';
+  static const instructorCourseDetails = 'instructorCourseDetails';
   static const instructorQuestionBank = 'instructorQuestionBank';
   static const instructorQuizzes = 'instructorQuizzes';
   static const instructorSettings = 'instructorSettings';
@@ -279,4 +308,22 @@ class RouteNames {
   static const adminSettings = 'adminSettings';
   static const adminHelp = 'adminHelp';
   static const adminNotifications = 'adminNotifications';
+}
+
+/// صفحة مؤقتة آمنة لحد ما تكمل التنفيذ
+class _ComingSoonPage extends StatelessWidget {
+  final String title;
+  const _ComingSoonPage({required this.title});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFF6F7F8),
+      alignment: Alignment.center,
+      child: Text(
+        "$title (Coming Soon)",
+        style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
+      ),
+    );
+  }
 }

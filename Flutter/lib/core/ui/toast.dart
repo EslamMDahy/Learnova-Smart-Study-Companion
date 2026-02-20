@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 @immutable
@@ -13,8 +14,9 @@ class AppToast {
     required String message,
     required IconData icon,
     Duration duration = const Duration(seconds: 3),
+    String? actionLabel,
+    VoidCallback? onAction,
   }) {
-    // maybeOf بيرجع OverlayState? فمش هيعمل dead code
     final overlay = Overlay.maybeOf(context);
     if (overlay == null) return;
 
@@ -25,22 +27,40 @@ class AppToast {
     }
 
     entry = OverlayEntry(
-      builder: (_) => Positioned(
-        top: 18,
-        right: 18,
-        child: Material(
-          color: Colors.transparent,
-          child: _ToastCard(
-            title: title,
-            message: message,
-            icon: icon,
-            onClose: () {
-              _timer?.cancel();
-              safeRemove();
-            },
+      builder: (_) {
+        final mq = MediaQuery.of(context);
+        final w = mq.size.width;
+
+        // responsive width with safe margins
+        final maxW = math.min(360.0, math.max(240.0, w - 32.0));
+        final isNarrow = w < 520;
+
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Align(
+              alignment: isNarrow ? Alignment.topCenter : Alignment.topRight,
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: maxW),
+                child: Material(
+                  color: Colors.transparent,
+                  child: _ToastCard(
+                    title: title,
+                    message: message,
+                    icon: icon,
+                    actionLabel: actionLabel,
+                    onAction: onAction,
+                    onClose: () {
+                      _timer?.cancel();
+                      safeRemove();
+                    },
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
 
     overlay.insert(entry);
@@ -54,6 +74,8 @@ class _ToastCard extends StatefulWidget {
   final String title;
   final String message;
   final IconData icon;
+  final String? actionLabel;
+  final VoidCallback? onAction;
   final VoidCallback onClose;
 
   const _ToastCard({
@@ -61,6 +83,8 @@ class _ToastCard extends StatefulWidget {
     required this.message,
     required this.icon,
     required this.onClose,
+    this.actionLabel,
+    this.onAction,
   });
 
   @override
@@ -85,10 +109,13 @@ class _ToastCardState extends State<_ToastCard>
 
   @override
   Widget build(BuildContext context) {
+    final hasAction = widget.actionLabel != null &&
+        widget.actionLabel!.trim().isNotEmpty &&
+        widget.onAction != null;
+
     return FadeTransition(
       opacity: _fade,
       child: Container(
-        width: 360,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -158,9 +185,22 @@ class _ToastCardState extends State<_ToastCard>
                       fontWeight: FontWeight.w700,
                       height: 1.3,
                     ),
-                    maxLines: 3,
+                    maxLines: hasAction ? 2 : 3,
                     overflow: TextOverflow.ellipsis,
                   ),
+                  if (hasAction) ...[
+                    const SizedBox(height: 10),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: TextButton(
+                        onPressed: () {
+                          widget.onClose();
+                          widget.onAction?.call();
+                        },
+                        child: Text(widget.actionLabel!.trim()),
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),

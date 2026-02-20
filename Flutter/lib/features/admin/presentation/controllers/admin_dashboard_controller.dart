@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'dart:developer';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -22,6 +23,9 @@ class AdminDashboardController extends StateNotifier<AdminDashboardState> {
 
   final Ref _ref;
 
+  CancelToken? _actionCancel;
+
+
   void _hydrateFromStorage() {
     final orgs = UserStorage.organizations;
     if (orgs.isEmpty) return;
@@ -45,6 +49,11 @@ class AdminDashboardController extends StateNotifier<AdminDashboardState> {
     required String description,
     String? logoUrl,
   }) async {
+    if (state.loading) return;
+
+    _actionCancel?.cancel('superseded');
+    _actionCancel = CancelToken();
+
     state = state.copyWith(loading: true, error: null);
 
     try {
@@ -105,5 +114,11 @@ class AdminDashboardController extends StateNotifier<AdminDashboardState> {
     if (state.error != null) {
       state = state.copyWith(error: null);
     }
+  }
+
+  @override
+  void dispose() {
+    _actionCancel?.cancel('disposed');
+    super.dispose();
   }
 }

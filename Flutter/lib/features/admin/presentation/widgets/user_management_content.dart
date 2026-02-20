@@ -8,6 +8,7 @@ import '../controllers/user_management_state.dart';
 import '../../data/dto/join_request_user.dart';
 
 import '../../../../shared/widgets/app_ui_components.dart';
+import '../../../../shared/widgets/async_state_view.dart';
 
 /* ============================================================
    Keep SAME constants for layout widths
@@ -21,8 +22,9 @@ class UserManagementContent extends ConsumerStatefulWidget {
 
   const UserManagementContent({
     super.key,
-    this.organizationId,
-  });
+    String? organizationId,
+    String? orgId, // ✅ backward compatible
+  }) : organizationId = (organizationId ?? orgId);
 
   @override
   ConsumerState<UserManagementContent> createState() =>
@@ -82,7 +84,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
         return;
       }
 
-      await ref.read(userManagementControllerProvider.notifier).loadUsers(
+      await ref.read(userManagementControllerProvider.notifier).init(
             organizationId: _orgId,
           );
     });
@@ -105,14 +107,8 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
         final isNarrow = c.maxWidth < 1100;
 
         return SingleChildScrollView(
-          padding: EdgeInsets.symmetric(
-            horizontal: isNarrow ? 16 : 116,
-            vertical: 32,
-          ),
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1400),
-              child: Column(
+          padding: EdgeInsets.zero,
+          child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const FigmaUmPageHeader(
@@ -130,7 +126,9 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                     selectedRole: selectedRole,
                     selectedStatus: selectedStatus,
                     isNarrow: isNarrow,
-                    onSearchChanged: (_) => setState(() {}),
+                    onSearchChanged: (v) {
+                      ref.read(userManagementControllerProvider.notifier).search(v);
+                    },
                     onRoleChanged: (v) => setState(() => selectedRole = v),
                     onStatusChanged: (v) => setState(() => selectedStatus = v),
                     onMoreFilters: () {
@@ -145,7 +143,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                         ? () {}
                         : () => ref
                             .read(userManagementControllerProvider.notifier)
-                            .loadUsers(organizationId: _orgId),
+                            .refresh(),
                   ),
 
                   const SizedBox(height: 16),
@@ -153,7 +151,21 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                   _UsersTableFigma(
                     isNarrow: isNarrow,
                     loading: state.loading,
+                    errorMessage: state.error,
                     users: users,
+                    page: state.page,
+                    pageSize: state.pageSize,
+                    totalCount: state.totalCount,
+                    onPrev: (state.page > 1 && !state.loading)
+                        ? () => ref.read(userManagementControllerProvider.notifier).changePage(state.page - 1)
+                        : null,
+                    onNext: (state.page < state.totalPages && !state.loading)
+                        ? () => ref.read(userManagementControllerProvider.notifier).changePage(state.page + 1)
+                        : null,
+                    onRetry: _orgId.isEmpty
+                        ? null
+                        : () => ref.read(userManagementControllerProvider.notifier)
+                            .refresh(),
                     onActionTap: () {
                       AppToast.show(
                         context,
@@ -165,8 +177,6 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                   ),
                 ],
               ),
-            ),
-          ),
         );
       },
     );
@@ -320,19 +330,36 @@ class _StatsRow extends StatelessWidget {
 class _UsersTableFigma extends StatelessWidget {
   final bool isNarrow;
   final bool loading;
+  final String? errorMessage;
   final List<JoinRequestUser> users;
+  final int page;
+  final int pageSize;
+  final int totalCount;
+  final VoidCallback? onRetry;
+  final VoidCallback? onPrev;
+  final VoidCallback? onNext;
   final VoidCallback onActionTap;
 
   const _UsersTableFigma({
     required this.isNarrow,
     required this.loading,
+    required this.errorMessage,
     required this.users,
+    required this.page,
+    required this.pageSize,
+    required this.totalCount,
+    required this.onRetry,
+    required this.onPrev,
+    required this.onNext,
     required this.onActionTap,
   });
 
   @override
   Widget build(BuildContext context) {
-    final showingTo = users.isEmpty ? 0 : (users.length < 5 ? users.length : 5);
+    final total = totalCount <= 0 ? users.length : totalCount;
+    final from = users.isEmpty ? 0 : ((page - 1) * pageSize + 1);
+    final to = users.isEmpty ? 0 : (from + users.length - 1);
+    final safeTo = (to > total) ? total : to;
 
     return Container(
       decoration: BoxDecoration(
@@ -353,18 +380,14 @@ class _UsersTableFigma extends StatelessWidget {
             rowHPad: _kRowHPad,
           ),
 
-          if (loading)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
-            )
-          else if (users.isEmpty)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: FigmaUmEmptyTableState(),
-            )
-          else
-            ListView.separated(
+          AsyncStateView(
+            loading: loading,
+            errorMessage: errorMessage,
+            isEmpty: users.isEmpty,
+            emptyTitle: 'No users',
+            emptyMessage: 'No users match your filters right now.',
+            onRetry: onRetry,
+            child: ListView.separated(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
               itemCount: users.length,
@@ -376,11 +399,12 @@ class _UsersTableFigma extends StatelessWidget {
                 onActionTap: onActionTap,
               ),
             ),
+          ), // ✅ IMPORTANT: close AsyncStateView
 
           FigmaUmTableFooter(
-            showingText: "Showing 1-$showingTo of ${users.length} users",
-            onPrev: null,
-            onNext: users.length > 5 ? () {} : null,
+            showingText: "Showing $from-$safeTo of $total users",
+            onPrev: onPrev,
+            onNext: onNext,
           ),
         ],
       ),

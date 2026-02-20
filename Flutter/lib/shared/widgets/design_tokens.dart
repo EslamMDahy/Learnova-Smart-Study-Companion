@@ -7,7 +7,7 @@ class AppColors {
   static const pageBg = Color(0xFFF6F7F8);
   static const bg = Color(0xFFF8FAFC);
   static const headerBg = Color(0xFFF1F5F9);
-
+  
 
   // surfaces
   static const card = Colors.white;
@@ -18,6 +18,7 @@ class AppColors {
   static const title = Color(0xFF111418);
   static const muted = Color(0xFF617589);
   static const hint = Color(0xFF9CA3AF);
+  
 
   // brand
   static const primary = Color(0xFF137FEC);
@@ -82,6 +83,19 @@ class AppText {
     height: 24 / 16,
     color: AppColors.muted,
   );
+
+  static const TextStyle h3 = TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.w700,
+    color: AppColors.title,
+  );
+
+  static const TextStyle muted = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    color: AppColors.muted,
+  );
+
 
   static const sectionTitle = TextStyle(
     fontWeight: FontWeight.w700,

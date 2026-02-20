@@ -45,4 +45,17 @@ class AppFailurePresenter {
         return Icons.warning_amber_rounded;
     }
   }
+
+  /// Suggested primary action label for UI (optional use).
+  static String? primaryActionLabel(AppFailure f) {
+    if (f.type == AppFailureType.unauthorized) return "Login";
+    if (f.isNetworkLike) return "Retry";
+    return null;
+  }
+
+  /// Suggested secondary action label for UI (optional use).
+  static String? secondaryActionLabel(AppFailure f) {
+    if (f.type == AppFailureType.unauthorized) return "Dismiss";
+    return null;
+  }
 }

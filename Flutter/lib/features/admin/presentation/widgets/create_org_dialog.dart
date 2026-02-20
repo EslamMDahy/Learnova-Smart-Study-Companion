@@ -65,37 +65,68 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
     Navigator.pop<Map<String, dynamic>>(context, payload);
   }
 
+  Widget _twoFields({
+    required bool isNarrow,
+    required Widget left,
+    required Widget right,
+  }) {
+    if (isNarrow) {
+      return Column(
+        children: [
+          left,
+          const SizedBox(height: 16),
+          right,
+        ],
+      );
+    }
+    return Row(
+      children: [
+        Expanded(child: left),
+        const SizedBox(width: 20),
+        Expanded(child: right),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return AppDialogShell(
-      child: Stack(
-        children: [
-          SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(48, 44, 48, 36),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const AppDialogTitleBlock(
-                  title: "Create New Organization",
-                  subtitle:
-                      "Set up a new institutional account for your university, school, or research center.",
-                ),
-                const SizedBox(height: 22),
+    return LayoutBuilder(
+      builder: (context, c) {
+        final w = c.maxWidth;
+        final isNarrow = w < 860;
 
-                AppCard(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const AppCardHeaderRow(
-                        icon: Icons.account_balance_outlined,
-                        title: "Organization Details",
-                      ),
-                      const SizedBox(height: 18),
+        final hPad = isNarrow ? 16.0 : 48.0;
+        final topPad = isNarrow ? 22.0 : 44.0;
+        final bottomPad = isNarrow ? 20.0 : 36.0;
 
-                      Row(
+        return AppDialogShell(
+          child: Stack(
+            children: [
+              SingleChildScrollView(
+                padding: EdgeInsets.fromLTRB(hPad, topPad, hPad, bottomPad),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const AppDialogTitleBlock(
+                      title: "Create New Organization",
+                      subtitle:
+                          "Set up a new institutional account for your university, school, or research center.",
+                    ),
+                    const SizedBox(height: 22),
+
+                    AppCard(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: AppLabeledField(
+                          const AppCardHeaderRow(
+                            icon: Icons.account_balance_outlined,
+                            title: "Organization Details",
+                          ),
+                          const SizedBox(height: 18),
+
+                          _twoFields(
+                            isNarrow: isNarrow,
+                            left: AppLabeledField(
                               label: "Organization Name",
                               child: AppTextField48(
                                 controller: _orgName,
@@ -106,10 +137,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                                 onChanged: (_) => setState(() {}),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: AppLabeledField(
+                            right: AppLabeledField(
                               label: "Organization Type",
                               child: AppDropdown48(
                                 value: _orgType,
@@ -125,15 +153,12 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                               ),
                             ),
                           ),
-                        ],
-                      ),
 
-                      const SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
-                      Row(
-                        children: [
-                          Expanded(
-                            child: AppLabeledField(
+                          _twoFields(
+                            isNarrow: isNarrow,
+                            left: AppLabeledField(
                               label: "Primary Domain",
                               child: AppTextField48(
                                 controller: _primaryDomain,
@@ -141,10 +166,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                                 textInputAction: TextInputAction.next,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: AppLabeledField(
+                            right: AppLabeledField(
                               label: "Location",
                               child: AppTextField48(
                                 controller: _location,
@@ -153,45 +175,42 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                               ),
                             ),
                           ),
-                        ],
-                      ),
 
-                      const SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
-                      AppLabeledField(
-                        label: "Description (max 50 chars)",
-                        child: AppTextField48(
-                          controller: _orgDesc,
-                          focusNode: _descFocus,
-                          hint: "Short description",
-                          maxLen: 50,
-                          textInputAction: TextInputAction.done,
-                          onSubmitted: (_) => _submit(),
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
+                          AppLabeledField(
+                            label: "Description (max 50 chars)",
+                            child: AppTextField48(
+                              controller: _orgDesc,
+                              focusNode: _descFocus,
+                              hint: "Short description",
+                              maxLen: 50,
+                              textInputAction: TextInputAction.done,
+                              onSubmitted: (_) => _submit(),
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
 
-                      const SizedBox(height: 18),
+                          const SizedBox(height: 18),
 
-                      AppLabeledField(
-                        label: "Organization Logo",
-                        child: AppLogoUrlUploader(
-                          controller: _logoUrl,
-                          onChanged: (_) => setState(() {}),
-                        ),
-                      ),
+                          AppLabeledField(
+                            label: "Organization Logo",
+                            child: AppLogoUrlUploader(
+                              controller: _logoUrl,
+                              onChanged: (_) => setState(() {}),
+                            ),
+                          ),
 
-                      const SizedBox(height: 22),
-                      const Divider(height: 1, color: Color(0xFFEEF2F4)),
-                      const SizedBox(height: 18),
+                          const SizedBox(height: 22),
+                          const Divider(height: 1, color: Color(0xFFEEF2F4)),
+                          const SizedBox(height: 18),
 
-                      const AppSubHeaderText(title: "Primary Administrator"),
-                      const SizedBox(height: 14),
+                          const AppSubHeaderText(title: "Primary Administrator"),
+                          const SizedBox(height: 14),
 
-                      Row(
-                        children: [
-                          Expanded(
-                            child: AppLabeledField(
+                          _twoFields(
+                            isNarrow: isNarrow,
+                            left: AppLabeledField(
                               label: "Full Name",
                               child: AppTextField48(
                                 controller: _adminName,
@@ -199,10 +218,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                                 textInputAction: TextInputAction.next,
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 20),
-                          Expanded(
-                            child: AppLabeledField(
+                            right: AppLabeledField(
                               label: "Administrator Email",
                               child: AppTextField48(
                                 controller: _adminEmail,
@@ -211,81 +227,88 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                               ),
                             ),
                           ),
+
+                          const SizedBox(height: 18),
+
+                          const AppInfoInlineBox(
+                            message:
+                                "Need help? Chat with our support team or learn more about how organizations work.",
+                          ),
+
+                          const SizedBox(height: 22),
+
+                          Align(
+                            alignment: Alignment.centerRight,
+                            child: Wrap(
+                              spacing: 14,
+                              runSpacing: 12,
+                              children: [
+                                TextButton(
+                                  onPressed: () => Navigator.pop(context),
+                                  style: TextButton.styleFrom(
+                                    foregroundColor: AppColors.title,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 14,
+                                      vertical: 12,
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    "Cancel",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w800),
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: _canSubmit ? _submit : null,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.primary,
+                                    disabledBackgroundColor:
+                                        const Color(0xFF93C5FD),
+                                    foregroundColor: Colors.white,
+                                    elevation: 0,
+                                    minimumSize: const Size(0, 48),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 18,
+                                      vertical: 16,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    "Create Organization",
+                                    style:
+                                        TextStyle(fontWeight: FontWeight.w900),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
+                    ),
 
-                      const SizedBox(height: 18),
+                    const SizedBox(height: 22),
 
-                      const AppInfoInlineBox(
-                        message:
-                            "Need help? Chat with our support team or learn more about how organizations work.",
-                      ),
-
-                      const SizedBox(height: 22),
-
-                      Align(
-                        alignment: Alignment.centerRight,
-                        child: Wrap(
-                          spacing: 14,
-                          runSpacing: 12,
-                          children: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(context),
-                              style: TextButton.styleFrom(
-                                foregroundColor: AppColors.title,
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 14, vertical: 12),
-                              ),
-                              child: const Text(
-                                "Cancel",
-                                style: TextStyle(fontWeight: FontWeight.w800),
-                              ),
-                            ),
-                            ElevatedButton(
-                              onPressed: _canSubmit ? _submit : null,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.primary,
-                                disabledBackgroundColor: const Color(0xFF93C5FD),
-                                foregroundColor: Colors.white,
-                                elevation: 0,
-                                minimumSize: const Size(0, 48),
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 18, vertical: 16),
-                                shape: RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                              ),
-                              child: const Text(
-                                "Create Organization",
-                                style: TextStyle(fontWeight: FontWeight.w900),
-                              ),
-                            ),
-                          ],
+                    const Center(
+                      child: Text(
+                        "© 2024 Learnova Academic Platform. All rights reserved.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w400,
+                          height: 20 / 14,
+                          color: AppColors.muted,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-
-                const SizedBox(height: 22),
-
-                const Center(
-                  child: Text(
-                    "© 2024 Learnova Academic Platform. All rights reserved.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w400,
-                      height: 20 / 14,
-                      color: AppColors.muted,
                     ),
-                  ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

@@ -1,22 +1,28 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/routing/app_router.dart';
+import 'core/session/session_bootstrapper.dart';
+import 'core/ui/global_loading_overlay.dart';
 
-class App extends StatelessWidget {
+class App extends ConsumerWidget {
   const App({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
-      title: 'Learnova Smart Study Companion',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        scaffoldBackgroundColor: Colors.white,
-        fontFamily: 'Lexend',
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF137FEC)),
-      ),
       routerConfig: appRouter,
+      builder: (context, child) {
+        return SessionBootstrapper(
+          child: Stack(
+            children: [
+              child ?? const SizedBox.shrink(),
+              const GlobalLoadingOverlay(), // ✅ فوق كل حاجة
+            ],
+          ),
+        );
+      },
     );
   }
 }

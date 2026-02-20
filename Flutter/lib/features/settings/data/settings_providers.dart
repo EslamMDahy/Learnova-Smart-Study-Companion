@@ -1,7 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/network/api_client.dart';
-import '../../auth/data/auth_providers.dart'; // 👈 غالباً هنا عندكم apiClientProvider
+import '../../auth/data/auth_providers.dart';
 import 'settings_api.dart';
 import 'settings_repository.dart';
 

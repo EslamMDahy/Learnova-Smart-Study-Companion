@@ -23,7 +23,10 @@ class Routes {
 
   // ✅ Instructor children
   static const instructorDashboard = '/instructor/dashboard';
-  static const instructorCourse = '/instructor/course';
+  static const instructorCourses = '/instructor/courses';
+  static const instructorCourseDetails = '/instructor/courses/:courseSlug';
+
+  // (معلّقين للتطوير)
   static const instructorQuestionBank = '/instructor/question-bank';
   static const instructorQuizzes = '/instructor/quizzes';
   static const instructorSettings = '/instructor/settings';
