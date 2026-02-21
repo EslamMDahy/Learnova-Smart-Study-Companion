@@ -1,8 +1,8 @@
 """your message here
 
-Revision ID: 6ebecccb1831
+Revision ID: 98d1b4715c5e
 Revises: 
-Create Date: 2026-02-12 02:41:05.031970
+Create Date: 2026-02-21 06:19:20.207509
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '6ebecccb1831'
+revision: str = '98d1b4715c5e'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -68,7 +68,6 @@ def upgrade() -> None:
     sa.Column('account_status', sa.Enum('active', 'suspended', 'deleted', 'pending_activation', name='account_status_enum'), nullable=False),
     sa.Column('last_login_at', sa.DateTime(timezone=True), nullable=True),
     sa.Column('last_password_change', sa.DateTime(timezone=True), nullable=True),
-    sa.Column('token_version', sa.Integer(), server_default='1', nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.PrimaryKeyConstraint('id')
@@ -179,13 +178,12 @@ def upgrade() -> None:
     op.create_table('courses',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('organization_id', sa.Integer(), nullable=True),
-    sa.Column('created_by', sa.Integer(), nullable=False),
+    sa.Column('created_by', sa.Integer(), nullable=True),
     sa.Column('title', sa.String(length=255), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('cover_image_url', sa.String(length=512), nullable=True),
     sa.Column('banner_image_url', sa.String(length=512), nullable=True),
     sa.Column('is_public', sa.Boolean(), nullable=False),
-    sa.Column('access_code', sa.String(length=50), nullable=True),
     sa.Column('visibility_level', sa.Enum('private', 'public', 'unlisted', name='course_visibility_level_enum'), nullable=False),
     sa.Column('requires_enrollment_approval', sa.Boolean(), nullable=False),
     sa.Column('learning_outcomes', sa.JSON(), nullable=True),
@@ -200,7 +198,7 @@ def upgrade() -> None:
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
     sa.CheckConstraint("\n            (\n                course_type = 'organization' AND organization_id IS NOT NULL\n            )\n            OR\n            (\n                course_type = 'individual' AND organization_id IS NULL\n            )\n            ", name='ck_courses_owner_matches_type'),
-    sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='RESTRICT'),
+    sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='SET NULL'),
     sa.ForeignKeyConstraint(['organization_id'], ['organizations.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
@@ -356,6 +354,32 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_course_instructors_instructor_id'), 'course_instructors', ['instructor_id'], unique=False)
     op.create_index('uq_course_instructors_course_instructor', 'course_instructors', ['course_id', 'instructor_id'], unique=True)
+    op.create_table('course_invitations',
+    sa.Column('id', sa.Integer(), nullable=False),
+    sa.Column('course_id', sa.Integer(), nullable=False),
+    sa.Column('created_by', sa.Integer(), nullable=False),
+    sa.Column('invited_email', sa.String(length=320), nullable=False),
+    sa.Column('invited_user_id', sa.Integer(), nullable=True),
+    sa.Column('token_hash', sa.String(length=128), nullable=True),
+    sa.Column('token_expires_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('status', sa.Enum('pending', 'accepted', 'revoked', 'expired', name='course_invite_status_enum'), server_default=sa.text("'pending'"), nullable=False),
+    sa.Column('sent_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('last_sent_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('send_count', sa.Integer(), server_default=sa.text('0'), nullable=False),
+    sa.Column('accepted_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('revoked_at', sa.DateTime(timezone=True), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('NOW()'), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), server_default=sa.text('NOW()'), nullable=False),
+    sa.ForeignKeyConstraint(['course_id'], ['courses.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['invited_user_id'], ['users.id'], ondelete='SET NULL'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('course_id', 'invited_email', name='uq_course_invite_course_email'),
+    sa.UniqueConstraint('token_hash')
+    )
+    op.create_index('ix_course_invites_course_id', 'course_invitations', ['course_id'], unique=False)
+    op.create_index('ix_course_invites_invited_email', 'course_invitations', ['invited_email'], unique=False)
+    op.create_index('ix_course_invites_status', 'course_invitations', ['status'], unique=False)
     op.create_table('credit_transactions',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('credit_wallet_id', sa.Integer(), nullable=False),
@@ -1031,6 +1055,10 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_credit_transactions_credit_wallet_id'), table_name='credit_transactions')
     op.drop_index(op.f('ix_credit_transactions_created_at'), table_name='credit_transactions')
     op.drop_table('credit_transactions')
+    op.drop_index('ix_course_invites_status', table_name='course_invitations')
+    op.drop_index('ix_course_invites_invited_email', table_name='course_invitations')
+    op.drop_index('ix_course_invites_course_id', table_name='course_invitations')
+    op.drop_table('course_invitations')
     op.drop_index('uq_course_instructors_course_instructor', table_name='course_instructors')
     op.drop_index(op.f('ix_course_instructors_instructor_id'), table_name='course_instructors')
     op.drop_table('course_instructors')
