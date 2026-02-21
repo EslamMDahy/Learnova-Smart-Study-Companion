@@ -4,6 +4,7 @@ from enum import Enum
 from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import datetime
+from app.models.enums import CourseStatus
 
 
 
@@ -41,6 +42,10 @@ class CourseCreateRequest(BaseModel):
     learning_outcomes: Optional[list[str]] = None
     tags: Optional[list[str]] = None
     category: Optional[str] = Field(default=None, max_length=100)
+    status: Optional[CourseStatus] = Field(
+        default=None,
+        description="draft | published | archived"
+    )
 
     model_config = ConfigDict(extra="forbid")
 
@@ -60,6 +65,8 @@ class CourseCreateResponse(BaseModel):
     is_public: bool
     visibility_level: CourseVisibilityLevel
     requires_enrollment_approval: bool
+    status: CourseStatus
+    published_at: Optional[datetime] = None
 
     model_config = ConfigDict(extra="forbid", use_enum_values=True)
 
@@ -203,3 +210,7 @@ class CourseInvitationsListResponse(BaseModel):
     items: List[CourseInvitationItem]
 
     model_config = ConfigDict(extra="forbid")
+
+
+
+
