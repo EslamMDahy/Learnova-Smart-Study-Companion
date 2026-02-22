@@ -43,6 +43,7 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             organization_id,
             created_by,
             title,
+            course_code,
             description,
             cover_image_url,
             banner_image_url,
@@ -64,6 +65,7 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             :organization_id,
             :created_by,
             :title,
+            :course_code,
             :description,
             :cover_image_url,
             :banner_image_url,
@@ -77,16 +79,12 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             0,
             0,
             CAST(:status AS course_status_enum),
-            CASE
-            WHEN CAST(:status AS course_status_enum) = 'published'::course_status_enum
-            THEN NOW()
-            ELSE NULL
-            END,
+            CASE WHEN CAST(:status AS course_status_enum) = 'published'::course_status_enum THEN NOW() ELSE NULL END,
             NOW(),
             NOW()
         )
-            RETURNING
-            id, title, course_type, organization_id, is_public, visibility_level,
+        RETURNING
+            id, title, course_code, course_type, organization_id, is_public, visibility_level,
             requires_enrollment_approval, status, published_at
     """).bindparams(
         bindparam("learning_outcomes", type_=JSONB),
@@ -97,6 +95,7 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
         "organization_id": payload.organization_id,
         "created_by": instructor_id,
         "title": payload.title,
+        "course_code": payload.course_code,
         "description": payload.description,
         "cover_image_url": payload.cover_image_url,
         "banner_image_url": payload.banner_image_url,
@@ -186,7 +185,7 @@ def upload_course_invitations_excel(*, course_id: int, file: UploadFile, sheet_n
         text("""
             SELECT invited_email
             FROM course_invitations
-            WHERE course_id = :course_id
+            WHERE id = :course_id
               AND invited_email = ANY(:emails)
         """),
         {"course_id": course_id, "emails": emails},
@@ -821,7 +820,7 @@ def accept_course_invitation(*, payload: CourseInviteAcceptRequest, db: Session,
                 SET
                     enrollment_count = enrollment_count + 1,
                     updated_at = NOW()
-                WHERE id = :course_id
+                WHERE course_id = :course_id
                 """),
             {"course_id": course_id},
         )
@@ -859,6 +858,7 @@ def get_my_courses(*, db: Session, current_user: dict):
                 SELECT
                     c.id,
                     c.title,
+                    c.course_code,
                     c.course_type::text AS course_type,
                     c.organization_id,
                     c.is_public,
@@ -894,6 +894,7 @@ def get_my_courses(*, db: Session, current_user: dict):
                 SELECT
                     c.id,
                     c.title,
+                    c.course_code,
                     c.course_type::text AS course_type,
                     c.organization_id,
                     c.is_public,
@@ -926,6 +927,7 @@ def get_my_courses(*, db: Session, current_user: dict):
             {
                 "id": r["id"],
                 "title": r["title"],
+                "course_code": r.get("course_code"),
                 "course_type": r["course_type"],
                 "organization_id": r["organization_id"],
                 "is_public": r["is_public"],
