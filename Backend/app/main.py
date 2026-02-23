@@ -1,14 +1,15 @@
 from fastapi import FastAPI
 
+from dotenv import load_dotenv
+
+load_dotenv()
+
 from app.features.auth.router import router as auth_router
 from app.features.organizations.router import router as organizations_router
 from app.features.settings.router import router as settings_router
 from app.features.courses.router import router as courses_router
 
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
-
-load_dotenv()
 
 app = FastAPI()
 # origins = [

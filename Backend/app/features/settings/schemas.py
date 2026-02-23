@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 ThemeModeStr = Literal["light", "dark", "system"]
 ProfileVisibilityStr = Literal["public", "private", "connections"]
+AvatarContentType = Literal["image/png", "image/jpeg"]
 
 
 class UpdateProfileRequest(BaseModel):
@@ -32,6 +33,26 @@ class UpdateProfileResponse(BaseModel):
     language_preference: str = "en_US"
 
     system_role: str
+
+
+class CreateAvatarUploadUrlRequest(BaseModel):
+    content_type: AvatarContentType
+    file_size_bytes: Optional[int] = None  # للـvalidation في الـservice (max 5MB)
+
+class CreateAvatarUploadUrlResponse(BaseModel):
+    upload_url: str
+    path: str
+    token: str  # لو الفرونت محتاجه (في بعض طرق الرفع بيستخدم x-signature)
+    content_type: str
+    max_bytes: int
+
+
+class ConfirmAvatarUploadRequest(BaseModel):
+    # حالياً مش هنستخدمه في المنطق، بس موجود للمستقبل
+    uploaded: bool = True
+    
+class ConfirmAvatarUploadResponse(BaseModel):
+    avatar_url: str
 
 
 class ChangePasswordRequest(BaseModel):
