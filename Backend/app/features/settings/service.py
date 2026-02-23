@@ -7,30 +7,24 @@ import secrets
 import os
 
 from datetime import datetime, timezone, timedelta
+from storage3.types import CreateSignedUploadUrlOptions
 
 from .schemas import UpdateProfileRequest
 
 from app.core.security import hash_password
 from app.core.security import verify_password  # عدّل import حسب مكانهم عندك
 from app.core.emailer import send_email
+from app.core.supabase_client import supabase
 from app.core.config import settings
 
+# 5MB
+_AVATAR_MAX_BYTES = 5 * 1024 * 1024
 
-def _generate_otp() -> str:
-    return secrets.token_hex(3)
-
-
-# def _to_nullable_str(v):
-#     """
-#     - None => None (no change decision handled outside)
-#     - "   " => None
-#     - "" => None
-#     - otherwise => stripped string
-#     """
-#     if v is None:
-#         return None
-#     s = str(v).strip()
-#     return None if s == "" else s
+_ALLOWED_CONTENT_TYPES = {
+    "image/png",
+    "image/jpeg",
+    "image/jpg",
+}
 
 
 def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
@@ -122,6 +116,176 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
         "last_login_at": row[12].isoformat() if row[12] else None,
         "created_at": row[13].isoformat() if row[13] else None,
         "updated_at": row[14].isoformat() if row[14] else None,
+    }
+
+
+def create_avatar_upload_url(*, payload, db: Session, current_user):
+    """
+    payload متوقع منه (في schemas عندك):
+      - content_type: str
+      - file_size_bytes: int
+    """
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    content_type = (getattr(payload, "content_type", None) or "").strip().lower()
+    file_size_bytes = getattr(payload, "file_size_bytes", None)
+
+    # validations
+    if not content_type:
+        raise HTTPException(status_code=400, detail="content_type is required")
+
+    if content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid content_type. Allowed: image/png, image/jpeg",
+        )
+
+    if file_size_bytes is None:
+        raise HTTPException(status_code=400, detail="file_size_bytes is required")
+
+    try:
+        file_size_bytes = int(file_size_bytes)
+    except Exception:
+        raise HTTPException(status_code=400, detail="file_size_bytes must be an integer")
+
+    if file_size_bytes <= 0:
+        raise HTTPException(status_code=400, detail="file_size_bytes must be > 0")
+
+    if file_size_bytes > _AVATAR_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="Avatar image is too large (max 5MB)")
+
+    bucket = settings.supabase_public_bucket
+    key = f"users/{user_id}/avatar"
+
+    # نطلع Signed Upload URL (ينفع تستخدمه الفرونت يرفع من غير api keys)
+    # NOTE: بعض إصدارات بايثون بتدعم options/upsert وبعضها بتبقى حساسة.
+    # هنحاول بـ upsert=True ولو حصل TypeError نرجع نجرب من غير options.
+    options = CreateSignedUploadUrlOptions(upsert="true")
+    try:
+        signed = supabase.storage.from_(bucket).create_signed_upload_url(
+            key,
+            options)
+    except TypeError:
+        signed = supabase.storage.from_(bucket).create_signed_upload_url(key)
+
+
+    data = None
+    error = None
+
+    if isinstance(signed, dict):
+        # بعض الإصدارات بتعمل error كـ key
+        error = signed.get("error")
+        # أغلب الوقت ده هو الـ data نفسه
+        if signed.get("signedUrl") or signed.get("signed_url") or signed.get("url"):
+            data = signed
+    else:
+        # لو رجع object
+        data = getattr(signed, "data", None)
+        error = getattr(signed, "error", None)
+
+    if error:
+        msg = error.get("message") if isinstance(error, dict) else str(error)
+        raise HTTPException(status_code=400, detail=f"Failed to create signed upload url: {msg}")
+
+    if not data:
+        raise HTTPException(status_code=400, detail="Failed to create signed upload url")
+
+    upload_url = data.get("signedUrl") or data.get("signed_url") or data.get("url")
+    token = data.get("token")
+    path = data.get("path") or key
+
+    if not upload_url:
+        raise HTTPException(status_code=400, detail="Signed upload URL is missing from response")
+
+    # مهم جدًا للفرونت:
+    # - يرفع بـ PUT/POST حسب ما SDK بتقول
+    # - ويبعت headers: Content-Type = content_type
+    # - وبعض الفلوهات تحتاج x-upsert أو x-signature (token) حسب نوع الـ signed upload
+    return {
+        "upload_url": upload_url,
+        "path": path,
+        "token": token,  # لو الفرونت محتاجه (في بعض طرق الرفع بيستخدم x-signature)
+        "content_type": content_type,
+        "max_bytes": _AVATAR_MAX_BYTES,
+    }
+
+
+def confirm_avatar_upload(*, payload, db: Session, current_user):
+    """
+    Endpoint الفرونت يناديه بعد الرفع.
+
+    payload ممكن يبقى فاضي دلوقتي،
+    بس مستقبلًا ممكن نحط فيه مثلا:
+      - checksum
+      - width/height
+      - ... إلخ
+    """
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Invalid token")
+
+    bucket = settings.supabase_public_bucket
+    key = f"users/{user_id}/avatar"
+
+    # نتأكد إن الملف موجود فعلًا في الستورج
+    # أنضف طريقة بدون تحميل الملف: list داخل folder والبحث عن الاسم
+    folder = f"users/{user_id}"
+    try:
+        items = supabase.storage.from_(bucket).list(path=folder)
+    except Exception:
+        items = None
+
+    exists = False
+    if isinstance(items, list):
+        for it in items:
+            # it غالبًا dict: {"name": "...", ...}
+            if (it.get("name") == "avatar"):
+                exists = True
+                break
+
+    if not exists:
+        raise HTTPException(
+            status_code=400,
+            detail="Avatar upload not found in storage. Upload the file first, then confirm.",
+        )
+
+    # دلوقتي نعمل update_at = now()
+    row = db.execute(
+        text("""
+            UPDATE users
+            SET updated_at = NOW()
+            WHERE id = :uid
+            RETURNING updated_at
+        """),
+        {"uid": user_id},
+    ).first()
+
+    if not row:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    db.commit()
+
+    base_url = supabase.storage.from_(bucket).get_public_url(key)
+
+    # updated_at_iso مثال: "2026-02-22T10:20:30.123456+00:00"
+    # هنحوّله لرقم epoch بسيط
+
+    updated_at = row[0].isoformat() if row[0] else datetime.now(timezone.utc).isoformat()
+
+    try:
+        dt = datetime.fromisoformat(updated_at.replace("Z", "+00:00"))
+        v = int(dt.timestamp())
+    except Exception:
+        v = int(datetime.now(timezone.utc).timestamp())
+        
+    avatar_url = f"{base_url}?v={v}"
+
+    return {
+        "message": "Avatar updated successfully",
+        "avatar_url": avatar_url,
+        "updated_at": updated_at,
     }
 
 
@@ -402,7 +566,7 @@ def request_delete_account(*, payload, db: Session, current_user):
         {"uid": user_id, "type": "delete_account_otp"},
     )
 
-    otp = _generate_otp()
+    otp = secrets.token_hex(3)
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
 
     db.execute(
