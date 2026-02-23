@@ -35,11 +35,15 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
 
     instructor_id = current_user["id"]
 
+    # ✅ NEW: status optional
+    status_value = (payload.status.value if payload.status is not None else "draft")
+
     stmt = text("""
         INSERT INTO courses (
             organization_id,
             created_by,
             title,
+            course_code,
             description,
             cover_image_url,
             banner_image_url,
@@ -53,6 +57,7 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             enrollment_count,
             total_ratings,
             status,
+            published_at,
             created_at,
             updated_at
         )
@@ -60,6 +65,7 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             :organization_id,
             :created_by,
             :title,
+            :course_code,
             :description,
             :cover_image_url,
             :banner_image_url,
@@ -72,12 +78,14 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             :course_type,
             0,
             0,
-            'draft',
+            CAST(:status AS course_status_enum),
+            CASE WHEN CAST(:status AS course_status_enum) = 'published'::course_status_enum THEN NOW() ELSE NULL END,
             NOW(),
             NOW()
         )
         RETURNING
-            id, title, course_type, organization_id, is_public, visibility_level, requires_enrollment_approval
+            id, title, course_code, course_type, organization_id, is_public, visibility_level,
+            requires_enrollment_approval, status, published_at
     """).bindparams(
         bindparam("learning_outcomes", type_=JSONB),
         bindparam("tags", type_=JSONB),
@@ -87,16 +95,18 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
         "organization_id": payload.organization_id,
         "created_by": instructor_id,
         "title": payload.title,
+        "course_code": payload.course_code,
         "description": payload.description,
         "cover_image_url": payload.cover_image_url,
         "banner_image_url": payload.banner_image_url,
         "is_public": payload.is_public,
         "visibility_level": payload.visibility_level.value,
         "requires_enrollment_approval": payload.requires_enrollment_approval,
-        "learning_outcomes": payload.learning_outcomes,  # list[str] | None
+        "learning_outcomes": payload.learning_outcomes,
         "category": payload.category,
-        "tags": payload.tags,  # list[str] | None
+        "tags": payload.tags,
         "course_type": payload.course_type.value,
+        "status": status_value,  # ✅ هنا التغيير
     }
 
     try:
@@ -104,16 +114,13 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
         if not row:
             raise HTTPException(status_code=503, detail="Failed to create course")
         db.commit()
+        return dict(row)
     except IntegrityError as e:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Course creation violates a constraint") from e
+        raise HTTPException(status_code=400, detail="Invalid course data") from e
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
-
-    return row
-
-
 # الأفضل تخليها في config.py بعدين (زي ما اتفقنا)
 COMMON_EMAIL_HEADERS = (
     "email",
@@ -178,7 +185,7 @@ def upload_course_invitations_excel(*, course_id: int, file: UploadFile, sheet_n
         text("""
             SELECT invited_email
             FROM course_invitations
-            WHERE course_id = :course_id
+            WHERE id = :course_id
               AND invited_email = ANY(:emails)
         """),
         {"course_id": course_id, "emails": emails},
@@ -851,6 +858,7 @@ def get_my_courses(*, db: Session, current_user: dict):
                 SELECT
                     c.id,
                     c.title,
+                    c.course_code,
                     c.course_type::text AS course_type,
                     c.organization_id,
                     c.is_public,
@@ -886,6 +894,7 @@ def get_my_courses(*, db: Session, current_user: dict):
                 SELECT
                     c.id,
                     c.title,
+                    c.course_code,
                     c.course_type::text AS course_type,
                     c.organization_id,
                     c.is_public,
@@ -918,6 +927,7 @@ def get_my_courses(*, db: Session, current_user: dict):
             {
                 "id": r["id"],
                 "title": r["title"],
+                "course_code": r.get("course_code"),
                 "course_type": r["course_type"],
                 "organization_id": r["organization_id"],
                 "is_public": r["is_public"],

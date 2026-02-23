@@ -43,6 +43,13 @@ class Course(Base):
         nullable=False
     )
 
+    # Optional short code shown in UI (e.g. CS-101)
+    course_code: Mapped[str | None] = mapped_column(
+        String(50),
+        nullable=True,
+        index=True,
+    )
+
     description: Mapped[str | None] = mapped_column(
         Text,
         nullable=True
