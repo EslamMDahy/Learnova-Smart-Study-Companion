@@ -39,7 +39,7 @@ class Settings:
     # Cookies
     cookie_secure: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
     cookie_samesite: Literal["lax", "strict", "none"] = os.getenv("COOKIE_SAMESITE", "lax")  # type: ignore
-    cookie_path: str = os.getenv("COOKIE_PATH", "/auth/refresh")
+    cookie_path: str = os.getenv("COOKIE_PATH", "/")
 
     # Supabase Storage
     supabase_url: str = os.getenv("SUPABASE_URL", "")

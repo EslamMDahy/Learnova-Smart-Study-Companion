@@ -254,15 +254,16 @@ def confirm_avatar_upload(*, payload, db: Session, current_user):
             detail="Avatar upload not found in storage. Upload the file first, then confirm.",
         )
 
-    # دلوقتي نعمل update_at = now()
+    # دلوقتي نعمل update_at = now() ونحفظ avatar_key
     row = db.execute(
         text("""
             UPDATE users
-            SET updated_at = NOW()
+            SET updated_at = NOW(),
+                avatar_key = :avatar_key
             WHERE id = :uid
             RETURNING updated_at
         """),
-        {"uid": user_id},
+        {"uid": user_id, "avatar_key": key},
     ).first()
 
     if not row:
