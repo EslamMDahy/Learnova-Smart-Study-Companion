@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 ThemeModeStr = Literal["light", "dark", "system"]
 ProfileVisibilityStr = Literal["public", "private", "connections"]
-AvatarContentType = Literal["image/png", "image/jpeg"]
+AvatarContentType = Literal["image/png", "image/jpeg", "image/jpg"]
 
 
 class UpdateProfileRequest(BaseModel):
@@ -24,7 +24,6 @@ class UpdateProfileResponse(BaseModel):
     full_name: str
     email: str
 
-    avatar_url: Optional[str] = None
     phone_number: Optional[str] = None
     bio: Optional[str] = None
 

@@ -18,13 +18,13 @@ from app.core.supabase_client import supabase
 from app.core.config import settings
 
 # 5MB
-_AVATAR_MAX_BYTES = 5 * 1024 * 1024
+# _AVATAR_MAX_BYTES = 5 * 1024 * 1024
 
-_ALLOWED_CONTENT_TYPES = {
-    "image/png",
-    "image/jpeg",
-    "image/jpg",
-}
+# _ALLOWED_CONTENT_TYPES = {
+#     "image/png",
+#     "image/jpeg",
+#     "image/jpg",
+# }
 
 
 def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
@@ -36,10 +36,6 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
 
     if payload.full_name is not None and payload.full_name.strip() != "":
         update_fields["full_name"] = payload.full_name.strip()
-
-    # avatar url can be updated to nothing or "" (deleted)
-    if payload.avatar_url is not None:
-        update_fields["avatar_url"] = payload.avatar_url.strip()
 
     if payload.phone is not None:
         update_fields["phone_number"] = payload.phone.strip()
@@ -68,7 +64,6 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
 
     for col in [
         "full_name",
-        "avatar_url",
         "phone_number",
         "bio",
         "student_id",
@@ -87,7 +82,7 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
             SET {", ".join(set_clauses)}
             WHERE id = :uid
             RETURNING
-              id, full_name, email, avatar_url, phone_number, bio,
+              id, full_name, email, phone_number, bio,
               student_id, university_email, language_preference,
               system_role, is_email_verified, account_status,
               last_login_at, created_at, updated_at
@@ -104,7 +99,6 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
         "id": row[0],
         "full_name": row[1],
         "email": row[2],
-        "avatar_url": row[3],
         "phone_number": row[4],
         "bio": row[5],
         "student_id": row[6],
@@ -131,6 +125,15 @@ def create_avatar_upload_url(*, payload, db: Session, current_user):
 
     content_type = (getattr(payload, "content_type", None) or "").strip().lower()
     file_size_bytes = getattr(payload, "file_size_bytes", None)
+
+    # 5MB
+    _AVATAR_MAX_BYTES = 5 * 1024 * 1024
+
+    _ALLOWED_CONTENT_TYPES = {
+        "image/png",
+        "image/jpeg",
+        "image/jpg",
+    }
 
     # validations
     if not content_type:
