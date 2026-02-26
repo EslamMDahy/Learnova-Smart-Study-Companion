@@ -8,6 +8,7 @@ from app.features.auth.router import router as auth_router
 from app.features.organizations.router import router as organizations_router
 from app.features.settings.router import router as settings_router
 from app.features.courses.router import router as courses_router
+from app.features.modules.router import router as modules_router
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -41,5 +42,6 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(courses_router)
+app.include_router(modules_router)
 app.include_router(organizations_router)
 app.include_router(settings_router)

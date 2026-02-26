@@ -131,6 +131,7 @@ class MaterialType(str, Enum):
     quiz = "quiz"
 
 class MaterialStatus(str, Enum):
+    draft_upload = "draft_upload"   # NEW
     uploaded = "uploaded"
     processing = "processing"
     ready = "ready"

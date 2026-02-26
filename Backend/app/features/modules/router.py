@@ -1,0 +1,24 @@
+from fastapi import APIRouter, Depends, status
+from sqlalchemy.orm import Session
+
+from app.db.session import get_db
+from app.core.deps import get_current_user
+from . import service
+from .schemas import ModuleCreateRequest, ModuleCreateResponse
+
+
+router = APIRouter(prefix="/courses/{course_id}/modules", tags=["Modules"])
+
+
+@router.post("", response_model=ModuleCreateResponse, status_code=status.HTTP_201_CREATED)
+def create_module(
+    course_id: int,
+    payload: ModuleCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    # course_id is path param now; service should use it instead of reading from payload
+    return service.create_module(
+        course_id=course_id, 
+        payload=payload, 
+        db=db, 
+        current_user=current_user)

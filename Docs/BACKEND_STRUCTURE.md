@@ -12,8 +12,10 @@ Backend/
 |  |  ├─ config.py
 |  |  ├─ deps.py
 |  |  ├─ emailer.py
+|  |  ├─ excel_utils.py
 |  |  ├─ jwt.py
 |  |  ├─ security.py
+|  |  ├─ supabase_clint.py
 │  │  └─ token_store.py
 |  |
 │  ├─ db/
@@ -22,6 +24,11 @@ Backend/
 |  | 
 │  ├─ features/
 |  |  ├─ auth/
+|  |  |  ├─ router.py
+|  |  |  ├─ schemas.py
+|  |  |  └─ service.py
+|  |  |
+|  |  ├─ courses/
 |  |  |  ├─ router.py
 |  |  |  ├─ schemas.py
 |  |  |  └─ service.py
