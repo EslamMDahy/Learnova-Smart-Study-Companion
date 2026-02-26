@@ -259,11 +259,10 @@ def confirm_avatar_upload(*, payload, db: Session, current_user):
         text("""
             UPDATE users
             SET updated_at = NOW(),
-                avatar_key = :avatar_key
             WHERE id = :uid
             RETURNING updated_at
         """),
-        {"uid": user_id, "avatar_key": key},
+        {"uid": user_id},
     ).first()
 
     if not row:
