@@ -33,7 +33,7 @@ class Course(Base):
         nullable=True
     )
 
-    created_by: Mapped[int] = mapped_column(
+    created_by: Mapped[int | None] = mapped_column(
         ForeignKey("users.id", ondelete="SET NULL"),
         nullable=True
     )
@@ -55,12 +55,12 @@ class Course(Base):
         nullable=True
     )
 
-    cover_image_url: Mapped[str | None] = mapped_column(
+    cover_image_key: Mapped[str | None] = mapped_column(
         String(512),
         nullable=True
     )
 
-    banner_image_url: Mapped[str | None] = mapped_column(
+    banner_image_key: Mapped[str | None] = mapped_column(
         String(512),
         nullable=True
     )

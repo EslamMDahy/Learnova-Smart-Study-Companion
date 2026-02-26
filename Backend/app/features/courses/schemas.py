@@ -33,8 +33,8 @@ class CourseCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255)
     course_code: Optional[str] = Field(default=None, max_length=50, description="Optional course code shown in UI")
     description: Optional[str] = None
-    cover_image_url: Optional[str] = Field(default=None, max_length=512)
-    banner_image_url: Optional[str] = Field(default=None, max_length=512)
+    # cover_image_url: Optional[str] = Field(default=None, max_length=512)
+    # banner_image_url: Optional[str] = Field(default=None, max_length=512)
 
     is_public: bool
     visibility_level: CourseVisibilityLevel

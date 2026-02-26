@@ -45,8 +45,6 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             title,
             course_code,
             description,
-            cover_image_url,
-            banner_image_url,
             is_public,
             visibility_level,
             requires_enrollment_approval,
@@ -67,8 +65,6 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             :title,
             :course_code,
             :description,
-            :cover_image_url,
-            :banner_image_url,
             :is_public,
             :visibility_level,
             :requires_enrollment_approval,
@@ -97,8 +93,6 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
         "title": payload.title,
         "course_code": payload.course_code,
         "description": payload.description,
-        "cover_image_url": payload.cover_image_url,
-        "banner_image_url": payload.banner_image_url,
         "is_public": payload.is_public,
         "visibility_level": payload.visibility_level.value,
         "requires_enrollment_approval": payload.requires_enrollment_approval,
@@ -122,6 +116,8 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
 # الأفضل تخليها في config.py بعدين (زي ما اتفقنا)
+
+
 COMMON_EMAIL_HEADERS = (
     "email",
     "e-mail",
