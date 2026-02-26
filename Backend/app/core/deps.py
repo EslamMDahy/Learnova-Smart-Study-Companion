@@ -71,20 +71,20 @@ def get_current_user(
             raise HTTPException(status_code=401, detail="Token revoked")
 
     # احسب avatar_url من avatar_key زي ما بيعمل login
-    avatar_url = None
-    if avatar_key:
-        try:
-            from datetime import datetime, timezone
-            base_url = supabase.storage.from_(settings.supabase_public_bucket).get_public_url(str(avatar_key))
-            ts = int(updated_at.timestamp()) if updated_at else int(datetime.now(timezone.utc).timestamp())
-            avatar_url = f"{base_url}?v={ts}"
-        except Exception:
-            avatar_url = None
+    # avatar_url = None
+    # if avatar_key:
+    #     try:
+    #         from datetime import datetime, timezone
+    #         base_url = supabase.storage.from_(settings.supabase_public_bucket).get_public_url(str(avatar_key))
+    #         ts = int(updated_at.timestamp()) if updated_at else int(datetime.now(timezone.utc).timestamp())
+    #         avatar_url = f"{base_url}?v={ts}"
+    #     except Exception:
+    #         avatar_url = None
 
     return {
         "id": uid,
         "email": email,
         "full_name": full_name,
         "system_role": system_role,
-        "avatar_url": avatar_url,
+        # "avatar_url": avatar_url,
     }
