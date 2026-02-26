@@ -3,7 +3,9 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
+from app.core.config import settings
 from app.core.jwt import decode_access_token
+from app.core.supabase_client import supabase
 from app.db.session import get_db
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -36,7 +38,7 @@ def get_current_user(
     row = db.execute(
         text(
             """
-            SELECT id, email, full_name, system_role, is_email_verified, last_password_change
+            SELECT id, email, full_name, system_role, is_email_verified, last_password_change, avatar_key, updated_at
             FROM users
             WHERE id = :id
             """
@@ -47,7 +49,7 @@ def get_current_user(
     if not row:
         raise HTTPException(status_code=401, detail="User not found")
 
-    uid, email, full_name, system_role, is_verified, last_password_change_db = row
+    uid, email, full_name, system_role, is_verified, last_password_change_db, avatar_key, updated_at = row
 
     # (اختياري): لو عايز تمنع غير المفعّلين من استخدام النظام كله
     if not is_verified:
@@ -68,9 +70,21 @@ def get_current_user(
         if token_ts != db_ts:
             raise HTTPException(status_code=401, detail="Token revoked")
 
+    # احسب avatar_url من avatar_key زي ما بيعمل login
+    avatar_url = None
+    if avatar_key:
+        try:
+            from datetime import datetime, timezone
+            base_url = supabase.storage.from_(settings.supabase_public_bucket).get_public_url(str(avatar_key))
+            ts = int(updated_at.timestamp()) if updated_at else int(datetime.now(timezone.utc).timestamp())
+            avatar_url = f"{base_url}?v={ts}"
+        except Exception:
+            avatar_url = None
+
     return {
         "id": uid,
         "email": email,
         "full_name": full_name,
         "system_role": system_role,
+        "avatar_url": avatar_url,
     }
