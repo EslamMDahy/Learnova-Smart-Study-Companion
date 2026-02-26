@@ -180,7 +180,7 @@ def init_material_upload(*, course_id: int, module_id: int, payload, db: Session
                 "file_size": file_size_bytes,
                 "storage_key": temp_key,
                 "mime_type": content_type,
-                "status": "uploaded",
+                "status": "draft_upload",
                 "uploaded_by": instructor_id,
             },
         ).mappings().first()
