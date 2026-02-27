@@ -166,8 +166,8 @@ class MyCourseItem(BaseModel):
     visibility_level: str  # أو CourseVisibilityLevel
     status: str
 
-    cover_image_url: Optional[str] = None
-    banner_image_url: Optional[str] = None
+    # cover_image_url: Optional[str] = None
+    # banner_image_url: Optional[str] = None
     category: Optional[str] = None
 
     created_by: int
