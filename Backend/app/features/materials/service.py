@@ -8,42 +8,14 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 import re
 
 from app.core.config import settings
+from app.core.storage_utils import split_object_key, sanitize_filename
 from app.core.supabase_client import supabase  # عدّل import حسب مكان supabase client عندك
-
 
 _PDF_MAX_BYTES = 50 * 1024 * 1024
 _ALLOWED_CONTENT_TYPES = {"application/pdf"}
 
-
-def _sanitize_filename(filename: str) -> str:
-    """
-    - remove any path parts
-    - keep safe chars
-    - collapse spaces
-    """
-    name = (filename or "").strip()
-    if not name:
-        return "file.pdf"
-
-    # take last part to avoid "C:\\x\\y.pdf" or "../../y.pdf"
-    name = name.replace("\\", "/").split("/")[-1].strip()
-
-    # replace spaces with underscores
-    name = re.sub(r"\s+", "_", name)
-
-    # allow letters, numbers, dash, underscore, dot
-    name = re.sub(r"[^A-Za-z0-9._-]", "", name)
-
-    # ensure extension
-    if not name.lower().endswith(".pdf"):
-        name = name + ".pdf"
-
-    # limit length
-    if len(name) > 120:
-        base, ext = name.rsplit(".", 1)
-        name = base[:115] + "." + ext
-
-    return name or "file.pdf"
+# صلاحية لينك الداونلود (ثواني)
+DOWNLOAD_URL_EXPIRES = 60 * 60  # 1 hour
 
 
 def init_material_upload(*, course_id: int, module_id: int, payload, db: Session, current_user: dict):
@@ -113,7 +85,10 @@ def init_material_upload(*, course_id: int, module_id: int, payload, db: Session
     if file_size_bytes > _PDF_MAX_BYTES:
         raise HTTPException(status_code=400, detail="File is too large (max 50MB)")
 
-    safe_filename = _sanitize_filename(str(filename or ""))
+    safe_filename = sanitize_filename(payload.filename,
+                                      allowed_extensions={"pdf"},
+                                      default_extension="pdf",
+                                      keep_original_extension=True,)
 
     # optional metadata
     title = getattr(payload, "title", None)
@@ -269,21 +244,6 @@ def init_material_upload(*, course_id: int, module_id: int, payload, db: Session
     }
 
 
-# صلاحية لينك الداونلود (ثواني)
-DOWNLOAD_URL_EXPIRES = 60 * 60  # 1 hour
-
-
-def _split_storage_key(storage_key: str):
-    """
-    Returns (folder, filename) from storage_key
-    e.g. "a/b/c/file.pdf" -> ("a/b/c", "file.pdf")
-    """
-    key = (storage_key or "").strip().strip("/")
-    if not key or "/" not in key:
-        return "", key
-    folder, filename = key.rsplit("/", 1)
-    return folder, filename
-
 
 def confirm_material_upload(*, material_id: int, db: Session, current_user: dict):
     # =========================
@@ -350,7 +310,7 @@ def confirm_material_upload(*, material_id: int, db: Session, current_user: dict
     # =========================
     # 4) Verify file exists in storage (no download)
     # =========================
-    folder, expected_filename = _split_storage_key(storage_key)
+    folder, expected_filename = split_object_key(storage_key)
 
     try:
         items = supabase.storage.from_(bucket).list(path=folder)
