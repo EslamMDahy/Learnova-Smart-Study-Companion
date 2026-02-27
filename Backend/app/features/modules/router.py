@@ -4,7 +4,9 @@ from sqlalchemy.orm import Session
 from app.db.session import get_db
 from app.core.deps import get_current_user
 from . import service
-from .schemas import ModuleCreateRequest, ModuleCreateResponse
+from .schemas import (ModuleCreateRequest,
+                      ModuleCreateResponse, 
+                      ModuleListResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}/modules", tags=["Modules"])
@@ -22,3 +24,13 @@ def create_module(
         payload=payload, 
         db=db, 
         current_user=current_user)
+
+@router.get("", response_model=ModuleListResponse,)
+def list_course_modules(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.list_course_modules(
+        course_id=course_id,
+        db=db,
+        current_user=current_user,)

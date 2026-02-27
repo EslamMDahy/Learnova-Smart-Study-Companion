@@ -24,7 +24,7 @@ from .schemas import (
 )
 
 
-router = APIRouter(prefix="/settings", tags=["settings"])
+router = APIRouter(prefix="/settings", tags=["Settings"])
 
 
 @router.patch("/profile", response_model=UpdateProfileResponse)

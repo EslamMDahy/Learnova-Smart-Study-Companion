@@ -15,7 +15,7 @@ from .schemas import SendVerificationEmailRequest
 from .schemas import SendVerificationEmailResponse
 from . import service
 
-router = APIRouter(prefix="/auth", tags=["auth"])
+router = APIRouter(prefix="/auth", tags=["Auth"])
 
 
 @router.post("/register", status_code=201)
