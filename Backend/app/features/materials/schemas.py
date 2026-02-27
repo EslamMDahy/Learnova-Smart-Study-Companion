@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -54,3 +54,38 @@ class MaterialConfirmUploadResponse(BaseModel):
     download_url_expires_in: Optional[int] = Field(default=None, description="Seconds")
 
     model_config = ConfigDict(extra="forbid")
+
+
+class MaterialListItem(BaseModel):
+    id: int
+    module_id: int
+
+    title: Optional[str] = None
+    description: Optional[str] = None
+
+    type: str  # material_type_enum as string
+    status: str  # material_status_enum as string
+
+    file_name: Optional[str] = None
+    file_size: Optional[int] = None
+    mime_type: Optional[str] = None
+
+    page_count: Optional[int] = None
+    duration_seconds: Optional[int] = None
+
+    uploaded_at: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    # Signed URL for private bucket (optional)
+    download_url: Optional[str] = Field(default=None, description="Signed download URL (private bucket)")
+
+    model_config = ConfigDict(extra="forbid")
+
+class MaterialListResponse(BaseModel):
+    course_id: int
+    module_id: int
+    materials: List[MaterialListItem]
+
+    model_config = ConfigDict(extra="forbid")
+
