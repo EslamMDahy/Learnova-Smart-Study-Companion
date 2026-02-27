@@ -4,10 +4,13 @@ class Endpoints {
   static const _auth = '/auth';
   static const _orgs = '/organizations';
   static const _settings = '/settings';
+  static const _courses = '/courses';
+
 
   // ================= AUTH =================
   static const login = '$_auth/login';
   static const signup = '$_auth/register';
+  static const logout = '$_auth/logout';
   static const forgotPassword = '$_auth/forgot-password';
   static const resetPassword = '$_auth/reset-password';
   static const verifyEmail = '$_auth/verify-email';
@@ -24,13 +27,27 @@ class Endpoints {
   ) =>
       '$_orgs/$organizationId/members/$orgMemberId/status'; // PATCH
 
-  // ================= SETTINGS =============
-  static const updateProfile = '$_settings/profile';          // PATCH
-  static const updatePassword = '$_settings/password';        // PATCH
-  static const deleteRequest = '$_settings/delete/request';   // POST
-  static const deleteConfirm = '$_settings/delete/confirm';   // DELETE
+  
+  // ================= COURSES ==============
+  static const createCourse = _courses; // POST /courses
+  static const myCourses = '$_courses/my'; // GET /courses/my
+  static String courseInvitationsUpload(String courseId) =>
+      '$_courses/$courseId/invitations/upload'; // POST
+  static String courseInvitationsSend(String courseId) =>
+      '$_courses/$courseId/invitations/send'; // POST
+  static String courseInvitationsList(String courseId) =>
+      '$_courses/$courseId/invitations'; // GET
 
-  // ✅ NEW (user_preferences)
-  static const getPreferences = '$_settings/preferences';     // GET
-  static const updatePreferences = '$_settings/preferences';  // PATCH
+// ================= SETTINGS =============
+  static const updateProfile = '$_settings/profile';                // PATCH
+  static const updatePassword = '$_settings/password';              // PATCH
+  static const deleteRequest = '$_settings/delete/request';         // POST
+  static const deleteConfirm = '$_settings/delete/confirm';         // DELETE
+
+  static const getPreferences = '$_settings/preferences';           // GET
+  static const updatePreferences = '$_settings/preferences';        // PATCH
+
+  // Avatar upload (2-step: get signed url → upload → confirm)
+  static const avatarUploadUrl = '$_settings/avatar/upload-url';   // POST
+  static const avatarConfirm   = '$_settings/avatar/confirm';       // POST
 }

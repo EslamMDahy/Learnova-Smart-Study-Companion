@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 
 import '../../core/storage/token_storage.dart';
 import '../../core/storage/user_storage.dart';
+import '../../core/theme/app_theme.dart';
 
 import '../../features/auth/presentation/pages/forget_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -15,18 +16,15 @@ import '../../shared/pages/home_page.dart';
 import '../../shared/pages/notifications_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
 
-// ✅ Admin shell + contents
 import '../../features/admin/presentation/pages/admin_shell.dart';
 import '../../features/admin/presentation/pages/admin_route_pages.dart';
 
-// ✅ Instructor shell + contents
 import '../../features/instructor/presentation/pages/instructor_shell.dart';
 import '../../features/instructor/presentation/pages/instructor_route_pages.dart';
 import '../../features/instructor/presentation/widgets/materials_explorer_page.dart';
 
 import 'routes.dart';
 
-/// ✅ Global navigator key (used by GlobalErrorToastListener for dialogs/navigation)
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
 final appRouter = GoRouter(
@@ -41,7 +39,6 @@ final appRouter = GoRouter(
       final path = state.uri.path;
       final isAuthRoute = _isAuthRoute(path);
 
-      // ✅ protect verify/reset: token query param required
       if ((path == Routes.verifyEmail || path == Routes.resetPassword) &&
           ((state.uri.queryParameters['token'] ?? '').trim().isEmpty)) {
         return Routes.login;
@@ -49,14 +46,11 @@ final appRouter = GoRouter(
 
       final hasToken = TokenStorage.hasToken;
 
-      // ❌ not logged in
       if (!hasToken && !isAuthRoute) {
         return Routes.login;
       }
 
-      // ❌ logged in and trying to access auth pages
       if (hasToken && isAuthRoute) {
-        // لو لسه me ما وصلتش، امنع صفحات auth عشان مايبانش login وهو عنده session
         if (!UserStorage.hasMe) return Routes.home;
 
         if (UserStorage.isOwner) return Routes.adminUsers;
@@ -64,14 +58,12 @@ final appRouter = GoRouter(
         return Routes.home;
       }
 
-      // ✅ Admin guard (owner-only)
       if (path.startsWith(Routes.admin)) {
         if (!UserStorage.hasMe) return null;
         if (!UserStorage.isOwner) return Routes.home;
         if (path == Routes.admin) return Routes.adminUsers;
       }
 
-      // ✅ Instructor guard (instructor-only)
       if (path.startsWith(Routes.instructor)) {
         if (!UserStorage.hasMe) return null;
 
@@ -90,7 +82,7 @@ final appRouter = GoRouter(
     }
   },
   routes: [
-    // --- Common Routes ---
+    // --- المسارات العامة ---
     GoRoute(
       path: Routes.home,
       name: RouteNames.home,
@@ -102,7 +94,7 @@ final appRouter = GoRouter(
       builder: (context, state) => const SettingsPage(),
     ),
 
-    // --- Auth Routes ---
+    // --- مسارات المصادقة ---
     GoRoute(
       path: Routes.login,
       name: RouteNames.login,
@@ -135,7 +127,7 @@ final appRouter = GoRouter(
       },
     ),
 
-    // --- Admin Shell ---
+    // --- شيل الأدمن ---
     ShellRoute(
       builder: (context, state, child) => AdminShell(child: child),
       routes: [
@@ -178,26 +170,28 @@ final appRouter = GoRouter(
       ],
     ),
 
-    // --- Instructor Shell ---
+    // --- شيل المدرس ---
     ShellRoute(
       builder: (context, state, child) => InstructorShell(child: child),
       routes: [
+        // لوحة التحكم
         GoRoute(
-          path: Routes.instructorDashboard,
+          path: Routes.instructorDashboard, // /instructor/dashboard
           name: RouteNames.instructorDashboard,
           pageBuilder: (context, state) =>
               const NoTransitionPage(child: InstructorDashboardRoutePage()),
         ),
+        // قائمة الكورسات
         GoRoute(
-          path: Routes.instructorCourses,
+          path: Routes.instructorCourses, // /instructor/courses
           name: RouteNames.instructorCourses,
           pageBuilder: (context, state) =>
               const NoTransitionPage(child: InstructorCourseRoutePage()),
         ),
 
-        // ✅ Course details (Materials Explorer)
+        // تفاصيل الكورس (مع slug)
         GoRoute(
-          path: Routes.instructorCourseDetails,
+          path: Routes.instructorCourseDetails, // /instructor/courses/:courseSlug
           name: RouteNames.instructorCourseDetails,
           pageBuilder: (context, state) {
             final slug = state.pathParameters['courseSlug']!;
@@ -207,39 +201,39 @@ final appRouter = GoRouter(
           },
         ),
 
-        // ✅ Instructor Notifications (موجودة)
+        // الإشعارات
         GoRoute(
-          path: Routes.instructorNotifications,
+          path: Routes.instructorNotifications, // /instructor/notifications
           name: RouteNames.instructorNotifications,
           pageBuilder: (context, state) =>
               const NoTransitionPage(child: NotificationsPage()),
         ),
-
-        // ✅ Instructor Settings (هنستخدم SettingsPage مؤقتاً)
+        // الإعدادات
         GoRoute(
-          path: Routes.instructorSettings,
+          path: Routes.instructorSettings, // /instructor/settings
           name: RouteNames.instructorSettings,
           pageBuilder: (context, state) =>
               const NoTransitionPage(child: SettingsPage()),
         ),
-
-        // ✅ placeholders للصفحات اللي لسه بتتكمل (بدون ما تكسر build)
+        // بنك الأسئلة العام
         GoRoute(
-          path: Routes.instructorQuestionBank,
+          path: Routes.instructorQuestionBank, // /instructor/question-bank
           name: RouteNames.instructorQuestionBank,
           pageBuilder: (context, state) => const NoTransitionPage(
             child: _ComingSoonPage(title: "Question Bank"),
           ),
         ),
+        // الاختبارات العامة
         GoRoute(
-          path: Routes.instructorQuizzes,
+          path: Routes.instructorQuizzes, // /instructor/quizzes
           name: RouteNames.instructorQuizzes,
           pageBuilder: (context, state) => const NoTransitionPage(
             child: _ComingSoonPage(title: "Quizzes"),
           ),
         ),
+        // المساعدة
         GoRoute(
-          path: Routes.instructorHelp,
+          path: Routes.instructorHelp, // /instructor/help
           name: RouteNames.instructorHelp,
           pageBuilder: (context, state) => const NoTransitionPage(
             child: _ComingSoonPage(title: "Help"),
@@ -250,8 +244,7 @@ final appRouter = GoRouter(
   ],
 );
 
-// --- Helpers ---
-
+// --- دوال مساعدة ---
 String _initialLocationSafe() {
   try {
     if (!TokenStorage.hasToken) return Routes.login;
@@ -308,9 +301,15 @@ class RouteNames {
   static const adminSettings = 'adminSettings';
   static const adminHelp = 'adminHelp';
   static const adminNotifications = 'adminNotifications';
+
+  // instructor course sub-pages (نحتفظ بها للتوافق)
+  static const instructorCourseMaterials = 'instructorCourseMaterials';
+  static const instructorCourseStudents = 'instructorCourseStudents';
+  static const instructorCourseAnalytics = 'instructorCourseAnalytics';
+  static const instructorCourseQuestionBank = 'instructorCourseQuestionBank';
+  static const instructorCourseQuizzes = 'instructorCourseQuizzes';
 }
 
-/// صفحة مؤقتة آمنة لحد ما تكمل التنفيذ
 class _ComingSoonPage extends StatelessWidget {
   final String title;
   const _ComingSoonPage({required this.title});
@@ -318,7 +317,7 @@ class _ComingSoonPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFFF6F7F8),
+      color: AppColors.pageBg,
       alignment: Alignment.center,
       child: Text(
         "$title (Coming Soon)",

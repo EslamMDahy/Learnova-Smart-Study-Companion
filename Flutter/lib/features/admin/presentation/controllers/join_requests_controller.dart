@@ -36,7 +36,7 @@ class JoinRequestsController extends StateNotifier<JoinRequestsState> {
         : (UserStorage.organizationId ?? '').trim();
 
     if (orgId.isEmpty) {
-      // ✅ validation-style error (not generic Exception)
+      
       throw ArgumentError('Missing organizationId.');
     }
     return orgId;
@@ -61,7 +61,7 @@ class JoinRequestsController extends StateNotifier<JoinRequestsState> {
     await load(forceRefresh: true);
   }
 
-  /// ✅ Now supports UI calls:
+  
   /// ctrl.load(organizationId: widget.orgId, view: 'pending')
   /// Still supports old calls:
   /// ctrl.load(forceRefresh: true)
@@ -161,7 +161,7 @@ class JoinRequestsController extends StateNotifier<JoinRequestsState> {
         memberId: orgMemberId.trim(),
       );
 
-      // ✅ refresh current page after successful action
+      
       await load(forceRefresh: true);
     } catch (e) {
       final failure = mapApiFailure(e);
@@ -185,7 +185,7 @@ class JoinRequestsController extends StateNotifier<JoinRequestsState> {
         memberId: orgMemberId.trim(),
       );
 
-      // ✅ refresh current page after successful action
+      
       await load(forceRefresh: true);
     } catch (e) {
       final failure = mapApiFailure(e);

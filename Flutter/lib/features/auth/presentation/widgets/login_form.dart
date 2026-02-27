@@ -23,7 +23,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   bool rememberMe = false;
   bool _obscurePassword = true;
 
-  // ✅ success banners state
+  
   bool _showResetSuccess = false;
   bool _showVerifiedSuccess = false;
   Timer? _successTimer;
@@ -173,7 +173,6 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                 return null;
               },
               suffix: IconButton(
-                splashRadius: 18,
                 icon: Icon(
                   _obscurePassword
                       ? Icons.visibility_off_outlined

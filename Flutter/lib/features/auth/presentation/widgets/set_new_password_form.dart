@@ -57,7 +57,7 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
     final ok = _formKey.currentState?.validate() ?? false;
     if (!ok) return;
 
-    // ✅ كل محاولة جديدة: امسح error فقط عبر clearError
+    
     ref.read(resetPasswordControllerProvider.notifier).clearError();
 
     final newPass = _newPassCtrl.text.trim();
@@ -136,7 +136,6 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                       return null;
                     },
                     suffix: IconButton(
-                      splashRadius: 18,
                       icon: Icon(
                         showNewPass
                             ? Icons.visibility_outlined
@@ -166,7 +165,6 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                       return null;
                     },
                     suffix: IconButton(
-                      splashRadius: 18,
                       icon: Icon(
                         showConfirmPass
                             ? Icons.visibility_outlined
@@ -192,7 +190,7 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                   const SizedBox(height: 16),
 
                   Center(
-                    child: AppBackLinkLabeled(
+                    child: AppBackLink(showLabel: true, 
                       label: "Return to Log In",
                       onTap: state.loading ? null : () => context.go(Routes.login),
                     ),

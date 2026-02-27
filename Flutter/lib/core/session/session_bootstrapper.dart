@@ -1,13 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../shared/widgets/async_state_view.dart';
 import '../storage/token_storage.dart';
 import '../storage/user_storage.dart';
 import 'session_bootstrap_controller.dart';
 
-/// Gate to ensure /me is loaded after token exists, avoiding role flicker
-/// and preventing repeated bootstraps on rebuilds (especially on web).
 class SessionBootstrapper extends ConsumerStatefulWidget {
   final Widget child;
 
@@ -31,7 +28,6 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
     _onStorageChanged = _maybeBootstrap;
     _storageListenable.addListener(_onStorageChanged);
 
-    // initial kick once
     WidgetsBinding.instance.addPostFrameCallback((_) => _maybeBootstrap());
   }
 
@@ -44,13 +40,9 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
   void _maybeBootstrap() {
     if (!mounted) return;
 
-    // No token => no need to bootstrap
     if (!TokenStorage.hasToken) return;
-
-    // Already have /me => nothing to do
     if (UserStorage.hasMe) return;
 
-    // Trigger controller bootstrap (controller should be idempotent)
     ref.read(sessionBootstrapControllerProvider.notifier).ensureBootstrapped();
   }
 
@@ -59,34 +51,100 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
     final async = ref.watch(sessionBootstrapControllerProvider);
 
     final needsBootstrap = TokenStorage.hasToken && !UserStorage.hasMe;
-
-    if (!needsBootstrap) {
-      return widget.child;
-    }
+    if (!needsBootstrap) return widget.child;
 
     final errMsg = async.hasError
         ? (() {
             final e = async.error;
-            if (e == null) return 'Failed to load your profile. Please retry.';
-            try {
-              final s = e.toString();
-              return s.trim().isEmpty
-                  ? 'Failed to load your profile. Please retry.'
-                  : s;
-            } catch (_) {
-              return 'Failed to load your profile. Please retry.';
-            }
+            final s = e?.toString() ?? '';
+            return s.trim().isEmpty
+                ? 'Failed to load your profile. Please retry.'
+                : s;
           })()
         : null;
 
+    // Facebook-ish Splash (white background + centered mark + bottom loader)
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: AsyncStateView(
-          loading: async.isLoading,
-          errorMessage: errMsg,
-          isEmpty: false,
-          onRetry: _maybeBootstrap,
-          child: const Center(child: CircularProgressIndicator()),
+        child: Stack(
+          children: [
+            // Center mark
+            Center(
+              child: Container(
+                width: 86,
+                height: 86,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF1877F2), // FB-like blue
+                  borderRadius: BorderRadius.circular(22),
+                ),
+                child: const Center(
+                  child: Text(
+                    'p',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 44,
+                      fontWeight: FontWeight.w900,
+                      height: 1,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // Bottom area: loader or error
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 18),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (errMsg == null) ...[
+                      const SizedBox(
+                        width: 26,
+                        height: 26,
+                        child: CircularProgressIndicator(strokeWidth: 2.5),
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Loading…',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          color: Color(0xFF6B7280),
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ] else ...[
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 18),
+                        child: Text(
+                          errMsg,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                            color: Color(0xFFDC2626),
+                            fontSize: 13,
+                            height: 1.3,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      ElevatedButton(
+                        onPressed: () {
+                          ref
+                              .read(sessionBootstrapControllerProvider.notifier)
+                              .ensureBootstrapped();
+                        },
+                        child: const Text('Retry'),
+                      ),
+                      const SizedBox(height: 6),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:learnova/core/ui/toast.dart';
 import '../widgets/app_ui_components.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -57,10 +58,11 @@ class _NotificationsPageState extends State<NotificationsPage> {
                       ),
                     ),
                     const SizedBox(width: 16),
-                    AppPrimarySoftButton(
+                    AppButton(
                       label: "Mark all as read",
+                      variant: AppButtonVariant.primarySoft,
                       onTap: () {
-                        // TODO: hook logic
+                        AppToast.info(context, title: "Coming soon", message: "Mark all as read will be available soon.");
                       },
                     ),
                   ],
@@ -95,7 +97,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
                 const SizedBox(height: 16),
 
-                // List (مثال)
+                
                 const AppNotificationCard(
                   title: "Assignment Due Soon: Neural Networks",
                   subtitle:

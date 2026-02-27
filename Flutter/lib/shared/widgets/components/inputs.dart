@@ -387,7 +387,7 @@ class FigmaUmSearch40 extends StatelessWidget {
         controller: controller,
         onChanged: onChanged,
         style: const TextStyle(
-          fontFamily: "Manrope",
+          fontFamily: "Inter",
           fontSize: 14,
           height: 19 / 14,
           color: AppColors.cGray700,
@@ -395,7 +395,7 @@ class FigmaUmSearch40 extends StatelessWidget {
         decoration: InputDecoration(
           hintText: "Search by name, ID, or email...",
           hintStyle: const TextStyle(
-            fontFamily: "Manrope",
+            fontFamily: "Inter",
             fontSize: 14,
             height: 19 / 14,
             color: AppColors.cGray500,
@@ -437,7 +437,7 @@ class JrInlineHint extends StatelessWidget {
           child: Text(
             text,
             style: const TextStyle(
-              fontFamily: "Manrope",
+              fontFamily: "Inter",
               fontSize: 14,
               fontWeight: FontWeight.w600,
               color: Color(0xFF6B7280),

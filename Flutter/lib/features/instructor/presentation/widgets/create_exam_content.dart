@@ -49,7 +49,7 @@ class _CreateExamContentState extends State<CreateExamContent> {
                         ? 'Add Questions'
                         : 'Settings'}",
                     style: TextStyle(
-                      color: Colors.blueGrey.shade500,
+                      color: const Color(0xFF617589),
                       fontSize: 14,
                     ),
                   ),
@@ -94,7 +94,7 @@ class _CreateExamContentState extends State<CreateExamContent> {
           const SizedBox(height: 40),
 
           // --- Dynamic Content Area (The Switcher) ---
-          // هنا الكود بيبدل المحتوى بناء على الخطوة الحالية
+          
           _buildStepFormContent(),
 
           const SizedBox(height: 40),
@@ -107,7 +107,7 @@ class _CreateExamContentState extends State<CreateExamContent> {
               children: [
                 OutlinedButton.icon(
                   onPressed:
-                      widget.onBack, // بيستخدم الـ callback اللي مبعوت من برا
+                      widget.onBack, 
                   icon: const Icon(Icons.arrow_back, size: 18),
                   label: Text(
                     widget.currentStep == 1
@@ -130,9 +130,9 @@ class _CreateExamContentState extends State<CreateExamContent> {
                 ),
                 ElevatedButton(
                   onPressed: widget
-                      .onNext, // بيستخدم الـ callback اللي مبعوت من برا للتحرك للأمام
+                      .onNext, 
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2563EB),
+                    backgroundColor: const Color(0xFF137FEC),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 48,
@@ -153,15 +153,15 @@ class _CreateExamContentState extends State<CreateExamContent> {
     );
   }
 
-  // دالة اختيار المحتوى بناءً على الخطوة الحالية
+  
   Widget _buildStepFormContent() {
     switch (widget.currentStep) {
       case 1:
-        return _buildStep1Fields(); // فورم الخطوة الأولى موجود تحت في نفس الملف
+        return _buildStep1Fields(); 
       case 2:
-        return const CreateExamContent2(); // بيعرض محتوى الملف التاني
+        return const CreateExamContent2(); 
       case 3:
-        return const CreateExamContent3(); // بيعرض محتوى الملف التالت
+        return const CreateExamContent3(); 
       default:
         return const SizedBox.shrink();
     }
@@ -189,7 +189,7 @@ class _CreateExamContentState extends State<CreateExamContent> {
           _buildLabel("Description / Instructions"),
           Text(
             "Provide instructions for students before they begin.",
-            style: TextStyle(color: Colors.blueGrey.shade500, fontSize: 13),
+            style: TextStyle(color: const Color(0xFF617589), fontSize: 13),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -235,12 +235,12 @@ class _CreateExamContentState extends State<CreateExamContent> {
     );
   }
 
-  // --- UI Helpers (نفس الـ Helpers اللي كانت عندك) ---
+  
   Widget _headerActionBtn(String label, {required bool isPrimary}) {
     return ElevatedButton(
       onPressed: () {},
       style: ElevatedButton.styleFrom(
-        backgroundColor: isPrimary ? const Color(0xFF2563EB) : Colors.white,
+        backgroundColor: isPrimary ? const Color(0xFF137FEC) : Colors.white,
         foregroundColor: isPrimary ? Colors.white : const Color(0xFF0F172A),
         side: isPrimary
             ? BorderSide.none
@@ -260,8 +260,8 @@ class _CreateExamContentState extends State<CreateExamContent> {
     required bool isCompleted,
   }) {
     Color mainColor = isActive
-        ? const Color(0xFF2563EB)
-        : (isCompleted ? const Color(0xFF10B981) : Colors.blueGrey.shade300);
+        ? const Color(0xFF137FEC)
+        : (isCompleted ? const Color(0xFF10B981) : const Color(0xFFCBD5E1));
     return Row(
       children: [
         Container(
@@ -291,7 +291,7 @@ class _CreateExamContentState extends State<CreateExamContent> {
           style: TextStyle(
             color: isActive || isCompleted
                 ? const Color(0xFF0F172A)
-                : Colors.blueGrey.shade400,
+                : const Color(0xFF94A3B8),
             fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
             fontSize: 14,
           ),
@@ -304,7 +304,7 @@ class _CreateExamContentState extends State<CreateExamContent> {
     width: 40,
     height: 1,
     margin: const EdgeInsets.symmetric(horizontal: 16),
-    color: Colors.blueGrey.shade200,
+    color: const Color(0xFFE2E8F0),
   );
 
   Widget _buildLabel(String text) => Padding(

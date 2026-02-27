@@ -18,7 +18,7 @@ class OrganizationsApi {
     final d = description.trim();
     final l = logoUrl?.trim();
 
-    // ✅ final validation (prevents 422)
+    
     if (n.isEmpty) {
       throw ArgumentError('Organization name is required.');
     }
@@ -41,7 +41,7 @@ class OrganizationsApi {
     final data = res.data;
     if (data is Map<String, dynamic>) return data;
 
-    // ✅ if backend returns invalid shape
+    
     throw const FormatException('Invalid response from createOrganization.');
   }
 
@@ -107,7 +107,7 @@ class OrganizationsApi {
       throw ArgumentError('newStatus is required.');
     }
 
-    // ✅ lock allowed values (prevents server validation errors)
+    
     const allowed = {'pending', 'accepted', 'rejected', 'approved'};
     if (!allowed.contains(status)) {
       throw ArgumentError('Invalid newStatus value: $status');

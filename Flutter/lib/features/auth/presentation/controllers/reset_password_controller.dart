@@ -20,7 +20,7 @@ class ResetPasswordController extends StateNotifier<ResetPasswordState> {
   AuthRepository get _repo => ref.read(authRepositoryProvider);
 
   void reset() {
-    // لا نمسح error مباشرة
+    
     clearError();
     state = const ResetPasswordState();
   }
@@ -37,7 +37,7 @@ class ResetPasswordController extends StateNotifier<ResetPasswordState> {
   }) async {
     final t = token.trim();
 
-    // امسح error فقط عبر clearError
+    
     clearError();
 
     state = state.copyWith(

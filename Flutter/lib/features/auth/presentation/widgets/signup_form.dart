@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/routing/routes.dart';
 import '../controllers/signup_controller.dart';
 
-// ✅ عدّل المسار ده لمكان ملف الـ tokens/components اللي فوق
+
 import '../../../../shared/widgets/app_ui_components.dart';
 
 enum AccountType { user, owner }
@@ -62,7 +62,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
       accountType = type;
       _localError = null;
 
-      // لو رايح Owner: role default مش مهم للـ owner لكن نخليه منظم
+      
       if (type == AccountType.owner) {
         userKind = UserKind.student; // irrelevant for owner
       }
@@ -238,11 +238,10 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                         obscureText: _obscurePassword,
                         onChanged: (_) {
                           _clearAllErrors();
-                          setState(() {}); // لتحديث chips
+                          setState(() {}); 
                         },
                         validator: _validatePassword,
                         suffix: IconButton(
-                          splashRadius: 18,
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility_off_outlined

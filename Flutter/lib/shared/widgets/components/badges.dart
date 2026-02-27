@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../design_tokens.dart';
 
@@ -56,20 +57,20 @@ class FigmaUmRolePill extends StatelessWidget {
   Widget build(BuildContext context) {
     final r = role.toLowerCase();
 
-    Color bg = const Color(0xFFDBEAFE);
-    Color br = const Color(0xFFBFDBFE);
-    Color fg = const Color(0xFF1E40AF);
+    Color bg = AppColors.badgeBlueBg;
+    Color br = AppColors.badgeBlueBorder;
+    Color fg = AppColors.badgeBlueFg;
 
     if (r == "teacher" || r == "instructor") {
-      bg = const Color(0xFFF3E8FF);
-      br = const Color(0xFFE9D5FF);
-      fg = const Color(0xFF6B21A8);
+      bg = AppColors.badgePurpleBg;
+      br = AppColors.badgePurpleBorder;
+      fg = AppColors.badgePurpleFg;
     }
 
     if (r == "owner") {
-      bg = const Color(0xFFE0E7FF);
-      br = const Color(0xFFC7D2FE);
-      fg = const Color(0xFF4338CA);
+      bg = AppColors.badgeIndigoBg;
+      br = AppColors.badgeIndigoBorder;
+      fg = AppColors.badgeIndigoFg;
     }
 
     return Container(
@@ -85,7 +86,7 @@ class FigmaUmRolePill extends StatelessWidget {
         _titleCase(r),
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontFamily: "Manrope",
+          fontFamily: "Inter",
           fontSize: 12,
           fontWeight: FontWeight.w500,
           height: 16 / 12,
@@ -124,20 +125,20 @@ class JrStatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final normalized = jrNormalizeStatus(status);
 
-    Color dot = const Color(0xFFEAB308);
+    Color dot = AppColors.warningDot;
     String label = normalized;
 
     if (normalized == 'accepted') {
-      dot = const Color(0xFF22C55E);
+      dot = AppColors.successDot;
       label = 'accepted';
     } else if (normalized == 'pending') {
-      dot = const Color(0xFFEAB308);
+      dot = AppColors.warningDot;
       label = 'pending';
     } else if (normalized == 'suspended') {
-      dot = const Color(0xFFEF4444);
+      dot = AppColors.errorDot;
       label = 'suspended';
     } else if (normalized == 'declined') {
-      dot = const Color(0xFFEF4444);
+      dot = AppColors.errorDot;
       label = 'declined';
     }
 
@@ -157,10 +158,10 @@ class JrStatusBadge extends StatelessWidget {
           label,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            fontFamily: "Manrope",
+            fontFamily: "Inter",
             fontSize: 14,
             fontWeight: FontWeight.w500,
-            color: Color(0xFF374151),
+            color: AppColors.textGray,
             height: 20 / 14,
           ),
         ),
@@ -195,12 +196,12 @@ class UpgradePeriodToggle extends StatelessWidget {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
           BoxShadow(
             color: Color(0x080F172A),
-            blurRadius: 18,
-            offset: Offset(0, 8),
+            blurRadius: (kIsWeb ? 12 : 18),
+            offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 8)),
           ),
         ],
       ),
@@ -258,14 +259,14 @@ class UpgradeToggleChip extends StatelessWidget {
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
+        duration: kIsWeb ? Duration.zero : const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: selected ? const Color(0xFF2563EB) : const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color:
-                selected ? const Color(0xFF2563EB) : const Color(0xFFE2E8F0),
+                selected ? const Color(0xFF2563EB) : AppColors.border,
           ),
         ),
         child: Text(

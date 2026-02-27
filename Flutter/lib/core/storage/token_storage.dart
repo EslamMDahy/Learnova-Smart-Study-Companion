@@ -1,3 +1,4 @@
+// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 
@@ -8,7 +9,7 @@ class TokenStorage {
   static String? _memoryAccess;
   static String? _memoryRefresh;
 
-  // عشان GoRouter يعمل refresh لما التوكين يتغير
+  
   static final ValueNotifier<int> _rev = ValueNotifier<int>(0);
   static Listenable get listenable => _rev;
 

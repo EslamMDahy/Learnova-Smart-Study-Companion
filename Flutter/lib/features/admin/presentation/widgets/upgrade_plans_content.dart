@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:learnova/core/ui/toast.dart';
 
-// ✅ REUSABLES (غيّر المسار حسب مشروعك)
+
 import '../../../../shared/widgets/app_ui_components.dart';
 
 class UpgradePlansContent extends StatefulWidget {
@@ -14,11 +15,11 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
   bool isYearly = false;
 
   void _comingSoon(String action) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("$action is coming soon."),
-        behavior: SnackBarBehavior.floating,
-      ),
+    AppToast.show(
+      context,
+      title: "Coming soon",
+      message: "$action is coming soon.",
+      icon: Icons.info_rounded,
     );
   }
 
@@ -28,7 +29,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
       builder: (context, c) {
         final isNarrow = c.maxWidth < 1100;
 
-        // ✅ Pricing model (consistent)
+        
         const proMonthly = 99;
         const proYearlyMonthlyEquivalent = 79; // "save" when billed yearly
         const monthsInYear = 12;
@@ -65,7 +66,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                   ),
                   const SizedBox(height: 22),
 
-                  // ✅ using reusable widget
+                  
                   UpgradePeriodToggle(
                     isYearly: isYearly,
                     onToggle: () => setState(() => isYearly = !isYearly),

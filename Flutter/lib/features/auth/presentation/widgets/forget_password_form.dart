@@ -23,7 +23,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
   void initState() {
     super.initState();
 
-    // ✅ ضمان إن الصفحة تبقى فاضية كل مرة تدخلها (حتى مع go_router reuse)
+    
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       ref.read(forgotPasswordControllerProvider.notifier).reset();
@@ -41,7 +41,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
     final ok = _formKey.currentState?.validate() ?? false;
     if (!ok) return;
 
-    // ✅ pattern: امسح error فقط عبر clearError قبل محاولة جديدة
+    
     ref.read(forgotPasswordControllerProvider.notifier).clearError();
 
     await ref
@@ -91,7 +91,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
               const SizedBox(height: 18),
             ],
 
-            // ✅ قبل الإرسال: الفورم كامل
+            
             if (!state.sent) ...[
               AppLabeledIconField(
                 label: 'Email',
@@ -119,7 +119,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
               ),
               const SizedBox(height: 16),
             ] else ...[
-              // ✅ بعد الإرسال: زر resend فقط (يعتمد على lastEmail)
+              
               AppPrimaryLoadingButton(
                 label: "Resend email",
                 loading: state.loading,
@@ -130,7 +130,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
               ),
               const SizedBox(height: 16),
 
-              // ✅ لو lastEmail مش موجود لأي سبب (rare) رجّع الفورم
+              
               if ((state.lastEmail ?? '').trim().isEmpty) ...[
                 SizedBox(
                   width: double.infinity,
@@ -151,7 +151,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
             ],
 
             Center(
-              child: AppBackLinkLabeled(
+              child: AppBackLink(showLabel: true, 
                 label: "Return to Log In",
                 onTap: state.loading ? null : _goToLogin,
               ),

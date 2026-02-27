@@ -36,7 +36,7 @@ class JoinRequestsResponse {
             JoinRequestUser.fromJson(item.cast<String, dynamic>()),
           );
         } catch (_) {
-          // ✅ Skip invalid entries (keeps the rest working)
+          
         }
       }
     }

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -40,7 +41,7 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
 
       final state = ref.read(verifyEmailControllerProvider);
       if (state.success) {
-        // ✅ كريتيف: استنى ثانية وبعدين وديه لوجين مع باراميتر نجاح
+        
         _goLoginTimer?.cancel();
         _goLoginTimer = Timer(const Duration(seconds: 2), () {
           if (!mounted) return;
@@ -102,7 +103,7 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
                   // Creative Card
                   TweenAnimationBuilder<double>(
                     tween: Tween(begin: 0.96, end: 1),
-                    duration: const Duration(milliseconds: 220),
+                    duration: kIsWeb ? Duration.zero : const Duration(milliseconds: 220),
                     curve: Curves.easeOut,
                     builder: (context, v, child) =>
                         Transform.scale(scale: v, child: child),
@@ -149,7 +150,7 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
                           ),
                           const SizedBox(height: 18),
 
-                          // ✅ زرار Login يظهر بس لو error (لأن success بيحوّل لوحده)
+                          
                           if (!state.loading && !state.success) ...[
                             SizedBox(
                               width: double.infinity,
@@ -180,7 +181,7 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
 
                   const SizedBox(height: 18),
 
-                  // ✅ رجوع بسيط تحت (دايمًا موجود)
+                  
                   Center(
                     child: InkWell(
                       onTap: () => context.go(Routes.login),

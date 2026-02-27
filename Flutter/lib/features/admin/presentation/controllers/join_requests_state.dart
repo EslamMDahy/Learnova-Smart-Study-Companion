@@ -33,7 +33,7 @@ class JoinRequestsState {
 
   JoinRequestsState copyWith({
     bool? loading,
-    Object? error = _unset, // ✅ allows explicit null
+    Object? error = _unset, 
     List<JoinRequestUser>? users,
     int? count,
     int? page,

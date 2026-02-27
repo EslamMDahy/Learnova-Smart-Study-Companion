@@ -1,4 +1,7 @@
 import 'dart:async';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -26,7 +29,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   VoidCallback? _beforeUnloadDispose;
 
-  // ✅ Single-page scroll (left nav scrolls to section)
+  
   final ScrollController _scrollController = ScrollController();
   
   final GlobalKey _kPersonal = GlobalKey();
@@ -38,7 +41,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _obscureNew = true;
   bool _obscureConfirm = true;
 
-  // ✅ Form keys
+  
   final _profileFormKey = GlobalKey<FormState>();
   final _passwordFormKey = GlobalKey<FormState>();
 
@@ -87,7 +90,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   String _initialProfileVisibility = 'private';
   bool _initialShowOnlineStatus = true;
 
-  // ✅ Cache للتواريخ عشان مايرجعوش "—" بعد save لو الباك رجّع null مؤقتًا
+  
   DateTime? _cachedCreatedAt;
   DateTime? _cachedLastLoginAt;
 
@@ -197,7 +200,7 @@ void _onNavSelect(int i) {
     return null;
   }
 
-  // ✅ Figma-like: "Sep, 2021"
+  
   String _fmtMemberSince(DateTime? dt) {
     if (dt == null) return "—";
     final d = dt.toLocal();
@@ -218,7 +221,7 @@ void _onNavSelect(int i) {
     return "${months[d.month - 1]}, ${d.year}";
   }
 
-  // ✅ Figma-like: "2 hours ago" + fallback date (بدون وقت)
+  
   String _fmtLastLoginRelative(DateTime? dt) {
     if (dt == null) return "—";
     final local = dt.toLocal();
@@ -239,7 +242,7 @@ void _onNavSelect(int i) {
     final s = (v ?? '').trim();
     if (s.isEmpty) return "Phone number is required";
 
-    // يسمح بأرقام + ومسافات و - و ()
+    
     final ok = RegExp(r'^[0-9+\-\s()]{7,20}$').hasMatch(s);
     if (!ok) return "Enter a valid phone number";
     return null;
@@ -257,6 +260,67 @@ void _onNavSelect(int i) {
     if (s.isEmpty) return "Confirmation is required";
     if (s != newPassword.text) return "Passwords don't match";
     return null;
+  }
+
+  // ──────────────────────────────────────
+  // Avatar Upload (Web via dart:html)
+  // ──────────────────────────────────────
+  Future<void> _pickAndUploadAvatar() async {
+    // Use dart:html file input for web
+    final input = html.FileUploadInputElement()
+      ..accept = 'image/png,image/jpeg,image/jpg'
+      ..multiple = false;
+
+    input.click();
+
+    await input.onChange.first;
+
+    final file = input.files?.first;
+    if (file == null) return;
+
+    // 5MB limit
+    if (file.size > 5 * 1024 * 1024) {
+      if (mounted) {
+        _toast(
+          context,
+          title: 'File too large',
+          message: 'Maximum avatar size is 5 MB.',
+          icon: Icons.warning_amber_rounded,
+        );
+      }
+      return;
+    }
+
+    final reader = html.FileReader();
+    reader.readAsArrayBuffer(file);
+    await reader.onLoad.first;
+
+    final bytes = (reader.result as Uint8List).toList();
+    final contentType = file.type.isNotEmpty ? file.type : 'image/jpeg';
+
+    final ok = await ref.read(settingsControllerProvider.notifier).uploadAvatar(
+      bytes: bytes,
+      contentType: contentType,
+    );
+
+    if (mounted) {
+      if (ok) {
+        _toast(
+          context,
+          title: 'Photo updated',
+          message: 'Your profile picture was updated successfully.',
+          icon: Icons.check_circle_outline_rounded,
+        );
+      } else {
+        final err = ref.read(settingsControllerProvider).error;
+        _toast(
+          context,
+          title: 'Upload failed',
+          message: err ?? 'Could not update photo. Please try again.',
+          icon: Icons.error_outline_rounded,
+        );
+      }
+    }
   }
 
   bool _validateProfileForm() {
@@ -285,7 +349,7 @@ void _onNavSelect(int i) {
     return ok;
   }
 
-  // ✅ Dirty check: مفيش save غير لو فيه تعديل فعلاً
+  
   bool get _hasChanges {
     final fn = firstName.text.trim();
     final ln = lastName.text.trim();
@@ -313,7 +377,7 @@ void _onNavSelect(int i) {
   }
 
   bool _shouldValidateProfileOnSave() {
-  // ✅ single-page: validate profile fields only if they changed
+  
   final fn = firstName.text.trim();
   final ln = lastName.text.trim();
   final ph = phoneNumber.text.trim();
@@ -353,7 +417,23 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
   @override
   Widget build(BuildContext context) {
     final st = ref.watch(settingsControllerProvider);
-
+    final isFirstLoad = (st.profile == null || st.preferences == null);
+    if (st.loading && isFirstLoad) {
+      return Scaffold(
+        backgroundColor: AppColors.pageBg,
+        body: SafeArea(
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: const Padding(
+                padding: AppSpacing.page,
+                child: _SettingsSkeleton(),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
     ref.listen(settingsControllerProvider, (prev, next) {
       final err = next.error;
       final ok = next.success;
@@ -367,7 +447,7 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
             message: ok,
             icon: Icons.check_circle_outline_rounded);
 
-        // ✅ بعد نجاح save: اعتبر القيم الحالية snapshot (عشان Save يتقفل)
+        
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
           _takeSnapshot();
@@ -376,7 +456,7 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
       }
     });
 
-    // ✅ Hydrate once (post-frame) when data arrives
+    
     if (!_hydrated && st.profile != null && st.preferences != null) {
       _hydrated = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -405,7 +485,7 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
         profileVisibility = st.preferences!.profileVisibility;
         showOnlineStatus = st.preferences!.showOnlineStatus;
 
-        // ✅ cache dates
+        
         _cachedCreatedAt = st.profile!.createdAt ?? _cachedCreatedAt;
         _cachedLastLoginAt = st.profile!.lastLoginAt ?? _cachedLastLoginAt;
 
@@ -414,23 +494,26 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
       });
     }
 
-    // ✅ لو الباك رجّع null بعد save: حافظ على آخر قيمة
+    
     _cachedCreatedAt = st.profile?.createdAt ?? _cachedCreatedAt;
     _cachedLastLoginAt = st.profile?.lastLoginAt ?? _cachedLastLoginAt;
 
     final isBusy =
         st.savingProfile || st.updatingPassword || st.deleting || st.savingPreferences;
 
-    // ✅ زرار Save يتقفل لو مفيش تغييرات
+    
     final canSave = _hasChanges && !isBusy;
 
-    // ✅ Figma-like smaller buttons (height 40)
+    
     const double btnH = 40;
 
-return WillPopScope(
-  onWillPop: () async {
-    if (!_hasChanges) return true;
-    return _confirmDiscardDialog(context);
+return PopScope(
+  canPop: !_hasChanges,
+  onPopInvokedWithResult: (didPop, _) async {
+    if (!didPop) {
+      final shouldPop = await _confirmDiscardDialog(context);
+      if (shouldPop && context.mounted) Navigator.of(context).pop();
+    }
   },
   child: AbsorbPointer(
     absorbing: isBusy,
@@ -501,7 +584,7 @@ return WillPopScope(
                             loading: st.savingProfile || st.savingPreferences,
                             onPressed: canSave
                                 ? () {
-                                    // ✅ validate profile ONLY if you are in Personal Info section
+                                    
                                     if (_shouldValidateProfileOnSave()) {
                                       if (!_validateProfileForm()) return;
                                     }
@@ -528,7 +611,7 @@ return WillPopScope(
                                           showOnlineStatus: showOnlineStatus,
                                         );
                                   }
-                                : null, // ✅ disabled if no changes
+                                : null, 
                           ),
                         ),
                       ],
@@ -553,6 +636,9 @@ return WillPopScope(
                             subtitle: st.profile?.email ?? universityEmailCtrl.text,
                             memberSince: _fmtMemberSince(_cachedCreatedAt),
                             lastLogin: _fmtLastLoginRelative(_cachedLastLoginAt),
+                            avatarUrl: st.profile?.avatarUrl,
+                            uploadingAvatar: st.uploadingAvatar,
+                            onUploadAvatar: () => _pickAndUploadAvatar(),
                           ),
                           const SizedBox(height: 16),
                           _NavCard(
@@ -590,7 +676,7 @@ return WillPopScope(
                         );
                       }
 
-                      // ✅ Sticky sidebar (left fixed, right scrolls)
+                      
                       return Stack(
                         children: [
                           Positioned.fill(
@@ -778,7 +864,6 @@ return WillPopScope(
                       onChanged: (_) => setState(() {}),
                       validator: (v) => _required(v, "Current password is required"),
                       suffix: IconButton(
-                        splashRadius: 18,
                         icon: Icon(
                           _obscureCurrent
                               ? Icons.visibility_off_outlined
@@ -799,7 +884,6 @@ return WillPopScope(
                       onChanged: (_) => setState(() {}),
                       validator: _validateNewPassword,
                       suffix: IconButton(
-                        splashRadius: 18,
                         icon: Icon(
                           _obscureNew
                               ? Icons.visibility_off_outlined
@@ -820,7 +904,6 @@ return WillPopScope(
                       onChanged: (_) => setState(() {}),
                       validator: _validateConfirmPassword,
                       suffix: IconButton(
-                        splashRadius: 18,
                         icon: Icon(
                           _obscureConfirm
                               ? Icons.visibility_off_outlined
@@ -837,7 +920,7 @@ return WillPopScope(
                       child: AppPrimaryLoadingButton(
                         label: "Update Password",
                         loading: st.updatingPassword,
-                        height: 40, // ✅ figma-like
+                        height: 40, 
                         onPressed: () {
                           if (!_validatePasswordForm()) return;
 
@@ -1272,7 +1355,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
 
     if (!mounted) return;
     if (ok) {
-      // ✅ logout after delete
+      
       ref.read(authRepositoryProvider).logout();
 
       if (context.mounted) {
@@ -1312,7 +1395,6 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                     ),
                   ),
                   IconButton(
-                    splashRadius: 18,
                     onPressed: isBusy ? null : () => Navigator.of(context).pop(),
                     icon: const Icon(Icons.close_rounded),
                   ),
@@ -1369,7 +1451,6 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                   obscureText: _obscurePass,
                   onChanged: (_) => setState(() {}),
                   suffix: IconButton(
-                    splashRadius: 18,
                     icon: Icon(
                       _obscurePass
                           ? Icons.visibility_off_outlined
@@ -1505,12 +1586,18 @@ class _ProfileCard extends StatelessWidget {
   final String subtitle;
   final String memberSince;
   final String lastLogin;
+  final String? avatarUrl;
+  final bool uploadingAvatar;
+  final VoidCallback? onUploadAvatar;
 
   const _ProfileCard({
     required this.name,
     required this.subtitle,
     required this.memberSince,
     required this.lastLogin,
+    this.avatarUrl,
+    this.uploadingAvatar = false,
+    this.onUploadAvatar,
   });
 
   @override
@@ -1538,22 +1625,76 @@ class _ProfileCard extends StatelessWidget {
             right: 0,
             child: Column(
               children: [
-                Container(
-                  width: 128,
-                  height: 128,
-                  decoration: BoxDecoration(
-                    color: AppColors.borderSoft,
-                    borderRadius: BorderRadius.circular(9999),
-                    border: Border.all(color: Colors.white, width: 4),
-                    boxShadow: const [
-                      BoxShadow(
-                        blurRadius: 6,
-                        offset: Offset(0, 4),
-                        color: Color(0x1A000000),
+                // Avatar with upload overlay
+                GestureDetector(
+                  onTap: uploadingAvatar ? null : onUploadAvatar,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 128,
+                        height: 128,
+                        decoration: BoxDecoration(
+                          color: AppColors.borderSoft,
+                          borderRadius: BorderRadius.circular(9999),
+                          border: Border.all(color: Colors.white, width: 4),
+                          boxShadow: const [
+                            BoxShadow(
+                              blurRadius: 6,
+                              offset: Offset(0, 4),
+                              color: Color(0x1A000000),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(9999),
+                          child: (avatarUrl != null && avatarUrl!.isNotEmpty)
+                              ? Image.network(
+                                  avatarUrl!,
+                                  key: ValueKey(avatarUrl),
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (_, __, ___) => const Icon(
+                                    Icons.person,
+                                    size: 54,
+                                    color: AppColors.muted,
+                                  ),
+                                )
+                              : const Icon(Icons.person, size: 54, color: AppColors.muted),
+                        ),
                       ),
+                      if (uploadingAvatar)
+                        Container(
+                          width: 128,
+                          height: 128,
+                          decoration: BoxDecoration(
+                            color: Colors.black38,
+                            borderRadius: BorderRadius.circular(9999),
+                          ),
+                          child: const Center(
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2.5,
+                              color: Colors.white,
+                            ),
+                          ),
+                        )
+                      else
+                        Positioned(
+                          bottom: 4,
+                          right: 4,
+                          child: Container(
+                            width: 30,
+                            height: 30,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF137FEC),
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                            child: const Icon(Icons.camera_alt, size: 15, color: Colors.white),
+                          ),
+                        ),
                     ],
                   ),
-                  child: const Icon(Icons.person, size: 54, color: AppColors.muted),
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -1778,6 +1919,124 @@ class _NavItem extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  
+
+}
+class _SettingsSkeleton extends StatelessWidget {
+  const _SettingsSkeleton();
+
+  Widget _line({double h = 14, double? w}) {
+    return Container(
+      height: h,
+      width: w,
+      decoration: BoxDecoration(
+        color: const Color(0xFFE5E7EB),
+        borderRadius: BorderRadius.circular(10),
+      ),
+    );
+  }
+
+  Widget _card({double minH = 220}) {
+    return ConstrainedBox(
+      constraints: BoxConstraints(minHeight: minH),
+      child: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderSoft),
+          boxShadow: const [
+            BoxShadow(
+              blurRadius: 2,
+              offset: Offset(0, 1),
+              color: AppColors.shadowSoft,
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: AppSpacing.cardPadding,
+          child: Column(
+            mainAxisSize: MainAxisSize.min, 
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _line(h: 16, w: 180),
+              const SizedBox(height: 10),
+              _line(h: 12, w: 300),
+              const SizedBox(height: 16),
+              _line(h: 44),
+              const SizedBox(height: 12),
+              _line(h: 44),
+              const SizedBox(height: 12),
+              _line(h: 44),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header skeleton
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _line(h: 22, w: 220),
+                  const SizedBox(height: 8),
+                  _line(h: 14, w: 520),
+                ],
+              ),
+            ),
+            const SizedBox(width: 16),
+            Column(
+              children: [
+                _line(h: 40, w: 120),
+                const SizedBox(height: 10),
+                _line(h: 40, w: 160),
+              ],
+            ),
+          ],
+        ),
+
+        const SizedBox(height: 24),
+
+        // Body skeleton
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                _card(minH: 260),
+                const SizedBox(height: 16),
+                _card(minH: 260),
+                const SizedBox(height: 16),
+                _card(minH: 240),
+                const SizedBox(height: 16),
+                _card(minH: 280),
+                const SizedBox(height: 16),
+                Container(
+                  height: 90,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: AppColors.dangerBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.dangerBorder),
+                  ),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

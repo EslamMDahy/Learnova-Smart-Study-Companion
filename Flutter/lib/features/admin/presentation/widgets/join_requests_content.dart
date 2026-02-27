@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,7 +23,7 @@ class JoinRequestsContent extends ConsumerStatefulWidget {
   const JoinRequestsContent({
     super.key,
     String? organizationId,
-    String? orgId, // ✅ backward compatible
+    String? orgId, 
   }) : organizationId = (organizationId ?? orgId);
 
   @override
@@ -32,6 +34,8 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
   String selectedRole = "All Roles";
   String selectedStatus = "All Status";
   final TextEditingController _search = TextEditingController();
+  Timer? _searchDebounce;
+  String _searchText = "";
 
   String get _orgId {
     final fromWidget = (widget.organizationId ?? '').trim();
@@ -54,12 +58,14 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _search.dispose();
     super.dispose();
   }
 
   Future<void> _refresh() async {
     if (_orgId.isEmpty) return;
+    _searchDebounce?.cancel();
     FocusScope.of(context).unfocus();
     await ref.read(joinRequestsControllerProvider.notifier).refresh();
   }
@@ -78,7 +84,7 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
           child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const FigmaUmPageHeader(
+                  const AppSectionHeader(
                     title: "Join Requests",
                     subtitle:
                         "Manage student and instructor accounts, roles, and permissions.",
@@ -88,15 +94,20 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
                   _StatsRow(isNarrow: isNarrow, users: state.users),
                   const SizedBox(height: 16),
 
-                  // ✅ نفس FiltersBar بتاع UserManagement (UI)
-                  // ✅ الوظيفة: search/role/status + refresh الحقيقي
+                  
+                  
                   FigmaUmFiltersBar(
                     controller: _search,
                     selectedRole: selectedRole,
                     selectedStatus: selectedStatus,
                     isNarrow: isNarrow,
                     onSearchChanged: (v) {
-                      ref.read(joinRequestsControllerProvider.notifier).search(v);
+                      _searchDebounce?.cancel();
+                      _searchDebounce = Timer(const Duration(milliseconds: 280), () {
+                        if (!mounted) return;
+                        setState(() => _searchText = v);
+                        ref.read(joinRequestsControllerProvider.notifier).search(v);
+                      });
                     },
                     onRoleChanged: (v) => setState(() => selectedRole = v),
                     onStatusChanged: (v) => setState(() => selectedStatus = v),
@@ -134,7 +145,7 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
   }
 
   List<JoinRequestUser> _applyFilters(List<JoinRequestUser> users) {
-    final q = _search.text.trim().toLowerCase();
+    final q = _searchText.trim().toLowerCase();
 
     return users.where((u) {
       final roleOk = selectedRole == "All Roles" ||
@@ -153,7 +164,7 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
 }
 
 /* ============================================================
-   STATS ROW (نفس شكل UserManagement)
+   STATS ROW
 ============================================================ */
 class _StatsRow extends StatelessWidget {
   final bool isNarrow;
@@ -161,6 +172,7 @@ class _StatsRow extends StatelessWidget {
   final String? error;
   final VoidCallback? onRetry;
 
+  // ignore: unused_element_parameter
   const _StatsRow({required this.isNarrow, required this.users, this.error, this.onRetry});
 
   @override
@@ -235,7 +247,7 @@ class _StatsRow extends StatelessWidget {
 }
 
 /* ============================================================
-   TABLE (نفس شكل UserManagement) + Actions (Accept/Decline)
+   TABLE + Actions (Accept/Decline)
 ============================================================ */
 class _JoinRequestsTableFigma extends StatelessWidget {
   final bool isNarrow;
@@ -296,7 +308,7 @@ class _JoinRequestsTableFigma extends StatelessWidget {
                     "Join Requests",
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontFamily: "Manrope",
+                      fontFamily: "Inter",
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.cText,
@@ -324,7 +336,7 @@ class _JoinRequestsTableFigma extends StatelessWidget {
                 orgId: orgId,
               ),
             ),
-          ), // ✅ مهم: قفلة AsyncStateView
+          ), 
 
           FigmaUmTableFooter(
             showingText: "Showing $from-$safeTo of $total requests",
@@ -392,7 +404,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                       child: Text(
                         _initials(user.fullName),
                         style: const TextStyle(
-                          fontFamily: "Manrope",
+                          fontFamily: "Inter",
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           height: 20 / 14,
@@ -410,7 +422,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                             user.fullName,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontFamily: "Manrope",
+                              fontFamily: "Inter",
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               height: 20 / 14,
@@ -422,7 +434,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                             user.email,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontFamily: "Manrope",
+                              fontFamily: "Inter",
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
                               height: 16 / 12,
@@ -470,7 +482,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                     "—",
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: "Manrope",
+                      fontFamily: "Inter",
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
                       height: 20 / 14,
@@ -489,7 +501,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                     "—",
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: "Manrope",
+                      fontFamily: "Inter",
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
                       height: 16 / 12,
@@ -508,7 +520,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
               ),
             ),
 
-            // Actions (✅ same function: accept/decline, UI changed فقط)
+            
             SizedBox(
               width: _kActionsColW,
               child: Align(
@@ -518,7 +530,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                     : const Text(
                         "—",
                         style: TextStyle(
-                          fontFamily: "Manrope",
+                          fontFamily: "Inter",
                           fontSize: 12,
                           fontWeight: FontWeight.w400,
                           height: 16 / 12,
@@ -544,7 +556,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
 }
 
 /* ============================================================
-   ACTIONS MENU (Accept/Decline) - نفس الوظيفة
+   ACTIONS MENU (Accept/Decline)
 ============================================================ */
 class _JoinRequestActionsMenu extends ConsumerStatefulWidget {
   final String orgId;
@@ -611,7 +623,7 @@ class _JoinRequestActionsMenuState extends ConsumerState<_JoinRequestActionsMenu
         }
       },
 
-      // ✅ نفس شكل زر الأكشن بتاع UM (3 نقط)
+      
       child: SizedBox(
         width: 28,
         height: 28,

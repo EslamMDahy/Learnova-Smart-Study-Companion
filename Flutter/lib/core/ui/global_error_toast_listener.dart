@@ -29,7 +29,7 @@ class _GlobalErrorToastListenerState
     ref.listen<AppFailure?>(appErrorProvider, (prev, next) {
       if (next == null) return;
 
-      // ✅ Do not show validation errors globally (forms should render inline)
+      
       if (next.type == AppFailureType.validation) {
         AppErrorReporter.clear(ref);
         return;
@@ -75,7 +75,7 @@ class _GlobalErrorToastListenerState
   }
 
   Future<void> _showSessionExpiredDialog(BuildContext ctx, AppFailure f) async {
-    // ✅ clear session before navigation so router redirect is consistent
+    
     try {
       TokenStorage.clear();
       UserStorage.clear();

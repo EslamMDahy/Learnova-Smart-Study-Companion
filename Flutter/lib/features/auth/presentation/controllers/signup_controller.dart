@@ -25,7 +25,7 @@ class SignupController extends StateNotifier<SignupState> {
   }
 
   void reset() {
-    // لا نمسح error مباشرة
+    
     clearError();
     state = const SignupState();
   }
@@ -35,7 +35,7 @@ class SignupController extends StateNotifier<SignupState> {
     return s.isNotEmpty && s.contains('@') && s.contains('.');
   }
 
-  /// ✅ Now matches backend:
+
   /// full_name, email, password, system_role
   Future<bool> signup({
     required String fullName,
@@ -43,7 +43,7 @@ class SignupController extends StateNotifier<SignupState> {
     required String password,
     required String systemRole,
   }) async {
-    // امسح error فقط عبر clearError
+    
     clearError();
 
     state = state.copyWith(loading: true);
@@ -52,7 +52,7 @@ class SignupController extends StateNotifier<SignupState> {
     final cleanEmail = email.trim();
     final cleanSystemRole = systemRole.trim().toLowerCase();
 
-    // ✅ Local validation (خفيف واحترافي)
+    
     if (cleanFullName.isEmpty) {
       state = state.copyWith(loading: false, error: 'Full name is required.');
       return false;
@@ -74,7 +74,7 @@ class SignupController extends StateNotifier<SignupState> {
       return false;
     }
 
-    // (اختياري) نعمل guard بسيط يوازي الباك
+    
     const allowed = {'student', 'instructor', 'assistant', 'owner'};
     if (!allowed.contains(cleanSystemRole)) {
       state = state.copyWith(

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -23,7 +25,7 @@ class UserManagementContent extends ConsumerStatefulWidget {
   const UserManagementContent({
     super.key,
     String? organizationId,
-    String? orgId, // ✅ backward compatible
+    String? orgId, 
   }) : organizationId = (organizationId ?? orgId);
 
   @override
@@ -35,6 +37,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
   String selectedRole = "All Roles";
   String selectedStatus = "All Status";
   final _search = TextEditingController();
+  Timer? _searchDebounce;
 
   String? _lastToastMsg;
   ProviderSubscription<UserManagementState>? _errSub;
@@ -93,6 +96,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
   @override
   void dispose() {
     _errSub?.close();
+    _searchDebounce?.cancel();
     _search.dispose();
     super.dispose();
   }
@@ -111,7 +115,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
           child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const FigmaUmPageHeader(
+                  const AppSectionHeader(
                     title: "User Management",
                     subtitle:
                         "Manage student and instructor accounts, roles, and permissions.",
@@ -128,6 +132,11 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                     isNarrow: isNarrow,
                     onSearchChanged: (v) {
                       ref.read(userManagementControllerProvider.notifier).search(v);
+                      _searchDebounce?.cancel();
+                      _searchDebounce = Timer(const Duration(milliseconds: 280), () {
+                        if (!mounted) return;
+                        setState(() {});
+                      });
                     },
                     onRoleChanged: (v) => setState(() => selectedRole = v),
                     onStatusChanged: (v) => setState(() => selectedStatus = v),
@@ -228,6 +237,7 @@ class _StatsRow extends StatelessWidget {
         users.where((e) => e.systemRole.toLowerCase() == "student").length;
     final pending = users.where((e) => e.status.toLowerCase() == "pending").length;
 
+    // ignore: unused_local_variable
     final cards = [
       const FigmaUmStatCard(
         title: "Total Users",
@@ -268,7 +278,7 @@ class _StatsRow extends StatelessWidget {
       ),
     ];
 
-    // ✅ update dynamic values without changing widget look
+    
     final updated = [
       FigmaUmStatCard(
         title: "Total Users",
@@ -399,7 +409,7 @@ class _UsersTableFigma extends StatelessWidget {
                 onActionTap: onActionTap,
               ),
             ),
-          ), // ✅ IMPORTANT: close AsyncStateView
+          ), 
 
           FigmaUmTableFooter(
             showingText: "Showing $from-$safeTo of $total users",
@@ -463,7 +473,7 @@ class _UserRowFigma extends StatelessWidget {
                       child: Text(
                         _initials(user.fullName),
                         style: const TextStyle(
-                          fontFamily: "Manrope",
+                          fontFamily: "Inter",
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           height: 20 / 14,
@@ -481,7 +491,7 @@ class _UserRowFigma extends StatelessWidget {
                             user.fullName,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontFamily: "Manrope",
+                              fontFamily: "Inter",
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               height: 20 / 14,
@@ -493,7 +503,7 @@ class _UserRowFigma extends StatelessWidget {
                             user.email,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontFamily: "Manrope",
+                              fontFamily: "Inter",
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
                               height: 16 / 12,
@@ -539,7 +549,7 @@ class _UserRowFigma extends StatelessWidget {
                     "—",
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: "Manrope",
+                      fontFamily: "Inter",
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
                       height: 20 / 14,
@@ -558,7 +568,7 @@ class _UserRowFigma extends StatelessWidget {
                     "—",
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: "Manrope",
+                      fontFamily: "Inter",
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
                       height: 16 / 12,

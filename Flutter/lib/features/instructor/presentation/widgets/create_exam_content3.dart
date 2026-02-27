@@ -8,7 +8,7 @@ class CreateExamContent3 extends StatefulWidget {
 }
 
 class _CreateExamContent3State extends State<CreateExamContent3> {
-  // متغيرات للتحكم في حالة المفاتيح (Switches) لكي تعمل عند الضغط
+  
   bool _shuffleQuestions = true;
   bool _showResults = false;
   bool _oneAtATime = false;
@@ -18,7 +18,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // العمود الأيسر: إعدادات الاختبار (Settings)
+        
         Expanded(
           flex: 2,
           child: Column(
@@ -30,17 +30,17 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
           ),
         ),
         const SizedBox(width: 32),
-        // العمود الأيمن: كارد ملخص الاختبار المنفصل (Quiz Summary)
+        
         Expanded(flex: 1, child: _buildQuizSummaryCard()),
       ],
     );
   }
 
-  // --- كارد التوقيت والمحاولات ---
+  
   Widget _buildTimingAttemptsCard() {
     return _buildSectionCard(
       icon: Icons.timer_outlined,
-      iconColor: Colors.blue,
+      iconColor: const Color(0xFF137FEC),
       title: "Timing & Attempts",
       subtitle: "Control how students access and take the quiz.",
       child: Column(
@@ -90,7 +90,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
     );
   }
 
-  // --- كارد العرض والأمان ---
+  
   Widget _buildDisplaySecurityCard() {
     return _buildSectionCard(
       icon: Icons.settings_outlined,
@@ -127,7 +127,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
     );
   }
 
-  // --- كارد ملخص الاختبار (Quiz Summary) ---
+  
   Widget _buildQuizSummaryCard() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -166,7 +166,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
     );
   }
 
-  // --- عناصر واجهة المستخدم المساعدة (Helper Widgets) ---
+  
 
   Widget _buildSectionCard({
     required IconData icon,
@@ -190,7 +190,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(0.1),
+                  color: iconColor.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(icon, color: iconColor, size: 20),
@@ -330,7 +330,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
             ],
           ),
         ),
-        Switch(value: value, onChanged: onChanged, activeColor: Colors.blue),
+        Switch(value: value, onChanged: onChanged, activeThumbColor: const Color(0xFF137FEC)),
       ],
     );
   }
@@ -372,7 +372,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
               "This quiz is currently saved as a draft. Publishing will make it visible to enrolled students immediately or on the scheduled date.",
               style: TextStyle(
                 fontSize: 11,
-                color: Colors.blueGrey.shade700,
+                color: const Color(0xFF617589),
                 height: 1.4,
               ),
             ),

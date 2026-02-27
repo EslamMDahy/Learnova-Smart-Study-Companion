@@ -8,7 +8,7 @@ class CreateExamContent2 extends StatefulWidget {
 }
 
 class _CreateExamContent2State extends State<CreateExamContent2> {
-  // قائمة لتخزين معرفات أو نصوص الأسئلة المختارة لكي تعمل الـ Checkboxes
+  
   final List<String> _selectedQuestions = [
     "Explain the difference between SQL and NoSQL databases, providing examples for each.",
     "Describe the CAP theorem and its implications for distributed system design.",
@@ -16,11 +16,11 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
 
   @override
   Widget build(BuildContext context) {
-    // المحتوى الداخلي فقط بدون الهيدر أو الستيبر
+    
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // العمود الأيسر: منطقة الأسئلة والبحث ( flex: 2 ليشغل مساحة أكبر)
+        
         Expanded(
           flex: 2,
           child: Column(
@@ -47,13 +47,13 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
           ),
         ),
         const SizedBox(width: 32),
-        // العمود الأيمن: كارد ملخص الاختبار (Quiz Summary)
+        
         Expanded(flex: 1, child: _buildQuizSummaryCard()),
       ],
     );
   }
 
-  // --- كارد اقتراحات الذكاء الاصطناعي ---
+  
   Widget _buildAIQuestionGenerator() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -92,7 +92,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
                 Text(
                   "Let our AI analyze the course material and suggest relevant questions for this quiz.",
                   style: TextStyle(
-                    color: Colors.blueGrey.shade500,
+                    color: const Color(0xFF617589),
                     fontSize: 13,
                   ),
                 ),
@@ -122,7 +122,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
     );
   }
 
-  // --- بار البحث والفلترة ---
+  
   Widget _buildFiltersBar() {
     return Row(
       children: [
@@ -179,7 +179,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
     );
   }
 
-  // --- قائمة الأسئلة ---
+  
   Widget _buildQuestionsList() {
     return Column(
       children: [
@@ -294,7 +294,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: diffColor.withOpacity(0.1),
+              color: diffColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(6),
             ),
             child: Text(
@@ -311,7 +311,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
     );
   }
 
-  // --- كارد ملخص الاختبار المنفصل (Quiz Summary) ---
+  
   Widget _buildQuizSummaryCard() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -376,7 +376,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
               "This quiz is currently saved as a draft. Publishing will make it visible to enrolled students immediately or on the scheduled date.",
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.blueGrey.shade700,
+                color: const Color(0xFF617589),
                 height: 1.4,
               ),
             ),

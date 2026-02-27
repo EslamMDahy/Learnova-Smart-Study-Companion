@@ -13,13 +13,13 @@ class ForgetPasswordLeftPanel extends StatelessWidget {
         image: DecorationImage(
           image: AssetImage('assets/book.png'),
 
-          // ✅ يخلي الصورة واضحة
+          
           fit: BoxFit.cover,
           alignment: Alignment.center,
 
-          // ✅ تحسين التباين بدل الطمس
+          
           colorFilter: ColorFilter.mode(
-            Color.fromRGBO(0, 0, 0, 0.25), // overlay خفيف جدًا
+            Color.fromRGBO(0, 0, 0, 0.25), 
             BlendMode.darken,
           ),
         ),

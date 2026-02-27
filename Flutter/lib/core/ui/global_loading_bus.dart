@@ -27,11 +27,10 @@ class GlobalLoadingBus {
   static bool _shouldTrack(RequestOptions o) {
     final extra = o.extra;
 
-    // explicit opt-out
+    // We don't want the big full-screen loader for every request.
+    // Opt-in only: pass Options(extra: {'globalLoading': true}).
     if (extra['silent'] == true) return false;
-    if (extra['globalLoading'] == false) return false;
-
-    return true;
+    return extra['globalLoading'] == true;
   }
 
   /// Called from Dio onRequest.

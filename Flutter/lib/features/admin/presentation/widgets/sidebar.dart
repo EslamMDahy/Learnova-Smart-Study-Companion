@@ -25,13 +25,13 @@ class AdminSidebarWidget extends StatelessWidget {
           index: AdminTabs.users,
         ),
         AppSidebarItem(
-          icon: Icons.group_add_rounded, // ✅ clearer for Join Requests (optional)
+          icon: Icons.group_add_rounded, 
           title: "Join Requests",
           index: AdminTabs.joinRequests,
         ),
         AppSidebarItem(
           icon: Icons.workspace_premium_outlined,
-          title: "Upgrade Plans", // ✅ consistent casing
+          title: "Upgrade Plans", 
           index: AdminTabs.upgradePlans,
         ),
       ],

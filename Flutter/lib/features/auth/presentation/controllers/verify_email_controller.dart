@@ -1,7 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/error/app_error_bus.dart';
-import '../../../../core/storage/token_storage.dart';
 import '../../../../core/network/error_mapper.dart';
 import '../../data/auth_providers.dart';
 import '../../data/auth_repository.dart';
@@ -40,7 +38,7 @@ class VerifyEmailController extends StateNotifier<VerifyEmailState> {
       return false;
     }
 
-    // امسح error فقط عبر clearError
+    
     clearError();
 
     state = state.copyWith(
@@ -66,7 +64,7 @@ class VerifyEmailController extends StateNotifier<VerifyEmailState> {
   }
 
   void reset() {
-    // لا نمسح error مباشرة
+    
     clearError();
     state = const VerifyEmailState();
   }

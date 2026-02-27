@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:learnova/core/storage/user_storage.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import 'package:learnova/features/instructor/presentation/widgets/create_course_dialog.dart';
-import 'package:learnova/features/instructor/presentation/widgets/create_exam_content.dart';
-import 'package:learnova/features/instructor/presentation/widgets/create_exam_content2.dart';
+import 'package:learnova/features/instructor/presentation/widgets/invite_students_dialog.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_course_widgets.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_dashboard_content.dart';
-import 'package:learnova/features/instructor/presentation/widgets/materials_explorer_page.dart';
-// استيراد الكود الجديد
-import '../../../../shared/pages/notifications_page.dart';
-import '../../../settings/presentation/pages/settings_page.dart';
+
+import '../controllers/instructor_courses_controller.dart';
 
 // ----------------------------------------------------------------
 // SECTION: Dashboard Route Page
@@ -17,63 +17,82 @@ class InstructorDashboardRoutePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const InstructorDashboardContent();
+    final name = (UserStorage.userMap?['full_name'] ?? '').toString().trim();
+    final displayName = name.isNotEmpty ? name : 'Professor';
+    return InstructorDashboardContent(userName: displayName);
   }
 }
 
 // ----------------------------------------------------------------
-// SECTION: Course Management Page
+// SECTION: Courses Route Page (Backend-ready)
 // ----------------------------------------------------------------
-class InstructorCourseRoutePage extends StatefulWidget {
+class InstructorCourseRoutePage extends ConsumerStatefulWidget {
   const InstructorCourseRoutePage({super.key});
 
   @override
-  State<InstructorCourseRoutePage> createState() =>
+  ConsumerState<InstructorCourseRoutePage> createState() =>
       _InstructorCourseRoutePageState();
 }
 
-class _InstructorCourseRoutePageState extends State<InstructorCourseRoutePage> {
-  // متغير للتحكم هل نعرض القائمة الرئيسية أم واجهة الإنشاء
-  bool isCreatingExam = false;
-  int currentStep = 1;
-
+class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRoutePage> {
   @override
-  Widget build(BuildContext context) {
-    // إذا كان المدرس ضغط على إنشاء، نعرض واجهة الخطوات
-    if (isCreatingExam) {
-      return CreateExamContent(
-        key: ValueKey('course_step_$currentStep'),
-        currentStep: currentStep,
-        onNext: () {
-          if (currentStep < 3) {
-            setState(() => currentStep++);
-          } else {
-            // هنا يمكنك إنهاء العملية والعودة للقائمة
-            setState(() {
-              isCreatingExam = false;
-              currentStep = 1;
-            });
-          }
-        },
-        onBack: () {
-          if (currentStep > 1) {
-            setState(() => currentStep--);
-          } else {
-            // إذا رجع من الخطوة الأولى، نعود للقائمة الرئيسية
-            setState(() => isCreatingExam = false);
-          }
-        },
+  void initState() {
+    super.initState();
+    // Load my courses once when entering the page
+    Future.microtask(() => ref
+        .read(instructorCoursesControllerProvider.notifier)
+        .load(force: true));
+  }
+
+  Future<void> _openCreateCourse() async {
+    final result = await showDialog<CreateCourseDialogResult>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => const CreateCourseDialog(),
+    );
+
+    if (result == null) return;
+
+    // 1) Create course first (backend returns course with id)
+    final created = await ref
+        .read(instructorCoursesControllerProvider.notifier)
+        .createCourse(result.request);
+
+    final courseIdNum = created['id'];
+    final courseId = (courseIdNum is num) ? courseIdNum.toInt() : int.tryParse('$courseIdNum');
+
+    if (courseId == null) {
+      // If backend response doesn't include id, we can't proceed with invites upload
+      // Still refresh list.
+      await ref.read(instructorCoursesControllerProvider.notifier).load(force: true);
+      return;
+    }
+
+    // 2) If course is PRIVATE (needs invites), open upload dialog with courseId
+    if (result.needsInvites) {
+      await showDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        builder: (_) => InviteStudentsDialog(courseId: courseId),
       );
     }
 
-    // الواجهة الافتراضية (قائمة الكورسات)
+    // 3) Refresh courses list after creation (and possible invites)
+    await ref.read(instructorCoursesControllerProvider.notifier).load(force: true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(instructorCoursesControllerProvider);
+
     return InstructorCourseContent(
-      onCreateNewCourse: () {
-        showDialog(
-          context: context,
-          builder: (_) => const CreateCourseDialog(),
-        );
-      },
+      loading: state.loading,
+      errorText: state.error,
+      courses: state.items,
+      onRefresh: () => ref
+          .read(instructorCoursesControllerProvider.notifier)
+          .load(force: true),
+      onCreateNewCourse: _openCreateCourse,
     );
   }
 }

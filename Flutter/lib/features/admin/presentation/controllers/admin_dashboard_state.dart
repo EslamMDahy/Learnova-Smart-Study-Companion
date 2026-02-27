@@ -2,7 +2,7 @@ class AdminDashboardState {
   final bool loading;
   final String? error;
 
-  /// ✅ org id used in admin flows (from selected org / first org)
+  
   final String? organizationId;
 
   const AdminDashboardState({
@@ -11,7 +11,7 @@ class AdminDashboardState {
     this.organizationId,
   });
 
-  /// ✅ Derived (no duplication)
+  
   bool get hasOrganization =>
       organizationId != null && organizationId!.trim().isNotEmpty;
 
@@ -19,7 +19,7 @@ class AdminDashboardState {
 
   AdminDashboardState copyWith({
     bool? loading,
-    Object? error = _unset, // ✅ allows explicit null
+    Object? error = _unset, 
     String? organizationId,
   }) {
     return AdminDashboardState(

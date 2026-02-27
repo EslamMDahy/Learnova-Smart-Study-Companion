@@ -23,6 +23,7 @@ class SettingsController extends StateNotifier<SettingsState> {
 
   CancelToken? _loadCancel;
   CancelToken? _saveCancel;
+  CancelToken? _avatarCancel;
 
   SettingsRepository get _repo => ref.read(settingsRepositoryProvider);
 
@@ -45,7 +46,7 @@ class SettingsController extends StateNotifier<SettingsState> {
   void _handleError(Object e, {bool stopLoading = true}) {
     final failure = mapApiFailure(e);
 
-    // لو عنده session ودي auth issue -> global handler
+    
     if (TokenStorage.hasToken && failure.isAuthIssue) {
       if (stopLoading) state = state.copyWith(loading: false);
       AppErrorReporter.report(ref, failure);
@@ -59,7 +60,7 @@ class SettingsController extends StateNotifier<SettingsState> {
   }
 
   void _hydrateProfileFromStorageIfPossible() {
-    // لو profile مش موجود، حاول هيدرِيت من التخزين فورًا (قبل الـAPI)
+    
     if (state.profile != null) return;
 
     final cachedUser = UserStorage.userMap;
@@ -74,7 +75,7 @@ class SettingsController extends StateNotifier<SettingsState> {
   }
 
   Future<void> load() async {
-    // لو بالفعل بيعمل load متكرر
+    
     if (state.loading) return;
 
     clearMessages();
@@ -83,12 +84,12 @@ class SettingsController extends StateNotifier<SettingsState> {
 
     _resetLoadCancel();
 
-    // ✅ Soft-load: لو عندنا داتا بالفعل متعملش loading true (عشان مفيش فلاش فاضي)
+    
     final hasData = state.profile != null && state.preferences != null;
     state = state.copyWith(loading: !hasData);
 
     try {
-      // 1) profile (repo نفسه cached-first)
+      
       final profile = await _repo.me(cancelToken: _loadCancel);
 
       // 2) preferences
@@ -96,7 +97,7 @@ class SettingsController extends StateNotifier<SettingsState> {
       try {
         prefs = await _repo.getPreferences(cancelToken: _loadCancel);
       } catch (_) {
-        // ✅ حافظ على الموجود بدل ما ترجع defaults لو عندنا بيانات
+        
         prefs = state.preferences ?? UserPreferences.defaults();
       }
 
@@ -110,6 +111,96 @@ class SettingsController extends StateNotifier<SettingsState> {
     }
   }
 
+  /// Upload avatar: 3-step flow
+  /// 1) Get signed upload URL from backend
+  /// 2) PUT file bytes to Supabase
+  /// 3) Confirm to backend → get new avatar_url
+  Future<bool> uploadAvatar({
+    required List<int> bytes,
+    required String contentType,
+  }) async {
+    clearMessages();
+    _avatarCancel?.cancel('superseded');
+    _avatarCancel = CancelToken();
+
+    state = state.copyWith(uploadingAvatar: true, error: null, success: null);
+
+    try {
+      // Step 1: signed upload url
+      final urlData = await _repo.getAvatarUploadUrl(
+        contentType: contentType,
+        fileSizeBytes: bytes.length,
+        cancelToken: _avatarCancel,
+      );
+
+      final uploadUrl = urlData['upload_url']?.toString() ?? '';
+      if (uploadUrl.isEmpty) throw Exception('Missing upload_url from server');
+
+      // Step 2: upload to Supabase
+      await _repo.uploadAvatarToSupabase(
+        uploadUrl: uploadUrl,
+        bytes: bytes,
+        contentType: contentType,
+        cancelToken: _avatarCancel,
+      );
+
+      // Step 3: confirm to backend
+      final newAvatarUrl = await _repo.confirmAvatarUpload(
+        cancelToken: _avatarCancel,
+      );
+
+      // Update local profile state
+      final updatedProfile = state.profile != null
+          ? UserProfile(
+              id: state.profile!.id,
+              fullName: state.profile!.fullName,
+              email: state.profile!.email,
+              avatarUrl: newAvatarUrl.isNotEmpty ? newAvatarUrl : state.profile!.avatarUrl,
+              phoneNumber: state.profile!.phoneNumber,
+              bio: state.profile!.bio,
+              studentId: state.profile!.studentId,
+              universityEmail: state.profile!.universityEmail,
+              languagePreference: state.profile!.languagePreference,
+              systemRole: state.profile!.systemRole,
+              isEmailVerified: state.profile!.isEmailVerified,
+              accountStatus: state.profile!.accountStatus,
+              createdAt: state.profile!.createdAt,
+              lastLoginAt: state.profile!.lastLoginAt,
+            )
+          : null;
+
+      // Persist to UserStorage
+      if (updatedProfile != null) {
+        final currentMe = UserStorage.meJson ?? <String, dynamic>{};
+        UserStorage.saveMe(
+          {
+            ...currentMe,
+            'user': {
+              ...(currentMe['user'] as Map<String, dynamic>? ?? {}),
+              'avatar_url': updatedProfile.avatarUrl,
+            },
+          },
+          persist: TokenStorage.isPersisted,
+        );
+      }
+
+      state = state.copyWith(
+        uploadingAvatar: false,
+        profile: updatedProfile,
+        success: 'Profile picture updated successfully',
+      );
+
+      return true;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      state = state.copyWith(
+        uploadingAvatar: false,
+        error: failure.message,
+      );
+      return false;
+    }
+  }
+
   Future<bool> saveProfile({
     required String firstName,
     required String lastName,
@@ -118,7 +209,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     required String language,
     required bool assignmentAlerts,
 
-    // Preferences (اختياري)
+    
     bool? emailNotifications,
     bool? courseUpdates,
     bool? announcementNotifications,
@@ -146,7 +237,7 @@ class SettingsController extends StateNotifier<SettingsState> {
         cancelToken: _saveCancel,
       );
 
-      // ✅ merge محافظ عالحقول اللي ممكن الباك ما يرجعهاش
+      
       final old = state.profile;
 
       final mergedProfile = UserProfile(
@@ -166,7 +257,7 @@ class SettingsController extends StateNotifier<SettingsState> {
         lastLoginAt: updatedProfile.lastLoginAt ?? old?.lastLoginAt,
       );
 
-      // ✅ حدّث UserStorage (شكل backend: { user: {...}, organizations: [...] })
+      
       final currentMe = UserStorage.meJson ?? <String, dynamic>{};
       UserStorage.saveMe(
         {
@@ -193,7 +284,7 @@ class SettingsController extends StateNotifier<SettingsState> {
       );
 
       UserPreferences savedPrefs = nextPrefs;
-      // لو endpoint مش موجود في الباك مش هنكسر
+      
       try {
         state = state.copyWith(savingPreferences: true);
         savedPrefs = await _repo.updatePreferences(
@@ -328,6 +419,7 @@ class SettingsController extends StateNotifier<SettingsState> {
   void dispose() {
     _loadCancel?.cancel('disposed');
     _saveCancel?.cancel('disposed');
+    _avatarCancel?.cancel('disposed');
     super.dispose();
   }
 }

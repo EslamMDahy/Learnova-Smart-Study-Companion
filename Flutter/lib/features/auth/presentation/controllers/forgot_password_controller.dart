@@ -20,7 +20,7 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
   AuthRepository get _repo => ref.read(authRepositoryProvider);
 
   void reset() {
-    // لا نمسح error مباشرة؛ لو موجود امسحه عبر clearError فقط
+    
     clearError();
     state = const ForgotPasswordState();
   }
@@ -39,15 +39,15 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
   Future<bool> sendResetLink(String email) async {
     final e = email.trim();
 
-    // كل محاولة جديدة: امسح error عبر clearError فقط
+    
     clearError();
 
-    // loading بدون لمس error مباشرة
+    
     state = state.copyWith(
       loading: true,
       sent: false,
       message: null,
-      lastEmail: state.lastEmail, // حافظ عليها لحد ما ننجح
+      lastEmail: state.lastEmail, 
     );
 
     if (!_looksLikeEmail(e)) {
@@ -71,7 +71,7 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
         loading: false,
         sent: true,
         message: safeMsg,
-        lastEmail: e, // ✅ خزّنه عشان resend
+        lastEmail: e, 
       );
       return true;
     } catch (err) {

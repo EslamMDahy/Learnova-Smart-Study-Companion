@@ -16,7 +16,7 @@ String _resolveOrgId(AdminDashboardState state) {
   final s = (state.organizationId ?? '').trim();
   if (s.isNotEmpty) return s;
 
-  // fallback لو محتاج UserStorage نفس منطقك - بس خليه هنا لو تحب
+  
   return '';
 }
 

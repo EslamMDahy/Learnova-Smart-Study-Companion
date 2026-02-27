@@ -1,5 +1,11 @@
 import 'dart:async';
+import 'dart:convert';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
 import 'package:dio/dio.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'package:dio/browser.dart';
 
 import '../config/env.dart';
 import '../storage/token_storage.dart';
@@ -19,17 +25,20 @@ class ApiClient {
         'Accept': 'application/json',
       },
     );
+    // Enable withCredentials so HttpOnly cookies (refresh token) are sent on web
+    (_dio.httpClientAdapter as BrowserHttpClientAdapter).withCredentials = true;
 
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          // ✅ global loading (unless silent)
+          
           GlobalLoadingBus.beginIfNeeded(options);
 
           final token = TokenStorage.token;
           if (token != null && token.trim().isNotEmpty) {
             options.headers['Authorization'] = 'Bearer ${token.trim()}';
           }
+
           handler.next(options);
         },
         onResponse: (response, handler) {
@@ -49,12 +58,16 @@ class ApiClient {
 
           final status = e.response?.statusCode;
 
-          // Refresh flow (if enabled)
+          
+          // - refresh enabled
+          // - 401/403
+          // - we currently have an access token (otherwise you're basically logged out)
+          // - not auth endpoints
+          // - not already retried
           final shouldTryRefresh =
               Env.enableRefreshToken &&
               (status == 401 || status == 403) &&
-              TokenStorage.isPersisted &&
-              TokenStorage.hasRefresh &&
+              TokenStorage.hasToken &&
               !_isAuthPath(e.requestOptions.path) &&
               !_hasAuthRetried(e.requestOptions);
 
@@ -62,10 +75,11 @@ class ApiClient {
             try {
               final newAccess = await _refreshAccessToken();
 
+              
               TokenStorage.saveSession(
                 accessToken: newAccess,
-                refreshToken: TokenStorage.refreshToken,
-                persist: true,
+                refreshToken: null,
+                persist: TokenStorage.isPersisted,
               );
 
               final retryResponse =
@@ -119,7 +133,6 @@ class ApiClient {
 
   // -------------------- public http methods --------------------
 
-  /// Matches Dio signature naming (queryParameters) to avoid friction across the app.
   Future<Response<T>> get<T>(
     String path, {
     Map<String, dynamic>? queryParameters,
@@ -242,8 +255,7 @@ class ApiClient {
     _refreshCompleter = c;
 
     try {
-      final rt = TokenStorage.refreshToken!;
-      final newToken = await _callRefreshEndpoint(rt);
+      final newToken = await _callRefreshEndpoint(); 
       c.complete(newToken);
       return newToken;
     } catch (e) {
@@ -254,43 +266,68 @@ class ApiClient {
     }
   }
 
-  Future<String> _callRefreshEndpoint(String refreshToken) async {
-    // Separate Dio to avoid interceptor recursion
-    final d = Dio(
-      BaseOptions(
-        baseUrl: Env.baseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
-        sendTimeout: const Duration(seconds: 15),
-        headers: const {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ),
-    );
+  Future<String> _callRefreshEndpoint() async {
+    // Use XHR directly instead of Dio — guarantees withCredentials=true
+    // on Flutter Web so the HttpOnly refresh cookie is always sent.
+    final url = '${Env.baseUrl}${Endpoints.refresh}';
+    final completer = Completer<String>();
 
-    final res = await d.post<Map<String, dynamic>>(
-      Endpoints.refresh,
-      data: {'refresh_token': refreshToken},
-    );
+    final xhr = html.HttpRequest()
+      ..open('POST', url)
+      ..setRequestHeader('Content-Type', 'application/json')
+      ..setRequestHeader('Accept', 'application/json')
+      ..withCredentials = true; // ← this is what sends the HttpOnly cookie
 
-    final payload = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
-    final root = (payload['data'] is Map<String, dynamic>)
-        ? (payload['data'] as Map<String, dynamic>)
-        : payload;
+    xhr.onLoad.listen((_) {
+      try {
+        final status = xhr.status ?? 0;
+        if (status < 200 || status >= 400) {
+          completer.completeError(
+            ApiException(
+              'Refresh failed: HTTP $status',
+              statusCode: status,
+              code: 'REFRESH_FAILED',
+            ),
+          );
+          return;
+        }
 
-    final newToken =
-        (root['access_token'] ?? root['token'] ?? root['accessToken'])?.toString();
+        final body = xhr.responseText ?? '';
+        // parse JSON manually
+        final decoded = _parseJsonBody(body);
+        final root = (decoded['data'] is Map)
+            ? (decoded['data'] as Map).cast<String, dynamic>()
+            : decoded;
 
-    if (newToken == null || newToken.trim().isEmpty) {
-      throw ApiException(
-        'Invalid refresh response.',
-        statusCode: res.statusCode,
-        code: 'REFRESH_INVALID',
+        final newToken = (root['access_token'] ?? root['token'] ?? root['accessToken'])?.toString();
+        if (newToken == null || newToken.trim().isEmpty) {
+          completer.completeError(
+            ApiException('Invalid refresh response.', statusCode: status, code: 'REFRESH_INVALID'),
+          );
+          return;
+        }
+        completer.complete(newToken.trim());
+      } catch (e) {
+        completer.completeError(e);
+      }
+    });
+
+    xhr.onError.listen((_) {
+      completer.completeError(
+        ApiException('Network error during token refresh.', code: 'REFRESH_NETWORK'),
       );
-    }
+    });
 
-    return newToken.trim();
+    xhr.send('{}');
+    return completer.future;
+  }
+
+  Map<String, dynamic> _parseJsonBody(String body) {
+    try {
+      return (jsonDecode(body) as Map).cast<String, dynamic>();
+    } catch (_) {
+      return <String, dynamic>{};
+    }
   }
 
   bool _hasAuthRetried(RequestOptions o) => o.extra['__authRetried'] == true;
@@ -327,13 +364,15 @@ class ApiClient {
     );
   }
 
+  
   bool _isAuthPath(String path) {
     final p = path.toLowerCase();
-    return p.contains('/login') ||
-        p.contains('/signup') ||
-        p.contains('/register') ||
-        p.contains('/refresh') ||
-        p.contains('/auth');
+    return p.endsWith(Endpoints.login.toLowerCase()) ||
+        p.endsWith(Endpoints.signup.toLowerCase()) ||
+        p.endsWith(Endpoints.refresh.toLowerCase()) ||
+        p.contains('/verify') ||
+        p.contains('/forgot') ||
+        p.contains('/reset');
   }
 
   String _pickErrorMessage(DioException e) {

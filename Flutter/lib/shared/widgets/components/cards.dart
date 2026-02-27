@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../design_tokens.dart';
 import 'badges.dart' show UpgradeTone;
@@ -10,7 +11,10 @@ class AppCardShell extends StatelessWidget {
   final BorderRadius borderRadius;
   final Color background;
   final Color borderColor;
-  final List<BoxShadow> boxShadow;
+
+  /// Optional: لو عايز تمرر shadow مخصوص من برّه
+  final List<BoxShadow>? boxShadow;
+
   final double? maxWidth;
 
   const AppCardShell({
@@ -20,18 +24,20 @@ class AppCardShell extends StatelessWidget {
     this.borderRadius = const BorderRadius.all(Radius.circular(12)),
     this.background = Colors.white,
     this.borderColor = AppColors.borderSoft,
-    this.boxShadow = const [
-      BoxShadow(
-        blurRadius: 2,
-        offset: Offset(0, 1),
-        color: AppColors.shadowSoft,
-      ),
-    ],
+    this.boxShadow,
     this.maxWidth,
   });
 
   @override
   Widget build(BuildContext context) {
+    final defaultShadow = <BoxShadow>[
+      BoxShadow(
+        blurRadius: 2,
+        offset: kIsWeb ? const Offset(0, 4) : const Offset(0, 1),
+        color: AppColors.shadowSoft,
+      ),
+    ];
+
     Widget c = Container(
       width: double.infinity,
       padding: padding,
@@ -39,7 +45,7 @@ class AppCardShell extends StatelessWidget {
         color: background,
         borderRadius: borderRadius,
         border: Border.all(color: borderColor),
-        boxShadow: boxShadow,
+        boxShadow: boxShadow ?? defaultShadow,
       ),
       child: child,
     );
@@ -54,9 +60,6 @@ class AppCardShell extends StatelessWidget {
     return c;
   }
 }
-
-
-
 
 
 /// ------------------------------------------------------------
@@ -76,10 +79,10 @@ class AppCard extends StatelessWidget {
         color: AppColors.card,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderSoft),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             blurRadius: 2,
-            offset: Offset(0, 1),
+            offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 1)),
             color: AppColors.shadowSoft,
           ),
         ],
@@ -109,7 +112,7 @@ class AppNotificationCard extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.8),
+        color: Colors.white.withValues(alpha: 0.8),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
@@ -201,11 +204,11 @@ class FigmaUmCardShell extends StatelessWidget {
       borderRadius: borderRadius,
       background: AppColors.cBg,
       borderColor: AppColors.cBorder,
-      boxShadow: const [
+      boxShadow: [
         BoxShadow(
           color: Color(0x0D000000),
           blurRadius: 2,
-          offset: Offset(0, 1),
+          offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 1)),
         ),
       ],
     );
@@ -225,11 +228,11 @@ class JrCardShell extends StatelessWidget {
       maxWidth: width,
       background: Colors.white,
       borderColor: const Color(0xFFE5E7EB),
-      boxShadow: const [
+      boxShadow: [
         BoxShadow(
           color: Color(0x0D000000),
           blurRadius: 2,
-          offset: Offset(0, 1),
+          offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 1)),
         ),
       ],
     );
@@ -267,11 +270,11 @@ class FigmaUmStatCard extends StatelessWidget {
         color: AppColors.cBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.cBorder),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             color: Color(0x0D000000),
             blurRadius: 2,
-            offset: Offset(0, 1),
+            offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 1)),
           ),
         ],
       ),
@@ -283,7 +286,7 @@ class FigmaUmStatCard extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  fontFamily: "Manrope",
+                  fontFamily: "Inter",
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                   height: 20 / 14,
@@ -307,7 +310,7 @@ class FigmaUmStatCard extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              fontFamily: "Manrope",
+              fontFamily: "Inter",
               fontSize: 24,
               fontWeight: FontWeight.w700,
               height: 32 / 24,
@@ -318,7 +321,7 @@ class FigmaUmStatCard extends StatelessWidget {
           Text(
             subtitle,
             style: TextStyle(
-              fontFamily: "Manrope",
+              fontFamily: "Inter",
               fontSize: 12,
               fontWeight: FontWeight.w500,
               height: 16 / 12,
@@ -380,9 +383,9 @@ class UpgradePlanCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             color: isPrimary
-                ? const Color(0xFF2563EB).withOpacity(0.10)
-                : const Color(0xFF0F172A).withOpacity(0.04),
-            blurRadius: 30,
+                ? const Color(0xFF2563EB).withValues(alpha: 0.10)
+                : const Color(0xFF0F172A).withValues(alpha: 0.04),
+            blurRadius: (kIsWeb ? 12 : 30),
             offset: const Offset(0, 12),
           ),
         ],

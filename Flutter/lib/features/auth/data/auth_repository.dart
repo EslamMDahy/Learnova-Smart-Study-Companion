@@ -18,7 +18,7 @@ class AuthRepository {
       LoginRequest(
         email: email.trim(),
         password: password,
-        rememberMe: persist, // ✅ NEW: map persist -> remember_me (backend)
+        rememberMe: persist, 
       ),
     );
 
@@ -28,7 +28,7 @@ class AuthRepository {
       throw Exception('Missing user in login response');
     }
 
-    // ✅ Store full user payload (expanded) from login response
+    
     final meToStore = <String, dynamic>{
       'user': res.user!.toJson(),
       'organizations': res.organizations
@@ -54,7 +54,7 @@ class AuthRepository {
     // save token (backend: access_token)
     TokenStorage.saveSession(
       accessToken: res.accessToken,
-      refreshToken: res.refreshToken,
+      refreshToken: null,
       persist: persist,
     );
   }
@@ -64,7 +64,7 @@ class AuthRepository {
     return n ?? id;
   }
 
-  /// ✅ matches backend register (no account_type, no invite_code)
+  
   Future<void> signup({
     required String fullName,
     required String email,
@@ -82,6 +82,8 @@ class AuthRepository {
   Future<String> verifyEmail(String token) {
     return _api.verifyEmail(token);
   }
+
+
 
   // ---------------- Password ----------------
 
@@ -101,7 +103,12 @@ class AuthRepository {
 
   // ---------------- Session ----------------
 
-  void logout() {
+  Future<void> logout() async {
+    try {
+      await _api.logout();
+    } catch (_) {
+      
+    }
     TokenStorage.clear();
     UserStorage.clear();
   }

@@ -11,7 +11,7 @@ class CreateOrganizationRequest {
         description = description.trim(),
         logoUrl = logoUrl?.trim();
 
-  /// ✅ Use this before calling API
+  
   void validate() {
     if (name.isEmpty) {
       throw ArgumentError('Organization name is required.');

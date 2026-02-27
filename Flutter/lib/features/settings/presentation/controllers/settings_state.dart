@@ -7,6 +7,7 @@ class SettingsState {
   final bool savingPreferences;
   final bool updatingPassword;
   final bool deleting;
+  final bool uploadingAvatar;
 
   final UserProfile? profile;
   final UserPreferences? preferences;
@@ -20,6 +21,7 @@ class SettingsState {
     this.savingPreferences = false,
     this.updatingPassword = false,
     this.deleting = false,
+    this.uploadingAvatar = false,
     this.profile,
     this.preferences,
     this.error,
@@ -32,6 +34,7 @@ class SettingsState {
     bool? savingPreferences,
     bool? updatingPassword,
     bool? deleting,
+    bool? uploadingAvatar,
     UserProfile? profile,
     UserPreferences? preferences,
     String? error,
@@ -43,6 +46,7 @@ class SettingsState {
       savingPreferences: savingPreferences ?? this.savingPreferences,
       updatingPassword: updatingPassword ?? this.updatingPassword,
       deleting: deleting ?? this.deleting,
+      uploadingAvatar: uploadingAvatar ?? this.uploadingAvatar,
       profile: profile ?? this.profile,
       preferences: preferences ?? this.preferences,
       error: error,

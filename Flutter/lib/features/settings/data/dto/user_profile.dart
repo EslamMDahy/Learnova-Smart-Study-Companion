@@ -93,8 +93,8 @@ class UserProfile {
     'full_name': fullName,
     'email': email,
     'avatar_url': avatarUrl,
-    'phone': phoneNumber,          // ✅ backend
-    'phone_number': phoneNumber,   // ✅ legacy/front convenience
+    'phone': phoneNumber,          
+    'phone_number': phoneNumber,   
     'bio': bio,
     'student_id': studentId,
     'university_email': universityEmail,

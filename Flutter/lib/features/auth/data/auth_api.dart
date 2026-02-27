@@ -21,14 +21,13 @@ class AuthApi {
     return LoginResponse.fromJson(payload);
   }
 
-  /// ✅ Now matches backend RegisterRequest:
-  /// full_name, email, password, system_role
   Future<void> signup({
     required String fullName,
     required String email,
     required String password,
     required String systemRole,
   }) async {
+    // ignore: inference_failure_on_function_invocation
     await _client.post(
       Endpoints.signup,
       data: {
@@ -72,8 +71,6 @@ class AuthApi {
     return _readMessage(res.data);
   }
 
-  // keep /me for later usage if you want, but DON'T use it in login flow
-  // ✅ Added CancelToken support for Session Bootstrap (Batch 10)
   Future<Map<String, dynamic>> me({CancelToken? cancelToken}) async {
     final res = await _client.get<Map<String, dynamic>>(
       Endpoints.me,
@@ -83,11 +80,9 @@ class AuthApi {
     return data;
   }
 
-  Future<String> refresh(String refreshToken) async {
-    final res = await _client.post<Map<String, dynamic>>(
-      Endpoints.refresh,
-      data: {"refresh_token": refreshToken},
-    );
+  
+  Future<String> refresh() async {
+    final res = await _client.post<Map<String, dynamic>>(Endpoints.refresh);
 
     final payload = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
     final root = (payload['data'] is Map<String, dynamic>)
@@ -103,6 +98,11 @@ class AuthApi {
     }
 
     return newToken.trim();
+  }
+
+  Future<void> logout() async {
+    // ignore: inference_failure_on_function_invocation
+    await _client.post(Endpoints.logout);
   }
 
   // ---------------- Helpers ----------------
