@@ -15,6 +15,8 @@ _ALLOWED_CONTENT_TYPES = {"application/pdf"}
 
 # صلاحية لينك الداونلود (ثواني)
 DOWNLOAD_URL_EXPIRES = 60 * 60  # 1 hour
+SIGNED_URL_EXPIRES_SECONDS = 60 * 60  # 1 hour
+
 
 
 def init_material_upload(*, course_id: int, module_id: int, payload, db: Session, current_user: dict):
@@ -532,3 +534,147 @@ def list_module_materials(*, course_id: int, module_id: int, db: Session, curren
 
 
 
+def get_material_download_url(*, course_id: int, module_id: int, material_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Auth basics
+    # =========================
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role not in {"instructor", "student"}:
+        raise HTTPException(status_code=403, detail="Only instructors or students can access materials")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    bucket = settings.supabase_private_bucket
+
+    # =========================
+    # 2) Fetch material + relations (must match course/module path)
+    # =========================
+    try:
+        row = db.execute(
+            text("""
+                SELECT
+                    mt.id              AS material_id,
+                    mt.storage_key     AS storage_key,
+                    mt.status          AS status,
+                    m.id               AS module_id,
+                    m.course_id        AS course_id,
+                    c.created_by       AS course_owner_id
+                FROM materials mt
+                JOIN modules m ON m.id = mt.module_id
+                JOIN courses c ON c.id = m.course_id
+                WHERE mt.id = :material_id
+                  AND mt.module_id = :module_id
+                  AND m.course_id = :course_id
+                LIMIT 1
+            """),
+            {"material_id": material_id, "module_id": module_id, "course_id": course_id},
+        ).mappings().first()
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
+
+    if not row:
+        raise HTTPException(status_code=404, detail="Material not found for this module/course")
+
+    storage_key = (row["storage_key"] or "").strip()
+    if not storage_key:
+        raise HTTPException(status_code=500, detail="Material storage_key is missing")
+
+    course_owner_id = row["course_owner_id"]
+
+    # =========================
+    # 3) Authorization
+    # =========================
+    if role == "instructor":
+        if course_owner_id != user_id:
+            raise HTTPException(status_code=403, detail="You can only access materials of your own course")
+        # Instructor allowed (no status restriction)
+    else:
+        # Student must be enrolled and allowed
+        allowed_enrollment_statuses = ("active", "completed")
+
+        try:
+            enrollment_status = db.execute(
+                text("""
+                    SELECT status
+                    FROM course_enrollments
+                    WHERE student_id = :uid
+                      AND course_id = :cid
+                    LIMIT 1
+                """),
+                {"uid": user_id, "cid": course_id},
+            ).scalar()
+        except SQLAlchemyError as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
+
+        if not enrollment_status:
+            raise HTTPException(status_code=403, detail="You are not enrolled in this course")
+
+        if enrollment_status not in allowed_enrollment_statuses:
+            raise HTTPException(status_code=403, detail=f"Enrollment status '{enrollment_status}' is not allowed")
+
+        # Student should only access "published/available" materials
+        # أنت عندك status "uploaded" شغال. لو غيرته لاحقًا عدّل هنا.
+        student_visible_status = "uploaded"
+        if (row["status"] or "").strip() != student_visible_status:
+            raise HTTPException(status_code=403, detail="Material is not available")
+
+    # =========================
+    # 4) Verify file exists in storage (no download)
+    # =========================
+    folder, filename = split_object_key(storage_key)
+    if not filename:
+        raise HTTPException(status_code=500, detail="Invalid storage_key")
+
+    try:
+        items = supabase.storage.from_(bucket).list(path=folder)
+    except Exception:
+        items = None
+
+    exists = False
+    if isinstance(items, list):
+        for it in items:
+            if isinstance(it, dict) and it.get("name") == filename:
+                exists = True
+                break
+
+    if not exists:
+        raise HTTPException(
+            status_code=400,
+            detail="File not found in storage. Please upload/confirm again.",
+        )
+
+    # =========================
+    # 5) Generate signed download URL
+    # =========================
+    download_url = None
+    try:
+        signed = supabase.storage.from_(bucket).create_signed_url(storage_key, SIGNED_URL_EXPIRES_SECONDS)
+    except Exception:
+        signed = None
+
+    if isinstance(signed, dict):
+        download_url = signed.get("signedUrl") or signed.get("signed_url") or signed.get("url")
+    else:
+        data = getattr(signed, "data", None) if signed is not None else None
+        if isinstance(data, dict):
+            download_url = data.get("signedUrl") or data.get("signed_url") or data.get("url")
+
+    if not download_url:
+        raise HTTPException(status_code=502, detail="Failed to generate signed download URL")
+
+    return {
+        "course_id": int(course_id),
+        "module_id": int(module_id),
+        "material_id": int(material_id),
+        "download_url": download_url,
+        "expires_in_seconds": SIGNED_URL_EXPIRES_SECONDS,
+    }

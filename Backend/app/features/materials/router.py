@@ -9,7 +9,8 @@ from .schemas import (
     MaterialInitUploadRequest,
     MaterialInitUploadResponse,
     MaterialConfirmUploadResponse,
-    MaterialListResponse)
+    MaterialListResponse,
+    MaterialDownloadUrlResponse)
 
 router = APIRouter(tags=["Materials"])
 
@@ -62,6 +63,23 @@ def list_module_materials(
     return service.list_module_materials(
         course_id=course_id,
         module_id=module_id,
+        db=db,
+        current_user=current_user,
+    )
+
+
+@router.get("/courses/{course_id}/modules/{module_id}/materials/{material_id}/download-url", 
+            response_model=MaterialDownloadUrlResponse,)
+def get_material_download_url(
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.get_material_download_url(
+        course_id=course_id,
+        module_id=module_id,
+        material_id=material_id,
         db=db,
         current_user=current_user,
     )
