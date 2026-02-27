@@ -8,8 +8,8 @@ from . import service
 from .schemas import (
     MaterialInitUploadRequest,
     MaterialInitUploadResponse,
-    MaterialConfirmUploadRequest,
-    MaterialConfirmUploadResponse,)
+    MaterialConfirmUploadResponse,
+    MaterialListResponse)
 
 router = APIRouter(tags=["Materials"])
 
@@ -48,3 +48,20 @@ def confirm_material_upload(
         material_id=material_id,
         db=db,
         current_user=current_user,)
+
+# =========================
+# List material metadata
+# =========================
+@router.get("/courses/{course_id}/modules/{module_id}/materials", response_model=MaterialListResponse)
+def list_module_materials(
+    course_id: int,
+    module_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    return service.list_module_materials(
+        course_id=course_id,
+        module_id=module_id,
+        db=db,
+        current_user=current_user,
+    )

@@ -5,7 +5,6 @@ from datetime import datetime, timezone
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-import re
 
 from app.core.config import settings
 from app.core.storage_utils import split_object_key, sanitize_filename
@@ -387,3 +386,149 @@ def confirm_material_upload(*, material_id: int, db: Session, current_user: dict
         "download_url": download_url,
         "download_url_expires_in": DOWNLOAD_URL_EXPIRES,
     }
+
+
+
+def list_module_materials(*, course_id: int, module_id: int, db: Session, current_user: dict):
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role not in {"instructor", "student"}:
+        raise HTTPException(status_code=403, detail="Only instructors or students can access materials")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    # =========================
+    # 1) Ensure module belongs to course + get course owner
+    # =========================
+    try:
+        row = db.execute(
+            text("""
+                SELECT
+                    m.id AS module_id,
+                    m.course_id,
+                    c.created_by
+                FROM modules m
+                JOIN courses c ON c.id = m.course_id
+                WHERE m.id = :mid
+                  AND m.course_id = :cid
+                LIMIT 1
+            """),
+            {"mid": module_id, "cid": course_id},
+        ).first()
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
+
+    if not row:
+        # يا إما module مش موجود، يا إما مش تابع للكورس ده
+        raise HTTPException(status_code=404, detail="Module not found for this course")
+
+    course_owner_id = row[2]
+
+    # =========================
+    # 2) Authorization
+    # =========================
+    if role == "instructor":
+        if course_owner_id != user_id:
+            raise HTTPException(status_code=403, detail="You can only access materials of your own course")
+
+        # instructor sees all materials (including drafts / upload states)
+        material_filter_sql = ""  # no filter
+        filter_params = {}
+
+    else:
+        # student must be enrolled and allowed
+        allowed_statuses = ("active", "completed")
+
+        try:
+            enrollment_status = db.execute(
+                text("""
+                    SELECT status
+                    FROM course_enrollments
+                    WHERE student_id = :uid
+                      AND course_id = :cid
+                    LIMIT 1
+                """),
+                {"uid": user_id, "cid": course_id},
+            ).scalar()
+        except SQLAlchemyError as e:
+            raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
+
+        if not enrollment_status:
+            raise HTTPException(status_code=403, detail="You are not enrolled in this course")
+
+        if enrollment_status not in allowed_statuses:
+            raise HTTPException(status_code=403, detail=f"Enrollment status '{enrollment_status}' is not allowed")
+
+        # student sees only published/available materials
+        # IMPORTANT: لازم تختار status value موجود فعلاً في enum عندك
+        # أنا هسميها "uploaded" هنا لأنك استخدمتها قبل كده. عدّلها لو enum عندك اسم مختلف.
+        student_visible_status = "uploaded"
+
+        material_filter_sql = "AND mt.status = CAST(:visible_status AS material_status_enum)"
+        filter_params = {"visible_status": student_visible_status}
+
+    # =========================
+    # 3) Fetch materials (metadata only)
+    # =========================
+    try:
+        materials_rows = db.execute(
+            text(f"""
+                SELECT
+                    mt.id,
+                    mt.module_id,
+                    mt.title,
+                    mt.description,
+                    mt.type,
+                    mt.file_name,
+                    mt.file_size,
+                    mt.mime_type,
+                    mt.status,
+                    mt.page_count,
+                    mt.duration_seconds,
+                    mt.uploaded_at,
+                    mt.created_at,
+                    mt.updated_at
+                FROM materials mt
+                WHERE mt.module_id = :mid
+                {material_filter_sql}
+                ORDER BY mt.created_at DESC, mt.id DESC
+            """),
+            {"mid": module_id, **filter_params},
+        ).all()
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
+
+    materials = [
+        {
+            "id": r[0],
+            "module_id": r[1],
+            "title": r[2],
+            "description": r[3],
+            "type": r[4],
+            "file_name": r[5],
+            "file_size": r[6],
+            "mime_type": r[7],
+            "status": r[8],
+            "page_count": r[9],
+            "duration_seconds": r[10],
+            "uploaded_at": r[11],
+            "created_at": r[12],
+            "updated_at": r[13],
+        }
+        for r in materials_rows
+    ]
+
+    return {
+        "course_id": course_id,
+        "module_id": module_id,
+        "materials": materials,
+    }
+
+
+
