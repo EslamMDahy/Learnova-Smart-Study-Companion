@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Optional, List
 from datetime import datetime
 from pydantic import BaseModel, Field, ConfigDict
 
@@ -27,5 +27,27 @@ class ModuleCreateResponse(BaseModel):
 
     created_at: datetime
     updated_at: datetime
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ModuleListItem(BaseModel):
+    id: int
+    course_id: int
+    title: str
+    description: Optional[str] = None
+    order_index: int
+
+    is_published: bool
+    published_at: Optional[datetime] = None
+
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(extra="forbid")
+
+class ModuleListResponse(BaseModel):
+    course_id: int
+    modules: List[ModuleListItem]
 
     model_config = ConfigDict(extra="forbid")

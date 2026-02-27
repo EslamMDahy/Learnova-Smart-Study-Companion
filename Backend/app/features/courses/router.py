@@ -15,7 +15,7 @@ from .schemas import (CourseCreateRequest,
                       CourseInvitationsListResponse,
                       CourseInviteStatus)
 
-router = APIRouter(prefix="/courses", tags=["courses"])
+router = APIRouter(prefix="/courses", tags=["Courses"])
 
 @router.post("", response_model=CourseCreateResponse, status_code=status.HTTP_201_CREATED)
 def create_course(
