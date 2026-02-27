@@ -89,3 +89,13 @@ class MaterialListResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+
+class MaterialDownloadUrlResponse(BaseModel):
+    course_id: int
+    module_id: int
+    material_id: int
+
+    download_url: str = Field(..., description="Signed download URL (private bucket)")
+    expires_in_seconds: int = Field(..., gt=0, description="Signed URL validity period in seconds")
+
+    model_config = ConfigDict(extra="forbid")
