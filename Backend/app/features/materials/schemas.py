@@ -45,11 +45,12 @@ class MaterialConfirmUploadRequest(BaseModel):
 class MaterialConfirmUploadResponse(BaseModel):
     material_id: int
     module_id: int
-    status: str  # e.g., "ready"
-    is_published: bool
-    published_at: Optional[datetime] = None
+    course_id: int
 
-    # Optional convenience for frontend demo
+    status: str
+    updated_at: datetime
+
     download_url: Optional[str] = None
+    download_url_expires_in: Optional[int] = Field(default=None, description="Seconds")
 
     model_config = ConfigDict(extra="forbid")

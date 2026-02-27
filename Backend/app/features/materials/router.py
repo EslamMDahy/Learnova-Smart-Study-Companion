@@ -37,16 +37,14 @@ def init_material_upload(
 # =========================
 # Confirm upload (by material id)
 # =========================
-# @router.post("/materials/{material_id}/confirm-upload",
-#     response_model=MaterialConfirmUploadResponse,
-#     status_code=status.HTTP_200_OK,)
-# def confirm_material_upload(
-#     material_id: int,
-#     payload: MaterialConfirmUploadRequest,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),):
-#     return service.confirm_material_upload(
-#         material_id=material_id,
-#         payload=payload,
-#         db=db,
-#         current_user=current_user,)
+@router.post("/materials/{material_id}/confirm-upload",
+    response_model=MaterialConfirmUploadResponse,
+    status_code=status.HTTP_200_OK,)
+def confirm_material_upload(
+    material_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.confirm_material_upload(
+        material_id=material_id,
+        db=db,
+        current_user=current_user,)

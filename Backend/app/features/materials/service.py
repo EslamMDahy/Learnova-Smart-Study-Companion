@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-import re
-from datetime import datetime, timezone
 from fastapi import HTTPException
-from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 from sqlalchemy import text
+from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+import re
 
 from app.core.config import settings
 from app.core.supabase_client import supabase  # عدّل import حسب مكان supabase client عندك
@@ -266,4 +266,164 @@ def init_material_upload(*, course_id: int, module_id: int, payload, db: Session
         # token/path لو schemas عندك بتعرضهم (اختياري)
         # "token": token,
         # "path": path,
+    }
+
+
+# صلاحية لينك الداونلود (ثواني)
+DOWNLOAD_URL_EXPIRES = 60 * 60  # 1 hour
+
+
+def _split_storage_key(storage_key: str):
+    """
+    Returns (folder, filename) from storage_key
+    e.g. "a/b/c/file.pdf" -> ("a/b/c", "file.pdf")
+    """
+    key = (storage_key or "").strip().strip("/")
+    if not key or "/" not in key:
+        return "", key
+    folder, filename = key.rsplit("/", 1)
+    return folder, filename
+
+
+def confirm_material_upload(*, material_id: int, db: Session, current_user: dict):
+    # =========================
+    # 1) AuthZ
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can confirm material uploads")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    bucket = settings.supabase_private_bucket
+
+    # =========================
+    # 2) Fetch material + ownership (material -> module -> course)
+    # =========================
+    mat = db.execute(
+        text("""
+            SELECT
+                mt.id AS material_id,
+                mt.module_id,
+                mt.storage_key,
+                mt.status,
+                mt.file_name,
+                m.course_id,
+                c.created_by
+            FROM materials mt
+            JOIN modules m ON m.id = mt.module_id
+            JOIN courses c ON c.id = m.course_id
+            WHERE mt.id = :mid
+            LIMIT 1
+        """),
+        {"mid": material_id},
+    ).mappings().first()
+
+    if not mat:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    if mat["created_by"] != instructor_id:
+        raise HTTPException(status_code=403, detail="You can only manage materials for your own course")
+
+    storage_key = (mat["storage_key"] or "").strip()
+    if not storage_key:
+        raise HTTPException(status_code=500, detail="Material storage_key is missing")
+
+    current_status = (mat["status"] or "").strip()
+
+    # =========================
+    # 3) Idempotency / status check
+    # =========================
+    if current_status != "draft_upload":
+        # لو بالفعل confirmed قبل كده (أو حالة تانية) رجّع 409 أو 200 حسب اللي تفضله
+        # أنا هخليه 409 عشان يبين misuse واضح
+        raise HTTPException(
+            status_code=409,
+            detail=f"Material status must be 'draft_upload' to confirm upload (current: '{current_status}')",
+        )
+
+    # =========================
+    # 4) Verify file exists in storage (no download)
+    # =========================
+    folder, expected_filename = _split_storage_key(storage_key)
+
+    try:
+        items = supabase.storage.from_(bucket).list(path=folder)
+    except Exception:
+        items = None
+
+    exists = False
+    if isinstance(items, list):
+        for it in items:
+            # غالبًا dict فيه "name"
+            if isinstance(it, dict) and it.get("name") == expected_filename:
+                exists = True
+                break
+
+    if not exists:
+        raise HTTPException(
+            status_code=400,
+            detail="Uploaded file not found in storage. Upload the file first, then confirm.",
+        )
+
+    # =========================
+    # 5) Update DB status to READY
+    # =========================
+    try:
+        row = db.execute(
+            text("""
+                UPDATE materials
+                SET
+                    status = CAST(:new_status AS material_status_enum),
+                    uploaded_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = :mid
+                RETURNING updated_at
+            """),
+            {"mid": material_id, "new_status": "uploaded"},
+        ).first()
+
+        if not row:
+            db.rollback()
+            raise HTTPException(status_code=503, detail="Failed to confirm material upload")
+
+        db.commit()
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        # مهم: ده ممكن يطلع لو READY_STATUS مش موجود في enum
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}") from e
+
+    updated_at = row[0].isoformat() if row and row[0] else datetime.now(timezone.utc).isoformat()
+
+    # =========================
+    # 6) Create signed download URL (private bucket)
+    # =========================
+    download_url = None
+    try:
+        signed = supabase.storage.from_(bucket).create_signed_url(storage_key, DOWNLOAD_URL_EXPIRES)
+    except Exception:
+        signed = None
+
+    if isinstance(signed, dict):
+        download_url = signed.get("signedUrl") or signed.get("signed_url") or signed.get("url")
+    else:
+        data = getattr(signed, "data", None) if signed is not None else None
+        if isinstance(data, dict):
+            download_url = data.get("signedUrl") or data.get("signed_url") or data.get("url")
+
+    # download_url اختياري — لو فشل، confirm نفسه يفضل ناجح
+    return {
+        "material_id": int(mat["material_id"]),
+        "module_id": int(mat["module_id"]),
+        "course_id": int(mat["course_id"]),
+        "status": "uploaded",
+        "updated_at": updated_at,
+        "download_url": download_url,
+        "download_url_expires_in": DOWNLOAD_URL_EXPIRES,
     }
