@@ -14,7 +14,6 @@ _PDF_MAX_BYTES = 50 * 1024 * 1024
 _ALLOWED_CONTENT_TYPES = {"application/pdf"}
 
 # صلاحية لينك الداونلود (ثواني)
-DOWNLOAD_URL_EXPIRES = 60 * 60  # 1 hour
 SIGNED_URL_EXPIRES_SECONDS = 60 * 60  # 1 hour
 
 
@@ -367,7 +366,7 @@ def confirm_material_upload(*, material_id: int, db: Session, current_user: dict
     # =========================
     download_url = None
     try:
-        signed = supabase.storage.from_(bucket).create_signed_url(storage_key, DOWNLOAD_URL_EXPIRES)
+        signed = supabase.storage.from_(bucket).create_signed_url(storage_key, SIGNED_URL_EXPIRES_SECONDS)
     except Exception:
         signed = None
 
@@ -386,7 +385,7 @@ def confirm_material_upload(*, material_id: int, db: Session, current_user: dict
         "status": "uploaded",
         "updated_at": updated_at,
         "download_url": download_url,
-        "download_url_expires_in": DOWNLOAD_URL_EXPIRES,
+        "SIGNED_URL_EXPIRES_SECONDS_in": SIGNED_URL_EXPIRES_SECONDS,
     }
 
 
