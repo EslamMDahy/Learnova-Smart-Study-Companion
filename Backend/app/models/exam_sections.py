@@ -7,7 +7,8 @@ from sqlalchemy import (
     Text,
     ForeignKey,
     Enum as SQLEnum,
-    Index
+    Index,
+    CheckConstraint
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
@@ -45,12 +46,23 @@ class ExamSection(Base):
         default=0
     )
 
-    topic_id: Mapped[int] = mapped_column(
-        ForeignKey("topics.id", ondelete="RESTRICT"),
-        nullable=False,
+    topic_id: Mapped[int | None] = mapped_column(
+        ForeignKey("topics.id", ondelete="SET NULL"),
+        nullable=True,
         index=True
     )
 
+    module_id: Mapped[int | None] = mapped_column(
+        ForeignKey("modules.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+
+    material_id: Mapped[int | None] = mapped_column(
+        ForeignKey("materials.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
     difficulty: Mapped[ExamSectionDifficulty | None] = mapped_column(
         SQLEnum(
             ExamSectionDifficulty,
@@ -80,11 +92,22 @@ class ExamSection(Base):
     )
 
     __table_args__ = (
+        CheckConstraint(
+            "(topic_id IS NOT NULL) OR (module_id IS NOT NULL) OR (material_id IS NOT NULL)",
+            name="ck_exam_sections_scope_required"
+        ),
         # unique (exam_id, order_index)
         Index(
             "uq_exam_sections_exam_order",
             "exam_id",
             "order_index",
             unique=True
+        ),
+        Index(
+            "ix_exam_sections_exam_scope",
+            "exam_id",
+            "topic_id",
+            "module_id",
+            "material_id"
         ),
     )

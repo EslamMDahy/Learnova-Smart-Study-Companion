@@ -37,8 +37,6 @@ from .practice_answers import PracticeAnswer
 from .practice_sessions import PracticeSession
 
 from .question import Question
-from .question_bank import QuestionBank
-from .question_option import QuestionOption
 from .question_recommendations import QuestionRecommendation
 from .question_tags import QuestionTag
 
