@@ -49,3 +49,10 @@ class ResetPasswordRequest(BaseModel):
 class ResetPasswordResponse(BaseModel):
     message: str
 
+
+
+class CheckEmailVerifiedRequest(BaseModel):
+    email: EmailStr
+
+class CheckEmailVerifiedResponse(BaseModel):
+    is_verified: bool

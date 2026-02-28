@@ -54,11 +54,6 @@ class LearningRecommendation(Base):
         index=True
     )
 
-    target_question_bank_id: Mapped[int | None] = mapped_column(
-        ForeignKey("question_banks.id", ondelete="SET NULL"),
-        nullable=True
-    )
-
     priority: Mapped[int] = mapped_column(
         Integer,
         default=1

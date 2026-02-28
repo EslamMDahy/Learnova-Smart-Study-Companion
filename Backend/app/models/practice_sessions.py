@@ -32,9 +32,24 @@ class PracticeSession(Base):
         nullable=False
     )
 
-    question_bank_id: Mapped[int] = mapped_column(
-        ForeignKey("question_banks.id", ondelete="CASCADE"),
-        nullable=False
+
+    # Optional scope filters for this session (question bank = course questions filtered)
+    module_id: Mapped[int | None] = mapped_column(
+        ForeignKey("modules.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+
+    topic_id: Mapped[int | None] = mapped_column(
+        ForeignKey("topics.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+
+    material_id: Mapped[int | None] = mapped_column(
+        ForeignKey("materials.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
     )
 
     session_type: Mapped[PracticeSessionType] = mapped_column(
@@ -90,5 +105,5 @@ class PracticeSession(Base):
 
     __table_args__ = (
         Index("ix_practice_sessions_student_course_started", "student_id", "course_id", "started_at"),
-        Index("ix_practice_sessions_bank_started", "question_bank_id", "started_at"),
-    )
+        Index("ix_practice_sessions_course_scope_started", "course_id", "module_id", "topic_id", "material_id", "started_at"),
+            )
