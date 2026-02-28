@@ -992,3 +992,28 @@ def reset_password(payload, db):
     db.commit()
 
     return {"message": "Password reset successfully"}    
+
+def check_email_verified(payload, db: Session) -> dict:
+    """
+    Check if a user's email address is verified.
+
+    Security notes:
+    - Returns { is_verified: false } for unknown emails (does NOT reveal if email exists).
+    - No authentication required — used by unverified users who can't log in.
+    - Rate limiting should be applied at the API gateway / reverse proxy level.
+    """
+    row = db.execute(
+        text("""
+            SELECT is_email_verified
+            FROM users
+            WHERE email = :email
+        """),
+        {"email": payload.email},
+    ).first()
+
+    # Unknown email → return false (don't reveal existence)
+    if row is None:
+        return {"is_verified": False}
+
+    (is_verified,) = row
+    return {"is_verified": bool(is_verified)}
