@@ -1,8 +1,8 @@
-"""edit on Question bank flow
+"""new tables
 
-Revision ID: 03c5b453fd61
+Revision ID: 5e2e2c8b0b06
 Revises: 
-Create Date: 2026-02-28 07:07:56.194942
+Create Date: 2026-02-28 20:53:11.490849
 
 """
 from typing import Sequence, Union
@@ -12,7 +12,7 @@ import sqlalchemy as sa
 
 
 # revision identifiers, used by Alembic.
-revision: str = '03c5b453fd61'
+revision: str = '5e2e2c8b0b06'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -539,9 +539,6 @@ def upgrade() -> None:
     sa.Column('thumbnail_key', sa.String(length=1024), nullable=True),
     sa.Column('mime_type', sa.String(length=100), nullable=True),
     sa.Column('status', sa.Enum('draft_upload', 'uploaded', 'processing', 'ready', 'error', name='material_status_enum'), nullable=False),
-    sa.Column('text_extracted', sa.Boolean(), nullable=False),
-    sa.Column('transcript_text', sa.Text(), nullable=True),
-    sa.Column('extracted_text', sa.Text(), nullable=True),
     sa.Column('duration_seconds', sa.Integer(), nullable=True),
     sa.Column('page_count', sa.Integer(), nullable=True),
     sa.Column('dimensions', sa.JSON(), nullable=True),

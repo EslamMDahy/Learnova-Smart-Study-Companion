@@ -120,7 +120,6 @@ def init_material_upload(*, course_id: int, module_id: int, payload, db: Session
                     storage_key,
                     mime_type,
                     status,
-                    text_extracted,
                     is_ai_processed,
                     uploaded_by,
                     uploaded_at,
@@ -137,7 +136,6 @@ def init_material_upload(*, course_id: int, module_id: int, payload, db: Session
                     :storage_key,
                     :mime_type,
                     CAST(:status AS material_status_enum),
-                    FALSE,
                     FALSE,
                     :uploaded_by,
                     NOW(),
@@ -385,7 +383,7 @@ def confirm_material_upload(*, material_id: int, db: Session, current_user: dict
         "status": "uploaded",
         "updated_at": updated_at,
         "download_url": download_url,
-        "SIGNED_URL_EXPIRES_SECONDS_in": SIGNED_URL_EXPIRES_SECONDS,
+        "download_url_expires_in": SIGNED_URL_EXPIRES_SECONDS,
     }
 
 
