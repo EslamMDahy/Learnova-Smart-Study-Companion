@@ -36,11 +36,11 @@ class MaterialInitUploadResponse(BaseModel):
 
 
 
-class MaterialConfirmUploadRequest(BaseModel):
-    # decide publish here (your preference)
-    # publish_now: bool = Field(default=False)
+# class MaterialConfirmUploadRequest(BaseModel):
+#     # decide publish here (your preference)
+#     # publish_now: bool = Field(default=False)
 
-    model_config = ConfigDict(extra="forbid")
+#     model_config = ConfigDict(extra="forbid")
 
 class MaterialConfirmUploadResponse(BaseModel):
     material_id: int

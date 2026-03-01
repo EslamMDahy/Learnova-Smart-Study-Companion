@@ -19,8 +19,8 @@ router = APIRouter(tags=["Materials"])
 # Init upload (nested under course + module)
 # =========================
 @router.post("/courses/{course_id}/modules/{module_id}/materials/init-upload",
-    response_model=MaterialInitUploadResponse,
-    status_code=status.HTTP_201_CREATED,)
+             response_model=MaterialInitUploadResponse,
+             status_code=status.HTTP_201_CREATED,)
 def init_material_upload(
     course_id: int,
     module_id: int,
@@ -39,8 +39,8 @@ def init_material_upload(
 # Confirm upload (by material id)
 # =========================
 @router.post("/materials/{material_id}/confirm-upload",
-    response_model=MaterialConfirmUploadResponse,
-    status_code=status.HTTP_200_OK,)
+             response_model=MaterialConfirmUploadResponse,
+             status_code=status.HTTP_200_OK,)
 def confirm_material_upload(
     material_id: int,
     db: Session = Depends(get_db),
@@ -53,13 +53,13 @@ def confirm_material_upload(
 # =========================
 # List material metadata
 # =========================
-@router.get("/courses/{course_id}/modules/{module_id}/materials", response_model=MaterialListResponse)
+@router.get("/courses/{course_id}/modules/{module_id}/materials", 
+            response_model=MaterialListResponse)
 def list_module_materials(
     course_id: int,
     module_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),
-):
+    current_user: dict = Depends(get_current_user),):
     return service.list_module_materials(
         course_id=course_id,
         module_id=module_id,
@@ -81,5 +81,4 @@ def get_material_download_url(
         module_id=module_id,
         material_id=material_id,
         db=db,
-        current_user=current_user,
-    )
+        current_user=current_user,)

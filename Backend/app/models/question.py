@@ -11,6 +11,7 @@ from sqlalchemy import (
     CheckConstraint
 )
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 
 from app.db.base import Base
@@ -37,12 +38,6 @@ class Question(Base):
         index=True
     )
 
-    topic_id: Mapped[int | None] = mapped_column(
-        ForeignKey("topics.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True
-    )
-
     module_id: Mapped[int | None] = mapped_column(
         ForeignKey("modules.id", ondelete="CASCADE"),
         nullable=True,
@@ -51,6 +46,12 @@ class Question(Base):
 
     material_id: Mapped[int | None] = mapped_column(
         ForeignKey("materials.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+
+    topic_id: Mapped[int | None] = mapped_column(
+        ForeignKey("topics.id", ondelete="CASCADE"),
         nullable=True,
         index=True
     )
@@ -73,7 +74,7 @@ class Question(Base):
     # For choice-based questions (mcq, multi_select, true_false, etc.)
     # Example: [{"option_text": "...", "is_correct": true, "order_index": 0, "explanation": "..."}]
     options: Mapped[list | None] = mapped_column(
-        JSON,
+        JSONB,
         nullable=True
     )
 
@@ -182,7 +183,8 @@ class Question(Base):
         Index("ix_questions_course_material", "course_id", "material_id"),
         # Ensure question is attached to at least a topic or a module
         CheckConstraint(
-            "(topic_id IS NOT NULL) OR (module_id IS NOT NULL) OR (material_id IS NOT NULL)",
+            "(topic_id IS NOT NULL) OR (module_id IS NOT NULL) OR (material_id IS NOT NULL) "
+            "OR (topic_id IS NULL AND module_id IS NULL AND material_id IS NULL)",
             name="ck_questions_scope_required"
         ),
     )

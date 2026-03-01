@@ -95,20 +95,20 @@ class Material(Base):
     )
 
     # AI pipeline fields (keep them, you can simplify later)
-    text_extracted: Mapped[bool] = mapped_column(
-        Boolean,
-        default=False,
-    )
+    # text_extracted: Mapped[bool] = mapped_column(
+    #     Boolean,
+    #     default=False,
+    # )
 
-    transcript_text: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-    )
+    # transcript_text: Mapped[str | None] = mapped_column(
+    #     Text,
+    #     nullable=True,
+    # )
 
-    extracted_text: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True,
-    )
+    # extracted_text: Mapped[str | None] = mapped_column(
+    #     Text,
+    #     nullable=True,
+    # )
 
     duration_seconds: Mapped[int | None] = mapped_column(
         Integer,

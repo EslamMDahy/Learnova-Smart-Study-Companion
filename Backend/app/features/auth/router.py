@@ -25,10 +25,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)):
     return service.register_user(payload, db)
 
 @router.post("/send-verification-email", response_model=SendVerificationEmailResponse)
-def send_verification_email(
-    payload: SendVerificationEmailRequest,
-    db: Session = Depends(get_db),
-):
+def send_verification_email(payload: SendVerificationEmailRequest, db: Session = Depends(get_db),):
     return service.send_verification_email(payload, db)
 
 @router.get("/verify-email")
@@ -36,10 +33,7 @@ def verify_email(token: str = Query(...), db: Session = Depends(get_db)):
     return service.verify_email_token(token, db)
 
 @router.post("/check-email-verified", response_model=CheckEmailVerifiedResponse)
-def check_email_verified(
-    payload: CheckEmailVerifiedRequest,
-    db: Session = Depends(get_db),
-):
+def check_email_verified(payload: CheckEmailVerifiedRequest, db: Session = Depends(get_db),):
     """
     Check if a user's email is verified without requiring authentication.
     Used by the 'I've Verified, Continue' button on the verify-email-sent screen.
@@ -51,6 +45,10 @@ def check_email_verified(
 def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)):
     return service.login_user(payload, db, response=response)
 
+@router.get("/me")
+def me(user=Depends(get_current_user)):
+    return {"user": user}
+
 @router.post("/refresh")
 def refresh_token(request: Request, response: Response, db: Session = Depends(get_db)):
     return service.refresh_access_token(db=db, request=request, response=response)
@@ -59,15 +57,8 @@ def refresh_token(request: Request, response: Response, db: Session = Depends(ge
 def logout(request: Request, response: Response, db: Session = Depends(get_db)):
     return service.logout_user(db=db, request=request, response=response)
 
-@router.get("/me")
-def me(user=Depends(get_current_user)):
-    return {"user": user}
-
 @router.post("/forgot-password", response_model=ForgetPasswordResponse)
-def forget_password(
-    payload: ForgetPasswordRequest,
-    db: Session = Depends(get_db),
-):
+def forget_password(payload: ForgetPasswordRequest, db: Session = Depends(get_db),):
     return service.forget_password_request(payload, db)
 
 @router.post("/reset-password", response_model=ResetPasswordResponse)
