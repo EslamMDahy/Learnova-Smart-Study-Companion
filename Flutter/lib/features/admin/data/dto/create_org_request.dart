@@ -23,9 +23,9 @@ class CreateOrganizationRequest {
 
   Map<String, dynamic> toJson() {
     return {
-      "name": name,
-      "description": description,
-      if (logoUrl != null && logoUrl!.isNotEmpty) "logo_url": logoUrl,
+      'name': name,
+      'description': description,
+      if (logoUrl != null && logoUrl!.isNotEmpty) 'logo_url': logoUrl,
     };
   }
 }

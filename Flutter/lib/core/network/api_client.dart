@@ -66,7 +66,7 @@ class ApiClient {
           // - not already retried
           final shouldTryRefresh =
               Env.enableRefreshToken &&
-              (status == 401 || status == 403) &&
+              status == 401 &&
               TokenStorage.hasToken &&
               !_isAuthPath(e.requestOptions.path) &&
               !_hasAuthRetried(e.requestOptions);
@@ -78,9 +78,9 @@ class ApiClient {
               
               TokenStorage.saveSession(
                 accessToken: newAccess,
-                refreshToken: null,
                 persist: TokenStorage.isPersisted,
               );
+              scheduleProactiveRefresh(newAccess); // reschedule after reactive refresh
 
               final retryResponse =
                   await _retryWithNewToken(e.requestOptions, newAccess);
@@ -130,6 +130,76 @@ class ApiClient {
   }
 
   final Dio _dio;
+
+  // -------------------- proactive refresh timer --------------------
+  // Fires 2 min before the access token expires so the user is NEVER
+  // interrupted by an expired-token 401 during active use.
+  // On each successful reactive refresh we also reschedule the timer.
+
+  Timer? _proactiveTimer;
+
+  /// Call once after login / bootstrap with the raw JWT string so the timer
+  /// knows when to schedule the silent refresh.
+  void scheduleProactiveRefresh(String accessToken) {
+    _proactiveTimer?.cancel();
+    try {
+      // Decode expiry without verifying signature (client-side only).
+      final parts = accessToken.split('.');
+      if (parts.length != 3) return;
+
+      // Base64url → base64 padding
+      String pad(String s) {
+        final rem = s.length % 4;
+        return rem == 0 ? s : s + '=' * (4 - rem);
+      }
+
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(pad(parts[1]))),
+      ) as Map<String, dynamic>;
+
+      final exp = payload['exp'];
+      if (exp == null) return;
+
+      final expiry = DateTime.fromMillisecondsSinceEpoch(
+        (exp as num).toInt() * 1000,
+        isUtc: true,
+      );
+      final now = DateTime.now().toUtc();
+
+      // Fire 2 minutes before expiry. If already within 2 min → fire in 5 s.
+      final fireIn = expiry
+          .subtract(const Duration(minutes: 2))
+          .difference(now);
+      final delay = fireIn.isNegative
+          ? const Duration(seconds: 5)
+          : fireIn;
+
+      _proactiveTimer = Timer(delay, _proactiveRefresh);
+    } catch (_) {
+      // If we can't parse the token just let the reactive interceptor handle it.
+    }
+  }
+
+  void cancelProactiveRefresh() {
+    _proactiveTimer?.cancel();
+    _proactiveTimer = null;
+  }
+
+  Future<void> _proactiveRefresh() async {
+    if (!TokenStorage.hasToken) return;
+    try {
+      final newToken = await _refreshAccessToken();
+      TokenStorage.saveSession(
+        accessToken: newToken,
+        persist: TokenStorage.isPersisted,
+      );
+      // Reschedule for the new token.
+      scheduleProactiveRefresh(newToken);
+    } catch (_) {
+      // Proactive refresh failed — the reactive interceptor will catch the
+      // eventual 401. Don't log the user out here.
+    }
+  }
 
   // -------------------- public http methods --------------------
 

@@ -107,11 +107,10 @@ class AppNotifIconButton extends StatelessWidget {
       child: InkWell(
         onTap: onTap ??
             () {
-              AppToast.show(
+              AppToast.info(
                 context,
                 title: 'Coming soon',
                 message: 'Notifications coming soon',
-                icon: Icons.info_rounded,
               );
             },
         borderRadius: BorderRadius.circular(8),
@@ -180,7 +179,7 @@ class AppSidebar extends StatelessWidget {
     required this.mainItems,
     required this.bottomItems,
     this.brandTitle = 'Learnova',
-    this.logoAssetPath = 'assets/logo.png',
+    this.logoAssetPath = 'assets/logo.webp',
     this.onBrandTap,
   });
 
@@ -197,7 +196,7 @@ class AppSidebar extends StatelessWidget {
         decoration: const BoxDecoration(
           color: Colors.white,
           border: Border(
-            right: BorderSide(color: _rightBorder, width: 1),
+            right: BorderSide(color: _rightBorder),
           ),
         ),
         child: SafeArea(
@@ -265,7 +264,7 @@ class AppSidebar extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.fromLTRB(10, 10, 10, 14),
                 decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: _divider, width: 1)),
+                  border: Border(top: BorderSide(color: _divider)),
                 ),
                 child: Column(
                   children: [
@@ -326,7 +325,7 @@ class _AppSidebarBrandHeader extends StatelessWidget {
               decoration: BoxDecoration(
                 color: _logoBg,
                 borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: _logoBorder, width: 1),
+                border: Border.all(color: _logoBorder),
               ),
               child: Padding(
                 padding: const EdgeInsets.all(5),
@@ -1592,13 +1591,11 @@ class AppLogoUrlUploader extends StatelessWidget {
           ElevatedButton(
             onPressed: onUploadPressed ??
                 () {
-                  final messenger = ScaffoldMessenger.maybeOf(context);
-                  messenger?.showSnackBar(
-                    const SnackBar(
-                      content: Text('Upload coming soon (use URL for now).'),
-                      behavior: SnackBarBehavior.floating,
-                    ),
-                  );
+                  AppToast.info(
+                  context,
+                  title: 'Coming soon',
+                  message: 'Upload coming soon — use URL for now.',
+                );
                 },
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.primary,
@@ -2187,7 +2184,7 @@ class JrEmptyTableState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const FigmaUmEmptyTableState(
-      message: "No pending join requests right now.",
+      message: 'No pending join requests right now.',
     );
   }
 }

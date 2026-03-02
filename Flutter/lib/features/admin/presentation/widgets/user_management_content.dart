@@ -26,7 +26,7 @@ class UserManagementContent extends ConsumerStatefulWidget {
     super.key,
     String? organizationId,
     String? orgId, 
-  }) : organizationId = (organizationId ?? orgId);
+  }) : organizationId = organizationId ?? orgId;
 
   @override
   ConsumerState<UserManagementContent> createState() =>
@@ -34,8 +34,8 @@ class UserManagementContent extends ConsumerStatefulWidget {
 }
 
 class _UserManagementContentState extends ConsumerState<UserManagementContent> {
-  String selectedRole = "All Roles";
-  String selectedStatus = "All Status";
+  String selectedRole = 'All Roles';
+  String selectedStatus = 'All Status';
   final _search = TextEditingController();
   Timer? _searchDebounce;
 
@@ -63,26 +63,29 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (!mounted) return;
 
-          AppToast.show(
+          AppToast.error(
             context,
-            title: "Something went wrong",
+            title: 'Something went wrong',
             message: err,
-            icon: Icons.warning_amber_rounded,
           );
 
           ref.read(userManagementControllerProvider.notifier).clearError();
+          _lastToastMsg = null; // allow same error to re-surface on next occurrence
         });
       },
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
       if (_orgId.isEmpty) {
-        if (!mounted) return;
-        AppToast.show(
+        // Show warning only after a brief delay to allow AdminDashboardController
+        // to finish its own loading — avoids false warnings for users who do have an org.
+        await Future.delayed(const Duration(milliseconds: 400));
+        if (!mounted || _orgId.isNotEmpty) return;
+        AppToast.warning(
           context,
-          title: "Action needed",
-          message: "Create/select an organization first.",
-          icon: Icons.lock_outline_rounded,
+          title: 'Action needed',
+          message: 'Create/select an organization first.',
         );
         return;
       }
@@ -116,9 +119,9 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const AppSectionHeader(
-                    title: "User Management",
+                    title: 'User Management',
                     subtitle:
-                        "Manage student and instructor accounts, roles, and permissions.",
+                        'Manage student and instructor accounts, roles, and permissions.',
                   ),
                   const SizedBox(height: 24),
 
@@ -141,11 +144,10 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                     onRoleChanged: (v) => setState(() => selectedRole = v),
                     onStatusChanged: (v) => setState(() => selectedStatus = v),
                     onMoreFilters: () {
-                      AppToast.show(
+                      AppToast.info(
                         context,
-                        title: "Coming soon",
-                        message: "More filters will be available soon.",
-                        icon: Icons.info_outline,
+                        title: 'Coming soon',
+                        message: 'More filters will be available soon.',
                       );
                     },
                     onRefresh: _orgId.isEmpty
@@ -176,11 +178,10 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                         : () => ref.read(userManagementControllerProvider.notifier)
                             .refresh(),
                     onActionTap: () {
-                      AppToast.show(
+                      AppToast.info(
                         context,
-                        title: "Coming soon",
-                        message: "User actions menu is coming soon.",
-                        icon: Icons.info_outline,
+                        title: 'Coming soon',
+                        message: 'User actions menu is coming soon.',
                       );
                     },
                   ),
@@ -195,10 +196,10 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
     final q = _search.text.trim().toLowerCase();
 
     return users.where((u) {
-      final roleOk = selectedRole == "All Roles" ||
+      final roleOk = selectedRole == 'All Roles' ||
           u.systemRole.toLowerCase() == selectedRole.toLowerCase();
 
-      final statusOk = selectedStatus == "All Status" ||
+      final statusOk = selectedStatus == 'All Status' ||
           _normalizeStatus(u.status) == _normalizeStatus(selectedStatus);
 
       final searchOk = q.isEmpty ||
@@ -231,86 +232,44 @@ class _StatsRow extends StatelessWidget {
     final total = users.length;
     final instructors = users.where((e) {
       final r = e.systemRole.toLowerCase();
-      return r == "teacher" || r == "instructor";
+      return r == 'teacher' || r == 'instructor';
     }).length;
     final students =
-        users.where((e) => e.systemRole.toLowerCase() == "student").length;
-    final pending = users.where((e) => e.status.toLowerCase() == "pending").length;
+        users.where((e) => e.systemRole.toLowerCase() == 'student').length;
+    final pending = users.where((e) => e.status.toLowerCase() == 'pending').length;
 
-    // ignore: unused_local_variable
-    final cards = [
-      const FigmaUmStatCard(
-        title: "Total Users",
-        value: "0",
-        subtitle: "+12% from last month",
-        subtitleColor: Color(0xFF16A34A),
-        iconBg: Color(0x1A137FEC),
-        icon: Icons.people_alt_outlined,
-        iconColor: Color(0xFF137FEC),
-      ),
-      const FigmaUmStatCard(
-        title: "Active Instructors",
-        value: "0",
-        subtitle: "Across 12 Departments",
-        subtitleColor: AppColors.cGray500,
-        iconBg: Color(0xFFFAF5FF),
-        icon: Icons.school_outlined,
-        iconColor: Color(0xFF9333EA),
-      ),
-      const FigmaUmStatCard(
-        title: "Active Students",
-        value: "0",
-        subtitle: "+5% new enrollments",
-        subtitleColor: Color(0xFF16A34A),
-        iconBg: Color(0xFFFFF7ED),
-        icon: Icons.groups_outlined,
-        iconColor: Color(0xFFEA580C),
-      ),
-      FigmaUmStatCard(
-        title: "Pending Approvals",
-        value: "$pending",
-        subtitle: "Requires attention",
-        subtitleColor: const Color(0xFFCA8A04),
-        iconBg: const Color(0xFFFEFCE8),
-        icon: Icons.hourglass_bottom_rounded,
-        iconColor: const Color(0xFFCA8A04),
-        fixedWidth: isNarrow ? null : 319,
-      ),
-    ];
-
-    
     final updated = [
       FigmaUmStatCard(
-        title: "Total Users",
-        value: "$total",
-        subtitle: "+12% from last month",
+        title: 'Total Users',
+        value: '$total',
+        subtitle: '+12% from last month',
         subtitleColor: const Color(0xFF16A34A),
         iconBg: const Color(0x1A137FEC),
         icon: Icons.people_alt_outlined,
         iconColor: const Color(0xFF137FEC),
       ),
       FigmaUmStatCard(
-        title: "Active Instructors",
-        value: "$instructors",
-        subtitle: "Across 12 Departments",
+        title: 'Active Instructors',
+        value: '$instructors',
+        subtitle: 'Across 12 Departments',
         subtitleColor: AppColors.cGray500,
         iconBg: const Color(0xFFFAF5FF),
         icon: Icons.school_outlined,
         iconColor: const Color(0xFF9333EA),
       ),
       FigmaUmStatCard(
-        title: "Active Students",
-        value: "$students",
-        subtitle: "+5% new enrollments",
+        title: 'Active Students',
+        value: '$students',
+        subtitle: '+5% new enrollments',
         subtitleColor: const Color(0xFF16A34A),
         iconBg: const Color(0xFFFFF7ED),
         icon: Icons.groups_outlined,
         iconColor: const Color(0xFFEA580C),
       ),
       FigmaUmStatCard(
-        title: "Pending Approvals",
-        value: "$pending",
-        subtitle: "Requires attention",
+        title: 'Pending Approvals',
+        value: '$pending',
+        subtitle: 'Requires attention',
         subtitleColor: const Color(0xFFCA8A04),
         iconBg: const Color(0xFFFEFCE8),
         icon: Icons.hourglass_bottom_rounded,
@@ -412,7 +371,7 @@ class _UsersTableFigma extends StatelessWidget {
           ), 
 
           FigmaUmTableFooter(
-            showingText: "Showing $from-$safeTo of $total users",
+            showingText: 'Showing $from-$safeTo of $total users',
             onPrev: onPrev,
             onNext: onNext,
           ),
@@ -473,7 +432,7 @@ class _UserRowFigma extends StatelessWidget {
                       child: Text(
                         _initials(user.fullName),
                         style: const TextStyle(
-                          fontFamily: "Inter",
+                          fontFamily: 'Inter',
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           height: 20 / 14,
@@ -491,7 +450,7 @@ class _UserRowFigma extends StatelessWidget {
                             user.fullName,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontFamily: "Inter",
+                              fontFamily: 'Inter',
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               height: 20 / 14,
@@ -503,7 +462,7 @@ class _UserRowFigma extends StatelessWidget {
                             user.email,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontFamily: "Inter",
+                              fontFamily: 'Inter',
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
                               height: 16 / 12,
@@ -512,9 +471,9 @@ class _UserRowFigma extends StatelessWidget {
                           ),
                           const SizedBox(height: 2),
                           const Text(
-                            "ID: —",
+                            'ID: —',
                             style: TextStyle(
-                              fontFamily: "Inter",
+                              fontFamily: 'Inter',
                               fontSize: 10,
                               fontWeight: FontWeight.w400,
                               height: 20 / 10,
@@ -546,10 +505,10 @@ class _UserRowFigma extends StatelessWidget {
                 child: Padding(
                   padding: EdgeInsets.only(left: _kCellLeftPad),
                   child: Text(
-                    "—",
+                    '—',
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: "Inter",
+                      fontFamily: 'Inter',
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
                       height: 20 / 14,
@@ -565,10 +524,10 @@ class _UserRowFigma extends StatelessWidget {
                 child: Padding(
                   padding: EdgeInsets.only(left: _kCellLeftPad),
                   child: Text(
-                    "—",
+                    '—',
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: "Inter",
+                      fontFamily: 'Inter',
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
                       height: 16 / 12,
@@ -612,11 +571,11 @@ class _UserRowFigma extends StatelessWidget {
   }
 
   static String _initials(String name) {
-    final parts = name.trim().split(RegExp(r"\s+"));
-    if (parts.isEmpty) return "—";
-    final a = parts[0].isNotEmpty ? parts[0][0] : "";
-    final b = parts.length > 1 && parts[1].isNotEmpty ? parts[1][0] : "";
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty) return '—';
+    final a = parts[0].isNotEmpty ? parts[0][0] : '';
+    final b = parts.length > 1 && parts[1].isNotEmpty ? parts[1][0] : '';
     final res = (a + b).toUpperCase();
-    return res.isEmpty ? "—" : res;
+    return res.isEmpty ? '—' : res;
   }
 }

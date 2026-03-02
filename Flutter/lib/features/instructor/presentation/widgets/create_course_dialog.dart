@@ -9,7 +9,7 @@ class CreateCourseDialogResult {
   const CreateCourseDialogResult({required this.request, required this.needsInvites});
 }
 
-// ── Design tokens (مطابق للبروتوتايب) ─────────────────────────────────────────
+// ── Design tokens (matches the prototype) ─────────────────────────────────────────
 class _K {
   static const pageBg   = Color(0xFFF6F7F8);
   static const white    = Colors.white;
@@ -67,8 +67,10 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
     final tErr = t.isEmpty ? 'Course title is required.' : null;
     String? cErr;
     if (c.isNotEmpty) {
-      if (c.length < 2 || c.length > 31)       cErr = 'Course code must be 2–31 characters.';
-      else if (!_codeRx.hasMatch(c))            cErr = 'Use letters/numbers and - _ / only.';
+      if (c.length < 2 || c.length > 31) {
+        cErr = 'Course code must be 2–31 characters.';
+      // ignore: curly_braces_in_flow_control_structures
+      } else if (!_codeRx.hasMatch(c))            cErr = 'Use letters/numbers and - _ / only.';
     }
     if (tErr == _titleError && cErr == _codeError) return;
     if (!mounted) return;
@@ -80,7 +82,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
   void _submit() {
     _validate();
     if (!_canSubmit) {
-      AppToast.show(context, title: 'Error', message: _titleError ?? _codeError ?? 'Fix highlighted fields.', icon: Icons.error_rounded);
+      AppToast.error(context, title: 'Validation Error', message: _titleError ?? _codeError ?? 'Fix highlighted fields.');
       return;
     }
     final isPublic = _visibility == _VisibilityChoice.publicCourse;
@@ -151,7 +153,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
                 _FormGroup(label: 'Course Description', child: _TextArea(controller: _desc)),
                 // AI Tip
                 const SizedBox(height: 8),
-                Row(children: const [
+                const Row(children: [
                   Icon(Icons.auto_awesome_rounded, size: 13, color: _K.blue),
                   SizedBox(width: 6),
                   Text('AI Tip: A detailed description helps generate better quiz questions.',
@@ -370,7 +372,7 @@ class _TextArea extends StatelessWidget {
           height: 40,
           color: const Color(0xFFFAFBFC),
           padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(children: const [
+          child: const Row(children: [
             _TbBtn(label: 'B', bold: true),
             _TbBtn(label: 'I', italic: true),
             _TbBtn(label: '≡'),
@@ -400,7 +402,7 @@ class _TbBtn extends StatelessWidget {
   final String label; final bool bold; final bool italic;
   const _TbBtn({required this.label, this.bold = false, this.italic = false});
   @override
-  Widget build(BuildContext context) => Container(
+  Widget build(BuildContext context) => SizedBox(
     width: 28, height: 28,
     child: Center(child: Text(label, style: TextStyle(
       fontSize: 12.5, fontWeight: bold ? FontWeight.w900 : FontWeight.w500,
@@ -480,8 +482,7 @@ class _CoverUploadState extends State<_CoverUpload> {
         color: _h ? _K.blueSoft : const Color(0xFFFAFBFC),
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: _h ? _K.blue : _K.border,
-          style: BorderStyle.solid, width: 1.5,
+          color: _h ? _K.blue : _K.border, width: 1.5,
         ),
       ),
       child: Column(children: [

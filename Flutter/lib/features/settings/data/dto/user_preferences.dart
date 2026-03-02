@@ -73,14 +73,14 @@ class UserPreferences {
   }
 
   Map<String, dynamic> toJson() => {
-        "email_notifications": emailNotifications,
-        "assignment_alerts": assignmentAlerts,
-        "course_updates": courseUpdates,
-        "announcement_notifications": announcementNotifications,
-        "grading_notifications": gradingNotifications,
-        "deadline_reminders": deadlineReminders,
-        "theme_mode": themeMode,
-        "profile_visibility": profileVisibility,
-        "show_online_status": showOnlineStatus,
+        'email_notifications': emailNotifications,
+        'assignment_alerts': assignmentAlerts,
+        'course_updates': courseUpdates,
+        'announcement_notifications': announcementNotifications,
+        'grading_notifications': gradingNotifications,
+        'deadline_reminders': deadlineReminders,
+        'theme_mode': themeMode,
+        'profile_visibility': profileVisibility,
+        'show_online_status': showOnlineStatus,
       };
 }

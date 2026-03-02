@@ -10,8 +10,8 @@ class AppSidebar extends ui.AppSidebar {
     required super.portalSubtitle,
     required super.mainItems,
     required super.bottomItems,
-    super.brandTitle = "Learnova",
-    super.logoAssetPath = "assets/logo.png",
+    super.brandTitle = 'Learnova',
+    super.logoAssetPath = 'assets/logo.webp',
     super.onBrandTap,
   });
 }

@@ -1,5 +1,3 @@
-import 'dart:typed_data';
-
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -10,6 +8,7 @@ import 'package:learnova/core/utils/file_download_stub.dart'
     as file_download;
 
 import '../../data/courses_providers.dart';
+import '../../../../core/ui/toast.dart';
 
 /// Dialog to invite students for PRIVATE courses.
 ///
@@ -46,8 +45,10 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
       content: csv,
       mimeType: 'text/csv',
     );
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Template downloaded. Fill it, then upload.')),
+    AppToast.success(
+      context,
+      title: 'Template Downloaded',
+      message: 'Fill it in, then upload to import students.',
     );
   }
 
@@ -131,7 +132,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: const Color(0xFFE5E7EB)),
             boxShadow: [
-              BoxShadow(color: Color(0x14000000), blurRadius: (kIsWeb ? 12 : 26), offset: Offset(0, 14)),
+              const BoxShadow(color: Color(0x14000000), blurRadius: (kIsWeb ? 12 : 26), offset: Offset(0, 14)),
             ],
           ),
           child: Padding(
@@ -205,7 +206,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
                     children: [
                       Expanded(
                         child: Text(
-                          fileName == null ? 'No file selected' : fileName,
+                          fileName ?? 'No file selected',
                           style: TextStyle(
                             fontSize: 12.8,
                             fontWeight: FontWeight.w700,

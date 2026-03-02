@@ -45,11 +45,10 @@ class AdminUsersRoutePage extends ConsumerWidget {
           final logo = (data['logo_url'] ?? '').toString().trim();
 
           if (name.isEmpty || desc.isEmpty) {
-            AppToast.show(
+            AppToast.error(
               context,
-              title: "Missing info",
-              message: "Organization name and description are required.",
-              icon: Icons.error_outline,
+              title: 'Missing info',
+              message: 'Organization name and description are required.',
             );
             return;
           }
@@ -77,7 +76,7 @@ class AdminJoinRequestsRoutePage extends ConsumerWidget {
     final hasOrg = orgId.isNotEmpty;
 
     if (!hasOrg) {
-      return const Center(child: Text("Create an organization first."));
+      return const Center(child: Text('Create an organization first.'));
     }
 
     return JoinRequestsContent(organizationId: orgId);
@@ -106,6 +105,6 @@ class AdminHelpRoutePage extends StatelessWidget {
   const AdminHelpRoutePage({super.key});
   @override
   Widget build(BuildContext context) {
-    return const Center(child: Text("Help & Support (Coming soon)"));
+    return const Center(child: Text('Help & Support (Coming soon)'));
   }
 }

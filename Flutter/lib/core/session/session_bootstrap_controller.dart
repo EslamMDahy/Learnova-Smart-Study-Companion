@@ -7,12 +7,21 @@ import '../storage/token_storage.dart';
 import '../storage/user_storage.dart';
 import '../../features/auth/data/auth_providers.dart';
 
-/// Bootstraps /me once after a valid token exists.
-/// Goal: prevent role-based flicker & make router guards deterministic.
+/// Bootstraps the session on cold start or after a storage change.
 ///
-/// - Runs only when TokenStorage.hasToken && !UserStorage.hasMe
-/// - Cancels previous request if re-triggered (reload / route refresh)
-/// - Persists in the same storage location as the token (session vs local)
+/// Two startup scenarios are handled:
+///
+/// A) **Normal tab session** – TokenStorage.hasToken is true (sessionStorage
+///    still alive). Just call /me and populate UserStorage.
+///
+/// B) **Remember-Me cold start** – The tab was closed and re-opened.
+///    sessionStorage is gone, so hasToken is false. BUT isPersisted is true
+///    (localStorage flag). In this case we first attempt a silent refresh
+///    (the HttpOnly refresh cookie does the heavy lifting), then call /me.
+///
+/// This means users who checked "Remember Me" are transparently logged back
+/// in after closing and re-opening the browser — matching the backend's
+/// 30-day refresh-token window.
 final sessionBootstrapControllerProvider =
     NotifierProvider<SessionBootstrapController, AsyncValue<void>>(
   SessionBootstrapController.new,
@@ -26,10 +35,15 @@ class SessionBootstrapController extends Notifier<AsyncValue<void>> {
   AsyncValue<void> build() => const AsyncData(null);
 
   Future<void> ensureBootstrapped() async {
-    final token = TokenStorage.token?.trim();
-    final hasToken = token != null && token.isNotEmpty;
+    // ── Scenario B: remember-me cold start (no token in sessionStorage) ──
+    if (!TokenStorage.hasToken && TokenStorage.isPersisted) {
+      await _silentRefreshThenBoot();
+      return;
+    }
 
-    if (!hasToken) {
+    // ── Scenario A: token exists in sessionStorage ──
+    final token = TokenStorage.token?.trim() ?? '';
+    if (token.isEmpty) {
       _reset();
       return;
     }
@@ -40,10 +54,44 @@ class SessionBootstrapController extends Notifier<AsyncValue<void>> {
       return;
     }
 
-    // Guard: if we already tried with the same token and still loading, skip.
     if (_lastToken == token && state.isLoading) return;
 
-    // Cancel previous in-flight attempt.
+    await _fetchMe(token);
+  }
+
+  // ─── silent refresh → /me ───────────────────────────────────────────────
+
+  Future<void> _silentRefreshThenBoot() async {
+    state = const AsyncLoading();
+
+    try {
+      final api = ref.read(authApiProvider);
+
+      // This call sends the HttpOnly refresh cookie automatically (withCredentials).
+      final newToken = await api.refresh();
+
+      TokenStorage.saveSession(
+        accessToken: newToken,
+        persist: true, // keep remember-me alive
+      );
+      // Start proactive refresh timer after silent re-auth.
+      ref.read(apiClientProvider).scheduleProactiveRefresh(newToken);
+
+      await _fetchMe(newToken);
+    } catch (e, st) {
+      // Refresh cookie expired or server error → clear everything, go to login.
+      TokenStorage.clear();
+      UserStorage.clear();
+
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(ref, failure);
+      state = AsyncError(e, st);
+    }
+  }
+
+  // ─── /me fetch ──────────────────────────────────────────────────────────
+
+  Future<void> _fetchMe(String token) async {
     _cancelToken?.cancel('superseded');
     final ct = CancelToken();
     _cancelToken = ct;
@@ -62,33 +110,23 @@ class SessionBootstrapController extends Notifier<AsyncValue<void>> {
 
       state = const AsyncData(null);
     } catch (e, st) {
-      // Silent on cancellation.
       if (e is DioException && e.type == DioExceptionType.cancel) {
         state = const AsyncData(null);
         return;
       }
 
       final failure = mapApiFailure(e);
-
-      // Report globally (includes 401/403 dialog + logout + redirect).
       AppErrorReporter.report(ref, failure);
-
-      // Keep state for a local retry UI (optional).
       state = AsyncError(e, st);
     }
   }
 
-  Map<String, dynamic> _normalizeMePayload(Map<String, dynamic> raw) {
-    // Expected shapes:
-    // A) { user: {...}, organizations: [...] }
-    // B) { id, email, system_role, ... }  -> treat as user
-    // C) nested { data: {...} }          -> unwrap if exists
-    Map<String, dynamic> root = raw;
+  // ─── helpers ────────────────────────────────────────────────────────────
 
+  Map<String, dynamic> _normalizeMePayload(Map<String, dynamic> raw) {
+    Map<String, dynamic> root = raw;
     final data = root['data'];
-    if (data is Map) {
-      root = data.cast<String, dynamic>();
-    }
+    if (data is Map) root = data.cast<String, dynamic>();
 
     Map<String, dynamic> user;
     final u = root['user'];
@@ -98,11 +136,8 @@ class SessionBootstrapController extends Notifier<AsyncValue<void>> {
       user = root;
     }
 
-    final out = <String, dynamic>{
-      'user': user,
-    };
+    final out = <String, dynamic>{'user': user};
 
-    // organizations (optional)
     final orgs = root['organizations'];
     if (orgs is List) {
       out['organizations'] =
@@ -111,8 +146,8 @@ class SessionBootstrapController extends Notifier<AsyncValue<void>> {
       out['organizations'] = [orgs.cast<String, dynamic>()];
     }
 
-    // selected org (front-only convenience)
-    final list = (out['organizations'] is List) ? out['organizations'] as List : const [];
+    final list =
+        (out['organizations'] is List) ? out['organizations'] as List : const [];
     if (list.isNotEmpty && out['selected_organization_id'] == null) {
       final first = list.first;
       if (first is Map) {

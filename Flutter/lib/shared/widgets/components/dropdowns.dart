@@ -130,7 +130,6 @@ class AppDropdownSmall extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppDropdown(
-      height: 40,
       value: value,
       items: items,
       onChanged: onChanged,
@@ -415,10 +414,10 @@ class _FigmaDropdownMenuState extends State<_FigmaDropdownMenu>
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                   boxShadow: [
-                    BoxShadow(
+                    const BoxShadow(
                       color: Color(0x14000000),
                       blurRadius: (kIsWeb ? 12 : 18),
-                      offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 6)),
+                      offset: (kIsWeb ? Offset(0, 4) : Offset(0, 6)),
                     ),
                   ],
                 ),
@@ -893,11 +892,11 @@ class _ModernDropdownMenuState<T> extends State<_ModernDropdownMenu<T>>
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: const Color(0xFFE2E8F0)),
                   boxShadow: [
-                    BoxShadow(
-                      color: const Color(0x14000000),
+                    const BoxShadow(
+                      color: Color(0x14000000),
                       blurRadius: kIsWeb ? 12 : 18,
                       offset:
-                          kIsWeb ? const Offset(0, 4) : const Offset(0, 6),
+                          kIsWeb ? Offset(0, 4) : Offset(0, 6),
                     ),
                   ],
                 ),
@@ -1060,7 +1059,7 @@ Future<T?> showFigmaUmMenu<T>({
       minWidth: minWidth,
       maxWidth: maxWidth,
       onSelect: (v) => close(v),
-      onDismiss: () => close(null),
+      onDismiss: () => close(),
     ),
   );
 
@@ -1173,10 +1172,10 @@ class _FigmaUmActionMenuOverlayState<T>
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: _border),
                   boxShadow: [
-                    BoxShadow(
+                    const BoxShadow(
                       color: Color(0x14000000),
                       blurRadius: (kIsWeb ? 12 : 18),
-                      offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 6)),
+                      offset: (kIsWeb ? Offset(0, 4) : Offset(0, 6)),
                     ),
                   ],
                 ),

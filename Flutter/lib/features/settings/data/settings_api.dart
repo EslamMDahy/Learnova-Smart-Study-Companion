@@ -38,12 +38,12 @@ class SettingsApi {
     final res = await _client.patch<Map<String, dynamic>>(
       Endpoints.updateProfile,
       data: {
-        "full_name": fullName.trim(),
-        "phone": phoneNumber?.trim(),
-        "bio": bio?.trim(),
-        "student_id": studentId?.trim(),
-        "university_email": universityEmail?.trim(),
-        "language_preference": languagePreference.trim(),
+        'full_name': fullName.trim(),
+        'phone': phoneNumber?.trim(),
+        'bio': bio?.trim(),
+        'student_id': studentId?.trim(),
+        'university_email': universityEmail?.trim(),
+        'language_preference': languagePreference.trim(),
       },
       cancelToken: cancelToken,
     );
@@ -122,8 +122,8 @@ class SettingsApi {
     final res = await _client.patch<Map<String, dynamic>>(
       Endpoints.updatePassword,
       data: {
-        "current_password": currentPassword,
-        "new_password": newPassword,
+        'current_password': currentPassword,
+        'new_password': newPassword,
       },
       cancelToken: cancelToken,
     );
@@ -136,7 +136,7 @@ class SettingsApi {
   }) async {
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.deleteRequest,
-      data: {"current_password": currentPassword},
+      data: {'current_password': currentPassword},
       cancelToken: cancelToken,
     );
     return _msg(res.data);
@@ -148,7 +148,7 @@ class SettingsApi {
   }) async {
     final res = await _client.delete<Map<String, dynamic>>(
       Endpoints.deleteConfirm,
-      data: {"otp": otp.trim()},
+      data: {'otp': otp.trim()},
       cancelToken: cancelToken,
     );
     return _msg(res.data);

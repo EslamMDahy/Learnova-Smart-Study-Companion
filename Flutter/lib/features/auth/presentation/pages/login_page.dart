@@ -13,10 +13,10 @@ class LoginPage extends StatelessWidget {
       body: LayoutBuilder(
         builder: (context, constraints) {
           if (constraints.maxWidth > 900) {
-            return Row(
-              children: const [
+            return const Row(
+              children: [
                 Expanded(flex: 5, child: LeftPanel()),
-                Expanded(flex: 5, child: LoginForm(isMobile: false)),
+                Expanded(flex: 5, child: LoginForm()),
               ],
             );
           }

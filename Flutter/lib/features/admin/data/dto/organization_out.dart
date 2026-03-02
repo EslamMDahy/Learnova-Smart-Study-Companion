@@ -21,27 +21,27 @@ class OrganizationOut {
 
   factory OrganizationOut.fromJson(Map<String, dynamic> json) {
     return OrganizationOut(
-      id: _toInt(json["id"]) ?? 0,
-      name: (json["name"] ?? "").toString().trim(),
-      description: (json["description"] ?? "").toString().trim(),
-      logoUrl: _toNullableString(json["logo_url"]),
-      ownerId: _toInt(json["owner_id"]) ?? 0,
-      subscriptionPlanId: _toInt(json["subscription_plan_id"]) ?? 0,
-      inviteCode: (json["invite_code"] ?? "").toString().trim(),
+      id: _toInt(json['id']) ?? 0,
+      name: (json['name'] ?? '').toString().trim(),
+      description: (json['description'] ?? '').toString().trim(),
+      logoUrl: _toNullableString(json['logo_url']),
+      ownerId: _toInt(json['owner_id']) ?? 0,
+      subscriptionPlanId: _toInt(json['subscription_plan_id']) ?? 0,
+      inviteCode: (json['invite_code'] ?? '').toString().trim(),
       subscriptionStatus:
-          (json["subscription_status"] ?? "").toString().trim().toLowerCase(),
+          (json['subscription_status'] ?? '').toString().trim().toLowerCase(),
     );
   }
 
   Map<String, dynamic> toJson() => {
-        "id": id,
-        "name": name,
-        "description": description,
-        if (logoUrl != null && logoUrl!.isNotEmpty) "logo_url": logoUrl,
-        "owner_id": ownerId,
-        "subscription_plan_id": subscriptionPlanId,
-        "invite_code": inviteCode,
-        "subscription_status": subscriptionStatus,
+        'id': id,
+        'name': name,
+        'description': description,
+        if (logoUrl != null && logoUrl!.isNotEmpty) 'logo_url': logoUrl,
+        'owner_id': ownerId,
+        'subscription_plan_id': subscriptionPlanId,
+        'invite_code': inviteCode,
+        'subscription_status': subscriptionStatus,
       };
 
   // ---------------- helpers ----------------

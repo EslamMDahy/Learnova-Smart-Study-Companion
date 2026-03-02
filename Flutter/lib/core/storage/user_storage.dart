@@ -147,15 +147,15 @@ class UserStorage {
 
     if (kDebugMode) {
       // ignore: avoid_print
-      print("ME JSON: ${UserStorage.meJson}");
+      print('ME JSON: ${UserStorage.meJson}');
       // ignore: avoid_print
-      print("ROLE: ${UserStorage.role} | isOwner=${UserStorage.isOwner}");
+      print('ROLE: ${UserStorage.role} | isOwner=${UserStorage.isOwner}');
       // ignore: avoid_print
       print(
-        "ORG_ID: ${UserStorage.organizationId} | hasOrg=${UserStorage.hasOrganization}",
+        'ORG_ID: ${UserStorage.organizationId} | hasOrg=${UserStorage.hasOrganization}',
       );
       // ignore: avoid_print
-      print("ORGS_COUNT: ${UserStorage.organizations.length}");
+      print('ORGS_COUNT: ${UserStorage.organizations.length}');
     }
   }
 

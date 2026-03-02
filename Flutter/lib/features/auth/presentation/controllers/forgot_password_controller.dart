@@ -27,7 +27,7 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
 
   void clearError() {
     if (state.error != null) {
-      state = state.copyWith(error: null);
+      state = state.copyWith();
     }
   }
 
@@ -46,7 +46,6 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
     state = state.copyWith(
       loading: true,
       sent: false,
-      message: null,
       lastEmail: state.lastEmail, 
     );
 
@@ -54,8 +53,7 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
       state = state.copyWith(
         loading: false,
         sent: false,
-        message: null,
-        error: "Please enter a valid email address.",
+        error: 'Please enter a valid email address.',
       );
       return false;
     }
@@ -65,7 +63,7 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
 
       final safeMsg = (msg.trim().isNotEmpty)
           ? msg.trim()
-          : "If this email exists, a reset link has been sent.";
+          : 'If this email exists, a reset link has been sent.';
 
       state = state.copyWith(
         loading: false,
@@ -78,14 +76,13 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
       final failure = mapApiFailure(err);
 
       if (TokenStorage.hasToken && failure.isAuthIssue) {
-        state = state.copyWith(loading: false, message: null);
+        state = state.copyWith(loading: false);
         AppErrorReporter.report(ref, failure);
         return false;
       }
 
       state = state.copyWith(
         loading: false,
-        message: null,
         error: failure.message,
       );
       return false;
@@ -97,8 +94,7 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
     if (!_looksLikeEmail(e)) {
       state = state.copyWith(
         sent: false,
-        message: null,
-        error: "Email is missing. Please enter your email again.",
+        error: 'Email is missing. Please enter your email again.',
       );
       return false;
     }

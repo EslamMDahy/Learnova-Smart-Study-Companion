@@ -1,13 +1,12 @@
 import 'dart:async';
-import 'dart:ui';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learnova/core/routing/routes.dart';
 import '../../data/courses_models.dart';
 import 'package:learnova/shared/widgets/app_ui_components.dart';
 import 'invite_students_dialog.dart';
+import '../controllers/selected_course_provider.dart';
 
 class InstructorCourseContent extends StatefulWidget {
   final VoidCallback? onCreateNewCourse;
@@ -33,15 +32,15 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
   final _search = TextEditingController();
   Timer? _searchDebounce;
 
-  String _searchText = "";
+  String _searchText = '';
 
-  String selectedSemester = "All Semesters";
-  String selectedStatus = "All Statuses";
-  String selectedType = "All Types";
+  String selectedSemester = 'All Semesters';
+  String selectedStatus = 'All Statuses';
+  String selectedType = 'All Types';
 
   // ---- Caches (performance)
   List<MyCourseItem> _cachedFiltered = const [];
-  String _cacheKey = "";
+  String _cacheKey = '';
 
   int _totalCoursesCached = 0;
   int _activeStudentsTotalCached = 0;
@@ -57,11 +56,11 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
   void didUpdateWidget(covariant InstructorCourseContent oldWidget) {
     super.didUpdateWidget(oldWidget);
 
-    // لو القائمة اتغيرت (جت من API مثلا) نعيد حساب totals + نفضي cache key
+    // If the list changed (e.g. fetched from API), recompute totals and clear the cache key
     if (!identical(oldWidget.courses, widget.courses) ||
         oldWidget.courses.length != widget.courses.length) {
       _recomputeTotals();
-      _cacheKey = "";
+      _cacheKey = '';
     }
   }
 
@@ -84,24 +83,24 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
 
   void _recomputeFiltered() {
     final key =
-        "${_searchText.trim().toLowerCase()}|$selectedSemester|$selectedStatus|$selectedType|${widget.courses.length}";
+        '${_searchText.trim().toLowerCase()}|$selectedSemester|$selectedStatus|$selectedType|${widget.courses.length}';
     if (key == _cacheKey) return;
     _cacheKey = key;
 
     final q = _searchText.trim().toLowerCase();
 
     bool statusOk(MyCourseItem c) {
-      if (selectedStatus == "All Statuses") return true;
+      if (selectedStatus == 'All Statuses') return true;
       return c.status.trim().toLowerCase() == selectedStatus.toLowerCase();
     }
 
     bool semesterOk(MyCourseItem c) {
-      if (selectedSemester == "All Semesters") return true;
-      return true; // اربطه بالـ API لما يبقى عندك semester في الموديل
+      if (selectedSemester == 'All Semesters') return true;
+      return true; // TODO: wire to API once semester field is available in the model
     }
 
     bool typeOk(MyCourseItem c) {
-      if (selectedType == "All Types") return true;
+      if (selectedType == 'All Types') return true;
       return c.courseType.trim().toLowerCase() == selectedType.toLowerCase();
     }
 
@@ -128,7 +127,7 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
       if (!mounted) return;
       setState(() {
         _searchText = value;
-        _cacheKey = ""; // عشان نضمن recompute للفلترة
+        _cacheKey = ''; // ensure filter recomputation on next render
       });
     });
   }
@@ -136,11 +135,11 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
   void _clearAll() {
     _search.clear();
     setState(() {
-      _searchText = "";
-      selectedSemester = "All Semesters";
-      selectedStatus = "All Statuses";
-      selectedType = "All Types";
-      _cacheKey = "";
+      _searchText = '';
+      selectedSemester = 'All Semesters';
+      selectedStatus = 'All Statuses';
+      selectedType = 'All Types';
+      _cacheKey = '';
     });
   }
 
@@ -150,9 +149,9 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
     final courses = _cachedFiltered;
 
     final hasActiveFilters = (_searchText.trim().isNotEmpty) ||
-        selectedSemester != "All Semesters" ||
-        selectedStatus != "All Statuses" ||
-        selectedType != "All Types";
+        selectedSemester != 'All Semesters' ||
+        selectedStatus != 'All Statuses' ||
+        selectedType != 'All Types';
 
     return Container(
       color: _CourseTokens.pageBg,
@@ -233,21 +232,21 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
                         onClearSearch: () {
                           _search.clear();
                           setState(() {
-                            _searchText = "";
-                            _cacheKey = "";
+                            _searchText = '';
+                            _cacheKey = '';
                           });
                         },
                         onClearSemester: () => setState(() {
-                          selectedSemester = "All Semesters";
-                          _cacheKey = "";
+                          selectedSemester = 'All Semesters';
+                          _cacheKey = '';
                         }),
                         onClearStatus: () => setState(() {
-                          selectedStatus = "All Statuses";
-                          _cacheKey = "";
+                          selectedStatus = 'All Statuses';
+                          _cacheKey = '';
                         }),
                         onClearType: () => setState(() {
-                          selectedType = "All Types";
-                          _cacheKey = "";
+                          selectedType = 'All Types';
+                          _cacheKey = '';
                         }),
                       ),
                       if ((widget.errorText ?? '').trim().isNotEmpty) ...[
@@ -322,11 +321,11 @@ class _CoursesFiltersBar extends StatelessWidget {
       width: isNarrow ? 170 : 158,
       value: selectedSemester,
       items: const [
-        "All Semesters",
-        "Fall 2023",
-        "Spring 2024",
-        "Fall 2024",
-        "Spring 2025",
+        'All Semesters',
+        'Fall 2023',
+        'Spring 2024',
+        'Fall 2024',
+        'Spring 2025',
       ],
       onChanged: onSemesterChanged,
     );
@@ -334,14 +333,14 @@ class _CoursesFiltersBar extends StatelessWidget {
     final statusDrop = FigmaUmDropdown40(
       width: isNarrow ? 158 : 146,
       value: selectedStatus,
-      items: const ["All Statuses", "active", "draft", "archived"],
+      items: const ['All Statuses', 'active', 'draft', 'archived'],
       onChanged: onStatusChanged,
     );
 
     final typeDrop = FigmaUmDropdown40(
       width: isNarrow ? 140 : 128,
       value: selectedType,
-      items: const ["All Types", "lecture", "seminar", "lab"],
+      items: const ['All Types', 'lecture', 'seminar', 'lab'],
       onChanged: onTypeChanged,
     );
 
@@ -354,7 +353,7 @@ class _CoursesFiltersBar extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border:       Border.all(color: const Color(0xFFE5E7EB)),
         boxShadow: [
-          BoxShadow(
+          const BoxShadow(
               color: Color(0x08000000),
               blurRadius: 8,
               offset: Offset(0, 2)),
@@ -416,9 +415,9 @@ class _ActiveFiltersChips extends StatelessWidget {
 
   bool get _hasAny =>
       (searchText.trim().isNotEmpty) ||
-      selectedSemester != "All Semesters" ||
-      selectedStatus   != "All Statuses"  ||
-      selectedType     != "All Types";
+      selectedSemester != 'All Semesters' ||
+      selectedStatus   != 'All Statuses'  ||
+      selectedType     != 'All Types';
 
   @override
   Widget build(BuildContext context) {
@@ -447,11 +446,11 @@ class _ActiveFiltersChips extends StatelessWidget {
         children: [
           if (searchText.trim().isNotEmpty)
             chip('Search: "${searchText.trim()}"', onClearSearch),
-          if (selectedSemester != "All Semesters")
+          if (selectedSemester != 'All Semesters')
             chip('Semester: $selectedSemester', onClearSemester),
-          if (selectedStatus != "All Statuses")
+          if (selectedStatus != 'All Statuses')
             chip('Status: $selectedStatus', onClearStatus),
-          if (selectedType != "All Types")
+          if (selectedType != 'All Types')
             chip('Type: $selectedType', onClearType),
           TextButton.icon(
             onPressed: onClearAll,
@@ -511,7 +510,7 @@ class _Breadcrumb extends StatelessWidget {
       children: [
         Icon(Icons.home_rounded, size: 14, color: _CourseTokens.textHint),
         SizedBox(width: 8),
-        Text("Home",
+        Text('Home',
             style: TextStyle(
                 color:      _CourseTokens.textHint,
                 fontSize:   12,
@@ -520,7 +519,7 @@ class _Breadcrumb extends StatelessWidget {
         Icon(Icons.chevron_right_rounded,
             size: 16, color: Color(0xFFCBD5E1)),
         SizedBox(width: 8),
-        Text("Courses Management",
+        Text('Courses Management',
             style: TextStyle(
                 color:      _CourseTokens.textHint,
                 fontSize:   12,
@@ -546,7 +545,7 @@ class _HeaderRow extends StatelessWidget {
       const left = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text("My Courses",
+          Text('My Courses',
               style: TextStyle(
                   fontSize:   30,
                   fontWeight: FontWeight.w900,
@@ -554,7 +553,7 @@ class _HeaderRow extends StatelessWidget {
                   height:     1.05)),
           SizedBox(height: 6),
           Text(
-              "Manage your curriculum, AI assessments, and student cohorts.",
+              'Manage your curriculum, AI assessments, and student cohorts.',
               style: TextStyle(
                   color:      _CourseTokens.textMuted,
                   fontSize:   13.2,
@@ -609,7 +608,7 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
         child: ElevatedButton.icon(
           onPressed: widget.onPressed,
           icon:  const Icon(Icons.add, size: 18, color: Colors.white),
-          label: const Text("Create New Course",
+          label: const Text('Create New Course',
               style: TextStyle(
                   fontSize:   12.6,
                   fontWeight: FontWeight.w800,
@@ -649,21 +648,21 @@ class _StatsRow extends StatelessWidget {
 
       final cards = [
         _MiniStatCard(
-          title:     "TOTAL COURSES",
+          title:     'TOTAL COURSES',
           value:     totalCourses.toString(),
           icon:      Icons.folder_outlined,
           iconBg:    const Color(0xFFEAF2FF),
           iconColor: const Color(0xFF137FEC),
         ),
         _MiniStatCard(
-          title:     "ACTIVE STUDENTS",
+          title:     'ACTIVE STUDENTS',
           value:     activeStudents.toString(),
           icon:      Icons.people_outline_rounded,
           iconBg:    const Color(0xFFE9FBF1),
           iconColor: const Color(0xFF16A34A),
         ),
         _MiniStatCard(
-          title:     "PENDING INVITES",
+          title:     'PENDING INVITES',
           value:     pendingInvites.toString(),
           icon:      Icons.mail_outline_rounded,
           iconBg:    const Color(0xFFFFF4DB),
@@ -862,7 +861,7 @@ class _NoResultsState extends StatelessWidget {
           borderRadius: BorderRadius.circular(16),
           border:       Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: [
-            BoxShadow(
+            const BoxShadow(
                 color:      Color(0x0D000000),
                 blurRadius: 2,
                 offset:     Offset(0, 1)),
@@ -918,7 +917,7 @@ class _CoursesEmptyState extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border:       Border.all(color: _CourseTokens.border),
             boxShadow: [
-              BoxShadow(
+              const BoxShadow(
                   color:      Color(0x0D000000),
                   blurRadius: 2,
                   offset:     Offset(0, 1)),
@@ -936,14 +935,14 @@ class _CoursesEmptyState extends StatelessWidget {
                   color: _CourseTokens.blue, size: 28),
             ),
             const SizedBox(height: 12),
-            const Text("No courses yet",
+            const Text('No courses yet',
                 style: TextStyle(
                     fontSize:   16,
                     fontWeight: FontWeight.w900,
                     color:      _CourseTokens.textPrimary)),
             const SizedBox(height: 6),
             const Text(
-                "Create your first course to start uploading materials, generating AI quizzes, and inviting students.",
+                'Create your first course to start uploading materials, generating AI quizzes, and inviting students.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize:   12.8,
@@ -957,7 +956,7 @@ class _CoursesEmptyState extends StatelessWidget {
                 onPressed: onCreate,
                 icon:  const Icon(Icons.add_rounded,
                     size: 18, color: Colors.white),
-                label: const Text("Create course",
+                label: const Text('Create course',
                     style: TextStyle(
                         fontWeight: FontWeight.w900,
                         color:      Colors.white)),
@@ -1100,33 +1099,35 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
   final GlobalKey _moreKey = GlobalKey();
 
   String _title(MyCourseItem c) =>
-      c.title.trim().isEmpty ? "Untitled course" : c.title.trim();
+      c.title.trim().isEmpty ? 'Untitled course' : c.title.trim();
 
   String _code(MyCourseItem c) {
     final code = c.safeCourseCode.trim();
-    return code.isNotEmpty ? code : "COURSE-${c.id}";
+    return code.isNotEmpty ? code : 'COURSE-${c.id}';
   }
 
   _CourseStatus _status(MyCourseItem c) {
     final s = c.status.trim().toLowerCase();
-    if (s == "draft")    return _CourseStatus.draft;
-    if (s == "archived") return _CourseStatus.archived;
+    if (s == 'draft')    return _CourseStatus.draft;
+    if (s == 'archived') return _CourseStatus.archived;
     return _CourseStatus.active;
   }
 
   String _meta(MyCourseItem c) {
     final parts = <String>[];
-    if ((c.category ?? "").trim().isNotEmpty)
+    if ((c.category ?? '').trim().isNotEmpty) {
       parts.add(c.category!.trim());
-    if (c.visibilityLevel.trim().isNotEmpty)
+    }
+    if (c.visibilityLevel.trim().isNotEmpty) {
       parts.add(c.visibilityLevel.trim());
-    return parts.join(" • ");
+    }
+    return parts.join(' • ');
   }
 
   int _students(MyCourseItem c) => c.enrollmentCount ?? 0;
   int _modules(MyCourseItem c)  => 0;
 
-  String _slug(MyCourseItem c) {
+String _slug(MyCourseItem c) {
     final code = c.safeCourseCode.trim();
     if (code.isNotEmpty) {
       return code
@@ -1136,7 +1137,7 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
     }
     return c.id.toString();
   }
-Future<void> _showCourseMenuFromKey(
+    Future<void> _showCourseMenuFromKey(
   BuildContext context,
   MyCourseItem c,
   GlobalKey anchorKey,
@@ -1177,14 +1178,14 @@ Future<void> _showCourseMenuFromKey(
   if (!mounted || selected == null) return;
 
   if (selected == 'materials') {
-    context.go(Routes.courseDetails(slug)); // ✅ تم التعديل هنا
+    SelectedCourseCache.set(c);
+    context.go(Routes.courseDetails(slug)); // ✅ navigate to course details
     return;
   }
 
   if (selected == 'invite') {
     await showDialog<bool>(
       context: context,
-      barrierDismissible: true,
       builder: (_) => InviteStudentsDialog(courseId: c.id),
     );
   }
@@ -1211,7 +1212,7 @@ Future<void> _showCourseMenuFromKey(
             : const LinearGradient(colors: [Color(0xFF134E4A), Color(0xFF0891B2)]));
     final enrollCount = widget.course.enrollmentCount ?? 0;
     final modulesCount = (widget.course.pendingInvites ?? 0).clamp(0, 99); // fallback field
-    final code = (widget.course.courseCode?.isNotEmpty == true) ? widget.course.courseCode! : '—';
+    final code = (widget.course.courseCode?.isNotEmpty ?? false) ? widget.course.courseCode! : '—';
     final metaLeft = widget.course.category ?? 'General';
     final metaRight = widget.course.courseType;
     final meta = '$metaLeft • $metaRight';
@@ -1222,7 +1223,7 @@ Future<void> _showCourseMenuFromKey(
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       curve: Curves.easeOut,
-      transform: hover ? (Matrix4.identity()..translate(0.0, -1.0, 0.0)) : Matrix4.identity(),
+      transform: hover ? (Matrix4.identity()..translate(0.0, -1.0)) : Matrix4.identity(),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -1239,7 +1240,8 @@ Future<void> _showCourseMenuFromKey(
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           final slug = _slug(widget.course);
-          context.go(Routes.courseDetails(slug)); // ✅ تم التعديل هنا
+          SelectedCourseCache.set(widget.course);
+          context.go(Routes.courseDetails(slug)); // ✅ navigate to course details
         },
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
@@ -1256,9 +1258,9 @@ Future<void> _showCourseMenuFromKey(
                         decoration: BoxDecoration(gradient: heroGradient),
                       ),
                     ),
-                    Positioned.fill(
+                    const Positioned.fill(
                       child: DecoratedBox(
-                        decoration: const BoxDecoration(
+                        decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.bottomCenter,
                             end: Alignment.topCenter,
@@ -1421,11 +1423,11 @@ class _AvatarStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return const SizedBox(
       height: 26,
       width: 56,
       child: Stack(
-        children: const [
+        children: [
           _AvatarDot(left: 0,  bg: Color(0xFFE2E8F0)),
           _AvatarDot(left: 16, bg: Color(0xFFDBEAFE)),
           _AvatarDot(left: 32, bg: Color(0xFFE9FBF1)),
@@ -1512,10 +1514,10 @@ class _ApiHero extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final statusLabel = status == _CourseStatus.active
-        ? "Active"
+        ? 'Active'
         : status == _CourseStatus.draft
-            ? "Draft"
-            : "Archived";
+            ? 'Draft'
+            : 'Archived';
 
     final statusColor = status == _CourseStatus.active
         ? const Color(0xFF16A34A)
@@ -1529,19 +1531,18 @@ class _ApiHero extends StatelessWidget {
         Image.network(imageUrl,
             fit:             BoxFit.cover,
             gaplessPlayback: true,
-            filterQuality:   FilterQuality.medium,
             errorBuilder:    (_, __, ___) =>
                 Container(color: const Color(0xFFEFF2F6)))
       else
         Container(color: const Color(0xFFEFF2F6)),
 
-      Positioned.fill(
+      const Positioned.fill(
         child: DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin:  Alignment.bottomCenter,
               end:    Alignment.topCenter,
-              colors: const [Color(0x99000000), Color(0x00000000)],
+              colors: [Color(0x99000000), Color(0x00000000)],
             ),
           ),
         ),
@@ -1653,7 +1654,7 @@ class _ApiBody extends StatelessWidget {
                   height:      1.2,
                   color:       _CourseTokens.textPrimary)),
           const SizedBox(height: 4),
-          Text(meta.isEmpty ? "—" : meta,
+          Text(meta.isEmpty ? '—' : meta,
               maxLines:  1,
               overflow:  TextOverflow.ellipsis,
               style: const TextStyle(
@@ -1666,7 +1667,7 @@ class _ApiBody extends StatelessWidget {
             const Icon(Icons.people_outline,
                 size: 18, color: _CourseTokens.textMuted),
             const SizedBox(width: 6),
-            Text("$students Students",
+            Text('$students Students',
                 style: const TextStyle(
                     fontFamily:  'Inter',
                     fontWeight:  FontWeight.w400,
@@ -1676,7 +1677,7 @@ class _ApiBody extends StatelessWidget {
             const Icon(Icons.menu_book_outlined,
                 size: 18, color: _CourseTokens.textMuted),
             const SizedBox(width: 6),
-            Text("$modules Modules",
+            Text('$modules Modules',
                 style: const TextStyle(
                     fontFamily:  'Inter',
                     fontWeight:  FontWeight.w400,
@@ -1696,7 +1697,7 @@ class _ApiBody extends StatelessWidget {
                   child: showPeople
                       ? _PeopleFooter(memberCountText: memberCountText)
                       : _NoteFooter(
-                          text: "Updated ${_fmtDate(updatedAt)}"),
+                          text: 'Updated ${_fmtDate(updatedAt)}'),
                 ),
               ),
               _IconActionButton(
@@ -1953,7 +1954,7 @@ class _CourseModel {
     required this.students,
     required this.modules,
     required this.coverUrl,
-    this.memberCountText = "",
+    this.memberCountText = '',
     this.note,
   });
 }

@@ -5,18 +5,20 @@ class SetNewPasswordLeftPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final w = MediaQuery.sizeOf(context).width;
+    final bgCacheWidth = (w * dpr).clamp(800.0, 2000.0).round();
     return Container(
       width: double.infinity,
       height: double.infinity,
 
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         image: DecorationImage(
-          image: AssetImage('assets/floors.png'),
+          image: ResizeImage(const AssetImage('assets/floors.webp'), width: bgCacheWidth),
 
           fit: BoxFit.cover,
-          alignment: Alignment.center,
 
-          colorFilter: ColorFilter.mode(
+          colorFilter: const ColorFilter.mode(
             Color.fromRGBO(0, 0, 0, 0.25),
             BlendMode.darken,
           ),
@@ -32,7 +34,7 @@ class SetNewPasswordLeftPanel extends StatelessWidget {
             /// Logo
             Row(
               children: [
-                Image.asset("assets/logo.png", height: 40),
+                Image.asset('assets/logo.webp', height: 40, cacheWidth: (40 * MediaQuery.of(context).devicePixelRatio).round()),
                 const SizedBox(width: 10),
                 const Text(
                   'Learnova',

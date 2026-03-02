@@ -68,7 +68,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
           children: [
             const AppAuthHeaderIcon(
               icon: Icons.refresh,
-              title: "Forgot password?",
+              title: 'Forgot password?',
               subtitle: "No worries, we'll send you reset instructions.",
             ),
             const SizedBox(height: 24),
@@ -76,7 +76,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
             if (state.sent && state.message != null) ...[
               AppInfoCard(
                 type: AppInfoType.success,
-                title: "Check your inbox",
+                title: 'Check your inbox',
                 message: state.message!,
               ),
               const SizedBox(height: 18),
@@ -85,7 +85,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
             if (state.error != null) ...[
               AppInfoCard(
                 type: AppInfoType.error,
-                title: "Something went wrong",
+                title: 'Something went wrong',
                 message: state.error!,
               ),
               const SizedBox(height: 18),
@@ -112,16 +112,15 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
               const SizedBox(height: 20),
 
               AppPrimaryLoadingButton(
-                label: "Send Reset Link",
+                label: 'Send Reset Link',
                 loading: state.loading,
                 onPressed: _onSend,
-                height: 50,
               ),
               const SizedBox(height: 16),
             ] else ...[
               
               AppPrimaryLoadingButton(
-                label: "Resend email",
+                label: 'Resend email',
                 loading: state.loading,
                 onPressed: () => ref
                     .read(forgotPasswordControllerProvider.notifier)
@@ -136,7 +135,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
                   width: double.infinity,
                   height: 48,
                   child: AppTextLoadingButton(
-                    label: "Enter a different email",
+                    label: 'Enter a different email',
                     loading: state.loading,
                     onPressed: () {
                       ref
@@ -152,7 +151,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
 
             Center(
               child: AppBackLink(showLabel: true, 
-                label: "Return to Log In",
+                label: 'Return to Log In',
                 onTap: state.loading ? null : _goToLogin,
               ),
             ),

@@ -47,7 +47,6 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
   Future<void> _openCreateCourse() async {
     final result = await showDialog<CreateCourseDialogResult>(
       context: context,
-      barrierDismissible: true,
       builder: (_) => const CreateCourseDialog(),
     );
 
@@ -72,7 +71,6 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
     if (result.needsInvites) {
       await showDialog<bool>(
         context: context,
-        barrierDismissible: true,
         builder: (_) => InviteStudentsDialog(courseId: courseId),
       );
     }

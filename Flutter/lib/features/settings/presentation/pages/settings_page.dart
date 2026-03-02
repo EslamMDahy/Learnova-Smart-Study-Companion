@@ -46,15 +46,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   final _passwordFormKey = GlobalKey<FormState>();
 
   // ===== Controllers (hydrate from API) =====
-  final firstName = TextEditingController(text: "");
-  final lastName = TextEditingController(text: "");
-  final universityEmailCtrl = TextEditingController(text: "");
-  final studentIdCtrl = TextEditingController(text: "");
+  final firstName = TextEditingController(text: '');
+  final lastName = TextEditingController(text: '');
+  final universityEmailCtrl = TextEditingController(text: '');
+  final studentIdCtrl = TextEditingController(text: '');
 
-  String _language = "English (US)";
+  String _language = 'English (US)';
 
-  final bio = TextEditingController(text: "");
-  final phoneNumber = TextEditingController(text: "");
+  final bio = TextEditingController(text: '');
+  final phoneNumber = TextEditingController(text: '');
 
   final currentPassword = TextEditingController();
   final newPassword = TextEditingController();
@@ -73,11 +73,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool showOnlineStatus = true;
 
   // ===== Snapshot for Cancel + Dirty check =====
-  String _initialFirstName = "";
-  String _initialLastName = "";
-  String _initialPhone = "";
-  String _initialBio = "";
-  String _initialLanguage = "English (US)";
+  String _initialFirstName = '';
+  String _initialLastName = '';
+  String _initialPhone = '';
+  String _initialBio = '';
+  String _initialLanguage = 'English (US)';
 
   bool _initialEmailNotifications = true;
   bool _initialAssignmentAlerts = true;
@@ -106,13 +106,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
       final full = st.profile!.fullName.trim();
       final parts = full.split(RegExp(r'\s+'));
-      firstName.text = parts.isNotEmpty ? parts.first : "";
-      lastName.text = parts.length > 1 ? parts.sublist(1).join(' ') : "";
+      firstName.text = parts.isNotEmpty ? parts.first : '';
+      lastName.text = parts.length > 1 ? parts.sublist(1).join(' ') : '';
 
       universityEmailCtrl.text = st.profile!.universityEmail ?? st.profile!.email;
-      studentIdCtrl.text = st.profile!.studentId ?? "";
-      phoneNumber.text = st.profile!.phoneNumber ?? "";
-      bio.text = st.profile!.bio ?? "";
+      studentIdCtrl.text = st.profile!.studentId ?? '';
+      phoneNumber.text = st.profile!.phoneNumber ?? '';
+      bio.text = st.profile!.bio ?? '';
 
       _language = _mapLangCodeToUi(st.profile!.languagePreference);
 
@@ -202,62 +202,62 @@ void _onNavSelect(int i) {
 
   
   String _fmtMemberSince(DateTime? dt) {
-    if (dt == null) return "—";
+    if (dt == null) return '—';
     final d = dt.toLocal();
     const months = [
-      "Jan",
-      "Feb",
-      "Mar",
-      "Apr",
-      "May",
-      "Jun",
-      "Jul",
-      "Aug",
-      "Sep",
-      "Oct",
-      "Nov",
-      "Dec"
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec'
     ];
-    return "${months[d.month - 1]}, ${d.year}";
+    return '${months[d.month - 1]}, ${d.year}';
   }
 
   
   String _fmtLastLoginRelative(DateTime? dt) {
-    if (dt == null) return "—";
+    if (dt == null) return '—';
     final local = dt.toLocal();
     final now = DateTime.now();
     final diff = now.difference(local);
 
-    if (diff.inMinutes < 1) return "Just now";
-    if (diff.inMinutes < 60) return "${diff.inMinutes} min ago";
-    if (diff.inHours < 24) return "${diff.inHours} hours ago";
-    if (diff.inDays < 7) return "${diff.inDays} days ago";
+    if (diff.inMinutes < 1) return 'Just now';
+    if (diff.inMinutes < 60) return '${diff.inMinutes} min ago';
+    if (diff.inHours < 24) return '${diff.inHours} hours ago';
+    if (diff.inDays < 7) return '${diff.inDays} days ago';
 
     // fallback date only
     String two(int n) => n.toString().padLeft(2, '0');
-    return "${local.year}-${two(local.month)}-${two(local.day)}";
+    return '${local.year}-${two(local.month)}-${two(local.day)}';
   }
 
   String? _validatePhone(String? v) {
     final s = (v ?? '').trim();
-    if (s.isEmpty) return "Phone number is required";
+    if (s.isEmpty) return 'Phone number is required';
 
     
     final ok = RegExp(r'^[0-9+\-\s()]{7,20}$').hasMatch(s);
-    if (!ok) return "Enter a valid phone number";
+    if (!ok) return 'Enter a valid phone number';
     return null;
   }
 
   String? _validateNewPassword(String? v) {
-    final s = (v ?? '');
-    if (s.isEmpty) return "New password is required";
-    if (s.length < 8) return "Password must be at least 8 characters";
+    final s = v ?? '';
+    if (s.isEmpty) return 'New password is required';
+    if (s.length < 8) return 'Password must be at least 8 characters';
     return null;
   }
 
   String? _validateConfirmPassword(String? v) {
-    final s = (v ?? '');
-    if (s.isEmpty) return "Confirmation is required";
+    final s = v ?? '';
+    if (s.isEmpty) return 'Confirmation is required';
     if (s != newPassword.text) return "Passwords don't match";
     return null;
   }
@@ -328,8 +328,8 @@ void _onNavSelect(int i) {
     if (!ok) {
       _toast(
         context,
-        title: "Validation",
-        message: "Please fix the highlighted fields.",
+        title: 'Validation',
+        message: 'Please fix the highlighted fields.',
         icon: Icons.warning_amber_rounded,
       );
     }
@@ -341,8 +341,8 @@ void _onNavSelect(int i) {
     if (!ok) {
       _toast(
         context,
-        title: "Validation",
-        message: "Please fix the highlighted fields.",
+        title: 'Validation',
+        message: 'Please fix the highlighted fields.',
         icon: Icons.warning_amber_rounded,
       );
     }
@@ -417,7 +417,7 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
   @override
   Widget build(BuildContext context) {
     final st = ref.watch(settingsControllerProvider);
-    final isFirstLoad = (st.profile == null || st.preferences == null);
+    final isFirstLoad = st.profile == null || st.preferences == null;
     if (st.loading && isFirstLoad) {
       return Scaffold(
         backgroundColor: AppColors.pageBg,
@@ -440,10 +440,10 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
 
       if (err != null && err.trim().isNotEmpty) {
         _toast(context,
-            title: "Error", message: err, icon: Icons.error_outline_rounded);
+            title: 'Error', message: err, icon: Icons.error_outline_rounded);
       } else if (ok != null && ok.trim().isNotEmpty) {
         _toast(context,
-            title: "Done",
+            title: 'Done',
             message: ok,
             icon: Icons.check_circle_outline_rounded);
 
@@ -455,44 +455,6 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
         });
       }
     });
-
-    
-    if (!_hydrated && st.profile != null && st.preferences != null) {
-      _hydrated = true;
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (!mounted) return;
-
-        final full = st.profile!.fullName.trim();
-        final parts = full.split(RegExp(r'\s+'));
-        firstName.text = parts.isNotEmpty ? parts.first : "";
-        lastName.text = parts.length > 1 ? parts.sublist(1).join(' ') : "";
-
-        universityEmailCtrl.text = st.profile!.universityEmail ?? st.profile!.email;
-        studentIdCtrl.text = st.profile!.studentId ?? "";
-        phoneNumber.text = st.profile!.phoneNumber ?? "";
-        bio.text = st.profile!.bio ?? "";
-
-        _language = _mapLangCodeToUi(st.profile!.languagePreference);
-
-        emailNotifications = st.preferences!.emailNotifications;
-        assignmentAlerts = st.preferences!.assignmentAlerts;
-        courseUpdates = st.preferences!.courseUpdates;
-        announcementNotifications = st.preferences!.announcementNotifications;
-        gradingNotifications = st.preferences!.gradingNotifications;
-        deadlineReminders = st.preferences!.deadlineReminders;
-
-        themeMode = st.preferences!.themeMode;
-        profileVisibility = st.preferences!.profileVisibility;
-        showOnlineStatus = st.preferences!.showOnlineStatus;
-
-        
-        _cachedCreatedAt = st.profile!.createdAt ?? _cachedCreatedAt;
-        _cachedLastLoginAt = st.profile!.lastLoginAt ?? _cachedLastLoginAt;
-
-        _takeSnapshot();
-        setState(() {});
-      });
-    }
 
     
     _cachedCreatedAt = st.profile?.createdAt ?? _cachedCreatedAt;
@@ -533,14 +495,14 @@ return PopScope(
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text("Account Settings", style: AppText.h1),
+                        children: [
+                          Text('Account Settings', style: AppText.h1),
                           SizedBox(height: 6),
                           Text(
-                            "Manage your personal information, security credentials, and system preferences.",
+                            'Manage your personal information, security credentials, and system preferences.',
                             style: AppText.subtitle,
                           ),
                         ],
@@ -553,7 +515,7 @@ return PopScope(
                         SizedBox(
                           width: 120,
                           child: AppPrimaryLoadingButton(
-                            label: "Cancel",
+                            label: 'Cancel',
                             loading: false,
                             height: btnH,
                             onPressed: () {
@@ -565,8 +527,8 @@ return PopScope(
                               });
                               _toast(
                                 context,
-                                title: "Cancelled",
-                                message: "Changes discarded.",
+                                title: 'Cancelled',
+                                message: 'Changes discarded.',
                                 icon: Icons.info_outline_rounded,
                               );
                             },
@@ -579,7 +541,7 @@ return PopScope(
                         SizedBox(
                           width: 160,
                           child: AppPrimaryLoadingButton(
-                            label: "Save Changes",
+                            label: 'Save Changes',
                             height: btnH,
                             loading: st.savingProfile || st.savingPreferences,
                             onPressed: canSave
@@ -632,7 +594,7 @@ return PopScope(
                           _ProfileCard(
                             name: (st.profile?.fullName.isNotEmpty ?? false)
                                 ? st.profile!.fullName
-                                : "${firstName.text} ${lastName.text}".trim(),
+                                : '${firstName.text} ${lastName.text}'.trim(),
                             subtitle: st.profile?.email ?? universityEmailCtrl.text,
                             memberSince: _fmtMemberSince(_cachedCreatedAt),
                             lastLogin: _fmtLastLoginRelative(_cachedLastLoginAt),
@@ -720,8 +682,8 @@ return PopScope(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const AppSectionHeader(
-              title: "Personal Information",
-              subtitle: "Update your personal details here.",
+              title: 'Personal Information',
+              subtitle: 'Update your personal details here.',
             ),
             const SizedBox(height: 24),
             LayoutBuilder(
@@ -729,21 +691,21 @@ return PopScope(
                 final isWide = c.maxWidth >= 780;
 
                 final first = AppLabeledIconField(
-                  label: "First Name",
+                  label: 'First Name',
                   controller: firstName,
-                  hint: "First name",
+                  hint: 'First name',
                   icon: Icons.person_outline,
                   onChanged: (_) => setState(() {}),
-                  validator: (v) => _required(v, "First name is required"),
+                  validator: (v) => _required(v, 'First name is required'),
                 );
 
                 final last = AppLabeledIconField(
-                  label: "Last Name",
+                  label: 'Last Name',
                   controller: lastName,
-                  hint: "Last name",
+                  hint: 'Last name',
                   icon: Icons.person_outline,
                   onChanged: (_) => setState(() {}),
-                  validator: (v) => _required(v, "Last name is required"),
+                  validator: (v) => _required(v, 'Last name is required'),
                 );
 
                 final row = isWide
@@ -768,9 +730,9 @@ return PopScope(
                     const SizedBox(height: 16),
                     AbsorbPointer(
                       child: AppLabeledIconField(
-                        label: "University Email",
+                        label: 'University Email',
                         controller: universityEmailCtrl,
-                        hint: "University email",
+                        hint: 'University email',
                         icon: Icons.email_outlined,
                         keyboardType: TextInputType.emailAddress,
                         onChanged: (_) {},
@@ -783,18 +745,18 @@ return PopScope(
 
                         final id = AbsorbPointer(
                           child: AppLabeledIconField(
-                            label: "Student ID",
+                            label: 'Student ID',
                             controller: studentIdCtrl,
-                            hint: "Student ID",
+                            hint: 'Student ID',
                             icon: Icons.badge_outlined,
                             onChanged: (_) {},
                           ),
                         );
 
                         final phone = AppLabeledIconField(
-                          label: "Phone Number",
+                          label: 'Phone Number',
                           controller: phoneNumber,
-                          hint: "+1 ...",
+                          hint: '+1 ...',
                           icon: Icons.phone_outlined,
                           keyboardType: TextInputType.phone,
                           onChanged: (_) => setState(() {}),
@@ -820,9 +782,9 @@ return PopScope(
                     ),
                     const SizedBox(height: 16),
                     AppLabeledIconField(
-                      label: "Bio / Academic Interests",
+                      label: 'Bio / Academic Interests',
                       controller: bio,
-                      hint: "Write something...",
+                      hint: 'Write something...',
                       icon: Icons.edit_outlined,
                       onChanged: (_) => setState(() {}),
                       validator: (_) => null,
@@ -845,8 +807,8 @@ return PopScope(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const AppSectionHeader(
-              title: "Security",
-              subtitle: "Manage your password and authentication settings.",
+              title: 'Security',
+              subtitle: 'Manage your password and authentication settings.',
             ),
             const SizedBox(height: 24),
             LayoutBuilder(
@@ -856,13 +818,13 @@ return PopScope(
                 final left = Column(
                   children: [
                     AppLabeledIconField(
-                      label: "Current Password",
+                      label: 'Current Password',
                       controller: currentPassword,
-                      hint: "Enter current password",
+                      hint: 'Enter current password',
                       icon: Icons.lock_outline,
                       obscureText: _obscureCurrent,
                       onChanged: (_) => setState(() {}),
-                      validator: (v) => _required(v, "Current password is required"),
+                      validator: (v) => _required(v, 'Current password is required'),
                       suffix: IconButton(
                         icon: Icon(
                           _obscureCurrent
@@ -876,9 +838,9 @@ return PopScope(
                     ),
                     const SizedBox(height: 20),
                     AppLabeledIconField(
-                      label: "New Password",
+                      label: 'New Password',
                       controller: newPassword,
-                      hint: "Enter new password",
+                      hint: 'Enter new password',
                       icon: Icons.lock_outline,
                       obscureText: _obscureNew,
                       onChanged: (_) => setState(() {}),
@@ -896,9 +858,9 @@ return PopScope(
                     ),
                     const SizedBox(height: 20),
                     AppLabeledIconField(
-                      label: "Confirm New Password",
+                      label: 'Confirm New Password',
                       controller: confirmPassword,
-                      hint: "Confirm new password",
+                      hint: 'Confirm new password',
                       icon: Icons.lock_outline,
                       obscureText: _obscureConfirm,
                       onChanged: (_) => setState(() {}),
@@ -918,7 +880,7 @@ return PopScope(
                     Align(
                       alignment: Alignment.centerLeft,
                       child: AppPrimaryLoadingButton(
-                        label: "Update Password",
+                        label: 'Update Password',
                         loading: st.updatingPassword,
                         height: 40, 
                         onPressed: () {
@@ -927,8 +889,8 @@ return PopScope(
                           if (currentPassword.text == newPassword.text) {
                             _toast(
                               context,
-                              title: "Validation",
-                              message: "New password must be different",
+                              title: 'Validation',
+                              message: 'New password must be different',
                               icon: Icons.warning_amber_rounded,
                             );
                             return;
@@ -953,12 +915,12 @@ return PopScope(
                   children: [
                     Expanded(child: left),
                     const SizedBox(width: 32),
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
-                            "Tips",
+                            'Tips',
                             style: TextStyle(
                               fontWeight: FontWeight.w700,
                               fontSize: 14,
@@ -967,7 +929,7 @@ return PopScope(
                           ),
                           SizedBox(height: 8),
                           Text(
-                            "Use a strong password and avoid reusing it across services.",
+                            'Use a strong password and avoid reusing it across services.',
                             style: TextStyle(
                               fontWeight: FontWeight.w400,
                               fontSize: 14,
@@ -994,17 +956,17 @@ return PopScope(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const AppSectionHeader(
-            title: "Preferences",
-            subtitle: "Customize your system experience.",
+            title: 'Preferences',
+            subtitle: 'Customize your system experience.',
           ),
           const SizedBox(height: 24),
           AppModernDropdown<String>(
-            label: "Interface Language",
+            label: 'Interface Language',
             value: _language,
             items: const [
-              DropdownMenuItem(value: "English (US)", child: Text("English (US)")),
-              DropdownMenuItem(value: "English (UK)", child: Text("English (UK)")),
-              DropdownMenuItem(value: "Arabic", child: Text("Arabic")),
+              DropdownMenuItem(value: 'English (US)', child: Text('English (US)')),
+              DropdownMenuItem(value: 'English (UK)', child: Text('English (UK)')),
+              DropdownMenuItem(value: 'Arabic', child: Text('Arabic')),
             ],
             onChanged: (v) {
               if (v == null) return;
@@ -1013,12 +975,12 @@ return PopScope(
           ),
           const SizedBox(height: 16),
           AppModernDropdown<String>(
-            label: "Theme Mode",
+            label: 'Theme Mode',
             value: themeMode,
             items: const [
-              DropdownMenuItem(value: "light", child: Text("Light")),
-              DropdownMenuItem(value: "dark", child: Text("Dark")),
-              DropdownMenuItem(value: "system", child: Text("System")),
+              DropdownMenuItem(value: 'light', child: Text('Light')),
+              DropdownMenuItem(value: 'dark', child: Text('Dark')),
+              DropdownMenuItem(value: 'system', child: Text('System')),
             ],
             onChanged: (v) {
               if (v == null) return;
@@ -1027,12 +989,12 @@ return PopScope(
           ),
           const SizedBox(height: 16),
           AppModernDropdown<String>(
-            label: "Profile Visibility",
+            label: 'Profile Visibility',
             value: profileVisibility,
             items: const [
-              DropdownMenuItem(value: "public", child: Text("Public")),
-              DropdownMenuItem(value: "private", child: Text("Private")),
-              DropdownMenuItem(value: "connections", child: Text("Connections")),
+              DropdownMenuItem(value: 'public', child: Text('Public')),
+              DropdownMenuItem(value: 'private', child: Text('Private')),
+              DropdownMenuItem(value: 'connections', child: Text('Connections')),
             ],
             onChanged: (v) {
               if (v == null) return;
@@ -1040,8 +1002,9 @@ return PopScope(
             },
           ),
           const SizedBox(height: 16),
+          // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
-            title: "Show Online Status",
+            title: 'Show Online Status',
             subtitle: "Allow others to see when you're online.",
             value: showOnlineStatus,
             onChanged: (v) => setState(() => showOnlineStatus = v),
@@ -1058,48 +1021,54 @@ return PopScope(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const AppSectionHeader(
-            title: "Notifications",
-            subtitle: "Control how and when you receive updates.",
+            title: 'Notifications',
+            subtitle: 'Control how and when you receive updates.',
           ),
           const SizedBox(height: 24),
+          // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
-            title: "Email Notifications",
-            subtitle: "Receive notifications by email.",
+            title: 'Email Notifications',
+            subtitle: 'Receive notifications by email.',
             value: emailNotifications,
             onChanged: (v) => setState(() => emailNotifications = v),
           ),
           const SizedBox(height: 12),
+          // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
-            title: "Assignment Alerts",
-            subtitle: "Get notified when new assessments are posted.",
+            title: 'Assignment Alerts',
+            subtitle: 'Get notified when new assessments are posted.',
             value: assignmentAlerts,
             onChanged: (v) => setState(() => assignmentAlerts = v),
           ),
           const SizedBox(height: 12),
+          // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
-            title: "Course Updates",
-            subtitle: "Updates about your courses.",
+            title: 'Course Updates',
+            subtitle: 'Updates about your courses.',
             value: courseUpdates,
             onChanged: (v) => setState(() => courseUpdates = v),
           ),
           const SizedBox(height: 12),
+          // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
-            title: "Announcements",
-            subtitle: "Important announcements.",
+            title: 'Announcements',
+            subtitle: 'Important announcements.',
             value: announcementNotifications,
             onChanged: (v) => setState(() => announcementNotifications = v),
           ),
           const SizedBox(height: 12),
+          // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
-            title: "Grading Notifications",
-            subtitle: "Grades & evaluation updates.",
+            title: 'Grading Notifications',
+            subtitle: 'Grades & evaluation updates.',
             value: gradingNotifications,
             onChanged: (v) => setState(() => gradingNotifications = v),
           ),
           const SizedBox(height: 12),
+          // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
-            title: "Deadline Reminders",
-            subtitle: "Reminders before deadlines.",
+            title: 'Deadline Reminders',
+            subtitle: 'Reminders before deadlines.',
             value: deadlineReminders,
             onChanged: (v) => setState(() => deadlineReminders = v),
           ),
@@ -1113,11 +1082,11 @@ return PopScope(
       builder: (context, c) {
         final narrow = c.maxWidth < 560;
 
-        final textContent = Column(
+        const textContent = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          children: const [
+          children: [
             Text(
-              "Danger Zone",
+              'Danger Zone',
               style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 18,
@@ -1126,7 +1095,7 @@ return PopScope(
             ),
             SizedBox(height: 6),
             Text(
-              "Once you delete your account, there is no going back. Please be certain.",
+              'Once you delete your account, there is no going back. Please be certain.',
               style: TextStyle(
                 fontWeight: FontWeight.w400,
                 fontSize: 14,
@@ -1138,7 +1107,7 @@ return PopScope(
         );
 
         final button = AppPrimaryLoadingButton(
-          label: "Delete Account",
+          label: 'Delete Account',
           loading: st.deleting,
           onPressed: () => _openDeleteDialog(context),
           height: 40,
@@ -1165,7 +1134,7 @@ return PopScope(
                 )
               : Row(
                   children: [
-                    Expanded(child: textContent),
+                    const Expanded(child: textContent),
                     const SizedBox(width: 16),
                     SizedBox(width: 170, child: button),
                   ],
@@ -1233,14 +1202,14 @@ return PopScope(
     switch (code) {
       case 'en_US':
       case 'en':
-        return "English (US)";
+        return 'English (US)';
       case 'en_GB':
-        return "English (UK)";
+        return 'English (UK)';
       case 'ar_EG':
       case 'ar':
-        return "Arabic";
+        return 'Arabic';
       default:
-        return "English (US)";
+        return 'English (US)';
     }
   }
 
@@ -1249,14 +1218,20 @@ return PopScope(
     BuildContext context, {
     required String title,
     required String message,
-    required IconData icon,
+    AppToastType type = AppToastType.info,
+    // icon param kept for call-site compatibility but ignored
+    IconData? icon,
   }) {
-    AppToast.show(
-      context,
-      title: title,
-      message: message,
-      icon: icon,
-    );
+    switch (type) {
+      case AppToastType.success:
+        AppToast.success(context, title: title, message: message);
+      case AppToastType.warning:
+        AppToast.warning(context, title: title, message: message);
+      case AppToastType.error:
+        AppToast.error(context, title: title, message: message);
+      case AppToastType.info:
+        AppToast.info(context, title: title, message: message);
+    }
   }
 }
 
@@ -1312,11 +1287,10 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
   Future<void> _requestOtp() async {
     final pass = _passCtrl.text.trim();
     if (pass.isEmpty) {
-      AppToast.show(
+      AppToast.warning(
         context,
-        title: "Validation",
-        message: "Password is required",
-        icon: Icons.warning_amber_rounded,
+        title: 'Validation',
+        message: 'Password is required',
       );
       return;
     }
@@ -1331,7 +1305,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
         _otpStep = true;
         _otpCtrl.clear();
       });
-      _startCountdown(60);
+      _startCountdown();
     }
   }
 
@@ -1340,11 +1314,10 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
     final valid = RegExp(r'^[a-zA-Z0-9]{6}$').hasMatch(otp);
 
     if (!valid) {
-      AppToast.show(
+      AppToast.warning(
         context,
-        title: "Validation",
-        message: "Enter a valid 6-digit OTP",
-        icon: Icons.warning_amber_rounded,
+        title: 'Validation',
+        message: 'Enter a valid 6-digit OTP',
       );
       return;
     }
@@ -1356,7 +1329,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
     if (!mounted) return;
     if (ok) {
       
-      ref.read(authRepositoryProvider).logout();
+      await ref.read(authRepositoryProvider).logout();
 
       if (context.mounted) {
         Navigator.of(context).pop();
@@ -1371,10 +1344,10 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
     final st = ref.watch(settingsControllerProvider);
     final isBusy = st.deleting;
 
-    final title = _otpStep ? "Confirm deletion" : "Delete account";
+    final title = _otpStep ? 'Confirm deletion' : 'Delete account';
     final subtitle = _otpStep
-        ? "Enter the 6-digit code sent to your email to confirm deletion."
-        : "We’ll send a one-time code to confirm. This action can’t be undone.";
+        ? 'Enter the 6-digit code sent to your email to confirm deletion.'
+        : 'We’ll send a one-time code to confirm. This action can’t be undone.';
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
@@ -1407,9 +1380,9 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
               // step pills
               Row(
                 children: [
-                  _StepPill(active: !_otpStep, label: "1  Password"),
+                  _StepPill(active: !_otpStep, label: '1  Password'),
                   const SizedBox(width: 8),
-                  _StepPill(active: _otpStep, label: "2  OTP"),
+                  _StepPill(active: _otpStep, label: '2  OTP'),
                 ],
               ),
               const SizedBox(height: 16),
@@ -1422,14 +1395,14 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: AppColors.dangerBorder),
                 ),
-                child: Row(
+                child: const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: const [
+                  children: [
                     Icon(Icons.warning_amber_rounded, color: Color(0xFFDC2626), size: 20),
                     SizedBox(width: 10),
                     Expanded(
                       child: Text(
-                        "Deleting your account is permanent. You’ll lose access to your data.",
+                        'Deleting your account is permanent. You’ll lose access to your data.',
                         style: TextStyle(
                           color: Color(0xCCDC2626),
                           height: 20 / 14,
@@ -1444,9 +1417,9 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
 
               if (!_otpStep)
                 AppLabeledIconField(
-                  label: "Current Password",
+                  label: 'Current Password',
                   controller: _passCtrl,
-                  hint: "••••••••",
+                  hint: '••••••••',
                   icon: Icons.lock_outline,
                   obscureText: _obscurePass,
                   onChanged: (_) => setState(() {}),
@@ -1467,9 +1440,9 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     AppLabeledIconField(
-                      label: "OTP",
+                      label: 'OTP',
                       controller: _otpCtrl,
-                      hint: "6-digit code",
+                      hint: '6-digit code',
                       icon: Icons.verified_outlined,
                       keyboardType: TextInputType.number,
                       onChanged: (_) => setState(() {}),
@@ -1478,7 +1451,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                     Row(
                       children: [
                         const Text(
-                          "Didn’t get the code?",
+                          'Didn’t get the code?',
                           style: TextStyle(color: AppColors.muted, fontSize: 13),
                         ),
                         const SizedBox(width: 8),
@@ -1490,8 +1463,8 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                                 },
                           child: Text(
                             _secondsLeft > 0
-                                ? "Resend in ${_mmss(_secondsLeft)}"
-                                : "Resend code",
+                                ? 'Resend in ${_mmss(_secondsLeft)}'
+                                : 'Resend code',
                           ),
                         ),
                       ],
@@ -1504,7 +1477,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                 children: [
                   Expanded(
                     child: AppPrimaryLoadingButton(
-                      label: _otpStep ? "Back" : "Cancel",
+                      label: _otpStep ? 'Back' : 'Cancel',
                       loading: false,
                       onPressed: isBusy
                           ? null
@@ -1524,7 +1497,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                   const SizedBox(width: 12),
                   Expanded(
                     child: AppPrimaryLoadingButton(
-                      label: _otpStep ? "Confirm delete" : "Request OTP",
+                      label: _otpStep ? 'Confirm delete' : 'Request OTP',
                       loading: isBusy,
                       onPressed: isBusy
                           ? null
@@ -1723,13 +1696,13 @@ class _ProfileCard extends StatelessWidget {
                     color: AppColors.successBg,
                     borderRadius: BorderRadius.circular(9999),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
+                    children: [
                       _Dot(color: AppColors.successDot),
                       SizedBox(width: 6),
                       Text(
-                        "Active Status",
+                        'Active Status',
                         style: TextStyle(
                           fontWeight: FontWeight.w500,
                           fontSize: 12,
@@ -1754,9 +1727,9 @@ class _ProfileCard extends StatelessWidget {
               ),
               child: Column(
                 children: [
-                  _TwoColRow(left: "Member since", right: memberSince),
+                  _TwoColRow(left: 'Member since', right: memberSince),
                   const SizedBox(height: 8),
-                  _TwoColRow(left: "Last login", right: lastLogin),
+                  _TwoColRow(left: 'Last login', right: lastLogin),
                 ],
               ),
             ),
@@ -1849,25 +1822,25 @@ class _NavCard extends StatelessWidget {
         children: [
           _NavItem(
             selected: selectedIndex == 0,
-            label: "Personal Info",
+            label: 'Personal Info',
             icon: Icons.person_outline,
             onTap: () => onSelect(0),
           ),
           _NavItem(
             selected: selectedIndex == 1,
-            label: "Security",
+            label: 'Security',
             icon: Icons.lock_outline,
             onTap: () => onSelect(1),
           ),
           _NavItem(
             selected: selectedIndex == 2,
-            label: "Preferences",
+            label: 'Preferences',
             icon: Icons.tune_rounded,
             onTap: () => onSelect(2),
           ),
           _NavItem(
             selected: selectedIndex == 3,
-            label: "Notifications",
+            label: 'Notifications',
             icon: Icons.notifications_none_rounded,
             onTap: () => onSelect(3),
           ),
@@ -1992,7 +1965,7 @@ class _SettingsSkeleton extends StatelessWidget {
                 children: [
                   _line(h: 22, w: 220),
                   const SizedBox(height: 8),
-                  _line(h: 14, w: 520),
+                  _line(w: 520),
                 ],
               ),
             ),

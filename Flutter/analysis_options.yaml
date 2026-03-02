@@ -16,6 +16,11 @@ analyzer:
     unused_element: ignore
     inference_failure_on_function_invocation: ignore
     deprecated_member_use: ignore
+    inference_failure_on_function_return_type: ignore
+    use_build_context_synchronously: ignore
+    inference_failure_on_untyped_parameter: ignore
+    inference_failure_on_instance_creation: ignore
+    flutter_style_todos: ignore
   exclude:
     - "**/*.g.dart"
     - "**/*.freezed.dart"

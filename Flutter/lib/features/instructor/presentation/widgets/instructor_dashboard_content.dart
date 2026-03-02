@@ -30,14 +30,14 @@ class InstructorDashboardContent extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _Breadcrumb(items: const [
+                const _Breadcrumb(items: [
                   'Home',
                   'Instructor Dashboard',
                 ]),
                 const SizedBox(height: 10),
                 Text(
                   'Welcome back, $userName',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 26,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.3,
@@ -101,22 +101,22 @@ class InstructorDashboardContent extends StatelessWidget {
                   direction: isTwoColStacked ? Axis.vertical : Axis.horizontal,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
+                    const Expanded(
                       flex: 7,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           _SectionHeader(title: 'Recent Activity', actionText: 'View All'),
                           _ActivityCard(),
                         ],
                       ),
                     ),
                     SizedBox(width: isTwoColStacked ? 0 : 20, height: isTwoColStacked ? 20 : 0),
-                    Expanded(
+                    const Expanded(
                       flex: 4,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text(
                             'Quick Actions',
                             style: TextStyle(
@@ -351,8 +351,8 @@ class _ActivityCard extends StatelessWidget {
           BoxShadow(color: Color(0x0A000000), blurRadius: 3, offset: Offset(0, 1)),
         ],
       ),
-      child: Column(
-        children: const [
+      child: const Column(
+        children: [
           _ActivityRow(
             iconBg: Color(0xFFF3E8FF),
             iconColor: Color(0xFF9333EA),
@@ -503,7 +503,7 @@ class _QuickActionsCard extends StatelessWidget {
 
         const tileH = 78.0;
 
-        final tiles = const [
+        const tiles = [
           _QuickTile(icon: Icons.cloud_upload_outlined, label: 'Upload Material'),
           _QuickTile(icon: Icons.auto_awesome_rounded, label: 'Generate Quiz'),
           _QuickTile(icon: Icons.fact_check_outlined, label: 'Review Bank'),

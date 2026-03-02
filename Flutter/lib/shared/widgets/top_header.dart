@@ -22,9 +22,9 @@ class TopHeaderWidget extends StatelessWidget {
   const TopHeaderWidget({
     super.key,
     required this.searchController,
-    this.searchHint = "Search topics, questions, or students...",
-    this.userName = "Alex Morgan",
-    this.userSubtitle = "Computer Science Dept.",
+    this.searchHint = 'Search topics, questions, or students...',
+    this.userName = 'Alex Morgan',
+    this.userSubtitle = 'Computer Science Dept.',
     this.avatarUrl,
     this.notificationsCount = 0,
     this.onSearchChanged,
@@ -60,7 +60,6 @@ class TopHeaderWidget extends StatelessWidget {
         border: Border(bottom: BorderSide(color: _bottomBorder)),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           if (isDrawerMode) ...[
             _HeaderIconButton(
@@ -219,7 +218,7 @@ class _NotifIcon extends StatelessWidget {
   }
 }
 
-/// ✅ Modern menu trigger بدون hover
+/// ✅ Modern menu trigger — no hover state needed
 class _ModernHeaderProfileMenu extends StatefulWidget {
   final String name;
   final String subtitle;
@@ -253,7 +252,6 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
     final action = await showFigmaUmMenu<String>(
       context: context,
       anchorKey: _anchorKey,
-      minWidth: 180,
       maxWidth: 220,
       entries: const [
         FigmaUmMenuEntry.item(

@@ -15,11 +15,10 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
   bool isYearly = false;
 
   void _comingSoon(String action) {
-    AppToast.show(
+    AppToast.info(
       context,
-      title: "Coming soon",
-      message: "$action is coming soon.",
-      icon: Icons.info_rounded,
+      title: 'Coming soon',
+      message: '$action is coming soon.',
     );
   }
 
@@ -33,7 +32,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
         const proMonthly = 99;
         const proYearlyMonthlyEquivalent = 79; // "save" when billed yearly
         const monthsInYear = 12;
-        final proYearlyBilled = proYearlyMonthlyEquivalent * monthsInYear;
+        const proYearlyBilled = proYearlyMonthlyEquivalent * monthsInYear;
 
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
@@ -41,10 +40,9 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 1200),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   const Text(
-                    "Ready to scale your institution?",
+                    'Ready to scale your institution?',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 34,
@@ -55,7 +53,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    "Choose a plan that fits your needs. Get savings with a yearly subscription.",
+                    'Choose a plan that fits your needs. Get savings with a yearly subscription.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 14.5,
@@ -75,19 +73,19 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                   const SizedBox(height: 28),
 
                   if (isNarrow) ...[
-                    UpgradePlanCard(
-                      title: "Starter",
-                      price: "Free",
-                      period: "",
+                    const UpgradePlanCard(
+                      title: 'Starter',
+                      price: 'Free',
+                      period: '',
                       description:
-                          "Essential features for small teams and test projects.",
-                      features: const [
-                        "Up to 50 Users",
-                        "Basic Analytics",
-                        "Community Support",
-                        "1GB Storage",
+                          'Essential features for small teams and test projects.',
+                      features: [
+                        'Up to 50 Users',
+                        'Basic Analytics',
+                        'Community Support',
+                        '1GB Storage',
                       ],
-                      buttonText: "Current Plan",
+                      buttonText: 'Current Plan',
                       isPopular: false,
                       isCurrent: true,
                       tone: UpgradeTone.neutral,
@@ -95,68 +93,68 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                     ),
                     const SizedBox(height: 16),
                     UpgradePlanCard(
-                      title: "Professional",
+                      title: 'Professional',
                       price: isYearly
                           ? proYearlyMonthlyEquivalent.toString()
                           : proMonthly.toString(),
-                      period: isYearly ? "/mo (billed yearly)" : "/month",
+                      period: isYearly ? '/mo (billed yearly)' : '/month',
                       subPriceText:
-                          isYearly ? "\$$proYearlyBilled billed yearly" : null,
+                          isYearly ? '\$$proYearlyBilled billed yearly' : null,
                       description:
-                          "Advanced features for growing schools and institutes.",
+                          'Advanced features for growing schools and institutes.',
                       features: const [
-                        "Unlimited Users",
-                        "Advanced Analytics",
-                        "Priority Email Support",
-                        "100GB Storage",
-                        "Custom Domain",
-                        "API Access",
+                        'Unlimited Users',
+                        'Advanced Analytics',
+                        'Priority Email Support',
+                        '100GB Storage',
+                        'Custom Domain',
+                        'API Access',
                       ],
-                      buttonText: "Upgrade Now",
+                      buttonText: 'Upgrade Now',
                       isPopular: true,
                       isCurrent: false,
                       tone: UpgradeTone.primary,
-                      onPressed: () => _comingSoon("Upgrade"),
+                      onPressed: () => _comingSoon('Upgrade'),
                     ),
                     const SizedBox(height: 16),
                     UpgradePlanCard(
-                      title: "Enterprise",
-                      price: "Custom",
-                      period: "",
+                      title: 'Enterprise',
+                      price: 'Custom',
+                      period: '',
                       description:
-                          "Full-scale solution for large universities and enterprises.",
+                          'Full-scale solution for large universities and enterprises.',
                       features: const [
-                        "On-premise Hosting",
-                        "Custom Integrations",
-                        "Dedicated Manager",
-                        "SLA Support",
-                        "Unlimited Storage",
-                        "White-labeling",
+                        'On-premise Hosting',
+                        'Custom Integrations',
+                        'Dedicated Manager',
+                        'SLA Support',
+                        'Unlimited Storage',
+                        'White-labeling',
                       ],
-                      buttonText: "Contact Sales",
+                      buttonText: 'Contact Sales',
                       isPopular: false,
                       isCurrent: false,
                       tone: UpgradeTone.neutral,
-                      onPressed: () => _comingSoon("Contact Sales"),
+                      onPressed: () => _comingSoon('Contact Sales'),
                     ),
                   ] else ...[
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
+                        const Expanded(
                           child: UpgradePlanCard(
-                            title: "Starter",
-                            price: "Free",
-                            period: "",
+                            title: 'Starter',
+                            price: 'Free',
+                            period: '',
                             description:
-                                "Essential features for small teams and test projects.",
-                            features: const [
-                              "Up to 50 Users",
-                              "Basic Analytics",
-                              "Community Support",
-                              "1GB Storage",
+                                'Essential features for small teams and test projects.',
+                            features: [
+                              'Up to 50 Users',
+                              'Basic Analytics',
+                              'Community Support',
+                              '1GB Storage',
                             ],
-                            buttonText: "Current Plan",
+                            buttonText: 'Current Plan',
                             isPopular: false,
                             isCurrent: true,
                             tone: UpgradeTone.neutral,
@@ -166,52 +164,52 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                         const SizedBox(width: 18),
                         Expanded(
                           child: UpgradePlanCard(
-                            title: "Professional",
+                            title: 'Professional',
                             price: isYearly
                                 ? proYearlyMonthlyEquivalent.toString()
                                 : proMonthly.toString(),
-                            period: isYearly ? "/mo (billed yearly)" : "/month",
+                            period: isYearly ? '/mo (billed yearly)' : '/month',
                             subPriceText: isYearly
-                                ? "\$$proYearlyBilled billed yearly"
+                                ? '\$$proYearlyBilled billed yearly'
                                 : null,
                             description:
-                                "Advanced features for growing schools and institutes.",
+                                'Advanced features for growing schools and institutes.',
                             features: const [
-                              "Unlimited Users",
-                              "Advanced Analytics",
-                              "Priority Email Support",
-                              "100GB Storage",
-                              "Custom Domain",
-                              "API Access",
+                              'Unlimited Users',
+                              'Advanced Analytics',
+                              'Priority Email Support',
+                              '100GB Storage',
+                              'Custom Domain',
+                              'API Access',
                             ],
-                            buttonText: "Upgrade Now",
+                            buttonText: 'Upgrade Now',
                             isPopular: true,
                             isCurrent: false,
                             tone: UpgradeTone.primary,
-                            onPressed: () => _comingSoon("Upgrade"),
+                            onPressed: () => _comingSoon('Upgrade'),
                           ),
                         ),
                         const SizedBox(width: 18),
                         Expanded(
                           child: UpgradePlanCard(
-                            title: "Enterprise",
-                            price: "Custom",
-                            period: "",
+                            title: 'Enterprise',
+                            price: 'Custom',
+                            period: '',
                             description:
-                                "Full-scale solution for large universities and enterprises.",
+                                'Full-scale solution for large universities and enterprises.',
                             features: const [
-                              "On-premise Hosting",
-                              "Custom Integrations",
-                              "Dedicated Manager",
-                              "SLA Support",
-                              "Unlimited Storage",
-                              "White-labeling",
+                              'On-premise Hosting',
+                              'Custom Integrations',
+                              'Dedicated Manager',
+                              'SLA Support',
+                              'Unlimited Storage',
+                              'White-labeling',
                             ],
-                            buttonText: "Contact Sales",
+                            buttonText: 'Contact Sales',
                             isPopular: false,
                             isCurrent: false,
                             tone: UpgradeTone.neutral,
-                            onPressed: () => _comingSoon("Contact Sales"),
+                            onPressed: () => _comingSoon('Contact Sales'),
                           ),
                         ),
                       ],
@@ -234,7 +232,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                             size: 18, color: Color(0xFF64748B)),
                         SizedBox(width: 10),
                         Text(
-                          "Secure payments · Cancel anytime · Invoice available",
+                          'Secure payments · Cancel anytime · Invoice available',
                           style: TextStyle(
                             color: Color(0xFF64748B),
                             fontWeight: FontWeight.w700,

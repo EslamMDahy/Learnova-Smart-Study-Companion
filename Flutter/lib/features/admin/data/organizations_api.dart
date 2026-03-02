@@ -27,9 +27,9 @@ class OrganizationsApi {
     }
 
     final payload = <String, dynamic>{
-      "name": n,
-      "description": d,
-      if (l != null && l.isNotEmpty) "logo_url": l,
+      'name': n,
+      'description': d,
+      if (l != null && l.isNotEmpty) 'logo_url': l,
     };
 
     final res = await _client.post<Map<String, dynamic>>(
@@ -69,10 +69,10 @@ class OrganizationsApi {
     final safePageSize = pageSize <= 0 ? 10 : pageSize;
 
     final q = <String, dynamic>{
-      "view": safeView,
-      "page": safePage,
-      "page_size": safePageSize,
-      if (search != null && search.trim().isNotEmpty) "search": search.trim(),
+      'view': safeView,
+      'page': safePage,
+      'page_size': safePageSize,
+      if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
     };
 
     final res = await _client.get<Map<String, dynamic>>(
@@ -115,7 +115,7 @@ class OrganizationsApi {
 
     final res = await _client.patch<Map<String, dynamic>>(
       Endpoints.updateMemberStatus(orgId, mId),
-      data: {"new_status": status},
+      data: {'new_status': status},
     );
 
     final data = res.data;

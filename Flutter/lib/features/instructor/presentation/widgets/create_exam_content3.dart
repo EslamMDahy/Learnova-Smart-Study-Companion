@@ -31,7 +31,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
         ),
         const SizedBox(width: 32),
         
-        Expanded(flex: 1, child: _buildQuizSummaryCard()),
+        Expanded(child: _buildQuizSummaryCard()),
       ],
     );
   }
@@ -41,25 +41,25 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
     return _buildSectionCard(
       icon: Icons.timer_outlined,
       iconColor: const Color(0xFF137FEC),
-      title: "Timing & Attempts",
-      subtitle: "Control how students access and take the quiz.",
+      title: 'Timing & Attempts',
+      subtitle: 'Control how students access and take the quiz.',
       child: Column(
         children: [
           Row(
             children: [
               Expanded(
                 child: _buildInputField(
-                  label: "Time Limit",
-                  hint: "60",
-                  suffix: "Minutes",
-                  helperText: "Leave blank for no time limit.",
+                  label: 'Time Limit',
+                  hint: '60',
+                  suffix: 'Minutes',
+                  helperText: 'Leave blank for no time limit.',
                 ),
               ),
               const SizedBox(width: 20),
               Expanded(
                 child: _buildDropdownField(
-                  label: "Allowed Attempts",
-                  value: "Unlimited",
+                  label: 'Allowed Attempts',
+                  value: 'Unlimited',
                 ),
               ),
             ],
@@ -69,17 +69,17 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
             children: [
               Expanded(
                 child: _buildDropdownField(
-                  label: "Grading Criteria",
-                  value: "Highest Score",
+                  label: 'Grading Criteria',
+                  value: 'Highest Score',
                   helperText:
-                      "Determines which score is recorded in the gradebook.",
+                      'Determines which score is recorded in the gradebook.',
                 ),
               ),
               const SizedBox(width: 20),
               Expanded(
                 child: _buildInputField(
-                  label: "Due Date",
-                  hint: "mm/dd/yyyy, --:-- --",
+                  label: 'Due Date',
+                  hint: 'mm/dd/yyyy, --:-- --',
                   suffixIcon: Icons.calendar_today_outlined,
                 ),
               ),
@@ -95,30 +95,30 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
     return _buildSectionCard(
       icon: Icons.settings_outlined,
       iconColor: Colors.purple,
-      title: "Display & Security",
-      subtitle: "Manage question behavior and result visibility.",
+      title: 'Display & Security',
+      subtitle: 'Manage question behavior and result visibility.',
       child: Column(
         children: [
           _buildSwitchTile(
-            title: "Shuffle Questions",
+            title: 'Shuffle Questions',
             subtitle:
-                "Randomize the order of questions for each student attempt.",
+                'Randomize the order of questions for each student attempt.',
             value: _shuffleQuestions,
             onChanged: (v) => setState(() => _shuffleQuestions = v),
           ),
           const Divider(height: 32),
           _buildSwitchTile(
-            title: "Show Results Immediately",
+            title: 'Show Results Immediately',
             subtitle:
-                "Students see their score and correct answers upon submission.",
+                'Students see their score and correct answers upon submission.',
             value: _showResults,
             onChanged: (v) => setState(() => _showResults = v),
           ),
           const Divider(height: 32),
           _buildSwitchTile(
-            title: "One Question at a Time",
+            title: 'One Question at a Time',
             subtitle:
-                "Prevent students from seeing upcoming questions or going back.",
+                'Prevent students from seeing upcoming questions or going back.',
             value: _oneAtATime,
             onChanged: (v) => setState(() => _oneAtATime = v),
           ),
@@ -140,7 +140,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Quiz Summary",
+            'Quiz Summary',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               fontSize: 18,
@@ -148,17 +148,17 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
             ),
           ),
           const SizedBox(height: 24),
-          _summaryRow("Total Questions", "15"),
+          _summaryRow('Total Questions', '15'),
           const Divider(height: 32, color: Color(0xFFF1F5F9)),
-          _summaryRow("Total Points", "100"),
+          _summaryRow('Total Points', '100'),
           const Divider(height: 32, color: Color(0xFFF1F5F9)),
-          _summaryRow("Difficulty", "Medium", color: Colors.orange),
+          _summaryRow('Difficulty', 'Medium', color: Colors.orange),
           const SizedBox(height: 24),
           _buildInfoBox(),
           const SizedBox(height: 24),
           _summaryButton(
             Icons.visibility_outlined,
-            "Preview as Student",
+            'Preview as Student',
             Colors.black87,
           ),
         ],
@@ -362,17 +362,17 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
         color: const Color(0xFFF0F9FF),
         borderRadius: BorderRadius.circular(8),
       ),
-      child: Row(
+      child: const Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.info_outline, size: 18, color: Color(0xFF0EA5E9)),
-          const SizedBox(width: 10),
+          Icon(Icons.info_outline, size: 18, color: Color(0xFF0EA5E9)),
+          SizedBox(width: 10),
           Expanded(
             child: Text(
-              "This quiz is currently saved as a draft. Publishing will make it visible to enrolled students immediately or on the scheduled date.",
+              'This quiz is currently saved as a draft. Publishing will make it visible to enrolled students immediately or on the scheduled date.',
               style: TextStyle(
                 fontSize: 11,
-                color: const Color(0xFF617589),
+                color: Color(0xFF617589),
                 height: 1.4,
               ),
             ),

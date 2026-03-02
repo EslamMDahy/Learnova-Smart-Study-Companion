@@ -19,7 +19,7 @@ class VerifyEmailController extends StateNotifier<VerifyEmailState> {
 
   void clearError() {
     if (state.error != null) {
-      state = state.copyWith(error: null);
+      state = state.copyWith();
     }
   }
 
@@ -34,7 +34,7 @@ class VerifyEmailController extends StateNotifier<VerifyEmailState> {
   Future<bool> verify(String token) async {
     final t = token.trim();
     if (t.isEmpty) {
-      setError("Invalid verification link. Please request a new one.");
+      setError('Invalid verification link. Please request a new one.');
       return false;
     }
 

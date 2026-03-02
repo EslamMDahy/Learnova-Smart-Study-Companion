@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../../../core/theme/app_theme.dart';
 
-/// Upload Course Materials dialog — matches Figma Container__2_ design.
-/// Primary color: AppColors.primary (0xFF137FEC).
+/// Upload Course Materials dialog.
+/// NOTE: Backend currently validates PDF only (max 50MB).
 class UploadMaterialsDialog extends StatefulWidget {
   const UploadMaterialsDialog({super.key});
 
@@ -10,12 +11,11 @@ class UploadMaterialsDialog extends StatefulWidget {
 }
 
 class _UploadMaterialsDialogState extends State<UploadMaterialsDialog> {
-  bool _isDragging = false;
+  final bool _isDragging = false;
 
-  static const _blue = Color(0xFF137FEC);
-  static const _border = Color(0xFFE2E8F0);
-  static const _text = Color(0xFF111418);
-  static const _muted = Color(0xFF617589);
+  static const _border = AppColors.border;
+  static const _text = AppColors.textTitle;
+  static const _muted = AppColors.textMuted;
 
   @override
   Widget build(BuildContext context) {
@@ -48,12 +48,12 @@ class _UploadMaterialsDialogState extends State<UploadMaterialsDialog> {
                     TextSpan(text: 'Add resources for the AI to analyze and generate study aids.\n'),
                     TextSpan(text: 'Supported formats: '),
                     TextSpan(
-                      text: 'PDF, DOCX, PPTX, MP4',
+                      text: 'PDF only',
                       style: TextStyle(fontWeight: FontWeight.w700, color: _text),
                     ),
                     TextSpan(text: '. Max file size: '),
                     TextSpan(
-                      text: '500MB',
+                      text: '50MB',
                       style: TextStyle(fontWeight: FontWeight.w700, color: _text),
                     ),
                     TextSpan(text: '.'),
@@ -97,7 +97,7 @@ class _UploadMaterialsDialogState extends State<UploadMaterialsDialog> {
                       style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
                     ),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: _blue,
+                      backgroundColor: AppColors.primary,
                       elevation: 0,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
@@ -119,12 +119,12 @@ class _DragDropArea extends StatelessWidget {
   final bool isDragging;
   const _DragDropArea({required this.isDragging});
 
-  static const _blue = Color(0xFF137FEC);
+  static const _blue = AppColors.primary;
   static const _blueCircle = Color(0xFFD0EAFC);
-  static const _bg = Color(0xFFF8FAFC);
-  static const _borderColor = Color(0xFFBFDBFE);
-  static const _muted = Color(0xFF617589);
-  static const _text = Color(0xFF111418);
+  static const _bg = AppColors.pageBg;
+  static const _borderColor = AppColors.border;
+  static const _muted = AppColors.textMuted;
+  static const _text = AppColors.textTitle;
 
   @override
   Widget build(BuildContext context) {
@@ -182,7 +182,7 @@ class _DragDropArea extends StatelessWidget {
               ElevatedButton(
                 onPressed: () {},
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: _blue,
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
@@ -304,9 +304,9 @@ class _UploadQueue extends StatelessWidget {
           const SizedBox(height: 16),
 
           // File items
-          _QueueItem(
+          const _QueueItem(
             icon: Icons.picture_as_pdf_rounded,
-            iconColor: const Color(0xFFEF4444),
+            iconColor: Color(0xFFEF4444),
             name: 'Lecture_04_Neural_Nets.pdf',
             sub: '2.4 MB',
             progress: 0.45,
@@ -314,17 +314,17 @@ class _UploadQueue extends StatelessWidget {
             showClose: true,
           ),
           const SizedBox(height: 14),
-          _QueueItem(
+          const _QueueItem(
             icon: Icons.description_rounded,
-            iconColor: const Color(0xFF137FEC),
+            iconColor: Color(0xFF137FEC),
             name: 'Assignment_Brief_v2.docx',
             sub: 'AI Analyzing Content...',
             isAnalyzing: true,
           ),
           const SizedBox(height: 14),
-          _QueueItem(
+          const _QueueItem(
             icon: Icons.video_file_rounded,
-            iconColor: const Color(0xFF9333EA),
+            iconColor: Color(0xFF9333EA),
             name: 'Guest_Speaker_Session.mp4',
             sub: 'Ready for Review',
             isDone: true,
@@ -423,8 +423,8 @@ class _QueueItem extends StatelessWidget {
                   valueColor: const AlwaysStoppedAnimation(Color(0xFF137FEC)),
                 ),
               ] else if (isAnalyzing) ...[ 
-                Row(
-                  children: const [
+                const Row(
+                  children: [
                     Icon(Icons.sync_rounded, size: 13, color: Color(0xFF9333EA)),
                     SizedBox(width: 4),
                     Text(
@@ -441,8 +441,8 @@ class _QueueItem extends StatelessWidget {
                   valueColor: const AlwaysStoppedAnimation(Color(0xFF9333EA)),
                 ),
               ] else if (isDone) ...[ 
-                Row(
-                  children: const [
+                const Row(
+                  children: [
                     Icon(Icons.check_circle_rounded, size: 13, color: Color(0xFF16A34A)),
                     SizedBox(width: 4),
                     Text(

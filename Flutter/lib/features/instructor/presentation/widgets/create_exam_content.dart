@@ -34,7 +34,7 @@ class _CreateExamContentState extends State<CreateExamContent> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    "Create New Exam",
+                    'Create New Exam',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -48,8 +48,8 @@ class _CreateExamContentState extends State<CreateExamContent> {
                         : widget.currentStep == 2
                         ? 'Add Questions'
                         : 'Settings'}",
-                    style: TextStyle(
-                      color: const Color(0xFF617589),
+                    style: const TextStyle(
+                      color: Color(0xFF617589),
                       fontSize: 14,
                     ),
                   ),
@@ -57,9 +57,9 @@ class _CreateExamContentState extends State<CreateExamContent> {
               ),
               Row(
                 children: [
-                  _headerActionBtn("Save Draft", isPrimary: false),
+                  _headerActionBtn('Save Draft', isPrimary: false),
                   const SizedBox(width: 12),
-                  _headerActionBtn("Publish Quiz", isPrimary: true),
+                  _headerActionBtn('Publish Quiz', isPrimary: true),
                 ],
               ),
             ],
@@ -71,21 +71,21 @@ class _CreateExamContentState extends State<CreateExamContent> {
             children: [
               _buildStepItem(
                 stepNumber: 1,
-                label: "1. Basic Details",
+                label: '1. Basic Details',
                 isActive: widget.currentStep == 1,
                 isCompleted: widget.currentStep > 1,
               ),
               _buildDivider(),
               _buildStepItem(
                 stepNumber: 2,
-                label: "2. Add Questions",
+                label: '2. Add Questions',
                 isActive: widget.currentStep == 2,
                 isCompleted: widget.currentStep > 2,
               ),
               _buildDivider(),
               _buildStepItem(
                 stepNumber: 3,
-                label: "3. Settings",
+                label: '3. Settings',
                 isActive: widget.currentStep == 3,
                 isCompleted: widget.currentStep > 3,
               ),
@@ -111,8 +111,8 @@ class _CreateExamContentState extends State<CreateExamContent> {
                   icon: const Icon(Icons.arrow_back, size: 18),
                   label: Text(
                     widget.currentStep == 1
-                        ? "Back to Dashboard"
-                        : "Back to Previous",
+                        ? 'Back to Dashboard'
+                        : 'Back to Previous',
                     style: const TextStyle(
                       fontWeight: FontWeight.w600,
                       color: Color(0xFF0F172A),
@@ -143,7 +143,7 @@ class _CreateExamContentState extends State<CreateExamContent> {
                     ),
                     elevation: 0,
                   ),
-                  child: Text(widget.currentStep == 3 ? "Finish" : "Next Step"),
+                  child: Text(widget.currentStep == 3 ? 'Finish' : 'Next Step'),
                 ),
               ],
             ),
@@ -179,22 +179,22 @@ class _CreateExamContentState extends State<CreateExamContent> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildLabel("Quiz Title *"),
+          _buildLabel('Quiz Title *'),
           TextField(
             decoration: _inputDecoration(
-              "e.g., Midterm Exam - Data Structures",
+              'e.g., Midterm Exam - Data Structures',
             ),
           ),
           const SizedBox(height: 24),
-          _buildLabel("Description / Instructions"),
-          Text(
-            "Provide instructions for students before they begin.",
-            style: TextStyle(color: const Color(0xFF617589), fontSize: 13),
+          _buildLabel('Description / Instructions'),
+          const Text(
+            'Provide instructions for students before they begin.',
+            style: TextStyle(color: Color(0xFF617589), fontSize: 13),
           ),
           const SizedBox(height: 12),
           TextField(
             maxLines: 5,
-            decoration: _inputDecoration("Enter detailed instructions here..."),
+            decoration: _inputDecoration('Enter detailed instructions here...'),
           ),
           const SizedBox(height: 24),
           Row(
@@ -203,11 +203,11 @@ class _CreateExamContentState extends State<CreateExamContent> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildLabel("Exam Category"),
+                    _buildLabel('Exam Category'),
                     DropdownButtonFormField<String>(
-                      decoration: _inputDecoration("Quiz"),
+                      decoration: _inputDecoration('Quiz'),
                       items: const [
-                        DropdownMenuItem(value: "Quiz", child: Text("Quiz")),
+                        DropdownMenuItem(value: 'Quiz', child: Text('Quiz')),
                       ],
                       onChanged: (v) {},
                     ),
@@ -219,10 +219,10 @@ class _CreateExamContentState extends State<CreateExamContent> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _buildLabel("Tags (Optional)"),
+                    _buildLabel('Tags (Optional)'),
                     TextField(
                       decoration: _inputDecoration(
-                        "Add tags separated by comma...",
+                        'Add tags separated by comma...',
                       ),
                     ),
                   ],
@@ -259,7 +259,7 @@ class _CreateExamContentState extends State<CreateExamContent> {
     required bool isActive,
     required bool isCompleted,
   }) {
-    Color mainColor = isActive
+    final Color mainColor = isActive
         ? const Color(0xFF137FEC)
         : (isCompleted ? const Color(0xFF10B981) : const Color(0xFFCBD5E1));
     return Row(
@@ -276,7 +276,7 @@ class _CreateExamContentState extends State<CreateExamContent> {
             child: isCompleted
                 ? const Icon(Icons.check, size: 16, color: Colors.white)
                 : Text(
-                    "$stepNumber",
+                    '$stepNumber',
                     style: TextStyle(
                       color: isActive ? Colors.white : mainColor,
                       fontWeight: FontWeight.bold,

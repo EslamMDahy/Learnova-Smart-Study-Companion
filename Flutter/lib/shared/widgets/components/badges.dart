@@ -61,13 +61,13 @@ class FigmaUmRolePill extends StatelessWidget {
     Color br = AppColors.badgeBlueBorder;
     Color fg = AppColors.badgeBlueFg;
 
-    if (r == "teacher" || r == "instructor") {
+    if (r == 'teacher' || r == 'instructor') {
       bg = AppColors.badgePurpleBg;
       br = AppColors.badgePurpleBorder;
       fg = AppColors.badgePurpleFg;
     }
 
-    if (r == "owner") {
+    if (r == 'owner') {
       bg = AppColors.badgeIndigoBg;
       br = AppColors.badgeIndigoBorder;
       fg = AppColors.badgeIndigoFg;
@@ -86,7 +86,7 @@ class FigmaUmRolePill extends StatelessWidget {
         _titleCase(r),
         overflow: TextOverflow.ellipsis,
         style: TextStyle(
-          fontFamily: "Inter",
+          fontFamily: 'Inter',
           fontSize: 12,
           fontWeight: FontWeight.w500,
           height: 16 / 12,
@@ -158,7 +158,7 @@ class JrStatusBadge extends StatelessWidget {
           label,
           overflow: TextOverflow.ellipsis,
           style: const TextStyle(
-            fontFamily: "Inter",
+            fontFamily: 'Inter',
             fontSize: 14,
             fontWeight: FontWeight.w500,
             color: AppColors.textGray,
@@ -198,10 +198,10 @@ class UpgradePeriodToggle extends StatelessWidget {
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: AppColors.border),
         boxShadow: [
-          BoxShadow(
+          const BoxShadow(
             color: Color(0x080F172A),
             blurRadius: (kIsWeb ? 12 : 18),
-            offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 8)),
+            offset: (kIsWeb ? Offset(0, 4) : Offset(0, 8)),
           ),
         ],
       ),
@@ -209,13 +209,13 @@ class UpgradePeriodToggle extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           UpgradeToggleChip(
-            text: "Monthly",
+            text: 'Monthly',
             selected: !isYearly,
             onTap: isYearly ? onToggle : null,
           ),
           const SizedBox(width: 8),
           UpgradeToggleChip(
-            text: "Yearly",
+            text: 'Yearly',
             selected: isYearly,
             onTap: !isYearly ? onToggle : null,
           ),
@@ -227,7 +227,7 @@ class UpgradePeriodToggle extends StatelessWidget {
               borderRadius: BorderRadius.circular(999),
             ),
             child: const Text(
-              "Save more",
+              'Save more',
               style: TextStyle(
                 color: Color(0xFF166534),
                 fontSize: 12,

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/routes.dart';
+import '../../../../core/storage/token_storage.dart';
 import '../controllers/signup_controller.dart';
 
 
@@ -117,7 +118,11 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
     if (!mounted) return;
 
     if (ok) {
-      context.go('${Routes.login}?signed=1');
+      final email = emailController.text.trim();
+      // Persist so that reopening the browser before verifying
+      // always returns the user to this screen.
+      TokenStorage.setPendingVerificationEmail(email);
+      context.go(Routes.verifyEmailSentFor(email));
     }
   }
 
@@ -347,13 +352,13 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "Already have an account? ",
+                        'Already have an account? ',
                         style: AppText.input.copyWith(color: AppColors.title),
                       ),
                       InkWell(
                         onTap: state.loading ? null : () => context.go(Routes.login),
                         child: Text(
-                          "Log in",
+                          'Log in',
                           style: AppText.input.copyWith(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w800,

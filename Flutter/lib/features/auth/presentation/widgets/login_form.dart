@@ -23,7 +23,6 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   bool rememberMe = false;
   bool _obscurePassword = true;
 
-  
   bool _showResetSuccess = false;
   bool _showVerifiedSuccess = false;
   Timer? _successTimer;
@@ -36,16 +35,11 @@ class _LoginFormState extends ConsumerState<LoginForm> {
       if (!mounted) return;
 
       final uri = GoRouterState.of(context).uri;
-      final resetDone = uri.queryParameters['reset'] == '1';
+      final resetDone   = uri.queryParameters['reset'] == '1';
       final verifiedDone = uri.queryParameters['verified'] == '1';
 
-      setState(() {
-        _showResetSuccess = false;
-        _showVerifiedSuccess = false;
-      });
-
       if (verifiedDone) setState(() => _showVerifiedSuccess = true);
-      if (resetDone) setState(() => _showResetSuccess = true);
+      if (resetDone)    setState(() => _showResetSuccess = true);
 
       if (verifiedDone || resetDone) {
         final clean = uri.replace(queryParameters: {});
@@ -55,7 +49,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
         _successTimer = Timer(const Duration(seconds: 3), () {
           if (!mounted) return;
           setState(() {
-            _showResetSuccess = false;
+            _showResetSuccess   = false;
             _showVerifiedSuccess = false;
           });
         });
@@ -71,9 +65,8 @@ class _LoginFormState extends ConsumerState<LoginForm> {
     super.dispose();
   }
 
-  void _clearError() {
-    ref.read(loginControllerProvider.notifier).clearError();
-  }
+  void _clearError() =>
+      ref.read(loginControllerProvider.notifier).clearError();
 
   Future<void> _onLogin() async {
     final okForm = _formKey.currentState?.validate() ?? false;
@@ -81,23 +74,36 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
     _clearError();
 
-    final email = _emailCtrl.text.trim();
+    final email    = _emailCtrl.text.trim();
     final password = _passwordCtrl.text;
 
-    final ok = await ref
+    final result = await ref
         .read(loginControllerProvider.notifier)
         .login(email, password, persist: rememberMe);
 
     if (!mounted) return;
 
-    if (ok) {
-      if (UserStorage.isOwner) {
-        context.go(Routes.adminUsers);
-      } else if (UserStorage.isInstructor) {
-        context.go(Routes.instructorDashboard);
-      } else {
-        context.go(Routes.home);
-      }
+    switch (result) {
+      case LoginResult.success:
+        if (UserStorage.isOwner) {
+          context.go(Routes.adminUsers);
+        } else if (UserStorage.isInstructor) {
+          context.go(Routes.instructorDashboard);
+        } else {
+          context.go(Routes.home);
+        }
+        break;
+
+      case LoginResult.emailNotVerified:
+        // pendingVerificationEmail is already stored by LoginController.
+        // Navigate to the verify screen with the email pre-filled.
+        context.go(Routes.verifyEmailSentFor(email));
+        break;
+
+      case LoginResult.authError:
+      case LoginResult.error:
+        // Error is shown inline via state.error.
+        break;
     }
   }
 
@@ -121,9 +127,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
             if (_showVerifiedSuccess && err == null) ...[
               AppSuccessBanner(
-                title: "Email verified!",
+                title: 'Email verified!',
                 message:
-                    "Your email has been verified successfully. You can log in now.",
+                    'Your email has been verified successfully. You can log in now.',
                 onClose: () => setState(() => _showVerifiedSuccess = false),
               ),
               const SizedBox(height: 18),
@@ -131,9 +137,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
             if (_showResetSuccess && err == null) ...[
               AppSuccessBanner(
-                title: "All set!",
+                title: 'All set!',
                 message:
-                    "Your password has been updated. Log in with the new one.",
+                    'Your password has been updated. Log in with the new one.',
                 onClose: () => setState(() => _showResetSuccess = false),
               ),
               const SizedBox(height: 18),
@@ -200,7 +206,6 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               label: 'Log In',
               loading: state.loading,
               onPressed: _onLogin,
-              height: 50,
             ),
 
             const SizedBox(height: 28),
@@ -232,8 +237,8 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                 ),
                 InkWell(
                   onTap: state.loading ? null : () => context.go(Routes.signup),
-                  child: Text(
-                    "Sign up",
+                  child: const Text(
+                    'Sign up',
                     style: TextStyle(
                       color: AppColors.primary,
                       fontWeight: FontWeight.bold,

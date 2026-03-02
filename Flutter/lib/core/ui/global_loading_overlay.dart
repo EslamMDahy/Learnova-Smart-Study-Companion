@@ -14,7 +14,6 @@ class GlobalLoadingOverlay extends ConsumerWidget {
 
     return Positioned.fill(
       child: AbsorbPointer(
-        absorbing: true,
         child: Container(
           color: AppColors.pageBg, 
           child: Center(
@@ -23,7 +22,7 @@ class GlobalLoadingOverlay extends ConsumerWidget {
               children: [
                 // Logo
                 Image.asset(
-                  'assets/logo.png',
+                  'assets/logo.webp',
                   height: 90,
                   fit: BoxFit.contain,
                 ),
@@ -41,7 +40,7 @@ class GlobalLoadingOverlay extends ConsumerWidget {
 
                 const SizedBox(height: 8),
 
-                Text(
+                const Text(
                   'Loading...',
                   style: AppText.mutedSmall,
                 ),

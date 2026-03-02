@@ -12,7 +12,7 @@ class AppCardShell extends StatelessWidget {
   final Color background;
   final Color borderColor;
 
-  /// Optional: لو عايز تمرر shadow مخصوص من برّه
+  /// Optional: pass a custom shadow from outside
   final List<BoxShadow>? boxShadow;
 
   final double? maxWidth;
@@ -31,9 +31,9 @@ class AppCardShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final defaultShadow = <BoxShadow>[
-      BoxShadow(
+      const BoxShadow(
         blurRadius: 2,
-        offset: kIsWeb ? const Offset(0, 4) : const Offset(0, 1),
+        offset: kIsWeb ? Offset(0, 4) : Offset(0, 1),
         color: AppColors.shadowSoft,
       ),
     ];
@@ -80,9 +80,9 @@ class AppCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderSoft),
         boxShadow: [
-          BoxShadow(
+          const BoxShadow(
             blurRadius: 2,
-            offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 1)),
+            offset: (kIsWeb ? Offset(0, 4) : Offset(0, 1)),
             color: AppColors.shadowSoft,
           ),
         ],
@@ -199,18 +199,17 @@ class FigmaUmCardShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCardShell(
-      child: child,
       padding: padding,
       borderRadius: borderRadius,
-      background: AppColors.cBg,
       borderColor: AppColors.cBorder,
       boxShadow: [
-        BoxShadow(
+        const BoxShadow(
           color: Color(0x0D000000),
           blurRadius: 2,
-          offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 1)),
+          offset: (kIsWeb ? Offset(0, 4) : Offset(0, 1)),
         ),
       ],
+      child: child,
     );
   }
 }
@@ -224,17 +223,16 @@ class JrCardShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppCardShell(
-      child: child,
       maxWidth: width,
-      background: Colors.white,
       borderColor: const Color(0xFFE5E7EB),
       boxShadow: [
-        BoxShadow(
+        const BoxShadow(
           color: Color(0x0D000000),
           blurRadius: 2,
-          offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 1)),
+          offset: (kIsWeb ? Offset(0, 4) : Offset(0, 1)),
         ),
       ],
+      child: child,
     );
   }
 }
@@ -271,10 +269,10 @@ class FigmaUmStatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.cBorder),
         boxShadow: [
-          BoxShadow(
+          const BoxShadow(
             color: Color(0x0D000000),
             blurRadius: 2,
-            offset: (kIsWeb ? const Offset(0, 4) : Offset(0, 1)),
+            offset: (kIsWeb ? Offset(0, 4) : Offset(0, 1)),
           ),
         ],
       ),
@@ -286,7 +284,7 @@ class FigmaUmStatCard extends StatelessWidget {
               Text(
                 title,
                 style: const TextStyle(
-                  fontFamily: "Inter",
+                  fontFamily: 'Inter',
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                   height: 20 / 14,
@@ -310,7 +308,7 @@ class FigmaUmStatCard extends StatelessWidget {
           Text(
             value,
             style: const TextStyle(
-              fontFamily: "Inter",
+              fontFamily: 'Inter',
               fontSize: 24,
               fontWeight: FontWeight.w700,
               height: 32 / 24,
@@ -321,7 +319,7 @@ class FigmaUmStatCard extends StatelessWidget {
           Text(
             subtitle,
             style: TextStyle(
-              fontFamily: "Inter",
+              fontFamily: 'Inter',
               fontSize: 12,
               fontWeight: FontWeight.w500,
               height: 16 / 12,
@@ -368,8 +366,8 @@ class UpgradePlanCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPrimary = tone == UpgradeTone.primary;
-    final isCustom = price == "Custom";
-    final isFree = price.toLowerCase() == "free";
+    final isCustom = price == 'Custom';
+    final isFree = price.toLowerCase() == 'free';
 
     return Container(
       padding: const EdgeInsets.all(24),
@@ -399,13 +397,11 @@ class UpgradePlanCard extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [Color(0xFFDBEAFE), Color(0xFFEDE9FE)],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
                 ),
                 borderRadius: BorderRadius.circular(999),
               ),
               child: const Text(
-                "MOST POPULAR",
+                'MOST POPULAR',
                 style: TextStyle(
                   color: Color(0xFF1E40AF),
                   fontSize: 11,
@@ -429,7 +425,7 @@ class UpgradePlanCard extends StatelessWidget {
 
           if (isFree) ...[
             const Text(
-              "Free",
+              'Free',
               style: TextStyle(
                 fontSize: 38,
                 fontWeight: FontWeight.w900,
@@ -444,7 +440,7 @@ class UpgradePlanCard extends StatelessWidget {
                   const Padding(
                     padding: EdgeInsets.only(bottom: 8, right: 2),
                     child: Text(
-                      "\$",
+                      '\$',
                       style: TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w900,

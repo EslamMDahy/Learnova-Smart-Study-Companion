@@ -27,7 +27,7 @@ class ResetPasswordController extends StateNotifier<ResetPasswordState> {
 
   void clearError() {
     if (state.error != null) {
-      state = state.copyWith(error: null);
+      state = state.copyWith();
     }
   }
 
@@ -43,15 +43,13 @@ class ResetPasswordController extends StateNotifier<ResetPasswordState> {
     state = state.copyWith(
       loading: true,
       success: false,
-      message: null,
     );
 
     if (t.isEmpty) {
       state = state.copyWith(
         loading: false,
         success: false,
-        message: null,
-        error: "Invalid reset link. Please request a new one.",
+        error: 'Invalid reset link. Please request a new one.',
       );
       return false;
     }
@@ -67,7 +65,7 @@ class ResetPasswordController extends StateNotifier<ResetPasswordState> {
         success: true,
         message: msg.trim().isNotEmpty
             ? msg.trim()
-            : "Password reset successfully. You can now log in.",
+            : 'Password reset successfully. You can now log in.',
       );
 
       return true;
@@ -75,14 +73,13 @@ class ResetPasswordController extends StateNotifier<ResetPasswordState> {
       final failure = mapApiFailure(err);
 
       if (TokenStorage.hasToken && failure.isAuthIssue) {
-        state = state.copyWith(loading: false, message: null);
+        state = state.copyWith(loading: false);
         AppErrorReporter.report(ref, failure);
         return false;
       }
 
       state = state.copyWith(
         loading: false,
-        message: null,
         error: failure.message,
       );
       return false;

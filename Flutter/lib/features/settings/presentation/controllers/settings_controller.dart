@@ -29,7 +29,7 @@ class SettingsController extends StateNotifier<SettingsState> {
 
   void clearMessages() {
     if (state.error != null || state.success != null) {
-      state = state.copyWith(error: null, success: null);
+      state = state.copyWith();
     }
   }
 
@@ -123,7 +123,7 @@ class SettingsController extends StateNotifier<SettingsState> {
     _avatarCancel?.cancel('superseded');
     _avatarCancel = CancelToken();
 
-    state = state.copyWith(uploadingAvatar: true, error: null, success: null);
+    state = state.copyWith(uploadingAvatar: true);
 
     try {
       // Step 1: signed upload url
@@ -301,7 +301,7 @@ class SettingsController extends StateNotifier<SettingsState> {
         savingProfile: false,
         profile: mergedProfile,
         preferences: savedPrefs,
-        success: "Saved",
+        success: 'Saved',
       );
 
       return true;
@@ -339,7 +339,7 @@ class SettingsController extends StateNotifier<SettingsState> {
 
       state = state.copyWith(
         updatingPassword: false,
-        success: msg.isEmpty ? "Password updated" : msg,
+        success: msg.isEmpty ? 'Password updated' : msg,
       );
       return true;
     } catch (e) {
@@ -364,7 +364,7 @@ class SettingsController extends StateNotifier<SettingsState> {
 
       state = state.copyWith(
         deleting: false,
-        success: msg.isEmpty ? "OTP sent" : msg,
+        success: msg.isEmpty ? 'OTP sent' : msg,
       );
       return true;
     } catch (e) {
@@ -386,7 +386,7 @@ class SettingsController extends StateNotifier<SettingsState> {
 
       state = state.copyWith(
         deleting: false,
-        success: msg.isEmpty ? "Account deleted" : msg,
+        success: msg.isEmpty ? 'Account deleted' : msg,
       );
       return true;
     } catch (e) {
@@ -400,18 +400,18 @@ class SettingsController extends StateNotifier<SettingsState> {
     final l = last.trim();
     if (f.isEmpty) return l;
     if (l.isEmpty) return f;
-    return "$f $l";
+    return '$f $l';
   }
 
   String _mapLanguageToCode(String ui) {
     switch (ui) {
-      case "English (US)":
-      case "English (UK)":
-        return "en";
-      case "Arabic":
-        return "ar";
+      case 'English (US)':
+      case 'English (UK)':
+        return 'en';
+      case 'Arabic':
+        return 'ar';
       default:
-        return "en";
+        return 'en';
     }
   }
 

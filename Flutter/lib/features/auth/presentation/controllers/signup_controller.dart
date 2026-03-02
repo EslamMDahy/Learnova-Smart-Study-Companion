@@ -20,7 +20,7 @@ class SignupController extends StateNotifier<SignupState> {
 
   void clearError() {
     if (state.error != null) {
-      state = state.copyWith(error: null);
+      state = state.copyWith();
     }
   }
 

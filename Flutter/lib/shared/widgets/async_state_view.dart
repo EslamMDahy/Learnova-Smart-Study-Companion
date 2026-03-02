@@ -200,8 +200,8 @@ class _LoadingSkeleton extends StatelessWidget {
   Widget build(BuildContext context) {
     // Shimmer animations can be surprisingly expensive on Flutter Web.
     // Keep skeleton static (web-friendly) and let pages feel snappy.
-    final base = const Color(0xFFE5E7EB);
-    final hi = const Color(0xFFF1F5F9);
+    const base = Color(0xFFE5E7EB);
+    const hi = Color(0xFFF1F5F9);
 
     // On mobile/desktop you can still get a subtle pulse without a ticker.
     // On web: lock to a single color to avoid jank.
@@ -239,7 +239,7 @@ class _LoadingSkeleton extends StatelessWidget {
                 children: [
                   bar(w: 180, h: 14),
                   const SizedBox(height: 8),
-                  bar(w: 260, h: 12),
+                  bar(w: 260),
                 ],
               ),
             ),
@@ -282,7 +282,7 @@ class _LoadingSkeleton extends StatelessWidget {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        bar(w: 220, h: 12),
+                        bar(w: 220),
                         const SizedBox(height: 8),
                         bar(w: 160, h: 11),
                       ],

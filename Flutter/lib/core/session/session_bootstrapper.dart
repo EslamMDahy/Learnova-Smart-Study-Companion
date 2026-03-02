@@ -7,7 +7,6 @@ import 'session_bootstrap_controller.dart';
 
 class SessionBootstrapper extends ConsumerStatefulWidget {
   final Widget child;
-
   const SessionBootstrapper({super.key, required this.child});
 
   @override
@@ -24,7 +23,6 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
 
     _storageListenable =
         Listenable.merge([TokenStorage.listenable, UserStorage.listenable]);
-
     _onStorageChanged = _maybeBootstrap;
     _storageListenable.addListener(_onStorageChanged);
 
@@ -40,8 +38,14 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
   void _maybeBootstrap() {
     if (!mounted) return;
 
-    if (!TokenStorage.hasToken) return;
-    if (UserStorage.hasMe) return;
+    // Trigger bootstrap when:
+    // A) A valid access token exists in sessionStorage but user data is missing.
+    // B) No token but persist flag exists (remember-me cold start — controller
+    //    will do a silent refresh first, then load /me).
+    final needsBootstrap = (TokenStorage.hasToken || TokenStorage.isPersisted) &&
+        !UserStorage.hasMe;
+
+    if (!needsBootstrap) return;
 
     ref.read(sessionBootstrapControllerProvider.notifier).ensureBootstrapped();
   }
@@ -50,7 +54,10 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
   Widget build(BuildContext context) {
     final async = ref.watch(sessionBootstrapControllerProvider);
 
-    final needsBootstrap = TokenStorage.hasToken && !UserStorage.hasMe;
+    // Show splash while bootstrapping.
+    final needsBootstrap =
+        (TokenStorage.hasToken || TokenStorage.isPersisted) && !UserStorage.hasMe;
+
     if (!needsBootstrap) return widget.child;
 
     final errMsg = async.hasError
@@ -58,29 +65,27 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
             final e = async.error;
             final s = e?.toString() ?? '';
             return s.trim().isEmpty
-                ? 'Failed to load your profile. Please retry.'
+                ? 'Failed to restore your session. Please log in again.'
                 : s;
           })()
         : null;
 
-    // Facebook-ish Splash (white background + centered mark + bottom loader)
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
         child: Stack(
           children: [
-            // Center mark
             Center(
               child: Container(
                 width: 86,
                 height: 86,
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1877F2), // FB-like blue
+                  color: const Color(0xFF137FEC),
                   borderRadius: BorderRadius.circular(22),
                 ),
                 child: const Center(
                   child: Text(
-                    'p',
+                    'L',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 44,
@@ -91,8 +96,6 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
                 ),
               ),
             ),
-
-            // Bottom area: loader or error
             Align(
               alignment: Alignment.bottomCenter,
               child: Padding(
@@ -108,7 +111,7 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
                       ),
                       const SizedBox(height: 12),
                       const Text(
-                        'Loading…',
+                        'Restoring session…',
                         style: TextStyle(
                           fontSize: 12.5,
                           color: Color(0xFF6B7280),
@@ -131,14 +134,11 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
                       ),
                       const SizedBox(height: 10),
                       ElevatedButton(
-                        onPressed: () {
-                          ref
-                              .read(sessionBootstrapControllerProvider.notifier)
-                              .ensureBootstrapped();
-                        },
+                        onPressed: () => ref
+                            .read(sessionBootstrapControllerProvider.notifier)
+                            .ensureBootstrapped(),
                         child: const Text('Retry'),
                       ),
-                      const SizedBox(height: 6),
                     ],
                   ],
                 ),

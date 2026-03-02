@@ -1,5 +1,4 @@
 import 'package:go_router/go_router.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/storage/token_storage.dart';
@@ -11,17 +10,18 @@ import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/set_new_password_page.dart';
 import '../../features/auth/presentation/pages/signup_page.dart';
 import '../../features/auth/presentation/pages/verify_email_page.dart';
-
+import '../../features/auth/presentation/pages/verify_email_sent_page.dart';
 import '../../shared/pages/home_page.dart';
+import '../../shared/pages/landing_page.dart';
 import '../../shared/pages/notifications_page.dart';
 import '../../features/settings/presentation/pages/settings_page.dart';
-
 import '../../features/admin/presentation/pages/admin_shell.dart';
 import '../../features/admin/presentation/pages/admin_route_pages.dart';
-
 import '../../features/instructor/presentation/pages/instructor_shell.dart';
 import '../../features/instructor/presentation/pages/instructor_route_pages.dart';
-import '../../features/instructor/presentation/widgets/materials_explorer_page.dart';
+import '../../features/instructor/presentation/pages/course_details/course_details_page.dart';
+import '../../features/instructor/presentation/controllers/selected_course_provider.dart';
+import '../../shared/pages/error_page.dart';
 
 import 'routes.dart';
 
@@ -37,27 +37,55 @@ final appRouter = GoRouter(
   redirect: (context, state) {
     try {
       final path = state.uri.path;
-      final isAuthRoute = _isAuthRoute(path);
 
+      // ── Token-required routes (guard empty token param) ─────────────────
       if ((path == Routes.verifyEmail || path == Routes.resetPassword) &&
-          ((state.uri.queryParameters['token'] ?? '').trim().isEmpty)) {
+          (state.uri.queryParameters['token'] ?? '').trim().isEmpty) {
         return Routes.login;
       }
 
-      final hasToken = TokenStorage.hasToken;
+      final hasToken    = TokenStorage.hasToken;
+      final isPersisted = TokenStorage.isPersisted;
+      final isAuthed    = hasToken || isPersisted;
 
-      if (!hasToken && !isAuthRoute) {
-        return Routes.login;
+      // ── Pending email verification (unverified login) ───────────────────
+      final pendingEmail = TokenStorage.pendingVerificationEmail;
+      if (pendingEmail != null &&
+          !isAuthed &&
+          path != Routes.verifyEmailSent &&
+          path != Routes.verifyEmail) {
+        return Routes.verifyEmailSentFor(pendingEmail);
       }
 
-      if (hasToken && isAuthRoute) {
-        if (!UserStorage.hasMe) return Routes.home;
-
+      // ── Landing / root ───────────────────────────────────────────────────
+      // '/' = landing page for guests.
+      // Authenticated users hitting '/' go to their dashboard.
+      if (path == Routes.landing) {
+        if (!isAuthed) return null; // show landing page
+        if (!UserStorage.hasMe) return Routes.home; // bootstrapping
         if (UserStorage.isOwner) return Routes.adminUsers;
         if (UserStorage.isInstructor) return Routes.instructorDashboard;
         return Routes.home;
       }
 
+      // ── Unauthenticated → protected route ───────────────────────────────
+      if (!isAuthed && !_isPublicRoute(path)) {
+        return Routes.landing; // send guests to landing, not /login
+      }
+
+      // ── Authenticated → auth-only routes ────────────────────────────────
+      if (isAuthed && _isAuthOnlyRoute(path)) {
+        // Verification routes stay accessible regardless.
+        if (path == Routes.verifyEmail || path == Routes.verifyEmailSent) {
+          return null;
+        }
+        if (!UserStorage.hasMe) return Routes.home;
+        if (UserStorage.isOwner) return Routes.adminUsers;
+        if (UserStorage.isInstructor) return Routes.instructorDashboard;
+        return Routes.home;
+      }
+
+      // ── Role guards ──────────────────────────────────────────────────────
       if (path.startsWith(Routes.admin)) {
         if (!UserStorage.hasMe) return null;
         if (!UserStorage.isOwner) return Routes.home;
@@ -66,188 +94,211 @@ final appRouter = GoRouter(
 
       if (path.startsWith(Routes.instructor)) {
         if (!UserStorage.hasMe) return null;
-
         if (!UserStorage.isInstructor) {
-          if (UserStorage.isOwner) return Routes.adminUsers;
-          return Routes.home;
+          return UserStorage.isOwner ? Routes.adminUsers : Routes.home;
         }
-
         if (path == Routes.instructor) return Routes.instructorDashboard;
       }
 
       return null;
     } catch (_) {
       _clearSessionSafe();
-      return Routes.login;
+      return Routes.landing;
     }
   },
   routes: [
-    // --- المسارات العامة ---
+    // ── Landing (guest entry point) ───────────────────────────────────────
+    GoRoute(
+      path: Routes.landing,
+      name: RouteNames.landing,
+      builder: (_, __) => const LandingPage(),
+    ),
+
+    // ── Authenticated home ────────────────────────────────────────────────
     GoRoute(
       path: Routes.home,
       name: RouteNames.home,
-      builder: (context, state) => const HomePage(),
+      builder: (_, __) => const HomePage(),
     ),
     GoRoute(
       path: Routes.settings,
       name: RouteNames.settings,
-      builder: (context, state) => const SettingsPage(),
+      builder: (_, __) => const SettingsPage(),
     ),
 
-    // --- مسارات المصادقة ---
+    // ── Error / Fallback ──────────────────────────────────────────────────
+    GoRoute(
+      path: Routes.error,
+      name: RouteNames.error,
+      builder: (_, state) {
+        final type    = state.uri.queryParameters['type'] ?? 'server';
+        final msg     = state.uri.queryParameters['msg'];
+        final errorId = state.uri.queryParameters['id'];
+        return ErrorPage(errorType: type, message: msg, errorId: errorId);
+      },
+    ),
+
+    // ── Auth routes ───────────────────────────────────────────────────────
     GoRoute(
       path: Routes.login,
       name: RouteNames.login,
-      builder: (context, state) => const LoginPage(),
+      builder: (_, __) => const LoginPage(),
     ),
     GoRoute(
       path: Routes.signup,
       name: RouteNames.signup,
-      builder: (context, state) => const SignUpPage(),
+      builder: (_, __) => const SignUpPage(),
     ),
     GoRoute(
       path: Routes.forgotPassword,
       name: RouteNames.forgotPassword,
-      builder: (context, state) => const ForgetPasswordPage(),
+      builder: (_, __) => const ForgetPasswordPage(),
     ),
     GoRoute(
       path: Routes.verifyEmail,
       name: RouteNames.verifyEmail,
-      builder: (context, state) {
-        final token = state.uri.queryParameters['token'];
-        return VerifyEmailPage(token: token);
+      builder: (_, state) =>
+          VerifyEmailPage(token: state.uri.queryParameters['token']),
+    ),
+    GoRoute(
+      path: Routes.verifyEmailSent,
+      name: RouteNames.verifyEmailSent,
+      builder: (_, state) {
+        final email = state.uri.queryParameters['email'];
+        return VerifyEmailSentPage(email: email);
       },
     ),
     GoRoute(
       path: Routes.resetPassword,
       name: RouteNames.resetPassword,
-      builder: (context, state) {
-        final token = state.uri.queryParameters['token'];
-        return SetNewPasswordPage(token: token);
-      },
+      builder: (_, state) =>
+          SetNewPasswordPage(token: state.uri.queryParameters['token']),
     ),
 
-    // --- شيل الأدمن ---
+    // ── Admin shell ───────────────────────────────────────────────────────
     ShellRoute(
-      builder: (context, state, child) => AdminShell(child: child),
+      builder: (_, __, child) => AdminShell(child: child),
       routes: [
         GoRoute(
           path: Routes.adminUsers,
           name: RouteNames.adminUsers,
-          pageBuilder: (context, state) =>
+          pageBuilder: (_, __) =>
               const NoTransitionPage(child: AdminUsersRoutePage()),
         ),
         GoRoute(
           path: Routes.adminJoinRequests,
           name: RouteNames.adminJoinRequests,
-          pageBuilder: (context, state) =>
+          pageBuilder: (_, __) =>
               const NoTransitionPage(child: AdminJoinRequestsRoutePage()),
         ),
         GoRoute(
           path: Routes.adminUpgradePlans,
           name: RouteNames.adminUpgradePlans,
-          pageBuilder: (context, state) =>
+          pageBuilder: (_, __) =>
               const NoTransitionPage(child: AdminUpgradePlansRoutePage()),
         ),
         GoRoute(
           path: Routes.adminSettings,
           name: RouteNames.adminSettings,
-          pageBuilder: (context, state) =>
+          pageBuilder: (_, __) =>
               const NoTransitionPage(child: AdminSettingsRoutePage()),
         ),
         GoRoute(
           path: Routes.adminHelp,
           name: RouteNames.adminHelp,
-          pageBuilder: (context, state) =>
+          pageBuilder: (_, __) =>
               const NoTransitionPage(child: AdminHelpRoutePage()),
         ),
         GoRoute(
           path: Routes.adminNotifications,
           name: RouteNames.adminNotifications,
-          pageBuilder: (context, state) =>
+          pageBuilder: (_, __) =>
               const NoTransitionPage(child: AdminNotificationsRoutePage()),
         ),
       ],
     ),
 
-    // --- شيل المدرس ---
+    // ── Instructor shell ──────────────────────────────────────────────────
     ShellRoute(
-      builder: (context, state, child) => InstructorShell(child: child),
+      builder: (_, __, child) => InstructorShell(child: child),
       routes: [
-        // لوحة التحكم
         GoRoute(
-          path: Routes.instructorDashboard, // /instructor/dashboard
+          path: Routes.instructorDashboard,
           name: RouteNames.instructorDashboard,
-          pageBuilder: (context, state) =>
+          pageBuilder: (_, __) =>
               const NoTransitionPage(child: InstructorDashboardRoutePage()),
         ),
-        // قائمة الكورسات
         GoRoute(
-          path: Routes.instructorCourses, // /instructor/courses
+          path: Routes.instructorCourses,
           name: RouteNames.instructorCourses,
-          pageBuilder: (context, state) =>
+          pageBuilder: (_, __) =>
               const NoTransitionPage(child: InstructorCourseRoutePage()),
         ),
-
-        // تفاصيل الكورس (مع slug)
         GoRoute(
-          path: Routes.instructorCourseDetails, // /instructor/courses/:courseSlug
+          path: Routes.instructorCourseDetails,
           name: RouteNames.instructorCourseDetails,
           pageBuilder: (context, state) {
             final slug = state.pathParameters['courseSlug']!;
+            final course = SelectedCourseCache.value;
+            if (course == null) {
+              // Cache lost on page refresh — redirect to courses list
+              return NoTransitionPage(
+                child: _CourseRedirectPage(slug: slug),
+              );
+            }
             return NoTransitionPage(
-              child: MaterialsExplorerPage(courseSlug: slug),
-            );
+                child: CourseDetailsPage(courseSlug: slug, course: course));
           },
         ),
-
-        // الإشعارات
         GoRoute(
-          path: Routes.instructorNotifications, // /instructor/notifications
+          path: Routes.instructorNotifications,
           name: RouteNames.instructorNotifications,
-          pageBuilder: (context, state) =>
+          pageBuilder: (_, __) =>
               const NoTransitionPage(child: NotificationsPage()),
         ),
-        // الإعدادات
         GoRoute(
-          path: Routes.instructorSettings, // /instructor/settings
+          path: Routes.instructorSettings,
           name: RouteNames.instructorSettings,
-          pageBuilder: (context, state) =>
+          pageBuilder: (_, __) =>
               const NoTransitionPage(child: SettingsPage()),
         ),
-        // بنك الأسئلة العام
         GoRoute(
-          path: Routes.instructorQuestionBank, // /instructor/question-bank
+          path: Routes.instructorQuestionBank,
           name: RouteNames.instructorQuestionBank,
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: _ComingSoonPage(title: "Question Bank"),
-          ),
+          pageBuilder: (_, __) => const NoTransitionPage(
+              child: _ComingSoonPage(title: 'Question Bank')),
         ),
-        // الاختبارات العامة
         GoRoute(
-          path: Routes.instructorQuizzes, // /instructor/quizzes
+          path: Routes.instructorQuizzes,
           name: RouteNames.instructorQuizzes,
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: _ComingSoonPage(title: "Quizzes"),
-          ),
+          pageBuilder: (_, __) =>
+              const NoTransitionPage(child: _ComingSoonPage(title: 'Quizzes')),
         ),
-        // المساعدة
         GoRoute(
-          path: Routes.instructorHelp, // /instructor/help
+          path: Routes.instructorHelp,
           name: RouteNames.instructorHelp,
-          pageBuilder: (context, state) => const NoTransitionPage(
-            child: _ComingSoonPage(title: "Help"),
-          ),
+          pageBuilder: (_, __) =>
+              const NoTransitionPage(child: _ComingSoonPage(title: 'Help')),
         ),
       ],
     ),
   ],
 );
 
-// --- دوال مساعدة ---
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 String _initialLocationSafe() {
   try {
-    if (!TokenStorage.hasToken) return Routes.login;
+    // Pending verification takes highest priority.
+    final pending = TokenStorage.pendingVerificationEmail;
+    if (pending != null && !TokenStorage.hasToken && !TokenStorage.isPersisted) {
+      return Routes.verifyEmailSentFor(pending);
+    }
+    // Guest → landing page.
+    if (!TokenStorage.hasToken && !TokenStorage.isPersisted) {
+      return Routes.landing;
+    }
+    // Authenticated → role-based dashboard.
     if (UserStorage.hasMe && UserStorage.isOwner) return Routes.adminUsers;
     if (UserStorage.hasMe && UserStorage.isInstructor) {
       return Routes.instructorDashboard;
@@ -255,16 +306,29 @@ String _initialLocationSafe() {
     return Routes.home;
   } catch (_) {
     _clearSessionSafe();
-    return Routes.login;
+    return Routes.landing;
   }
 }
 
-bool _isAuthRoute(String path) {
+/// Routes that are publicly accessible without authentication.
+/// Includes the landing page, auth pages, and utility pages.
+bool _isPublicRoute(String path) {
+  return path == Routes.landing ||
+      _isAuthOnlyRoute(path) ||
+      path == Routes.error ||
+      path == Routes.verifyEmail ||
+      path == Routes.verifyEmailSent;
+}
+
+/// Auth-flow routes: login, signup, forgot/reset password.
+/// These redirect authenticated users away (to dashboard).
+bool _isAuthOnlyRoute(String path) {
   return path == Routes.login ||
       path == Routes.signup ||
       path == Routes.forgotPassword ||
       path == Routes.resetPassword ||
-      path == Routes.verifyEmail;
+      path == Routes.verifyEmail ||
+      path == Routes.verifyEmailSent;
 }
 
 void _clearSessionSafe() {
@@ -274,40 +338,43 @@ void _clearSessionSafe() {
   } catch (_) {}
 }
 
+// ── Route names ───────────────────────────────────────────────────────────────
+
 class RouteNames {
   RouteNames._();
-  static const home = 'home';
-  static const login = 'login';
-  static const signup = 'signup';
-  static const forgotPassword = 'forgotPassword';
-  static const verifyEmail = 'verifyEmail';
-  static const resetPassword = 'resetPassword';
-  static const settings = 'settings';
+  static const landing         = 'landing';
+  static const home            = 'home';
+  static const login           = 'login';
+  static const signup          = 'signup';
+  static const forgotPassword  = 'forgotPassword';
+  static const verifyEmail     = 'verifyEmail';
+  static const verifyEmailSent = 'verifyEmailSent';
+  static const resetPassword   = 'resetPassword';
+  static const settings        = 'settings';
+  static const error           = 'error';
 
-  // instructor
-  static const instructorDashboard = 'instructorDashboard';
-  static const instructorCourses = 'instructorCourses';
+  static const instructorDashboard     = 'instructorDashboard';
+  static const instructorCourses       = 'instructorCourses';
   static const instructorCourseDetails = 'instructorCourseDetails';
-  static const instructorQuestionBank = 'instructorQuestionBank';
-  static const instructorQuizzes = 'instructorQuizzes';
-  static const instructorSettings = 'instructorSettings';
-  static const instructorHelp = 'instructorHelp';
+  static const instructorQuestionBank  = 'instructorQuestionBank';
+  static const instructorQuizzes       = 'instructorQuizzes';
+  static const instructorSettings      = 'instructorSettings';
+  static const instructorHelp          = 'instructorHelp';
   static const instructorNotifications = 'instructorNotifications';
 
-  // admin
-  static const adminUsers = 'adminUsers';
-  static const adminJoinRequests = 'adminJoinRequests';
-  static const adminUpgradePlans = 'adminUpgradePlans';
-  static const adminSettings = 'adminSettings';
-  static const adminHelp = 'adminHelp';
+  static const adminUsers         = 'adminUsers';
+  static const adminJoinRequests  = 'adminJoinRequests';
+  static const adminUpgradePlans  = 'adminUpgradePlans';
+  static const adminSettings      = 'adminSettings';
+  static const adminHelp          = 'adminHelp';
   static const adminNotifications = 'adminNotifications';
 
-  // instructor course sub-pages (نحتفظ بها للتوافق)
-  static const instructorCourseMaterials = 'instructorCourseMaterials';
-  static const instructorCourseStudents = 'instructorCourseStudents';
-  static const instructorCourseAnalytics = 'instructorCourseAnalytics';
+  // compat
+  static const instructorCourseMaterials    = 'instructorCourseMaterials';
+  static const instructorCourseStudents     = 'instructorCourseStudents';
+  static const instructorCourseAnalytics    = 'instructorCourseAnalytics';
   static const instructorCourseQuestionBank = 'instructorCourseQuestionBank';
-  static const instructorCourseQuizzes = 'instructorCourseQuizzes';
+  static const instructorCourseQuizzes      = 'instructorCourseQuizzes';
 }
 
 class _ComingSoonPage extends StatelessWidget {
@@ -320,9 +387,36 @@ class _ComingSoonPage extends StatelessWidget {
       color: AppColors.pageBg,
       alignment: Alignment.center,
       child: Text(
-        "$title (Coming Soon)",
+        '$title (Coming Soon)',
         style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
       ),
+    );
+  }
+}
+
+/// Shown when cache is lost (page refresh). Sends the user back to courses list.
+class _CourseRedirectPage extends StatefulWidget {
+  final String slug;
+  const _CourseRedirectPage({required this.slug});
+  @override
+  State<_CourseRedirectPage> createState() => _CourseRedirectPageState();
+}
+
+class _CourseRedirectPageState extends State<_CourseRedirectPage> {
+  @override
+  void initState() {
+    super.initState();
+    // Redirect on next frame so the router is fully mounted
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.go(Routes.instructorCourses);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return const Scaffold(
+      backgroundColor: AppColors.pageBg,
+      body: Center(child: CircularProgressIndicator()),
     );
   }
 }

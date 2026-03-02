@@ -49,7 +49,7 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
     final token = widget.token?.trim();
     if (token == null || token.isEmpty) {
       setState(
-        () => _localError = "Invalid reset link. Please request a new one.",
+        () => _localError = 'Invalid reset link. Please request a new one.',
       );
       return;
     }
@@ -95,9 +95,9 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                 children: [
                   const AppAuthHeaderIcon(
                     icon: Icons.security,
-                    title: "Set new password",
+                    title: 'Set new password',
                     subtitle:
-                        "Please choose a strong password. It must be different from\npreviously used passwords.",
+                        'Please choose a strong password. It must be different from\npreviously used passwords.',
                   ),
 
                   const SizedBox(height: 24),
@@ -105,7 +105,7 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                   if (_localError != null) ...[
                     AppInfoCard(
                       type: AppInfoType.error,
-                      title: "Invalid link",
+                      title: 'Invalid link',
                       message: _localError!,
                     ),
                     const SizedBox(height: 18),
@@ -114,24 +114,24 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                   if (state.error != null) ...[
                     AppInfoCard(
                       type: AppInfoType.error,
-                      title: "Reset failed",
+                      title: 'Reset failed',
                       message: state.error!,
                     ),
                     const SizedBox(height: 18),
                   ],
 
                   AppLabeledIconField(
-                    label: "New Password",
+                    label: 'New Password',
                     controller: _newPassCtrl,
-                    hint: "Enter new password",
+                    hint: 'Enter new password',
                     icon: Icons.lock_outline,
                     obscureText: !showNewPass,
                     onChanged: (_) => _clearAllErrors(),
                     validator: (v) {
-                      final s = (v ?? "").trim();
-                      if (s.isEmpty) return "Password is required";
+                      final s = (v ?? '').trim();
+                      if (s.isEmpty) return 'Password is required';
                       if (s.length < 6) {
-                        return "Password must be at least 6 characters";
+                        return 'Password must be at least 6 characters';
                       }
                       return null;
                     },
@@ -152,16 +152,16 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                   const SizedBox(height: 16),
 
                   AppLabeledIconField(
-                    label: "Confirm Password",
+                    label: 'Confirm Password',
                     controller: _confirmCtrl,
-                    hint: "Confirm password",
+                    hint: 'Confirm password',
                     icon: Icons.lock_outline,
                     obscureText: !showConfirmPass,
                     onChanged: (_) => _clearAllErrors(),
                     validator: (v) {
-                      final s = (v ?? "").trim();
-                      if (s.isEmpty) return "Confirm password is required";
-                      if (s != _newPassCtrl.text) return "Passwords do not match";
+                      final s = (v ?? '').trim();
+                      if (s.isEmpty) return 'Confirm password is required';
+                      if (s != _newPassCtrl.text) return 'Passwords do not match';
                       return null;
                     },
                     suffix: IconButton(
@@ -181,17 +181,16 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                   const SizedBox(height: 20),
 
                   AppPrimaryLoadingButton(
-                    label: "Reset Password",
+                    label: 'Reset Password',
                     loading: state.loading,
                     onPressed: _submit,
-                    height: 50,
                   ),
 
                   const SizedBox(height: 16),
 
                   Center(
                     child: AppBackLink(showLabel: true, 
-                      label: "Return to Log In",
+                      label: 'Return to Log In',
                       onTap: state.loading ? null : () => context.go(Routes.login),
                     ),
                   ),

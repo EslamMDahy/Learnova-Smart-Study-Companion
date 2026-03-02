@@ -17,7 +17,7 @@ class SetNewPasswordPage extends StatelessWidget {
                 const Expanded(flex: 5, child: SetNewPasswordLeftPanel()),
                 Expanded(
                   flex: 5,
-                  child: SetNewPasswordForm(token: token, isMobile: false),
+                  child: SetNewPasswordForm(token: token),
                 ),
               ],
             );

@@ -149,4 +149,3 @@ class AppSoftButton extends StatelessWidget {
     );
   }
 }
-

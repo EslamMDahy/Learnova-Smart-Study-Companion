@@ -248,16 +248,13 @@ class AppTheme {
     final bool isDark = brightness == Brightness.dark;
 
     final ColorScheme colorScheme = isDark
-        ? ColorScheme.dark(
+        ? const ColorScheme.dark(
             primary: AppColors.primary,
-            surface: const Color(0xFF1E1E2E),
+            surface: Color(0xFF1E1E2E),
             onPrimary: Colors.white,
-            onSurface: Colors.white,
           )
         : const ColorScheme.light(
             primary: AppColors.primary,
-            surface: Colors.white,
-            onPrimary: Colors.white,
             onSurface: AppColors.textTitle,
             outline: AppColors.border,
           );

@@ -11,5 +11,8 @@ final authApiProvider = Provider<AuthApi>((ref) {
 });
 
 final authRepositoryProvider = Provider<AuthRepository>((ref) {
-  return AuthRepository(ref.read(authApiProvider));
+  return AuthRepository(
+    ref.read(authApiProvider),
+    ref.read(apiClientProvider),   // needed for proactive token refresh
+  );
 });

@@ -25,12 +25,12 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
     _cancel?.cancel();
     _cancel = CancelToken();
 
-    state = state.copyWith(loading: true, error: null);
+    state = state.copyWith(loading: true);
 
     try {
       final res =
           await _ref.read(coursesRepositoryProvider).myCourses(cancelToken: _cancel);
-      state = state.copyWith(loading: false, items: res.items, error: null);
+      state = state.copyWith(loading: false, items: res.items);
     } catch (e) {
       final failure = mapApiFailure(e);
       AppErrorReporter.report(_ref, failure);
@@ -51,7 +51,7 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
     _cancel?.cancel();
     _cancel = CancelToken();
 
-    state = state.copyWith(loading: true, error: null);
+    state = state.copyWith(loading: true);
 
     try {
       final created = await _ref
@@ -59,7 +59,7 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
           .createCourse(payload: payload, cancelToken: _cancel);
 
       // stop loading here; the caller will decide when to refresh
-      state = state.copyWith(loading: false, error: null);
+      state = state.copyWith(loading: false);
       return created;
     } catch (e) {
       final failure = mapApiFailure(e);
