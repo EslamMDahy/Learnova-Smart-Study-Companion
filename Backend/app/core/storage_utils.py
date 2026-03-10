@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import re
 from typing import Iterable, Optional
+from typing import Any
 
 _SAFE_DEFAULT_NAME = "file"
 
@@ -21,8 +22,6 @@ def split_object_key(key: str) -> tuple[str, str]:
         return "", k
     folder, basename = k.rsplit("/", 1)
     return folder, basename
-
-
 
 
 
@@ -134,3 +133,36 @@ def sanitize_filename(filename: str, *,
             final_name = final_name[:max_length] or default_name
 
     return final_name
+
+
+
+def delete_storage_object(*, supabase_client: Any, bucket: str, storage_key: str) -> None:
+    storage_key = (storage_key or "").strip()
+    bucket = (bucket or "").strip()
+
+    if not bucket:
+        raise ValueError("bucket is required")
+
+    if not storage_key:
+        raise ValueError("storage_key is required")
+
+    try:
+        result = supabase_client.storage.from_(bucket).remove([storage_key])
+    except Exception as e:
+        raise RuntimeError(f"Failed to delete storage object: {str(e)}") from e
+
+    error = None
+
+    if isinstance(result, dict):
+        error = result.get("error")
+    else:
+        error = getattr(result, "error", None)
+        data = getattr(result, "data", None)
+
+        # بعض الإصدارات ترجع error داخل data
+        if not error and isinstance(data, dict):
+            error = data.get("error")
+
+    if error:
+        msg = error.get("message") if isinstance(error, dict) else str(error)
+        raise RuntimeError(f"Failed to delete storage object: {msg}")
