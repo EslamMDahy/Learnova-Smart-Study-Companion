@@ -388,6 +388,228 @@ def confirm_material_upload(*, material_id: int, db: Session, current_user: dict
 
 
 
+def copy_material(*, source_module_id: int, target_course_id: int, target_module_id: int, db: Session, current_user: dict):
+    # =========================
+    # 1) AuthZ
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can copy materials")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not source_module_id or source_module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid source_module_id")
+
+    if not target_course_id or target_course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid target_course_id")
+
+    if not target_module_id or target_module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid target_module_id")
+
+    # =========================
+    # 2) Validate target module belongs to target course + ownership
+    # =========================
+    target_module = db.execute(
+        text("""
+            SELECT
+                m.id AS module_id,
+                m.course_id,
+                c.created_by
+            FROM modules m
+            JOIN courses c
+              ON c.id = m.course_id
+            WHERE m.id = :target_module_id
+            LIMIT 1
+        """),
+        {"target_module_id": target_module_id},
+    ).mappings().first()
+
+    if not target_module:
+        raise HTTPException(status_code=404, detail="Target module not found")
+
+    if int(target_module["course_id"]) != int(target_course_id):
+        raise HTTPException(status_code=400, detail="Target module does not belong to target course")
+
+    if int(target_module["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only copy materials into your own course")
+
+    # =========================
+    # 3) Validate source module ownership
+    # =========================
+    source_module = db.execute(
+        text("""
+            SELECT
+                m.id AS module_id,
+                m.course_id,
+                c.created_by
+            FROM modules m
+            JOIN courses c
+              ON c.id = m.course_id
+            WHERE m.id = :source_module_id
+            LIMIT 1
+        """),
+        {"source_module_id": source_module_id},
+    ).mappings().first()
+
+    if not source_module:
+        raise HTTPException(status_code=404, detail="Source module not found")
+
+    if int(source_module["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only copy materials from your own course")
+
+    # =========================
+    # 4) Fetch source materials
+    # =========================
+    source_materials = db.execute(
+        text("""
+            SELECT
+                id,
+                title,
+                description,
+                type,
+                file_name,
+                file_size,
+                storage_key,
+                thumbnail_key,
+                mime_type,
+                status,
+                duration_seconds,
+                page_count,
+                dimensions,
+                is_ai_processed,
+                ai_processed_at,
+                uploaded_by,
+                uploaded_at,
+                processed_at
+            FROM materials
+            WHERE module_id = :source_module_id
+            ORDER BY id ASC
+        """),
+        {"source_module_id": source_module_id},
+    ).mappings().all()
+
+    if not source_materials:
+        return []
+
+    copied_materials = []
+
+    # =========================
+    # 5) Copy rows only (reuse same storage_key)
+    # =========================
+    try:
+        for material in source_materials:
+            new_row = db.execute(
+                text("""
+                    INSERT INTO materials (
+                        module_id,
+                        title,
+                        description,
+                        type,
+                        file_name,
+                        file_size,
+                        storage_key,
+                        thumbnail_key,
+                        mime_type,
+                        status,
+                        duration_seconds,
+                        page_count,
+                        dimensions,
+                        is_ai_processed,
+                        ai_processed_at,
+                        uploaded_by,
+                        uploaded_at,
+                        processed_at,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (
+                        :module_id,
+                        :title,
+                        :description,
+                        CAST(:type AS material_type_enum),
+                        :file_name,
+                        :file_size,
+                        :storage_key,
+                        :thumbnail_key,
+                        :mime_type,
+                        CAST(:status AS material_status_enum),
+                        :duration_seconds,
+                        :page_count,
+                        CAST(:dimensions AS JSON),
+                        :is_ai_processed,
+                        :ai_processed_at,
+                        :uploaded_by,
+                        :uploaded_at,
+                        :processed_at,
+                        NOW(),
+                        NOW()
+                    )
+                    RETURNING
+                        id,
+                        module_id,
+                        title,
+                        description,
+                        type,
+                        file_name,
+                        file_size,
+                        storage_key,
+                        thumbnail_key,
+                        mime_type,
+                        status,
+                        duration_seconds,
+                        page_count,
+                        dimensions,
+                        is_ai_processed,
+                        ai_processed_at,
+                        uploaded_by,
+                        uploaded_at,
+                        processed_at,
+                        created_at,
+                        updated_at
+                """),
+                {
+                    "module_id": target_module_id,
+                    "title": material["title"],
+                    "description": material["description"],
+                    "type": material["type"],
+                    "file_name": material["file_name"],
+                    "file_size": material["file_size"],
+                    "storage_key": material["storage_key"],
+                    "thumbnail_key": material["thumbnail_key"],
+                    "mime_type": material["mime_type"],
+                    "status": material["status"],
+                    "duration_seconds": material["duration_seconds"],
+                    "page_count": material["page_count"],
+                    "dimensions": material["dimensions"],
+                    "is_ai_processed": material["is_ai_processed"],
+                    "ai_processed_at": material["ai_processed_at"],
+                    "uploaded_by": instructor_id,
+                    "uploaded_at": material["uploaded_at"],
+                    "processed_at": material["processed_at"],
+                },
+            ).mappings().first()
+
+            if not new_row:
+                db.rollback()
+                raise HTTPException(status_code=503, detail="Failed to copy material")
+
+            copied_materials.append(dict(new_row))
+
+        return copied_materials
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while copying materials") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
 def list_module_materials(*, course_id: int, module_id: int, db: Session, current_user: dict):
     user_id = current_user.get("id")
     if not user_id:

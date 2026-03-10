@@ -6,7 +6,8 @@ from app.core.deps import get_current_user
 from . import service
 from .schemas import (ModuleCreateRequest,
                       ModuleCreateResponse, 
-                      ModuleListResponse)
+                      ModuleListResponse,
+                      ModuleCopyResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}/modules", tags=["Modules"])
@@ -25,6 +26,18 @@ def create_module(
         db=db, 
         current_user=current_user)
 
+@router.post("/{module_id}/copy", response_model=ModuleCopyResponse, status_code=status.HTTP_201_CREATED)
+def copy_module(
+    course_id: int,
+    module_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.copy_module(
+        target_course_id=course_id,
+        source_module_id=module_id,
+        db=db,
+        current_user=current_user,)
+
 @router.get("", response_model=ModuleListResponse,)
 def list_course_modules(
     course_id: int,
@@ -34,3 +47,4 @@ def list_course_modules(
         course_id=course_id,
         db=db,
         current_user=current_user,)
+

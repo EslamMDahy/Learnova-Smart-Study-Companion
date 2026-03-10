@@ -31,6 +31,23 @@ class ModuleCreateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class ModuleCopyResponse(BaseModel):
+    id: int
+    course_id: int
+
+    title: str
+    description: Optional[str] = None
+    order_index: int
+
+    is_published: bool
+    published_at: Optional[datetime] = None
+
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ModuleListItem(BaseModel):
     id: int
     course_id: int

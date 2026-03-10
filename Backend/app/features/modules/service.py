@@ -7,6 +7,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from datetime import datetime, timezone
 
 from .schemas import ModuleCreateRequest
+from app.features.materials.service import copy_material
 
 
 def create_module(*, course_id: int, payload: ModuleCreateRequest, db: Session, current_user: dict):
@@ -137,7 +138,167 @@ def create_module(*, course_id: int, payload: ModuleCreateRequest, db: Session, 
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
-    
+
+
+
+def copy_module(*, target_course_id: int, source_module_id: int, db: Session, current_user: dict):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can copy modules")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not target_course_id or target_course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid target course_id")
+
+    if not source_module_id or source_module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    # =========================
+    # 2) Validate source module
+    # =========================
+    source_module = db.execute(
+        text("""
+            SELECT id, course_id, title, description, is_published, published_at
+            FROM modules
+            WHERE id = :mid
+            LIMIT 1
+        """),
+        {"mid": source_module_id},
+    ).mappings().first()
+
+    if not source_module:
+        raise HTTPException(status_code=404, detail="Source module not found")
+
+    source_course_id = source_module["course_id"]
+
+    # =========================
+    # 3) Validate ownership of source course
+    # =========================
+    source_course = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :cid
+            LIMIT 1
+        """),
+        {"cid": source_course_id},
+    ).mappings().first()
+
+    if not source_course:
+        raise HTTPException(status_code=404, detail="Source course not found")
+
+    if source_course["created_by"] != instructor_id:
+        raise HTTPException(status_code=403, detail="You can only copy modules from your own courses")
+
+    # =========================
+    # 4) Validate ownership of target course
+    # =========================
+    target_course = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :cid
+            LIMIT 1
+        """),
+        {"cid": target_course_id},
+    ).mappings().first()
+
+    if not target_course:
+        raise HTTPException(status_code=404, detail="Target course not found")
+
+    if target_course["created_by"] != instructor_id:
+        raise HTTPException(status_code=403, detail="You can only copy modules into your own courses")
+
+    # =========================
+    # 5) Compute new order_index
+    # =========================
+    next_order_index = db.execute(
+        text("""
+            SELECT COALESCE(MAX(order_index), -1) + 1 AS next_idx
+            FROM modules
+            WHERE course_id = :cid
+        """),
+        {"cid": target_course_id},
+    ).scalar()
+
+    if next_order_index is None:
+        next_order_index = 0
+
+    # =========================
+    # 6) Insert copied module
+    # =========================
+    try:
+        new_module = db.execute(
+            text("""
+                INSERT INTO modules (
+                    course_id,
+                    title,
+                    description,
+                    order_index,
+                    is_published,
+                    published_at,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    :course_id,
+                    :title,
+                    :description,
+                    :order_index,
+                    :is_published,
+                    :published_at,
+                    NOW(),
+                    NOW()
+                )
+                RETURNING
+                    id,
+                    course_id,
+                    title,
+                    description,
+                    order_index,
+                    is_published,
+                    published_at,
+                    created_at,
+                    updated_at
+            """),
+            {
+                "course_id": target_course_id,
+                "title": source_module["title"],
+                "description": source_module["description"],
+                "order_index": int(next_order_index),
+                "is_published": source_module["is_published"],
+                "published_at": source_module["published_at"],
+            },
+        ).mappings().first()
+
+        if not new_module:
+            db.rollback()
+            raise HTTPException(status_code=503, detail="Failed to copy module")
+
+        copy_material(
+            source_module_id=source_module_id,
+            target_course_id=target_course_id,
+            target_module_id=int(new_module["id"]),
+            db=db,
+            current_user=current_user,)
+        db.commit()
+
+        return dict(new_module)
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while copying module") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
 
 
 def list_course_modules(*, course_id: int, db: Session, current_user: dict):
