@@ -14,6 +14,7 @@ from .schemas import UpdateProfileRequest
 from app.core.security import hash_password
 from app.core.security import verify_password  # عدّل import حسب مكانهم عندك
 from app.core.emailer import send_email
+from app.core.storage_utils import delete_storage_object
 from app.core.supabase_client import supabase
 from app.core.config import settings
 
@@ -743,20 +744,18 @@ def confirm_delete_account(*, payload, db: Session, current_user):
     if not otp:
         raise HTTPException(status_code=400, detail="OTP is required")
 
-    if not (len(otp) == 6):  # otp.isdigit() and
+    if len(otp) != 6:
         raise HTTPException(status_code=400, detail="Invalid OTP format")
 
     row = db.execute(
-        text(
-            """
+        text("""
             SELECT id, expires_at, used_at
             FROM user_tokens
             WHERE user_id = :uid
               AND type = :type
               AND token = :token
             LIMIT 1
-        """
-        ),
+        """),
         {"uid": user_id, "type": "delete_account_otp", "token": otp},
     ).first()
 
@@ -771,22 +770,75 @@ def confirm_delete_account(*, payload, db: Session, current_user):
     now = datetime.now(timezone.utc)
     if expires_at <= now:
         db.execute(
-            text("UPDATE user_tokens SET used_at = NOW() WHERE id = :tid"),
+            text("""
+                UPDATE user_tokens
+                SET used_at = NOW()
+                WHERE id = :tid
+            """),
             {"tid": token_id},
         )
         db.commit()
         raise HTTPException(status_code=400, detail="Invalid or expired OTP")
 
-    db.execute(
-        text("UPDATE user_tokens SET used_at = NOW() WHERE id = :tid"),
-        {"tid": token_id},
-    )
-
-    db.execute(
-        text("DELETE FROM users WHERE id = :uid"),
+    # =========================
+    # 1) Fetch avatar key before deleting user
+    #    Assumption: users.avatar_key exists
+    # =========================
+    user_row = db.execute(
+        text("""
+            SELECT id, avatar_key
+            FROM users
+            WHERE id = :uid
+            LIMIT 1
+        """),
         {"uid": user_id},
-    )
+    ).mappings().first()
 
-    db.commit()
+    if not user_row:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    avatar_key = user_row["avatar_key"]
+
+    try:
+        # mark OTP as used
+        db.execute(
+            text("""
+                UPDATE user_tokens
+                SET used_at = NOW()
+                WHERE id = :tid
+            """),
+            {"tid": token_id},
+        )
+
+        # delete user
+        deleted = db.execute(
+            text("""
+                DELETE FROM users
+                WHERE id = :uid
+                RETURNING id
+            """),
+            {"uid": user_id},
+        ).first()
+
+        if not deleted:
+            db.rollback()
+            raise HTTPException(status_code=404, detail="User not found")
+
+        # delete avatar from storage only if exists
+        if avatar_key:
+            delete_storage_object(
+                supabase_client=supabase,
+                bucket=settings.supabase_public_bucket,
+                storage_key=avatar_key,
+            )
+
+        db.commit()
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Failed to delete account: {str(e)}") from e
 
     return {"message": "Account deleted successfully"}
