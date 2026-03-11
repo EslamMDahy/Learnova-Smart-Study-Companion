@@ -900,6 +900,61 @@ def get_material_download_url(*, course_id: int, module_id: int, material_id: in
 
 
 
+def _delete_material_internal(*, material_id: int, db: Session, storage_bucket: str,):
+    
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    material_row = db.execute(
+        text("""
+            SELECT
+                id,
+                storage_key
+            FROM materials
+            WHERE id = :material_id
+            LIMIT 1
+        """),
+        {"material_id": material_id},
+    ).mappings().first()
+
+    if not material_row:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    storage_key = material_row["storage_key"]
+
+    deleted = db.execute(
+        text("""
+            DELETE FROM materials
+            WHERE id = :material_id
+            RETURNING id
+        """),
+        {"material_id": material_id},
+    ).mappings().first()
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    remaining_refs = db.execute(
+        text("""
+            SELECT COUNT(*) AS ref_count
+            FROM materials
+            WHERE storage_key = :storage_key
+        """),
+        {"storage_key": storage_key},
+    ).scalar()
+
+    if remaining_refs is None:
+        remaining_refs = 0
+
+    if int(remaining_refs) == 0 and storage_key:
+        delete_storage_object(
+            supabase_client=supabase,
+            bucket=storage_bucket,
+            storage_key=storage_key,
+        )
+
+
+
 def delete_material(*, course_id: int, module_id: int, material_id: int, db: Session, current_user: dict):
     # =========================
     # 1) AuthZ
@@ -927,7 +982,6 @@ def delete_material(*, course_id: int, module_id: int, material_id: int, db: Ses
             SELECT
                 mat.id,
                 mat.module_id,
-                mat.storage_key,
                 m.course_id,
                 c.created_by
             FROM materials mat
@@ -953,49 +1007,17 @@ def delete_material(*, course_id: int, module_id: int, material_id: int, db: Ses
     if int(material_row["created_by"]) != int(instructor_id):
         raise HTTPException(status_code=403, detail="You can only delete materials from your own course")
 
-    storage_key = material_row["storage_key"]
-
     # =========================
-    # 3) Delete material row
+    # 3) Delete material 
+    #    with storge opject 
+    #    if not used in another material
     # =========================
     try:
-        deleted = db.execute(
-            text("""
-                DELETE FROM materials
-                WHERE id = :material_id
-                RETURNING id
-            """),
-            {"material_id": material_id},
-        ).mappings().first()
-
-        if not deleted:
-            db.rollback()
-            raise HTTPException(status_code=404, detail="Material not found")
-
-        # =========================
-        # 4) Check remaining references to same storage_key
-        # =========================
-        remaining_refs = db.execute(
-            text("""
-                SELECT COUNT(*) AS ref_count
-                FROM materials
-                WHERE storage_key = :storage_key
-            """),
-            {"storage_key": storage_key},
-        ).scalar()
-
-        if remaining_refs is None:
-            remaining_refs = 0
-
-        # =========================
-        # 5) Delete physical object only if unreferenced
-        # =========================
-        if int(remaining_refs) == 0 and storage_key:
-            delete_storage_object(
-                supabase_client=supabase,
-                bucket=settings.supabase_private_bucket,
-                storage_key=storage_key,
-            )
+        _delete_material_internal(
+            material_id=material_id,
+            db=db,
+            storage_bucket=settings.supabase_private_bucket,
+        )
 
         db.commit()
         return None
@@ -1015,6 +1037,124 @@ def delete_material(*, course_id: int, module_id: int, material_id: int, db: Ses
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+
+# def delete_material(*, course_id: int, module_id: int, material_id: int, db: Session, current_user: dict):
+#     # =========================
+#     # 1) AuthZ
+#     # =========================
+#     role = (current_user.get("system_role") or "").strip().lower()
+#     if role != "instructor":
+#         raise HTTPException(status_code=403, detail="Only instructors can delete materials")
+
+#     instructor_id = current_user.get("id")
+#     if not instructor_id:
+#         raise HTTPException(status_code=401, detail="Unauthorized")
+
+#     if not course_id or course_id <= 0:
+#         raise HTTPException(status_code=422, detail="Invalid course_id")
+#     if not module_id or module_id <= 0:
+#         raise HTTPException(status_code=422, detail="Invalid module_id")
+#     if not material_id or material_id <= 0:
+#         raise HTTPException(status_code=422, detail="Invalid material_id")
+
+#     # =========================
+#     # 2) Validate ownership chain
+#     # =========================
+#     material_row = db.execute(
+#         text("""
+#             SELECT
+#                 mat.id,
+#                 mat.module_id,
+#                 mat.storage_key,
+#                 m.course_id,
+#                 c.created_by
+#             FROM materials mat
+#             JOIN modules m
+#               ON m.id = mat.module_id
+#             JOIN courses c
+#               ON c.id = m.course_id
+#             WHERE mat.id = :material_id
+#             LIMIT 1
+#         """),
+#         {"material_id": material_id},
+#     ).mappings().first()
+
+#     if not material_row:
+#         raise HTTPException(status_code=404, detail="Material not found")
+
+#     if int(material_row["module_id"]) != int(module_id):
+#         raise HTTPException(status_code=400, detail="Material does not belong to this module")
+
+#     if int(material_row["course_id"]) != int(course_id):
+#         raise HTTPException(status_code=400, detail="Module does not belong to this course")
+
+#     if int(material_row["created_by"]) != int(instructor_id):
+#         raise HTTPException(status_code=403, detail="You can only delete materials from your own course")
+
+#     storage_key = material_row["storage_key"]
+
+#     # =========================
+#     # 3) Delete material row
+#     # =========================
+#     try:
+#         deleted = db.execute(
+#             text("""
+#                 DELETE FROM materials
+#                 WHERE id = :material_id
+#                 RETURNING id
+#             """),
+#             {"material_id": material_id},
+#         ).mappings().first()
+
+#         if not deleted:
+#             db.rollback()
+#             raise HTTPException(status_code=404, detail="Material not found")
+
+#         # =========================
+#         # 4) Check remaining references to same storage_key
+#         # =========================
+#         remaining_refs = db.execute(
+#             text("""
+#                 SELECT COUNT(*) AS ref_count
+#                 FROM materials
+#                 WHERE storage_key = :storage_key
+#             """),
+#             {"storage_key": storage_key},
+#         ).scalar()
+
+#         if remaining_refs is None:
+#             remaining_refs = 0
+
+#         # =========================
+#         # 5) Delete physical object only if unreferenced
+#         # =========================
+#         if int(remaining_refs) == 0 and storage_key:
+#             delete_storage_object(
+#                 supabase_client=supabase,
+#                 bucket=settings.supabase_private_bucket,
+#                 storage_key=storage_key,
+#             )
+
+#         db.commit()
+#         return None
+
+#     except HTTPException:
+#         db.rollback()
+#         raise
+
+#     except IntegrityError as e:
+#         db.rollback()
+#         raise HTTPException(status_code=409, detail="Conflict while deleting material") from e
+
+#     except SQLAlchemyError as e:
+#         db.rollback()
+#         raise HTTPException(status_code=500, detail="Database error") from e
+
+#     except Exception as e:
+#         db.rollback()
+#         raise HTTPException(status_code=500, detail=str(e)) from e
     
 
 
