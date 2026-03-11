@@ -9,6 +9,8 @@ from .schemas import (ModuleCreateRequest,
                       ModuleUpdateRequest,
                       ModuleUpdateResponse,
                       ModuleCopyResponse,
+                      ModuleReorderRequest,
+                      ModuleReorderResponse,
                       ModuleListResponse)
 
 
@@ -51,6 +53,18 @@ def copy_module(
     return service.copy_module(
         target_course_id=course_id,
         source_module_id=module_id,
+        db=db,
+        current_user=current_user,)
+
+@router.patch("/reorder", response_model=ModuleReorderResponse, status_code=status.HTTP_200_OK,)
+def reorder_modules(
+    course_id: int,
+    payload: ModuleReorderRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.reorder_modules(
+        course_id=course_id,
+        payload=payload,
         db=db,
         current_user=current_user,)
 

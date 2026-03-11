@@ -30,23 +30,6 @@ class ModuleCreateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class ModuleCopyResponse(BaseModel):
-    id: int
-    course_id: int
-
-    title: str
-    description: Optional[str] = None
-    order_index: int
-
-    is_published: bool
-    published_at: Optional[datetime] = None
-
-    created_at: datetime
-    updated_at: datetime
-
-    model_config = ConfigDict(extra="forbid")
-
-
 class ModuleUpdateRequest(BaseModel):
     title: Optional[str] = Field(
         default=None,
@@ -77,6 +60,39 @@ class ModuleUpdateResponse(BaseModel):
 
     created_at: datetime
     updated_at: datetime
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ModuleCopyResponse(BaseModel):
+    id: int
+    course_id: int
+
+    title: str
+    description: Optional[str] = None
+    order_index: int
+
+    is_published: bool
+    published_at: Optional[datetime] = None
+
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ModuleReorderRequest(BaseModel):
+    module_ids: List[int] = Field(
+        ...,
+        min_length=1,
+        description="Final ordered list of all module IDs in the course"
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+class ModuleReorderResponse(BaseModel):
+    course_id: int
+    module_ids: List[int]
 
     model_config = ConfigDict(extra="forbid")
 
