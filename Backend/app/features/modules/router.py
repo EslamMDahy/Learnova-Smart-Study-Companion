@@ -5,9 +5,11 @@ from app.db.session import get_db
 from app.core.deps import get_current_user
 from . import service
 from .schemas import (ModuleCreateRequest,
-                      ModuleCreateResponse, 
-                      ModuleListResponse,
-                      ModuleCopyResponse)
+                      ModuleCreateResponse,
+                      ModuleUpdateRequest,
+                      ModuleUpdateResponse,
+                      ModuleCopyResponse,
+                      ModuleListResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}/modules", tags=["Modules"])
@@ -25,6 +27,20 @@ def create_module(
         payload=payload, 
         db=db, 
         current_user=current_user)
+
+@router.patch("/{module_id}/update", response_model=ModuleUpdateResponse, status_code=status.HTTP_200_OK,)
+def update_module(
+    course_id: int,
+    module_id: int,
+    payload: ModuleUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.update_module(
+        course_id=course_id,
+        module_id=module_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
 
 @router.post("/{module_id}/copy", response_model=ModuleCopyResponse, status_code=status.HTTP_201_CREATED)
 def copy_module(

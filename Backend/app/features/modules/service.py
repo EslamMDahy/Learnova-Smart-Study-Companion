@@ -6,8 +6,11 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from datetime import datetime, timezone
 
-from .schemas import ModuleCreateRequest
+from .schemas import (ModuleCreateRequest,
+                      ModuleUpdateRequest)
+
 from app.features.materials.service import copy_material
+
 
 
 def create_module(*, course_id: int, payload: ModuleCreateRequest, db: Session, current_user: dict):
@@ -134,6 +137,120 @@ def create_module(*, course_id: int, payload: ModuleCreateRequest, db: Session, 
         db.rollback()
         # مثال: unique constraint على (course_id, order_index) لو حصل concurrency
         raise HTTPException(status_code=409, detail="Conflict while creating module") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def update_module(*, course_id: int, module_id: int, payload: ModuleUpdateRequest, db: Session, current_user: dict):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can update modules")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    # =========================
+    # 2) Validate module belongs to course + ownership
+    # =========================
+    module_row = db.execute(
+        text("""
+            SELECT
+                m.id,
+                m.course_id,
+                c.created_by
+            FROM modules m
+            JOIN courses c
+              ON c.id = m.course_id
+            WHERE m.id = :module_id
+            LIMIT 1
+        """),
+        {"module_id": module_id},
+    ).mappings().first()
+
+    if not module_row:
+        raise HTTPException(status_code=404, detail="Module not found")
+
+    if int(module_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Module does not belong to this course")
+
+    if int(module_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only update modules in your own course")
+
+    # =========================
+    # 3) Build dynamic update fields
+    #    Ignore missing fields and ignore null values
+    # =========================
+    update_fields = {}
+
+    if payload.title is not None and payload.title.strip() != "":
+        update_fields["title"] = payload.title.strip()
+
+    if payload.description is not None:
+        update_fields["description"] = payload.description.strip() or None
+
+    if payload.is_published is not None:
+        update_fields["is_published"] = bool(payload.is_published)
+        update_fields["published_at"] = datetime.now(timezone.utc) if payload.is_published else None
+
+    if not update_fields:
+        raise HTTPException(status_code=400, detail="No updatable fields provided")
+
+    set_clauses = []
+    params = {"module_id": module_id}
+
+    for col in ["title", "description", "is_published", "published_at"]:
+        if col in update_fields:
+            set_clauses.append(f"{col} = :{col}")
+            params[col] = update_fields[col]
+
+    set_clauses.append("updated_at = NOW()")
+
+    # =========================
+    # 4) Update module
+    # =========================
+    try:
+        row = db.execute(
+            text(f"""
+                UPDATE modules
+                SET {", ".join(set_clauses)}
+                WHERE id = :module_id
+                RETURNING
+                    id,
+                    course_id,
+                    title,
+                    description,
+                    order_index,
+                    is_published,
+                    published_at,
+                    created_at,
+                    updated_at
+            """),
+            params,
+        ).mappings().first()
+
+        if not row:
+            db.rollback()
+            raise HTTPException(status_code=404, detail="Module not found")
+
+        db.commit()
+        return dict(row)
+
+    except HTTPException:
+        db.rollback()
+        raise
 
     except SQLAlchemyError as e:
         db.rollback()

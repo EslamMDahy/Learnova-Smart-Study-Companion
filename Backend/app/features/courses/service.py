@@ -45,7 +45,7 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             title,
             course_code,
             description,
-            is_public,
+            is_open_for_enrollment,
             visibility_level,
             requires_enrollment_approval,
             learning_outcomes,
@@ -65,7 +65,7 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             :title,
             :course_code,
             :description,
-            :is_public,
+            :is_open_for_enrollment,
             :visibility_level,
             :requires_enrollment_approval,
             :learning_outcomes,
@@ -80,7 +80,7 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             NOW()
         )
         RETURNING
-            id, title, course_code, course_type, organization_id, is_public, visibility_level,
+            id, title, course_code, course_type, organization_id, is_open_for_enrollment, visibility_level,
             requires_enrollment_approval, status, published_at
     """).bindparams(
         bindparam("learning_outcomes", type_=JSONB),
@@ -93,7 +93,7 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
         "title": payload.title,
         "course_code": payload.course_code,
         "description": payload.description,
-        "is_public": payload.is_public,
+        "is_open_for_enrollment": payload.is_open_for_enrollment,
         "visibility_level": payload.visibility_level.value,
         "requires_enrollment_approval": payload.requires_enrollment_approval,
         "learning_outcomes": payload.learning_outcomes,
@@ -147,7 +147,7 @@ def upload_course_invitations_excel(*, course_id: int, file: UploadFile, sheet_n
     # =========================
     course_row = db.execute(
         text("""
-            SELECT id, created_by, is_public
+            SELECT id, created_by, is_open_for_enrollment
             FROM courses
             WHERE id = :course_id
         """),
@@ -160,8 +160,8 @@ def upload_course_invitations_excel(*, course_id: int, file: UploadFile, sheet_n
     if course_row["created_by"] != instructor_id:
         raise HTTPException(status_code=403, detail="You can only invite users to your own course")
 
-    if course_row["is_public"] is True:
-        raise HTTPException(status_code=409, detail="This course is public and does not require invitations")
+    if course_row["is_open_for_enrollment"] is True:
+        raise HTTPException(status_code=409, detail="This course is open for enrollment and does not require invitations")
 
     # =========================
     # 3) Extract emails from Excel
@@ -311,7 +311,7 @@ def send_course_invitations(*, course_id: int,
     # =========================
     course_row = db.execute(
         text("""
-            SELECT id, created_by, is_public, title
+            SELECT id, created_by, is_open_for_enrollment, title
             FROM courses
             WHERE id = :course_id
         """),
@@ -324,8 +324,8 @@ def send_course_invitations(*, course_id: int,
     if course_row["created_by"] != instructor_id:
         raise HTTPException(status_code=403, detail="You can only send invites for your own course")
 
-    if course_row["is_public"] is True:
-        raise HTTPException(status_code=409, detail="This course is public and does not require invitations")
+    if course_row["is_open_for_enrollment"] is True:
+        raise HTTPException(status_code=409, detail="This course is open for enrollment and does not require invitations")
 
     course_title = course_row.get("title") or "your course"
 
@@ -857,7 +857,7 @@ def get_my_courses(*, db: Session, current_user: dict):
                     c.course_code,
                     c.course_type::text AS course_type,
                     c.organization_id,
-                    c.is_public,
+                    c.is_open_for_enrollment,
                     c.visibility_level::text AS visibility_level,
                     c.status::text AS status,
                     c.category,
@@ -891,7 +891,7 @@ def get_my_courses(*, db: Session, current_user: dict):
                     c.course_code,
                     c.course_type::text AS course_type,
                     c.organization_id,
-                    c.is_public,
+                    c.is_open_for_enrollment,
                     c.visibility_level::text AS visibility_level,
                     c.status::text AS status,
                     c.category,
@@ -922,7 +922,7 @@ def get_my_courses(*, db: Session, current_user: dict):
                 "course_code": r.get("course_code"),
                 "course_type": r["course_type"],
                 "organization_id": r["organization_id"],
-                "is_public": r["is_public"],
+                "is_open_for_enrollment": r["is_open_for_enrollment"],
                 "visibility_level": r["visibility_level"],
                 "status": r["status"],
                 # "cover_image_url": r["cover_image_url"],
@@ -957,7 +957,7 @@ def list_course_invitations(*,course_id: int, limit: int, offset: int,db: Sessio
     # 2) Validate course exists + ownership + private
     course_row = db.execute(
         text("""
-            SELECT id, created_by, is_public
+            SELECT id, created_by, is_open_for_enrollment
             FROM courses
             WHERE id = :course_id
         """),
@@ -970,8 +970,8 @@ def list_course_invitations(*,course_id: int, limit: int, offset: int,db: Sessio
     if course_row["created_by"] != instructor_id:
         raise HTTPException(status_code=403, detail="You can only view invitations for your own course")
 
-    if course_row["is_public"] is True:
-        raise HTTPException(status_code=409, detail="This course is public and has no invitations")
+    if course_row["is_open_for_enrollment"] is True:
+        raise HTTPException(status_code=409, detail="This course is open for enrollment and has no invitations")
 
     params: dict = {"course_id": course_id}
 
