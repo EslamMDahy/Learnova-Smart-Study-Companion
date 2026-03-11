@@ -418,6 +418,136 @@ def copy_module(*, target_course_id: int, source_module_id: int, db: Session, cu
 
 
 
+def reorder_modules(*, course_id: int, payload, db: Session, current_user: dict):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can reorder modules")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    module_ids = getattr(payload, "module_ids", None)
+    if not isinstance(module_ids, list) or not module_ids:
+        raise HTTPException(status_code=400, detail="module_ids must be a non-empty list")
+
+    try:
+        module_ids = [int(mid) for mid in module_ids]
+    except Exception:
+        raise HTTPException(status_code=400, detail="module_ids must contain valid integers")
+
+    if any(mid <= 0 for mid in module_ids):
+        raise HTTPException(status_code=400, detail="module_ids must contain positive integers only")
+
+    if len(module_ids) != len(set(module_ids)):
+        raise HTTPException(status_code=400, detail="module_ids must not contain duplicates")
+
+    # =========================
+    # 2) Validate course exists + ownership
+    # =========================
+    course_row = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if int(course_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only reorder modules for your own course")
+
+    # =========================
+    # 3) Fetch all course modules
+    # =========================
+    db_module_rows = db.execute(
+        text("""
+            SELECT id
+            FROM modules
+            WHERE course_id = :course_id
+            ORDER BY order_index ASC, id ASC
+        """),
+        {"course_id": course_id},
+    ).mappings().all()
+
+    db_module_ids = [int(row["id"]) for row in db_module_rows]
+
+    if not db_module_ids:
+        raise HTTPException(status_code=404, detail="No modules found for this course")
+
+    # request must include all modules exactly once
+    if set(module_ids) != set(db_module_ids):
+        raise HTTPException(
+            status_code=400,
+            detail="module_ids must include all course modules exactly once"
+        )
+
+    # =========================
+    # 4) Reorder with two-phase update
+    #    to avoid unique conflict on (course_id, order_index)
+    # =========================
+    try:
+        # phase 1: move to temporary negative order values
+        for idx, module_id in enumerate(module_ids):
+            db.execute(
+                text("""
+                    UPDATE modules
+                    SET order_index = :temp_order_index,
+                        updated_at = NOW()
+                    WHERE id = :module_id
+                      AND course_id = :course_id
+                """),
+                {
+                    "temp_order_index": -(idx + 1),
+                    "module_id": module_id,
+                    "course_id": course_id,
+                },
+            )
+
+        # phase 2: assign final order values
+        for idx, module_id in enumerate(module_ids):
+            db.execute(
+                text("""
+                    UPDATE modules
+                    SET order_index = :final_order_index,
+                        updated_at = NOW()
+                    WHERE id = :module_id
+                      AND course_id = :course_id
+                """),
+                {
+                    "final_order_index": idx,
+                    "module_id": module_id,
+                    "course_id": course_id,
+                },
+            )
+
+        db.commit()
+
+        return {
+            "course_id": course_id,
+            "module_ids": module_ids,
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
 def list_course_modules(*, course_id: int, db: Session, current_user: dict):
     user_id = current_user.get("id")
     if not user_id:
