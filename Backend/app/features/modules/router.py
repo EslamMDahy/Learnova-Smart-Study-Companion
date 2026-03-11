@@ -78,3 +78,14 @@ def list_course_modules(
         db=db,
         current_user=current_user,)
 
+@router.delete("/{module_id}/delete", status_code=status.HTTP_204_NO_CONTENT,)
+def delete_module(
+    course_id: int,
+    module_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    service.delete_module(
+        course_id=course_id,
+        module_id=module_id,
+        db=db,
+        current_user=current_user,)
