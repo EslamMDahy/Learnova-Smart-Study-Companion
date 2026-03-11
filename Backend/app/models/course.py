@@ -65,10 +65,10 @@ class Course(Base):
         nullable=True
     )
 
-    is_public: Mapped[bool] = mapped_column(
+    is_open_for_enrollment: Mapped[bool] = mapped_column(
         Boolean,
         default=False,
-        index=True
+        index=True,
     )
 
     # access_code: Mapped[str | None] = mapped_column(
