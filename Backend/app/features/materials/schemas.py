@@ -99,3 +99,19 @@ class MaterialDownloadUrlResponse(BaseModel):
     expires_in_seconds: int = Field(..., gt=0, description="Signed URL validity period in seconds")
 
     model_config = ConfigDict(extra="forbid")
+
+
+class MaterialReassignRequest(BaseModel):
+    target_module_id: int = Field(
+        ...,
+        description="The target module ID to move the material into"
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+class MaterialReassignResponse(BaseModel):
+    id: int
+    module_id: int
+    storage_key: str
+
+    model_config = ConfigDict(extra="forbid")
