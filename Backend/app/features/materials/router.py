@@ -10,7 +10,9 @@ from .schemas import (
     MaterialInitUploadResponse,
     MaterialConfirmUploadResponse,
     MaterialListResponse,
-    MaterialDownloadUrlResponse)
+    MaterialDownloadUrlResponse,
+    MaterialReassignRequest,
+    MaterialReassignResponse)
 
 router = APIRouter(tags=["Materials"])
 
@@ -79,6 +81,22 @@ def get_material_download_url(
         course_id=course_id,
         module_id=module_id,
         material_id=material_id,
+        db=db,
+        current_user=current_user,)
+
+@router.patch("/{material_id}/reassign",response_model=MaterialReassignResponse,status_code=status.HTTP_200_OK,)
+def reassign_material(
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    payload: MaterialReassignRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.reassign_material(
+        course_id=course_id,
+        module_id=module_id,
+        material_id=material_id,
+        payload=payload,
         db=db,
         current_user=current_user,)
 

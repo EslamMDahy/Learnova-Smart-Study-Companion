@@ -900,6 +900,147 @@ def get_material_download_url(*, course_id: int, module_id: int, material_id: in
 
 
 
+def reassign_material(*, course_id: int, module_id: int, material_id: int, payload, db: Session, current_user: dict):
+    # =========================
+    # 1) AuthZ
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can reassign materials")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    target_module_id = getattr(payload, "target_module_id", None)
+    if not target_module_id:
+        raise HTTPException(status_code=422, detail="target_module_id is required")
+
+    try:
+        target_module_id = int(target_module_id)
+    except Exception:
+        raise HTTPException(status_code=422, detail="Invalid target_module_id")
+
+    if target_module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid target_module_id")
+
+    # =========================
+    # 2) Validate source material + ownership chain
+    # =========================
+    material_row = db.execute(
+        text("""
+            SELECT
+                mat.id,
+                mat.module_id,
+                mat.storage_key,
+                src_mod.course_id,
+                c.created_by
+            FROM materials mat
+            JOIN modules src_mod
+              ON src_mod.id = mat.module_id
+            JOIN courses c
+              ON c.id = src_mod.course_id
+            WHERE mat.id = :material_id
+            LIMIT 1
+        """),
+        {"material_id": material_id},
+    ).mappings().first()
+
+    if not material_row:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    if int(material_row["module_id"]) != int(module_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this module")
+
+    if int(material_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this course")
+
+    if int(material_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only reassign materials in your own course")
+
+    # =========================
+    # 3) Validate target module
+    # =========================
+    target_module_row = db.execute(
+        text("""
+            SELECT
+                m.id,
+                m.course_id,
+                c.created_by
+            FROM modules m
+            JOIN courses c
+              ON c.id = m.course_id
+            WHERE m.id = :target_module_id
+            LIMIT 1
+        """),
+        {"target_module_id": target_module_id},
+    ).mappings().first()
+
+    if not target_module_row:
+        raise HTTPException(status_code=404, detail="Target module not found")
+
+    if int(target_module_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Target module must belong to the same course")
+
+    if int(target_module_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only reassign materials into your own course")
+
+    # optional but useful
+    if int(target_module_id) == int(module_id):
+        raise HTTPException(status_code=400, detail="Material is already assigned to this module")
+
+    # =========================
+    # 4) Update material.module_id only
+    #    Do NOT change storage_key
+    # =========================
+    try:
+        updated_row = db.execute(
+            text("""
+                UPDATE materials
+                SET module_id = :target_module_id,
+                    updated_at = NOW()
+                WHERE id = :material_id
+                RETURNING
+                    id,
+                    module_id,
+                    storage_key
+            """),
+            {
+                "target_module_id": target_module_id,
+                "material_id": material_id,
+            },
+        ).mappings().first()
+
+        if not updated_row:
+            db.rollback()
+            raise HTTPException(status_code=404, detail="Material not found")
+
+        db.commit()
+        return dict(updated_row)
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while reassigning material") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
 def _delete_material_internal(*, material_id: int, db: Session, storage_bucket: str,):
     
     if not material_id or material_id <= 0:
