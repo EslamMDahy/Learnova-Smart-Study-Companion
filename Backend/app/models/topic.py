@@ -22,8 +22,8 @@ class Topic(Base):
         autoincrement=True
     )
 
-    module_id: Mapped[int] = mapped_column(
-        ForeignKey("modules.id", ondelete="CASCADE"),
+    material_id: Mapped[int] = mapped_column(
+        ForeignKey("materials.id", ondelete="CASCADE"),
         nullable=False,
         index=True
     )
@@ -50,14 +50,16 @@ class Topic(Base):
         index=True
     )
 
-    estimated_duration_minutes: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True
+    is_ai_generated: Mapped[bool] = mapped_column(
+        Boolean,
+        default=True,
+        index=True
     )
 
-    is_required: Mapped[bool] = mapped_column(
+    is_reviewed: Mapped[bool] = mapped_column(
         Boolean,
-        default=True
+        default=False,
+        index=True
     )
 
     created_at: Mapped[datetime] = mapped_column(
@@ -72,11 +74,6 @@ class Topic(Base):
     )
 
     __table_args__ = (
-        # unique (module_id, order_index)
-        Index(
-            "uq_topics_module_order",
-            "module_id",
-            "order_index",
-            unique=True
-        ),
+        Index("ix_topics_material_parent", "material_id", "parent_topic_id"),
+        Index("ix_topics_material_order", "material_id", "order_index"),
     )

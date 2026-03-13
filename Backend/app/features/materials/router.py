@@ -10,7 +10,9 @@ from .schemas import (
     MaterialInitUploadResponse,
     MaterialConfirmUploadResponse,
     MaterialListResponse,
-    MaterialDownloadUrlResponse)
+    MaterialDownloadUrlResponse,
+    MaterialReassignRequest,
+    MaterialReassignResponse)
 
 router = APIRouter(tags=["Materials"])
 
@@ -33,7 +35,6 @@ def init_material_upload(
         payload=payload,
         db=db,
         current_user=current_user,)
-
 
 # =========================
 # Confirm upload (by material id)
@@ -77,6 +78,36 @@ def get_material_download_url(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):
     return service.get_material_download_url(
+        course_id=course_id,
+        module_id=module_id,
+        material_id=material_id,
+        db=db,
+        current_user=current_user,)
+
+@router.patch("/{material_id}/reassign",response_model=MaterialReassignResponse,status_code=status.HTTP_200_OK,)
+def reassign_material(
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    payload: MaterialReassignRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.reassign_material(
+        course_id=course_id,
+        module_id=module_id,
+        material_id=material_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
+
+@router.delete("/courses/{course_id}/modules/{module_id}/materials/{material_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_material(
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    service.delete_material(
         course_id=course_id,
         module_id=module_id,
         material_id=material_id,

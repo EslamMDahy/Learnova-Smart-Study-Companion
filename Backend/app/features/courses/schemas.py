@@ -36,7 +36,7 @@ class CourseCreateRequest(BaseModel):
     # cover_image_url: Optional[str] = Field(default=None, max_length=512)
     # banner_image_url: Optional[str] = Field(default=None, max_length=512)
 
-    is_public: bool
+    is_open_for_enrollment: bool
     visibility_level: CourseVisibilityLevel
     requires_enrollment_approval: bool = False
 
@@ -64,7 +64,7 @@ class CourseCreateResponse(BaseModel):
     course_code: Optional[str] = None
     course_type: CourseType
     organization_id: Optional[int]
-    is_public: bool
+    is_open_for_enrollment: bool
     visibility_level: CourseVisibilityLevel
     requires_enrollment_approval: bool
 
@@ -151,8 +151,6 @@ class CourseInviteAcceptResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-
-
 class MyCourseItem(BaseModel):
     id: int
     title: str
@@ -162,7 +160,7 @@ class MyCourseItem(BaseModel):
     course_type: str  # أو CourseType
     organization_id: Optional[int] = None
 
-    is_public: bool
+    is_open_for_enrollment: bool
     visibility_level: str  # أو CourseVisibilityLevel
     status: str
 
