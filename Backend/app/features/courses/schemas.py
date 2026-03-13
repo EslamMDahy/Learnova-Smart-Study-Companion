@@ -4,6 +4,7 @@ from enum import Enum
 from typing import Optional, List
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import datetime
+from app.models.enums import CourseStatus
 
 
 
@@ -30,17 +31,22 @@ class CourseCreateRequest(BaseModel):
     organization_id: Optional[int] = Field(default=None, description="Required if course_type=organization")
 
     title: str = Field(..., min_length=1, max_length=255)
+    course_code: Optional[str] = Field(default=None, max_length=50, description="Optional course code shown in UI")
     description: Optional[str] = None
-    cover_image_url: Optional[str] = Field(default=None, max_length=512)
-    banner_image_url: Optional[str] = Field(default=None, max_length=512)
+    # cover_image_url: Optional[str] = Field(default=None, max_length=512)
+    # banner_image_url: Optional[str] = Field(default=None, max_length=512)
 
-    is_public: bool
+    is_open_for_enrollment: bool
     visibility_level: CourseVisibilityLevel
     requires_enrollment_approval: bool = False
 
     learning_outcomes: Optional[list[str]] = None
     tags: Optional[list[str]] = None
     category: Optional[str] = Field(default=None, max_length=100)
+    status: Optional[CourseStatus] = Field(
+        default=None,
+        description="draft | published | archived"
+    )
 
     model_config = ConfigDict(extra="forbid")
 
@@ -55,11 +61,16 @@ class CourseCreateRequest(BaseModel):
 class CourseCreateResponse(BaseModel):
     id: int
     title: str
+    course_code: Optional[str] = None
     course_type: CourseType
     organization_id: Optional[int]
-    is_public: bool
+    is_open_for_enrollment: bool
     visibility_level: CourseVisibilityLevel
     requires_enrollment_approval: bool
+
+    # keep parity with DB model
+    status: CourseStatus
+    published_at: Optional[datetime] = None
 
     model_config = ConfigDict(extra="forbid", use_enum_values=True)
 
@@ -140,21 +151,21 @@ class CourseInviteAcceptResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-
-
 class MyCourseItem(BaseModel):
     id: int
     title: str
 
+    course_code: Optional[str] = None
+
     course_type: str  # أو CourseType
     organization_id: Optional[int] = None
 
-    is_public: bool
+    is_open_for_enrollment: bool
     visibility_level: str  # أو CourseVisibilityLevel
     status: str
 
-    cover_image_url: Optional[str] = None
-    banner_image_url: Optional[str] = None
+    # cover_image_url: Optional[str] = None
+    # banner_image_url: Optional[str] = None
     category: Optional[str] = None
 
     created_by: int
@@ -203,3 +214,7 @@ class CourseInvitationsListResponse(BaseModel):
     items: List[CourseInvitationItem]
 
     model_config = ConfigDict(extra="forbid")
+
+
+
+

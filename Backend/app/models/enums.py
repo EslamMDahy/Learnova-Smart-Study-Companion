@@ -131,6 +131,7 @@ class MaterialType(str, Enum):
     quiz = "quiz"
 
 class MaterialStatus(str, Enum):
+    draft_upload = "draft_upload"   # NEW
     uploaded = "uploaded"
     processing = "processing"
     ready = "ready"
@@ -141,16 +142,17 @@ class AIQuestionGenerationStatus(str, Enum):
     completed = "completed"
     failed = "failed"
 
-class QuestionBankPurpose(str, Enum):
-    practice = "practice"
-    exam = "exam"
-    homework = "homework"
-    quiz = "quiz"
+class QuestionGenerationScope(str, Enum):
+    topic = "topic"
+    material = "material"
+    module = "module"
+    course = "course"
+    custom = "custom"
 
-class QuestionBankAccessLevel(str, Enum):
-    public = "public"
-    private = "private"
-    organization = "organization"
+
+
+
+
 
 class PracticeSessionType(str, Enum):
     practice = "practice"
@@ -164,10 +166,16 @@ class PracticeSessionStatus(str, Enum):
     abandoned = "abandoned"
 
 class QuestionType(str, Enum):
-    multiple_choice = "multiple_choice"
+    multiple_choice = "multiple_choice"         # single correct
+    multi_select = "multi_select"               # multiple correct
     true_false = "true_false"
     short_answer = "short_answer"
     essay = "essay"
+    fill_in_the_blank = "fill_in_the_blank"
+    matching = "matching"
+    ordering = "ordering"
+    numeric = "numeric"
+    code = "code"
 
 class QuestionDifficulty(str, Enum):
     easy = "easy"

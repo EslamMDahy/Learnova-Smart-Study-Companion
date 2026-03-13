@@ -113,7 +113,8 @@ sqlalchemy.url = postgresql+psycopg://<password>@localhost:5432/learnova
 
 <!-- - Create a new migration (auto-generate)
 ```bat
-alembic revision --autogenerate -m "initialize the DB"
+python -m alembic -c alembic.ini revision --autogenerate -m "reblace the avatarURL with avatarKEY"
+
 ``` -->
 - Apply migrations to DB
 ```bat

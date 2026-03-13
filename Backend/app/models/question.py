@@ -7,9 +7,11 @@ from sqlalchemy import (
     JSON,
     Enum as SQLEnum,
     Index,
-    Boolean
+    Boolean,
+    CheckConstraint
 )
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 
 from app.db.base import Base
@@ -30,19 +32,26 @@ class Question(Base):
         autoincrement=True
     )
 
-    bank_id: Mapped[int] = mapped_column(
-        ForeignKey("question_banks.id", ondelete="CASCADE"),
-        nullable=False
+    course_id: Mapped[int] = mapped_column(
+        ForeignKey("courses.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
     )
 
-    topic_id: Mapped[int] = mapped_column(
-        ForeignKey("topics.id", ondelete="CASCADE"),
-        nullable=False,
+    module_id: Mapped[int | None] = mapped_column(
+        ForeignKey("modules.id", ondelete="CASCADE"),
+        nullable=True,
         index=True
     )
 
     material_id: Mapped[int | None] = mapped_column(
         ForeignKey("materials.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True
+    )
+
+    topic_id: Mapped[int | None] = mapped_column(
+        ForeignKey("topics.id", ondelete="CASCADE"),
         nullable=True,
         index=True
     )
@@ -59,6 +68,13 @@ class Question(Base):
 
     explanation: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True
+    )
+
+    # For choice-based questions (mcq, multi_select, true_false, etc.)
+    # Example: [{"option_text": "...", "is_correct": true, "order_index": 0, "explanation": "..."}]
+    options: Mapped[list | None] = mapped_column(
+        JSONB,
         nullable=True
     )
 
@@ -160,6 +176,15 @@ class Question(Base):
     )
 
     __table_args__ = (
-        # (bank_id, topic_id)
-        Index("ix_questions_bank_topic", "bank_id", "topic_id"),
+        # (course_id, topic_id)
+                # Fast filtering inside a course question bank
+        Index("ix_questions_course_topic", "course_id", "topic_id"),
+        Index("ix_questions_course_module", "course_id", "module_id"),
+        Index("ix_questions_course_material", "course_id", "material_id"),
+        # Ensure question is attached to at least a topic or a module
+        CheckConstraint(
+            "(topic_id IS NOT NULL) OR (module_id IS NOT NULL) OR (material_id IS NOT NULL) "
+            "OR (topic_id IS NULL AND module_id IS NULL AND material_id IS NULL)",
+            name="ck_questions_scope_required"
+        ),
     )

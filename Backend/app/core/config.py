@@ -41,6 +41,11 @@ class Settings:
     cookie_samesite: Literal["lax", "strict", "none"] = os.getenv("COOKIE_SAMESITE", "lax")  # type: ignore
     cookie_path: str = os.getenv("COOKIE_PATH", "/auth/refresh")
 
+    # Supabase Storage
+    supabase_url: str = os.getenv("SUPABASE_URL", "")
+    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    supabase_public_bucket: str = os.getenv("SUPABASE_PUBLIC_BUCKET", "learnova-public-assets")
+    supabase_private_bucket: str = os.getenv("SUPABASE_PRIVATE_BUCKET", "learnova-private-assets")
 
 
 settings = Settings()

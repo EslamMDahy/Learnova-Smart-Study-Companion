@@ -9,6 +9,10 @@ from . import service
 from .schemas import (
     UpdateProfileRequest,
     UpdateProfileResponse,
+    CreateAvatarUploadUrlRequest,
+    CreateAvatarUploadUrlResponse,
+    ConfirmAvatarUploadRequest,
+    ConfirmAvatarUploadResponse,
     ChangePasswordRequest,
     ChangePasswordResponse,
     RequestDeleteAccountRequest,
@@ -20,7 +24,7 @@ from .schemas import (
 )
 
 
-router = APIRouter(prefix="/settings", tags=["settings"])
+router = APIRouter(prefix="/settings", tags=["Settings"])
 
 
 @router.patch("/profile", response_model=UpdateProfileResponse)
@@ -33,6 +37,25 @@ def update_profile(
         db=db, 
         current_user=current_user)
 
+@router.post("/avatar/upload-url", response_model=CreateAvatarUploadUrlResponse)
+def create_avatar_upload_url(
+    payload: CreateAvatarUploadUrlRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),):
+    return service.create_avatar_upload_url(
+        payload=payload,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/avatar/confirm", response_model=ConfirmAvatarUploadResponse)
+def confirm_avatar_upload(
+    payload: ConfirmAvatarUploadRequest,
+    db: Session = Depends(get_db),
+    current_user=Depends(get_current_user),):
+    return service.confirm_avatar_upload(
+        payload=payload,
+        db=db,
+        current_user=current_user,)
 
 @router.patch("/password", response_model=ChangePasswordResponse)
 def change_password(

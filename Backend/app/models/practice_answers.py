@@ -5,6 +5,7 @@ from sqlalchemy import (
     Text,
     Boolean,
     ForeignKey,
+    JSON,
     Index
 )
 from sqlalchemy.orm import Mapped, mapped_column
@@ -33,8 +34,16 @@ class PracticeAnswer(Base):
         index=True
     )
 
-    selected_option_id: Mapped[int | None] = mapped_column(
-        ForeignKey("question_options.id", ondelete="SET NULL"),
+    # For choice-based questions:
+    # - single choice/true-false: selected_option_index
+    # - multi-select: selected_option_indices
+    selected_option_index: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True
+    )
+
+    selected_option_indices: Mapped[list | None] = mapped_column(
+        JSON,
         nullable=True
     )
 

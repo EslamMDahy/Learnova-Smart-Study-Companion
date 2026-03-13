@@ -40,7 +40,7 @@ class User(Base):
         nullable=True
     )
 
-    avatar_url: Mapped[str | None] = mapped_column(
+    avatar_key: Mapped[str | None] = mapped_column(
         String(512),
         nullable=True
     )

@@ -8,7 +8,6 @@ import os
 
 from datetime import datetime, timedelta, timezone
 
-from .schemas import RegisterRequest
 from .schemas import LoginRequest
 
 from app.core.security import hash_password
@@ -16,6 +15,7 @@ from app.core.security import verify_password
 from app.core.security import hmac_sha256_hex
 from app.core.emailer import send_email
 from app.core.jwt import create_access_token
+from app.core.supabase_client import supabase
 from app.core.config import settings
 
 
@@ -73,13 +73,19 @@ def register_user(payload, db: Session):
         },
     ).first()
 
-    db.commit()
-
-
     if not row:
         raise HTTPException(status_code=500, detail="Failed to create user")
 
     user_id = row[0]
+
+    avatar_key = f"users/{user_id}/avatar"
+
+    db.execute(
+        text("UPDATE users SET avatar_key = :avatar_key WHERE id = :uid"),
+        {"avatar_key": avatar_key, "uid": user_id},
+    )
+
+    db.commit()
 
     send_verification_email(payload, db)
     
@@ -368,10 +374,10 @@ def login_user(payload: LoginRequest, db: Session, response: Response):
         text("""
              SELECT
              id, full_name, email, hashed_password,
-             avatar_url, phone_number,  bio, 
+             avatar_key, phone_number,  bio, 
              system_role, student_id, university_email, 
              language_preference, is_email_verified, 
-             created_at, last_login_at, last_password_change
+             created_at, updated_at, last_login_at, last_password_change
              FROM users
              WHERE email = :email
              """
@@ -383,7 +389,7 @@ def login_user(payload: LoginRequest, db: Session, response: Response):
     if not row:
         raise HTTPException(status_code=401, detail="Invalid credentials")
 
-    user_id, full_name, email, hashed_pw, avatar_url, phone_number,  bio, system_role, student_id, university_email, language_preference, is_verified, created_at, last_login_at, last_password_change = row
+    user_id, full_name, email, hashed_pw, avatar_key, phone_number,  bio, system_role, student_id, university_email, language_preference, is_verified, created_at, updated_at, last_login_at, last_password_change = row
 
     # 2) باسورد غلط (قبل verification)
     if not verify_password(payload.password, hashed_pw):
@@ -394,6 +400,18 @@ def login_user(payload: LoginRequest, db: Session, response: Response):
         raise HTTPException(status_code=403, detail="Email not verified")
     
     # 4) preparing the login response data
+    base_url = supabase.storage.from_(settings.supabase_public_bucket).get_public_url(str(avatar_key))
+
+    avatar_updated_at = updated_at.isoformat() if updated_at else datetime.now(timezone.utc).isoformat()
+
+    try:
+        dt = datetime.fromisoformat(avatar_updated_at.replace("Z", "+00:00"))
+        v = int(dt.timestamp())
+    except Exception:
+        v = int(datetime.now(timezone.utc).timestamp())
+        
+    avatar_url = f"{base_url}?v={v}"
+
     user = {
         "id": user_id,
         "full_name": full_name,
@@ -534,6 +552,33 @@ def login_user(payload: LoginRequest, db: Session, response: Response):
     db.commit()
 
     return resp
+
+
+
+def check_email_verified(payload, db: Session) -> dict:
+    """
+    Check if a user's email address is verified.
+
+    Security notes:
+    - Returns { is_verified: false } for unknown emails (does NOT reveal if email exists).
+    - No authentication required — used by unverified users who can't log in.
+    - Rate limiting should be applied at the API gateway / reverse proxy level.
+    """
+    row = db.execute(
+        text("""
+            SELECT is_email_verified
+            FROM users
+            WHERE email = :email
+        """),
+        {"email": payload.email},
+    ).first()
+
+    # Unknown email → return false (don't reveal existence)
+    if row is None:
+        return {"is_verified": False}
+
+    (is_verified,) = row
+    return {"is_verified": bool(is_verified)}
 
 
 
@@ -974,3 +1019,5 @@ def reset_password(payload, db):
     db.commit()
 
     return {"message": "Password reset successfully"}    
+
+
