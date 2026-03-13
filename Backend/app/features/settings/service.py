@@ -258,7 +258,7 @@ def confirm_avatar_upload(*, payload, db: Session, current_user):
     row = db.execute(
         text("""
             UPDATE users
-            SET updated_at = NOW(),
+            SET updated_at = NOW()
             WHERE id = :uid
             RETURNING updated_at
         """),

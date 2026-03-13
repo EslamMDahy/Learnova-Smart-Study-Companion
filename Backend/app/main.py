@@ -1,34 +1,20 @@
-from fastapi import FastAPI
-
 from dotenv import load_dotenv
+load_dotenv()  # ← لازم يكون أول حاجة قبل أي import تاني
 
-load_dotenv()
-
-from app.features.auth.router import router as auth_router
-from app.features.organizations.router import router as organizations_router
-from app.features.settings.router import router as settings_router
-from app.features.courses.router import router as courses_router
-from app.features.modules.router import router as modules_router
-from app.features.materials.router import router as materials_router
-from app.features.questions.router import router as questions_router
-
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-app = FastAPI()
-# origins = [
-#     "http://localhost:5173",
-#     "http://127.0.0.1:5173",
-#     "http://localhost:8000",
-#     "http://127.0.0.1:8000",
-# ]
+from app.core.config import settings
+from app.features.auth.router          import router as auth_router
+from app.features.organizations.router import router as organizations_router
+from app.features.settings.router      import router as settings_router
+from app.features.courses.router       import router as courses_router
+from app.features.modules.router       import router as modules_router
+from app.features.materials.router     import router as materials_router
+from app.features.questions.router     import router as questions_router
 
-# app.add_middleware(
-#     CORSMiddleware,
-#     allow_origins=origins,
-#     allow_credentials=False,
-#     allow_methods=["*"],
-#     allow_headers=["*"],
-# )
+app = FastAPI()
+
 origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
@@ -37,7 +23,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials=True,  # لازم عشان الكوكي
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )

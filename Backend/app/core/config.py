@@ -18,7 +18,6 @@ class Settings:
     # Invite tokens (HMAC)
     invite_token_secret: str = os.getenv("INVITE_TOKEN_SECRET", "")
 
-
     # SMTP
     smtp_host: str = os.getenv("SMTP_HOST", "")
     smtp_port: int = int(os.getenv("SMTP_PORT", "587"))
@@ -36,10 +35,23 @@ class Settings:
     refresh_token_expire_days_short: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS_SHORT", "1"))
     refresh_token_expire_days_remember: int = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS_REMEMBER", "30"))
 
-    # Cookies
+    # ─── Cookie settings ────────────────────────────────────────────────────────
+    # IMPORTANT — Flutter Web on localhost:
+    #
+    # The frontend (:5173) and backend (:8000) are different ports = cross-origin.
+    # For the HttpOnly refresh-token cookie to be sent on a credentialed cross-origin
+    # POST from Flutter Web XHR (withCredentials=true), you MUST use:
+    #
+    #   COOKIE_SAMESITE=none   → tells browser: send cookie on cross-origin requests
+    #   COOKIE_SECURE=false    → Chrome on localhost allows SameSite=none without Secure
+    #   COOKIE_PATH=/          → cookie must reach /auth/refresh (a subpath of /)
+    #
+    # Setting COOKIE_SAMESITE=lax causes the browser to silently drop the cookie on
+    # cross-origin POST requests, so the backend receives no cookie → 401.
+    # ────────────────────────────────────────────────────────────────────────────
     cookie_secure: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
-    cookie_samesite: Literal["lax", "strict", "none"] = os.getenv("COOKIE_SAMESITE", "lax")  # type: ignore
-    cookie_path: str = os.getenv("COOKIE_PATH", "/auth/refresh")
+    cookie_samesite: Literal["lax", "strict", "none"] = os.getenv("COOKIE_SAMESITE", "none")  # type: ignore
+    cookie_path: str = os.getenv("COOKIE_PATH", "/")
 
     # Supabase Storage
     supabase_url: str = os.getenv("SUPABASE_URL", "")

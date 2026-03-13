@@ -19,6 +19,19 @@ from app.core.supabase_client import supabase
 from app.core.config import settings
 
 
+def _set_refresh_cookie(response: Response, refresh_raw: str, refresh_expires_at: datetime):
+    ttl_seconds = max(int((refresh_expires_at - datetime.now(timezone.utc)).total_seconds()), 0)
+    response.set_cookie(
+        key=settings.refresh_cookie_name,
+        value=refresh_raw,
+        httponly=True,
+        secure=settings.cookie_secure,
+        samesite=settings.cookie_samesite,
+        path=settings.cookie_path,
+        max_age=ttl_seconds,
+        expires=refresh_expires_at,
+    )
+
 
 def register_user(payload, db: Session):
     # 1) Check email unique
@@ -524,15 +537,7 @@ def login_user(payload: LoginRequest, db: Session, response: Response):
     )
 
     # set cookie
-    response.set_cookie(
-        key=settings.refresh_cookie_name,
-        value=refresh_raw,
-        httponly=True,
-        secure=settings.cookie_secure,     # false في dev, true في prod
-        samesite=settings.cookie_samesite, # "lax" غالبًا
-        path=settings.cookie_path,         # "/auth/refresh" أفضل
-        expires=int(refresh_expires_at.timestamp()),
-    )
+    _set_refresh_cookie(response, refresh_raw, refresh_expires_at)
 
 
     # 6) Sending the login response
@@ -594,14 +599,13 @@ def refresh_access_token(*, db: Session, request: Request, response: Response):
     now = datetime.now(timezone.utc)
     refresh_hash = hmac_sha256_hex(refresh_raw, settings.refresh_token_secret)
 
-    # 2) validate token in DB
+    # 2) validate token — بنجيب used_at و id عشان grace window
     row = db.execute(
         text("""
-            SELECT ut.user_id, expires_at, created_at 
+            SELECT ut.user_id, expires_at, created_at, used_at, id
             FROM user_tokens ut
             WHERE ut.type = 'refresh'
               AND ut.token = :token
-              AND ut.used_at IS NULL
               AND ut.expires_at > NOW()
             LIMIT 1
         """),
@@ -609,25 +613,52 @@ def refresh_access_token(*, db: Session, request: Request, response: Response):
     ).first()
 
     if not row:
-        # refresh invalid/expired/reused
-        # امسح cookie احتياطيًا
-        response.delete_cookie(
-            key=settings.refresh_cookie_name,
-            path=settings.cookie_path,
-        )
+        response.delete_cookie(key=settings.refresh_cookie_name, path=settings.cookie_path)
         raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
 
-    user_id = row[0]
-    expires_at = row[1]
-    created_at= row[2]
+    user_id, expires_at, created_at, used_at, token_id = row
 
-    # 3) get user claims (عشان نطلع access token)
+    # Grace window: Flutter Web بتبعت 2 requests متوازيين لما الـ access token يخلص
+    # الأول بيشتغل تمام، الثاني بيلاقي used_at IS NOT NULL بعد مللي ثانية
+    # لو الـ token اتستخدم من أقل من 10 ثواني → parallel request → نرجعله access token جديد
+    _GRACE_SECONDS = 10
+    if used_at is not None:
+        used_utc = used_at if used_at.tzinfo else used_at.replace(tzinfo=timezone.utc)
+        age = (now - used_utc).total_seconds()
+        if age <= _GRACE_SECONDS:
+            # ابحث عن الـ token الجديد اللي الـ request الأول عمله
+            fresh = db.execute(
+                text("""
+                    SELECT ut.id FROM user_tokens ut
+                    WHERE ut.user_id = :uid AND ut.type = 'refresh'
+                      AND ut.used_at IS NULL AND ut.expires_at > NOW()
+                    ORDER BY ut.created_at DESC LIMIT 1
+                """),
+                {"uid": user_id},
+            ).first()
+            if fresh:
+                ur = db.execute(
+                    text("SELECT id, email, full_name, system_role, last_password_change FROM users WHERE id = :uid LIMIT 1"),
+                    {"uid": user_id},
+                ).first()
+                if ur:
+                    return {
+                        "access_token": create_access_token(
+                            subject=str(ur[0]),
+                            extra={"email": ur[1], "full_name": ur[2], "system_role": ur[3],
+                                   "last_password_change": int(ur[4].timestamp()) if ur[4] else None},
+                        ),
+                        "token_type": "bearer",
+                    }
+        # خارج الـ grace window → reuse attack حقيقي
+        response.delete_cookie(key=settings.refresh_cookie_name, path=settings.cookie_path)
+        raise HTTPException(status_code=401, detail="Invalid or expired refresh token")
+
+    # 3) get user claims
     user_row = db.execute(
         text("""
             SELECT id, email, full_name, system_role, last_password_change
-            FROM users
-            WHERE id = :uid
-            LIMIT 1
+            FROM users WHERE id = :uid LIMIT 1
         """),
         {"uid": user_id},
     ).first()
@@ -638,16 +669,10 @@ def refresh_access_token(*, db: Session, request: Request, response: Response):
 
     uid, email, full_name, system_role, last_password_change = user_row
 
-    # 4) invalidate ALL old refresh tokens (single-session strategy)
+    # 4) invalidate THIS token فقط (مش كل tokens اليوزر عشان الـ grace window تشتغل)
     db.execute(
-        text("""
-            UPDATE user_tokens
-            SET used_at = NOW()
-            WHERE user_id = :uid
-              AND type = 'refresh'
-              AND used_at IS NULL
-        """),
-        {"uid": uid},
+        text("UPDATE user_tokens SET used_at = NOW() WHERE id = :tid"),
+        {"tid": token_id},
     )
 
     # 5) mint new refresh token (rotation)
@@ -669,15 +694,7 @@ def refresh_access_token(*, db: Session, request: Request, response: Response):
     )
 
     # 6) set cookie with new refresh
-    response.set_cookie(
-        key=settings.refresh_cookie_name,
-        value=new_refresh_raw,
-        httponly=True,
-        secure=settings.cookie_secure,
-        samesite=settings.cookie_samesite,
-        path=settings.cookie_path,
-        expires=int(refresh_expires_at.timestamp()),
-    )
+    _set_refresh_cookie(response, new_refresh_raw, refresh_expires_at)
 
     # 7) mint new access token (15 min)
     access_token = create_access_token(
@@ -1018,6 +1035,4 @@ def reset_password(payload, db):
 
     db.commit()
 
-    return {"message": "Password reset successfully"}    
-
-
+    return {"message": "Password reset successfully"}
