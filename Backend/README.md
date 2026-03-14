@@ -29,12 +29,14 @@ cd Learnova-Smart-Study-Companion\Backend
 ## 2) Create & activate venv
 
 **CMD**
+
 ```bat
 python -m venv .venv
 .venv\Scripts\activate.bat
 ```
 
 **PowerShell**
+
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -49,7 +51,9 @@ pip install -r requirements.txt
 ```
 
 Notes:
-- `psycopg` / `psycopg-binary` is included in requirements and is used as the PostgreSQL driver. fileciteturn4file2L27-L29  
+
+- `psycopg` / `psycopg-binary` is included in requirements and is used as the PostgreSQL driver. fileciteturn4file2L27-L29
+
 <!-- - `passlib` / `bcrypt` are also in requirements (legacy). If your local hashing uses `app/core/security.py` (PBKDF2), you **do not need them**, but keeping them installed is harmless. -->
 
 ---
@@ -57,12 +61,15 @@ Notes:
 ## 4) PostgreSQL setup (Windows ZIP / Portable)
 
 ### Extract PostgreSQL
+
 Example:
+
 ```
 C:\pgsql\
 ```
 
 Required binaries:
+
 - `C:\pgsql\bin\psql.exe`
 - `C:\pgsql\bin\pg_ctl.exe`
 - `C:\pgsql\bin\initdb.exe` fileciteturn4file0L53-L57
@@ -70,6 +77,7 @@ Required binaries:
 ### Initialize DB directory (one time only)
 
 Skip if `C:\pgsql\data` already exists:
+
 ```bat
 C:\pgsql\bin\initdb -D C:\pgsql\data -U postgres -A password -W
 ```
@@ -77,11 +85,13 @@ C:\pgsql\bin\initdb -D C:\pgsql\data -U postgres -A password -W
 ### Start / stop PostgreSQL
 
 Start:
+
 ```bat
 C:\pgsql\bin\pg_ctl -D C:\pgsql\data -l C:\pgsql\logfile.log start
 ```
 
 Stop:
+
 ```bat
 C:\pgsql\bin\pg_ctl -D C:\pgsql\data stop
 ```
@@ -91,11 +101,13 @@ C:\pgsql\bin\pg_ctl -D C:\pgsql\data stop
 ## 5) Create the database
 
 Open psql:
+
 ```bat
 C:\pgsql\bin\psql -U postgres
 ```
 
 Create DB:
+
 ```sql
 CREATE DATABASE learnova;
 \q
@@ -116,15 +128,16 @@ DATABASE_URL=postgresql+psycopg://postgres:<PASSWORD>@localhost:5432/learnova
 # DATABASE_URL=postgresql+psycopg2://postgres:<PASSWORD>@localhost:5432/learnova
 
 # SMTP (Gmail App Password)
-SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
-SMTP_USER=your_email@gmail.com
-SMTP_PASS=your_gmail_app_password
-SMTP_FROM=your_email@gmail.com
+SMTP_HOST=<SMTP_HOST>
+SMTP_PORT=<SMTP_PORT>
+SMTP_USER=<SMTP_USER>
+SMTP_PASS=<SMTP_PASS>
+SMTP_FROM=<SMTP_FROM>
 
 # App
 API_BASE_URL=http://127.0.0.1:8000
 ```
+
 <!-- This format matches the earlier README template.-->
 
 ### If you prefer setting env vars in CMD (Windows)
@@ -132,10 +145,11 @@ API_BASE_URL=http://127.0.0.1:8000
 **Important detail:** use quotes when the value contains `http://` so CMD doesn’t parse it weirdly.
 
 ```bat
-set SMTP_HOST=smtp.gmail.com
-set SMTP_PORT=587
-set SMTP_USER=your_email@gmail.com
-set SMTP_PASS=your_app_password
+SMTP_HOST=<SMTP_HOST>
+SMTP_PORT=<SMTP_PORT>
+SMTP_USER=<SMTP_USER>
+SMTP_PASS=<SMTP_PASS>
+SMTP_FROM=<SMTP_FROM>
 set "API_BASE_URL=http://127.0.0.1:8000"
 ```
 
@@ -144,12 +158,14 @@ set "API_BASE_URL=http://127.0.0.1:8000"
 ## 7) Run Alembic migrations
 
 Apply migrations:
+
 ```bat
 python -m alembic -c alembic.ini upgrade head
 
 ```
 
 Useful:
+
 ```bat
 alembic current
 alembic history
@@ -161,12 +177,14 @@ alembic history
 ## 8) Seed test data (Subscription plans + Owner users + Organizations)
 
 Connect to DB:
+
 ```bat
 C:\pgsql\bin\psql -U postgres -d learnova
 
 ```
 
 ### Generate a real password hash (recommended)
+
 Instead of using `TEMP_HASH`, generate a PBKDF2 hash using the project code:
 
 ```bat
@@ -176,6 +194,7 @@ python -c "from app.core.security import hash_password; print(hash_password('Cha
 Copy the output and paste it into the SQL below (replace `TEMP_HASH`).
 
 ### Seed SQL
+
 ```sql
 -- 1) Subscription plans (2 rows)
 INSERT INTO subscription_plans
@@ -229,16 +248,19 @@ ON CONFLICT (invite_code) DO NOTHING;
 ## 9) Run the API server
 
 Option A (uvicorn):
+
 ```bat
 uvicorn app.main:app --reload
 ```
 
 Option B (fastapi dev):
+
 ```bat
 fastapi dev app/main.py
 ```
 
 Server:
+
 ```
 http://127.0.0.1:8000
 ```
@@ -248,6 +270,7 @@ http://127.0.0.1:8000
 ## 10) Helpful DB cleanup for testing
 
 Delete a user by email:
+
 ```sql
 DELETE FROM users WHERE email = 'your@email.com';
 ```
@@ -260,11 +283,14 @@ DELETE FROM users WHERE email = 'your@email.com';
 
 - **SMTP env vars missing** → confirm you set `SMTP_HOST/SMTP_USER/SMTP_PASS` and restarted your terminal or loaded `.env`.
 - **CMD: `'http:' is not recognized`** → use:
+
   ```bat
   set "API_BASE_URL=http://127.0.0.1:8000"
   ```
+
   (quotes matter on Windows CMD) fileciteturn4file1L117-L118
 - **Alembic errors** → run:
+
   ```bat
   alembic current
   alembic upgrade head
@@ -275,4 +301,4 @@ DELETE FROM users WHERE email = 'your@email.com';
 ## Security notes
 
 - Never commit `.env` or SMTP credentials. fileciteturn4file0L262-L265
-- Gmail needs **App Password** (not your normal password). 
+- Gmail needs **App Password** (not your normal password).
