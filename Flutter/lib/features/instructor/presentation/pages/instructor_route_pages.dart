@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:learnova/features/instructor/presentation/widgets/create_course_dialog.dart';
 import 'package:learnova/features/instructor/presentation/widgets/invite_students_dialog.dart';
+import 'package:learnova/features/instructor/data/mock_services.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_course_widgets.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_dashboard_content.dart';
 
@@ -67,7 +68,14 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
       return;
     }
 
-    // 2) If course is PRIVATE (needs invites), open upload dialog with courseId
+    // 2) Seed locally-managed learning outcomes for the dedicated Outcomes tab.
+    if (result.learningOutcomes.isNotEmpty) {
+      await ref
+          .read(learningOutcomeMockServiceProvider)
+          .seedOutcomes(courseId, result.learningOutcomes);
+    }
+
+    // 3) If course is PRIVATE (needs invites), open upload dialog with courseId
     if (result.needsInvites) {
       await showDialog<bool>(
         context: context,
@@ -75,7 +83,7 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
       );
     }
 
-    // 3) Refresh courses list after creation (and possible invites)
+    // 4) Refresh courses list after creation (and possible invites)
     await ref.read(instructorCoursesControllerProvider.notifier).load(force: true);
   }
 

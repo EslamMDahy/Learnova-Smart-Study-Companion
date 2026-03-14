@@ -1,9 +1,12 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../core/storage/token_storage.dart';
-import '../../core/storage/user_storage.dart';
-import '../../core/theme/app_theme.dart';
+import '../session/session_providers.dart';
+import '../session/session_snapshot.dart';
+import '../storage/token_storage.dart';
+import '../storage/user_storage.dart';
+import '../theme/app_theme.dart';
 
 import '../../features/auth/presentation/pages/forget_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -27,280 +30,304 @@ import 'routes.dart';
 
 final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>();
 
-final appRouter = GoRouter(
-  navigatorKey: rootNavigatorKey,
-  initialLocation: _initialLocationSafe(),
-  refreshListenable: Listenable.merge([
-    TokenStorage.listenable,
-    UserStorage.listenable,
-  ]),
-  redirect: (context, state) {
-    try {
-      final path = state.uri.path;
+final _routerRefreshListenableProvider = Provider<ValueNotifier<int>>((ref) {
+  final n = ValueNotifier<int>(0);
+  ref.listen(sessionSnapshotProvider, (_, __) => n.value++);
+  ref.onDispose(n.dispose);
+  return n;
+});
 
-      // ── Token-required routes (guard empty token param) ─────────────────
-      if ((path == Routes.verifyEmail || path == Routes.resetPassword) &&
-          (state.uri.queryParameters['token'] ?? '').trim().isEmpty) {
-        return Routes.login;
-      }
+final appRouterProvider = Provider<GoRouter>((ref) {
+  final refresh = ref.watch(_routerRefreshListenableProvider);
+  final initialSession = SessionSnapshot.fromStorage();
 
-      final hasToken    = TokenStorage.hasToken;
-      final isPersisted = TokenStorage.isPersisted;
-      final isAuthed    = hasToken || isPersisted;
+  final router = GoRouter(
+    navigatorKey: rootNavigatorKey,
+    initialLocation: _initialLocationSafe(initialSession),
+    refreshListenable: refresh,
+    redirect: (context, state) {
+      try {
+        final s = ref.read(sessionSnapshotProvider);
+        final path = state.uri.path;
 
-      // ── Pending email verification (unverified login) ───────────────────
-      final pendingEmail = TokenStorage.pendingVerificationEmail;
-      if (pendingEmail != null &&
-          !isAuthed &&
-          path != Routes.verifyEmailSent &&
-          path != Routes.verifyEmail) {
-        return Routes.verifyEmailSentFor(pendingEmail);
-      }
+        // ── Token-required routes (guard empty token param) ─────────────────
+        if ((path == Routes.verifyEmail || path == Routes.resetPassword) &&
+            (state.uri.queryParameters['token'] ?? '').trim().isEmpty) {
+          return Routes.login;
+        }
 
-      // ── Landing / root ───────────────────────────────────────────────────
-      // '/' = landing page for guests.
-      // Authenticated users hitting '/' go to their dashboard.
-      if (path == Routes.landing) {
-        if (!isAuthed) return null; // show landing page
-        if (!UserStorage.hasMe) return Routes.home; // bootstrapping
-        if (UserStorage.isOwner) return Routes.adminUsers;
-        if (UserStorage.isInstructor) return Routes.instructorDashboard;
-        return Routes.home;
-      }
+        final isAuthed = s.isAuthed;
 
-      // ── Unauthenticated → protected route ───────────────────────────────
-      if (!isAuthed && !_isPublicRoute(path)) {
-        return Routes.landing; // send guests to landing, not /login
-      }
+        // ── Pending email verification (unverified login) ───────────────────
+        final pendingEmail = s.pendingVerificationEmail;
+        if (pendingEmail != null &&
+            !isAuthed &&
+            path != Routes.verifyEmailSent &&
+            path != Routes.verifyEmail) {
+          return Routes.verifyEmailSentFor(pendingEmail);
+        }
 
-      // ── Authenticated → auth-only routes ────────────────────────────────
-      if (isAuthed && _isAuthOnlyRoute(path)) {
-        // Verification routes stay accessible regardless.
-        if (path == Routes.verifyEmail || path == Routes.verifyEmailSent) {
+        // ── Landing / root ───────────────────────────────────────────────────
+        // '/' = landing page for guests.
+        // Authenticated users hitting '/' go to their dashboard.
+        if (path == Routes.landing) {
+          if (!isAuthed) return null; // show landing page
+          if (!s.hasMe) return Routes.home; // bootstrapping
+          if (s.isOwner) return Routes.adminUsers;
+          if (s.isInstructor) return Routes.instructorDashboard;
+          return Routes.home;
+        }
+
+        // ── Unauthenticated → protected route ───────────────────────────────
+        if (!isAuthed && !_isPublicRoute(path)) {
+          return Routes.landing; // send guests to landing, not /login
+        }
+
+        // ── Authenticated → auth-only routes ────────────────────────────────
+        if (isAuthed && _isAuthOnlyRoute(path)) {
+          // Verification routes stay accessible regardless.
+          if (path == Routes.verifyEmail || path == Routes.verifyEmailSent) {
+            return null;
+          }
+          if (!s.hasMe) return Routes.home;
+          if (s.isOwner) return Routes.adminUsers;
+          if (s.isInstructor) return Routes.instructorDashboard;
+          return Routes.home;
+        }
+
+        // ── /settings → role-based settings ────────────────────────────────
+        // The generic /settings route has no shell — redirect to the
+        // role-specific settings page that lives inside the correct shell.
+        if (path == Routes.settings) {
+          if (!s.hasMe) return null; // wait for bootstrap
+          if (s.isOwner) return Routes.adminSettings;
+          if (s.isInstructor) return Routes.instructorSettings;
+          // Generic student/home settings (no dedicated shell yet)
           return null;
         }
-        if (!UserStorage.hasMe) return Routes.home;
-        if (UserStorage.isOwner) return Routes.adminUsers;
-        if (UserStorage.isInstructor) return Routes.instructorDashboard;
-        return Routes.home;
-      }
 
-      // ── Role guards ──────────────────────────────────────────────────────
-      if (path.startsWith(Routes.admin)) {
-        if (!UserStorage.hasMe) return null;
-        if (!UserStorage.isOwner) return Routes.home;
-        if (path == Routes.admin) return Routes.adminUsers;
-      }
-
-      if (path.startsWith(Routes.instructor)) {
-        if (!UserStorage.hasMe) return null;
-        if (!UserStorage.isInstructor) {
-          return UserStorage.isOwner ? Routes.adminUsers : Routes.home;
+        // ── Role guards ──────────────────────────────────────────────────────
+        if (path.startsWith(Routes.admin)) {
+          if (!s.hasMe) return null;
+          if (!s.isOwner) return Routes.home;
+          if (path == Routes.admin) return Routes.adminUsers;
         }
-        if (path == Routes.instructor) return Routes.instructorDashboard;
+
+        if (path.startsWith(Routes.instructor)) {
+          if (!s.hasMe) return null;
+          if (!s.isInstructor) {
+            return s.isOwner ? Routes.adminUsers : Routes.home;
+          }
+          if (path == Routes.instructor) return Routes.instructorDashboard;
+        }
+
+        return null;
+      } catch (_) {
+        _clearSessionSafe();
+        return Routes.landing;
       }
+    },
+    routes: [
+      // ── Landing (guest entry point) ───────────────────────────────────────
+      GoRoute(
+        path: Routes.landing,
+        name: RouteNames.landing,
+        builder: (_, __) => const LandingPage(),
+      ),
 
-      return null;
-    } catch (_) {
-      _clearSessionSafe();
-      return Routes.landing;
-    }
-  },
-  routes: [
-    // ── Landing (guest entry point) ───────────────────────────────────────
-    GoRoute(
-      path: Routes.landing,
-      name: RouteNames.landing,
-      builder: (_, __) => const LandingPage(),
-    ),
+      // ── Authenticated home ────────────────────────────────────────────────
+      GoRoute(
+        path: Routes.home,
+        name: RouteNames.home,
+        builder: (_, __) => const HomePage(),
+      ),
+      GoRoute(
+        path: Routes.settings,
+        name: RouteNames.settings,
+        builder: (_, __) => const SettingsPage(),
+      ),
 
-    // ── Authenticated home ────────────────────────────────────────────────
-    GoRoute(
-      path: Routes.home,
-      name: RouteNames.home,
-      builder: (_, __) => const HomePage(),
-    ),
-    GoRoute(
-      path: Routes.settings,
-      name: RouteNames.settings,
-      builder: (_, __) => const SettingsPage(),
-    ),
+      // ── Error / Fallback ──────────────────────────────────────────────────
+      GoRoute(
+        path: Routes.error,
+        name: RouteNames.error,
+        builder: (_, state) {
+          final type = state.uri.queryParameters['type'] ?? 'server';
+          final msg = state.uri.queryParameters['msg'];
+          final errorId = state.uri.queryParameters['id'];
+          return ErrorPage(errorType: type, message: msg, errorId: errorId);
+        },
+      ),
 
-    // ── Error / Fallback ──────────────────────────────────────────────────
-    GoRoute(
-      path: Routes.error,
-      name: RouteNames.error,
-      builder: (_, state) {
-        final type    = state.uri.queryParameters['type'] ?? 'server';
-        final msg     = state.uri.queryParameters['msg'];
-        final errorId = state.uri.queryParameters['id'];
-        return ErrorPage(errorType: type, message: msg, errorId: errorId);
-      },
-    ),
+      // ── Auth routes ───────────────────────────────────────────────────────
+      GoRoute(
+        path: Routes.login,
+        name: RouteNames.login,
+        builder: (_, __) => const LoginPage(),
+      ),
+      GoRoute(
+        path: Routes.signup,
+        name: RouteNames.signup,
+        builder: (_, __) => const SignUpPage(),
+      ),
+      GoRoute(
+        path: Routes.forgotPassword,
+        name: RouteNames.forgotPassword,
+        builder: (_, __) => const ForgetPasswordPage(),
+      ),
+      GoRoute(
+        path: Routes.verifyEmail,
+        name: RouteNames.verifyEmail,
+        builder: (_, state) =>
+            VerifyEmailPage(token: state.uri.queryParameters['token']),
+      ),
+      GoRoute(
+        path: Routes.verifyEmailSent,
+        name: RouteNames.verifyEmailSent,
+        builder: (_, state) {
+          final email = state.uri.queryParameters['email'];
+          return VerifyEmailSentPage(email: email);
+        },
+      ),
+      GoRoute(
+        path: Routes.resetPassword,
+        name: RouteNames.resetPassword,
+        builder: (_, state) =>
+            SetNewPasswordPage(token: state.uri.queryParameters['token']),
+      ),
 
-    // ── Auth routes ───────────────────────────────────────────────────────
-    GoRoute(
-      path: Routes.login,
-      name: RouteNames.login,
-      builder: (_, __) => const LoginPage(),
-    ),
-    GoRoute(
-      path: Routes.signup,
-      name: RouteNames.signup,
-      builder: (_, __) => const SignUpPage(),
-    ),
-    GoRoute(
-      path: Routes.forgotPassword,
-      name: RouteNames.forgotPassword,
-      builder: (_, __) => const ForgetPasswordPage(),
-    ),
-    GoRoute(
-      path: Routes.verifyEmail,
-      name: RouteNames.verifyEmail,
-      builder: (_, state) =>
-          VerifyEmailPage(token: state.uri.queryParameters['token']),
-    ),
-    GoRoute(
-      path: Routes.verifyEmailSent,
-      name: RouteNames.verifyEmailSent,
-      builder: (_, state) {
-        final email = state.uri.queryParameters['email'];
-        return VerifyEmailSentPage(email: email);
-      },
-    ),
-    GoRoute(
-      path: Routes.resetPassword,
-      name: RouteNames.resetPassword,
-      builder: (_, state) =>
-          SetNewPasswordPage(token: state.uri.queryParameters['token']),
-    ),
+      // ── Admin shell ───────────────────────────────────────────────────────
+      ShellRoute(
+        builder: (_, __, child) => AdminShell(child: child),
+        routes: [
+          GoRoute(
+            path: Routes.adminUsers,
+            name: RouteNames.adminUsers,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: AdminUsersRoutePage()),
+          ),
+          GoRoute(
+            path: Routes.adminJoinRequests,
+            name: RouteNames.adminJoinRequests,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: AdminJoinRequestsRoutePage()),
+          ),
+          GoRoute(
+            path: Routes.adminUpgradePlans,
+            name: RouteNames.adminUpgradePlans,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: AdminUpgradePlansRoutePage()),
+          ),
+          GoRoute(
+            path: Routes.adminSettings,
+            name: RouteNames.adminSettings,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: AdminSettingsRoutePage()),
+          ),
+          GoRoute(
+            path: Routes.adminHelp,
+            name: RouteNames.adminHelp,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: AdminHelpRoutePage()),
+          ),
+          GoRoute(
+            path: Routes.adminNotifications,
+            name: RouteNames.adminNotifications,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: AdminNotificationsRoutePage()),
+          ),
+        ],
+      ),
 
-    // ── Admin shell ───────────────────────────────────────────────────────
-    ShellRoute(
-      builder: (_, __, child) => AdminShell(child: child),
-      routes: [
-        GoRoute(
-          path: Routes.adminUsers,
-          name: RouteNames.adminUsers,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: AdminUsersRoutePage()),
-        ),
-        GoRoute(
-          path: Routes.adminJoinRequests,
-          name: RouteNames.adminJoinRequests,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: AdminJoinRequestsRoutePage()),
-        ),
-        GoRoute(
-          path: Routes.adminUpgradePlans,
-          name: RouteNames.adminUpgradePlans,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: AdminUpgradePlansRoutePage()),
-        ),
-        GoRoute(
-          path: Routes.adminSettings,
-          name: RouteNames.adminSettings,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: AdminSettingsRoutePage()),
-        ),
-        GoRoute(
-          path: Routes.adminHelp,
-          name: RouteNames.adminHelp,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: AdminHelpRoutePage()),
-        ),
-        GoRoute(
-          path: Routes.adminNotifications,
-          name: RouteNames.adminNotifications,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: AdminNotificationsRoutePage()),
-        ),
-      ],
-    ),
-
-    // ── Instructor shell ──────────────────────────────────────────────────
-    ShellRoute(
-      builder: (_, __, child) => InstructorShell(child: child),
-      routes: [
-        GoRoute(
-          path: Routes.instructorDashboard,
-          name: RouteNames.instructorDashboard,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: InstructorDashboardRoutePage()),
-        ),
-        GoRoute(
-          path: Routes.instructorCourses,
-          name: RouteNames.instructorCourses,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: InstructorCourseRoutePage()),
-        ),
-        GoRoute(
-          path: Routes.instructorCourseDetails,
-          name: RouteNames.instructorCourseDetails,
-          pageBuilder: (context, state) {
-            final slug = state.pathParameters['courseSlug']!;
-            final course = SelectedCourseCache.value;
-            if (course == null) {
-              // Cache lost on page refresh — redirect to courses list
+      // ── Instructor shell ──────────────────────────────────────────────────
+      ShellRoute(
+        builder: (_, __, child) => InstructorShell(child: child),
+        routes: [
+          GoRoute(
+            path: Routes.instructorDashboard,
+            name: RouteNames.instructorDashboard,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: InstructorDashboardRoutePage()),
+          ),
+          GoRoute(
+            path: Routes.instructorCourses,
+            name: RouteNames.instructorCourses,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: InstructorCourseRoutePage()),
+          ),
+          GoRoute(
+            path: Routes.instructorCourseDetails,
+            name: RouteNames.instructorCourseDetails,
+            pageBuilder: (context, state) {
+              final slug = state.pathParameters['courseSlug']!;
+              final course = SelectedCourseCache.value;
+              if (course == null) {
+                // Cache lost on page refresh — redirect to courses list
+                return NoTransitionPage(
+                  child: _CourseRedirectPage(slug: slug),
+                );
+              }
               return NoTransitionPage(
-                child: _CourseRedirectPage(slug: slug),
+                child: CourseDetailsPage(courseSlug: slug, course: course),
               );
-            }
-            return NoTransitionPage(
-                child: CourseDetailsPage(courseSlug: slug, course: course));
-          },
-        ),
-        GoRoute(
-          path: Routes.instructorNotifications,
-          name: RouteNames.instructorNotifications,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: NotificationsPage()),
-        ),
-        GoRoute(
-          path: Routes.instructorSettings,
-          name: RouteNames.instructorSettings,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: SettingsPage()),
-        ),
-        GoRoute(
-          path: Routes.instructorQuestionBank,
-          name: RouteNames.instructorQuestionBank,
-          pageBuilder: (_, __) => const NoTransitionPage(
-              child: _ComingSoonPage(title: 'Question Bank')),
-        ),
-        GoRoute(
-          path: Routes.instructorQuizzes,
-          name: RouteNames.instructorQuizzes,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: _ComingSoonPage(title: 'Quizzes')),
-        ),
-        GoRoute(
-          path: Routes.instructorHelp,
-          name: RouteNames.instructorHelp,
-          pageBuilder: (_, __) =>
-              const NoTransitionPage(child: _ComingSoonPage(title: 'Help')),
-        ),
-      ],
-    ),
-  ],
-);
+            },
+          ),
+          GoRoute(
+            path: Routes.instructorNotifications,
+            name: RouteNames.instructorNotifications,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: NotificationsPage()),
+          ),
+          GoRoute(
+            path: Routes.instructorSettings,
+            name: RouteNames.instructorSettings,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: SettingsPage()),
+          ),
+          GoRoute(
+            path: Routes.instructorQuestionBank,
+            name: RouteNames.instructorQuestionBank,
+            pageBuilder: (_, __) => const NoTransitionPage(
+              child: _ComingSoonPage(title: 'Question Bank'),
+            ),
+          ),
+          GoRoute(
+            path: Routes.instructorQuizzes,
+            name: RouteNames.instructorQuizzes,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: _ComingSoonPage(title: 'Quizzes')),
+          ),
+          GoRoute(
+            path: Routes.instructorHelp,
+            name: RouteNames.instructorHelp,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: _ComingSoonPage(title: 'Help')),
+          ),
+        ],
+      ),
+    ],
+  );
+
+  ref.onDispose(router.dispose);
+  return router;
+});
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-String _initialLocationSafe() {
+String _initialLocationSafe(SessionSnapshot session) {
   try {
     // Pending verification takes highest priority.
-    final pending = TokenStorage.pendingVerificationEmail;
-    if (pending != null && !TokenStorage.hasToken && !TokenStorage.isPersisted) {
+    final pending = session.pendingVerificationEmail;
+    if (pending != null && !session.hasAccessToken && !session.isPersisted) {
       return Routes.verifyEmailSentFor(pending);
     }
     // Guest → landing page.
-    if (!TokenStorage.hasToken && !TokenStorage.isPersisted) {
+    if (!session.hasAccessToken && !session.isPersisted) {
       return Routes.landing;
     }
     // Authenticated → role-based dashboard.
-    if (UserStorage.hasMe && UserStorage.isOwner) return Routes.adminUsers;
-    if (UserStorage.hasMe && UserStorage.isInstructor) {
+    if (session.hasMe && session.isOwner) return Routes.adminUsers;
+    if (session.hasMe && session.isInstructor) {
       return Routes.instructorDashboard;
     }
     return Routes.home;
@@ -342,39 +369,39 @@ void _clearSessionSafe() {
 
 class RouteNames {
   RouteNames._();
-  static const landing         = 'landing';
-  static const home            = 'home';
-  static const login           = 'login';
-  static const signup          = 'signup';
-  static const forgotPassword  = 'forgotPassword';
-  static const verifyEmail     = 'verifyEmail';
+  static const landing = 'landing';
+  static const home = 'home';
+  static const login = 'login';
+  static const signup = 'signup';
+  static const forgotPassword = 'forgotPassword';
+  static const verifyEmail = 'verifyEmail';
   static const verifyEmailSent = 'verifyEmailSent';
-  static const resetPassword   = 'resetPassword';
-  static const settings        = 'settings';
-  static const error           = 'error';
+  static const resetPassword = 'resetPassword';
+  static const settings = 'settings';
+  static const error = 'error';
 
-  static const instructorDashboard     = 'instructorDashboard';
-  static const instructorCourses       = 'instructorCourses';
+  static const instructorDashboard = 'instructorDashboard';
+  static const instructorCourses = 'instructorCourses';
   static const instructorCourseDetails = 'instructorCourseDetails';
-  static const instructorQuestionBank  = 'instructorQuestionBank';
-  static const instructorQuizzes       = 'instructorQuizzes';
-  static const instructorSettings      = 'instructorSettings';
-  static const instructorHelp          = 'instructorHelp';
+  static const instructorQuestionBank = 'instructorQuestionBank';
+  static const instructorQuizzes = 'instructorQuizzes';
+  static const instructorSettings = 'instructorSettings';
+  static const instructorHelp = 'instructorHelp';
   static const instructorNotifications = 'instructorNotifications';
 
-  static const adminUsers         = 'adminUsers';
-  static const adminJoinRequests  = 'adminJoinRequests';
-  static const adminUpgradePlans  = 'adminUpgradePlans';
-  static const adminSettings      = 'adminSettings';
-  static const adminHelp          = 'adminHelp';
+  static const adminUsers = 'adminUsers';
+  static const adminJoinRequests = 'adminJoinRequests';
+  static const adminUpgradePlans = 'adminUpgradePlans';
+  static const adminSettings = 'adminSettings';
+  static const adminHelp = 'adminHelp';
   static const adminNotifications = 'adminNotifications';
 
   // compat
-  static const instructorCourseMaterials    = 'instructorCourseMaterials';
-  static const instructorCourseStudents     = 'instructorCourseStudents';
-  static const instructorCourseAnalytics    = 'instructorCourseAnalytics';
+  static const instructorCourseMaterials = 'instructorCourseMaterials';
+  static const instructorCourseStudents = 'instructorCourseStudents';
+  static const instructorCourseAnalytics = 'instructorCourseAnalytics';
   static const instructorCourseQuestionBank = 'instructorCourseQuestionBank';
-  static const instructorCourseQuizzes      = 'instructorCourseQuizzes';
+  static const instructorCourseQuizzes = 'instructorCourseQuizzes';
 }
 
 class _ComingSoonPage extends StatelessWidget {

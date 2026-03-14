@@ -24,6 +24,11 @@ class CourseDetailsState {
   // ── In-memory question bank ───────────────────────────────────────────────
   final List<QuestionModel> questions;
 
+  // ── Question bank backend sync (NEW — G-04/G-05) ──────────────────────────
+  final bool questionsLoading;   // true while POST .../questions is in-flight
+  final String? questionsError;  // non-null if last sync failed
+  final int? lastSyncedCount;    // how many questions were created in last batch
+
   // ── Upload progress ───────────────────────────────────────────────────────
   final bool uploading;
   final String? uploadError;
@@ -40,6 +45,9 @@ class CourseDetailsState {
     this.downloadUrls = const {},
     this.downloadUrlLoading = const {},
     this.questions = const [],
+    this.questionsLoading = false,
+    this.questionsError,
+    this.lastSyncedCount,
     this.uploading = false,
     this.uploadError,
     this.uploadProgress = 0.0,
@@ -56,6 +64,9 @@ class CourseDetailsState {
     Map<int, String>? downloadUrls,
     Map<int, bool>? downloadUrlLoading,
     List<QuestionModel>? questions,
+    bool? questionsLoading,
+    String? questionsError,
+    int? lastSyncedCount,
     bool? uploading,
     String? uploadError,
     double? uploadProgress,
@@ -71,6 +82,9 @@ class CourseDetailsState {
       downloadUrls: downloadUrls ?? this.downloadUrls,
       downloadUrlLoading: downloadUrlLoading ?? this.downloadUrlLoading,
       questions: questions ?? this.questions,
+      questionsLoading: questionsLoading ?? this.questionsLoading,
+      questionsError: questionsError,
+      lastSyncedCount: lastSyncedCount ?? this.lastSyncedCount,
       uploading: uploading ?? this.uploading,
       uploadError: uploadError,
       uploadProgress: uploadProgress ?? this.uploadProgress,

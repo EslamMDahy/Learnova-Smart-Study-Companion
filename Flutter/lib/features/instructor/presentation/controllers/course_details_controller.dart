@@ -9,6 +9,7 @@ import '../../data/modules_models.dart';
 import '../../data/materials_models.dart';
 import '../../data/topics_models.dart';
 import '../../data/question_models.dart';
+import '../../data/mock_services.dart';
 import '../../data/modules_materials_providers.dart';
 
 import 'course_details_state.dart';
@@ -114,28 +115,80 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
       ..[moduleId] = true;
     state = state.copyWith(topicsLoading: newLoading);
 
+    List<TopicItem> backendTopics = const [];
     try {
       final res = await _ref.read(topicsApiProvider).listTopics(
             courseId: _courseId,
             moduleId: moduleId,
           );
-      final sorted = List<TopicItem>.from(res.topics)
-        ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
-      final newTopics = Map<int, List<TopicItem>>.from(state.topics)
-        ..[moduleId] = sorted;
-      final newLoad = Map<int, bool>.from(state.topicsLoading)
-        ..[moduleId] = false;
-      state = state.copyWith(topics: newTopics, topicsLoading: newLoad);
-    } catch (e) {
-      if (e is DioException && e.type == DioExceptionType.cancel) return;
-      // Non-fatal — topics may not be implemented yet on backend.
-      final newLoad = Map<int, bool>.from(state.topicsLoading)
-        ..[moduleId] = false;
-      // Store empty list so we don't retry on every render.
-      final newTopics = Map<int, List<TopicItem>>.from(state.topics)
-        ..[moduleId] = [];
-      state = state.copyWith(topicsLoading: newLoad, topics: newTopics);
+      backendTopics = res.topics;
+    } catch (_) {
+      // Non-fatal — topic authoring is currently handled via local fallback storage.
     }
+
+    final localTopics = await _ref.read(topicMockServiceProvider).listTopics(moduleId);
+    final merged = <int, TopicItem>{
+      for (final topic in backendTopics) topic.id: topic,
+      for (final topic in localTopics) topic.id: topic,
+    }.values.toList()
+      ..sort((a, b) {
+        final materialCmp = (a.materialId ?? 0).compareTo(b.materialId ?? 0);
+        if (materialCmp != 0) return materialCmp;
+        return a.orderIndex.compareTo(b.orderIndex);
+      });
+
+    final newTopics = Map<int, List<TopicItem>>.from(state.topics)
+      ..[moduleId] = merged;
+    final newLoad = Map<int, bool>.from(state.topicsLoading)
+      ..[moduleId] = false;
+    state = state.copyWith(topicsLoading: newLoad, topics: newTopics);
+  }
+
+  Future<TopicItem?> createTopic({
+    required int moduleId,
+    required int materialId,
+    required TopicCreateRequest payload,
+  }) async {
+    try {
+      final topic = await _ref.read(topicMockServiceProvider).createTopic(
+            moduleId,
+            payload,
+            materialId: materialId,
+          );
+      final existing = List<TopicItem>.from(state.topics[moduleId] ?? []);
+      existing.add(topic);
+      existing.sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+      final newTopics = Map<int, List<TopicItem>>.from(state.topics)
+        ..[moduleId] = existing;
+      state = state.copyWith(topics: newTopics);
+      return topic;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+      return null;
+    }
+  }
+
+  Future<void> updateTopic(TopicItem topic) async {
+    final updated = await _ref.read(topicMockServiceProvider).updateTopic(topic.moduleId, topic);
+    final existing = List<TopicItem>.from(state.topics[topic.moduleId] ?? const []);
+    final idx = existing.indexWhere((t) => t.id == topic.id);
+    if (idx >= 0) {
+      existing[idx] = updated;
+    } else {
+      existing.add(updated);
+    }
+    final newTopics = Map<int, List<TopicItem>>.from(state.topics)
+      ..[topic.moduleId] = existing;
+    state = state.copyWith(topics: newTopics);
+  }
+
+  Future<void> deleteTopic({required int moduleId, required int topicId}) async {
+    await _ref.read(topicMockServiceProvider).deleteTopic(moduleId, topicId);
+    final existing = List<TopicItem>.from(state.topics[moduleId] ?? const []);
+    final newTopics = Map<int, List<TopicItem>>.from(state.topics)
+      ..[moduleId] = existing.where((t) => t.id != topicId).toList();
+    state = state.copyWith(topics: newTopics);
   }
 
   // ── Download URLs ─────────────────────────────────────────────────────────
@@ -228,7 +281,7 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     }
   }
 
-  // ── Question Bank ─────────────────────────────────────────────────────────
+  // ── Question Bank (in-memory) ─────────────────────────────────────────────
 
   void addQuestion(QuestionModel question) {
     state = state.copyWith(questions: [question, ...state.questions]);
@@ -238,6 +291,96 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     state = state.copyWith(
       questions: state.questions.where((q) => q.id != questionId).toList(),
     );
+  }
+
+  // ── Question Bank (backend sync) — NEW ────────────────────────────────────
+
+  /// Syncs the in-memory MCQ questions to the backend for a specific material.
+  ///
+  /// [moduleId] and [materialId] identify the parent context in the course tree.
+  /// Only [QuestionType.multipleChoice] questions are sent — the backend batch
+  /// endpoint currently only accepts MCQ.
+  ///
+  /// On success: [CourseDetailsState.lastSyncedCount] is updated and each
+  /// synced question's [QuestionModel.remoteId] is set from the backend response.
+  /// Returns true if at least one question was created successfully.
+  Future<bool> syncQuestionsToBackend({
+    required int moduleId,
+    required int materialId,
+  }) async {
+    final mcqQuestions = state.questions
+        .where((q) => q.type == QuestionType.multipleChoice)
+        .toList();
+
+    if (mcqQuestions.isEmpty) return false;
+
+    state = state.copyWith(
+      questionsLoading: true,
+      questionsError: null,
+    );
+
+    try {
+      final resp = await _ref.read(questionsApiProvider).batchCreateQuestions(
+            courseId: _courseId,
+            moduleId: moduleId,
+            materialId: materialId,
+            questions: mcqQuestions,
+          );
+
+      // Stamp each MCQ question with its new remote id (matched by question text).
+      // Non-MCQ questions are passed through unmodified.
+      final updatedQuestions = state.questions.map((q) {
+        if (q.type != QuestionType.multipleChoice) return q;
+        final match = resp.questions
+            .where((r) => r.questionText == q.text)
+            .toList();
+        if (match.isEmpty) return q;
+        return QuestionModel(
+          id: q.id,
+          remoteId: match.first.id,
+          text: q.text,
+          type: q.type,
+          difficulty: q.difficulty,
+          source: q.source,
+          approvalStatus: q.approvalStatus,
+          options: q.options,
+          correctOptionId: q.correctOptionId,
+          correctBool: q.correctBool,
+          sampleAnswer: q.sampleAnswer,
+          explanation: q.explanation,
+          expectedAnswer: q.expectedAnswer,
+          tags: q.tags,
+          usageCount: q.usageCount,
+          successRate: q.successRate,
+          maxScore: q.maxScore,
+          autoGradable: q.autoGradable,
+          courseId: _courseId,
+          moduleId: moduleId,
+          moduleName: q.moduleName,
+          materialId: materialId,
+          materialName: q.materialName,
+          topicId: q.topicId,
+          topicName: q.topicName,
+          createdAt: q.createdAt,
+        );
+      }).toList();
+
+      state = state.copyWith(
+        questionsLoading: false,
+        questions: updatedQuestions,
+        lastSyncedCount: resp.createdCount,
+      );
+
+      return resp.createdCount > 0;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+      state = state.copyWith(
+        questionsLoading: false,
+        questionsError: failure.message,
+      );
+      return false;
+    }
   }
 
   @override

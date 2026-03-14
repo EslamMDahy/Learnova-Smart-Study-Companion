@@ -8,6 +8,7 @@ import '../../data/modules_models.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 
 class AddQuestionSheet extends StatefulWidget {
+  final bool isDialog;
   final int? moduleId;
   final String? moduleName;
   final int? materialId;
@@ -26,6 +27,7 @@ class AddQuestionSheet extends StatefulWidget {
     this.topicName,
     this.modules = const [],
     this.showAiHint = false,
+    this.isDialog = false,
     required this.onAdd,
   });
 
@@ -165,27 +167,27 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.92,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFFF6F7F8),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6F7F8),
+        borderRadius: BorderRadius.circular(widget.isDialog ? 18 : 20),
       ),
       child: Column(children: [
-        // Handle bar
-        Container(
-          margin: const EdgeInsets.only(top: 10),
-          width: 40,
-          height: 4,
-          decoration: BoxDecoration(
-            color: AppColors.border,
-            borderRadius: BorderRadius.circular(2),
+        if (!widget.isDialog)
+          Container(
+            margin: const EdgeInsets.only(top: 10),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppColors.border,
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
-        ),
 
         // White header card
         Container(
           color: Colors.white,
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-          margin: const EdgeInsets.fromLTRB(0, 10, 0, 0),
+          margin: EdgeInsets.fromLTRB(0, widget.isDialog ? 0 : 10, 0, 0),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             // Title row
             Row(children: [
@@ -773,4 +775,46 @@ class _TFOptionBtn extends StatelessWidget {
           ),
         ),
       );
+}
+
+
+Future<void> showAddQuestionDialog(
+  BuildContext context, {
+  int? moduleId,
+  String? moduleName,
+  int? materialId,
+  String? materialName,
+  String? topicName,
+  List<ModuleItem> modules = const [],
+  bool showAiHint = false,
+  required ValueChanged<QuestionModel> onAdd,
+}) {
+  final size = MediaQuery.of(context).size;
+  final width = size.width < 900 ? size.width * 0.96 : 980.0;
+  final height = size.height * 0.92;
+
+  return showDialog<void>(
+    context: context,
+    barrierColor: Colors.black.withOpacity(0.35),
+    builder: (_) => Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(16),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: width, maxHeight: height),
+          child: AddQuestionSheet(
+            isDialog: true,
+            moduleId: moduleId,
+            moduleName: moduleName,
+            materialId: materialId,
+            materialName: materialName,
+            topicName: topicName,
+            modules: modules,
+            showAiHint: showAiHint,
+            onAdd: onAdd,
+          ),
+        ),
+      ),
+    ),
+  );
 }

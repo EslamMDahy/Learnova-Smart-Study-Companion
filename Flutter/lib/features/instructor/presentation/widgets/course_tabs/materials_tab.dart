@@ -10,10 +10,14 @@ import '../../../data/courses_models.dart';
 import '../../../data/modules_models.dart';
 import '../../../data/materials_models.dart';
 import '../../../data/topics_models.dart';
+import '../../../data/learning_outcomes_models.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../controllers/course_details_state.dart';
+import '../add_question_sheet.dart';
+import '../course_outcomes_panel.dart';
 import '../upload_material_sheet.dart';
 import '../generate_questions_dialog.dart';
+import '../module_selector_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Color palette
@@ -22,7 +26,6 @@ class _K {
   _K._();
   static const purple     = Color(0xFF7C3AED);
   static const purpleSoft = Color(0xFFF5F3FF);
-  static const purpleMid  = Color(0xFFEDE9FE);
   static const purpleBd   = Color(0xFFDDD6FE);
   static const amber      = Color(0xFFD97706);
   static const amberSoft  = Color(0xFFFFFBEB);
@@ -79,6 +82,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
   @override
   Widget build(BuildContext context) {
     final st = ref.watch(courseDetailsControllerProvider(widget.course.id));
+    final active = _active ?? _sel;
     return Column(children: [
       Expanded(
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -99,15 +103,32 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
           Expanded(child: _buildPanel(st)),
         ]),
       ),
-      if (_sel != null)
+      if (_sel != null && active != null)
         _FooterWidget(
-          ctx: _active ?? _sel!,
+          ctx: active,
           uploading: st.uploading,
+          canGenerate: _canGenerate(active, st),
           onUpload: () { final m = _sel?.module; if (m != null) _showUploadSheet(m); },
-          onGenerate: () => _openGenerateDialog(moduleId: _sel?.module?.id),
+          onGenerate: () => _openGenerateDialog(
+            moduleId: active.module?.id,
+            materialId: active.material?.id,
+            topicId: active.topic?.id,
+          ),
           onClose: () => setState(() { _sel = null; _stack.clear(); }),
         ),
     ]);
+  }
+
+  bool _canGenerate(_Ctx ctx, CourseDetailsState st) {
+    switch (ctx.type) {
+      case _CType.module:
+        final mats = st.materials[ctx.module!.id] ?? const <MaterialItem>[];
+        return mats.isNotEmpty;
+      case _CType.material:
+        return ctx.material != null;
+      case _CType.topic:
+        return ctx.material != null && ctx.topic != null;
+    }
   }
 
   // ── Tap handlers ────────────────────────────────────────────────────────
@@ -118,8 +139,9 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
         _expanded.remove(m.id); _sel = null; _stack.clear();
       } else {
         _expanded.add(m.id); _sel = _Ctx.module(m); _stack.clear();
-        if (!st.materials.containsKey(m.id))
+        if (!st.materials.containsKey(m.id)) {
           ref.read(courseDetailsControllerProvider(widget.course.id).notifier).loadMaterials(m.id);
+        }
       }
     });
   }
@@ -147,7 +169,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
     final c = _active;
     if (c == null) return _EmptyStateWidget(onCreate: _showCreateModuleDialog);
 
-    if (c.type == _CType.module)
+    if (c.type == _CType.module) {
       return _ModulePanelWidget(
         module: c.module!, materials: st.materials[c.module!.id] ?? [],
         uploading: st.uploading, uploadProgress: st.uploadProgress,
@@ -156,41 +178,66 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
         onRename: () => _showRenameDialog(c.module!),
         onTogglePublish: () => _togglePublish(c.module!),
         onDelete: () => _confirmDelete(c.module!),
+        onShare: () => _showShareModuleDialog(c.module!),
       );
+    }
 
     if (c.type == _CType.material) {
-      final mid = c.module!.id; final matId = c.material!.id;
+      final mid = c.module!.id;
+      final matId = c.material!.id;
+      final materialTopics = (st.topics[mid] ?? const <TopicItem>[])
+          .where((t) => t.materialId == null || t.materialId == matId)
+          .toList();
+      final outcomes = ref.watch(courseLOProvider(widget.course.id));
       return _MaterialPanelWidget(
         module: c.module!, material: c.material!,
-        topics: st.topics[mid] ?? [], topicsLoading: st.topicsLoading[mid] ?? false,
+        topics: materialTopics, topicsLoading: st.topicsLoading[mid] ?? false,
+        outcomes: outcomes,
         downloadUrl: st.downloadUrls[matId] ?? c.material!.downloadUrl,
         urlLoading: st.downloadUrlLoading[matId] ?? false,
         onTopicTap: _drillTopic,
-        onAddTopicManual: () => _showAddTopicDialog(c.module!),
-        onGenerateTopicsAI: () => _openGenerateDialog(moduleId: mid),
+        onAddTopicManual: () => _showAddTopicDialog(c.module!, c.material!),
+        onGenerateTopicsAI: () => _openGenerateDialog(moduleId: mid, materialId: matId),
         onRefreshUrl: () => ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
             .fetchDownloadUrl(moduleId: mid, materialId: matId, force: true),
       );
     }
 
+    final outcomes = ref.watch(courseLOProvider(widget.course.id));
     return _TopicPanelWidget(
-      module: c.module!, material: c.material!, topic: c.topic!,
-      canPop: _stack.isNotEmpty, onBack: _pop,
-      onGenerate: () => _openGenerateDialog(moduleId: c.module!.id),
+      module: c.module!,
+      material: c.material!,
+      topic: c.topic!,
+      outcomes: outcomes,
+      canPop: _stack.isNotEmpty,
+      onBack: _pop,
+      onGenerate: () => _openGenerateDialog(
+        moduleId: c.module!.id,
+        materialId: c.material!.id,
+        topicId: c.topic!.id,
+      ),
+      onAddManualQuestion: () => _showAddQuestionSheet(c.module!, c.material!, c.topic!),
+      onEditTopic: () => _showEditTopicDialog(c.module!, c.material!, c.topic!),
     );
   }
 
   // ── Dialogs ──────────────────────────────────────────────────────────────
   Future<void> _showCreateModuleDialog() async {
-    final tc = TextEditingController(), dc = TextEditingController();
-    final ok = await showDialog<bool>(context: context,
-        builder: (_) => _ModuleDialogWidget(titleCtrl: tc, descCtrl: dc));
-    if (ok != true || !mounted) return;
-    final m = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
-        .createModule(tc.text.trim(), description: dc.text.trim().isEmpty ? null : dc.text.trim());
-    if (m != null && mounted) {
-      AppToast.success(context, title: 'Module created', message: '"${m.title}" added.');
-      setState(() { _expanded.add(m.id); _sel = _Ctx.module(m); _stack.clear(); });
+    final result = await showModuleSelectorSheet(context, widget.course.id);
+    if (result == null || !mounted) return;
+
+    if (result.isNew) {
+      final m = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+          .createModule(result.newTitle!, description: result.newDescription);
+      if (m != null && mounted) {
+        AppToast.success(context, title: 'Module created', message: '"${m.title}" added.');
+        setState(() { _expanded.add(m.id); _sel = _Ctx.module(m); _stack.clear(); });
+      }
+    } else if (result.existing != null) {
+      // Share an existing module with this course — for now show info toast
+      // (backend endpoint for sharing to be wired when available)
+      AppToast.info(context, title: 'Module linked',
+          message: '"${result.existing!.title}" will be shared with this course.');
     }
   }
 
@@ -207,9 +254,15 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
               filename: r.filename, contentType: r.contentType, title: r.title);
       if (success) ok++;
     }
-    if (mounted && ok > 0)
+    if (mounted && ok > 0) {
       AppToast.success(context, title: 'Uploaded',
           message: ok == 1 ? '"${results.first.title}" is ready.' : '$ok files uploaded.');
+    }
+  }
+
+  Future<void> _showShareModuleDialog(ModuleItem m) async {
+    AppToast.info(context, title: 'Share Module',
+        message: 'Module sharing across courses will be available once the backend endpoint is wired.');
   }
 
   Future<void> _showRenameDialog(ModuleItem m) async {
@@ -236,19 +289,150 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
     AppToast.info(context, title: 'Coming soon', message: 'Deletion coming soon.');
   }
 
-  Future<void> _showAddTopicDialog(ModuleItem m) async {
+  Future<void> _showAddTopicDialog(ModuleItem m, MaterialItem mat) async {
     final tc = TextEditingController(), dc = TextEditingController();
-    final ok = await showDialog<bool>(context: context,
+    TopicDifficulty selectedDiff = TopicDifficulty.beginner;
+    final result = await showDialog<Map<String, dynamic>>(context: context,
         builder: (_) => _AddTopicDialogWidget(
-            moduleTitle: m.title, titleCtrl: tc, descCtrl: dc));
-    if (ok != true || !mounted) return;
-    AppToast.info(context, title: 'Coming soon',
-        message: 'Manual topic creation coming soon.');
+            moduleTitle: m.title, titleCtrl: tc, descCtrl: dc,
+            onDifficultyChanged: (d) => selectedDiff = d));
+    if (result == null || !mounted) return;
+    final difficulty = result['difficulty'] as TopicDifficulty? ?? selectedDiff;
+    final linkedOutcomeId = result['linkedOutcomeId'] as String?;
+    final topic = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .createTopic(
+          moduleId: m.id,
+          materialId: mat.id,
+          payload: TopicCreateRequest(
+            title: tc.text.trim(),
+            description: dc.text.trim().isEmpty ? null : dc.text.trim(),
+            source: TopicSource.manual,
+            difficulty: difficulty,
+            linkedOutcomeId: linkedOutcomeId,
+            linkedOutcomeIds: linkedOutcomeId == null ? const [] : [linkedOutcomeId],
+          ),
+        );
+    if (topic != null && mounted) {
+      AppToast.success(context, title: 'Topic added', message: '"${topic.title}" created under ${mat.displayTitle}.');
+    }
   }
 
-  void _openGenerateDialog({int? moduleId}) => showDialog(context: context,
+  Future<void> _showEditTopicDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
+    final outcomes = ref.read(courseLOProvider(widget.course.id));
+    final notesCtrl = TextEditingController(text: topic.instructorNotes ?? '');
+    TopicReadiness readiness = topic.readiness;
+    final selectedOutcomeIds = <String>{...topic.linkedOutcomeIds};
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          title: const Text('Manage Topic', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          content: SizedBox(
+            width: 460,
+            child: SingleChildScrollView(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(topic.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                const SizedBox(height: 12),
+                const Text('Readiness', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                const SizedBox(height: 6),
+                Wrap(
+                  spacing: 8,
+                  children: TopicReadiness.values.map((r) => ChoiceChip(
+                    label: Text(r.label),
+                    selected: readiness == r,
+                    onSelected: (_) => setDialogState(() => readiness = r),
+                  )).toList(),
+                ),
+                const SizedBox(height: 14),
+                const Text('Learning outcomes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                const SizedBox(height: 6),
+                if (outcomes.isEmpty)
+                  const Text('No course outcomes yet. Add them in the Outcomes tab.', style: TextStyle(fontSize: 12, color: AppColors.textHint))
+                else
+                  ...outcomes.map((lo) => CheckboxListTile(
+                    value: selectedOutcomeIds.contains(lo.id),
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: Text('${lo.code} • ${lo.description}', style: const TextStyle(fontSize: 12.5)),
+                    onChanged: (v) => setDialogState(() {
+                      if (v ?? false) {
+                        selectedOutcomeIds.add(lo.id);
+                      } else {
+                        selectedOutcomeIds.remove(lo.id);
+                      }
+                    }),
+                  )),
+                const SizedBox(height: 14),
+                TextField(
+                  controller: notesCtrl,
+                  maxLines: 4,
+                  decoration: InputDecoration(
+                    labelText: 'Instructor notes',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ]),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () async {
+                await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+                    .deleteTopic(moduleId: m.id, topicId: topic.id);
+                if (mounted) Navigator.pop(dialogContext, true);
+              },
+              child: const Text('Delete', style: TextStyle(color: Color(0xFFDC2626))),
+            ),
+            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () async {
+                await ref.read(courseDetailsControllerProvider(widget.course.id).notifier).updateTopic(
+                  topic.copyWith(
+                    materialId: mat.id,
+                    linkedOutcomeIds: selectedOutcomeIds.toList(),
+                    linkedOutcomeId: selectedOutcomeIds.isEmpty ? null : selectedOutcomeIds.first,
+                    instructorNotes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                    readiness: readiness,
+                  ),
+                );
+                if (mounted) Navigator.pop(dialogContext, true);
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
+              child: const Text('Save'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (result == true && mounted) {
+      AppToast.success(
+        context,
+        title: 'Topic updated',
+        message: 'Topic details were saved.',
+      );
+    }
+  }
+
+  Future<void> _showAddQuestionSheet(ModuleItem module, MaterialItem material, TopicItem topic) async {
+    await showAddQuestionDialog(
+      context,
+      moduleId: module.id,
+      moduleName: module.title,
+      materialId: material.id,
+      materialName: material.displayTitle,
+      topicName: topic.title,
+      onAdd: (q) => ref.read(courseDetailsControllerProvider(widget.course.id).notifier).addQuestion(q),
+    );
+  }
+
+  void _openGenerateDialog({int? moduleId, int? materialId, int? topicId}) => showDialog(context: context,
       builder: (_) => GenerateQuestionsDialog(
-          courseId: widget.course.id, initialModuleId: moduleId));
+        courseId: widget.course.id,
+        initialModuleId: moduleId,
+        initialMaterialId: materialId,
+        initialTopicId: topicId,
+      ));
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -432,16 +616,23 @@ class _ModuleRowWidget extends StatelessWidget {
   }
 
   Widget _buildChildren() {
-    if (loading) return const Padding(padding: EdgeInsets.symmetric(vertical: 10),
+    if (loading) {
+      return const Padding(padding: EdgeInsets.symmetric(vertical: 10),
         child: Center(child: SizedBox(width: 14, height: 14,
             child: CircularProgressIndicator(strokeWidth: 1.5))));
-    if (materials.isEmpty) return const Padding(padding: EdgeInsets.fromLTRB(50, 5, 12, 8),
+    }
+    if (materials.isEmpty) {
+      return const Padding(padding: EdgeInsets.fromLTRB(50, 5, 12, 8),
         child: Text('No materials — tap ＋ to upload',
             style: TextStyle(fontSize: 11, color: AppColors.textHint)));
+    }
     return Column(children: materials.map((mat) {
       final matSel = active?.material?.id == mat.id &&
           (active?.type == _CType.material || active?.type == _CType.topic);
-      return _MatRowWidget(material: mat, topics: moduleTopics, isSelected: matSel,
+      final scopedTopics = moduleTopics
+          .where((t) => t.materialId == null || t.materialId == mat.id)
+          .toList();
+      return _MatRowWidget(material: mat, topics: scopedTopics, isSelected: matSel,
           active: active, onTap: () => onMaterialTap(mat), onTopicTap: (t) => onTopicTap(mat, t));
     }).toList());
   }
@@ -509,9 +700,9 @@ class _MatRowWidget extends StatelessWidget {
 //  FOOTER
 // ─────────────────────────────────────────────────────────────────────────────
 class _FooterWidget extends StatelessWidget {
-  final _Ctx ctx; final bool uploading;
+  final _Ctx ctx; final bool uploading; final bool canGenerate;
   final VoidCallback onUpload, onGenerate, onClose;
-  const _FooterWidget({required this.ctx, required this.uploading,
+  const _FooterWidget({required this.ctx, required this.uploading, required this.canGenerate,
       required this.onUpload, required this.onGenerate, required this.onClose});
 
   String get _label => switch (ctx.type) {
@@ -547,8 +738,8 @@ class _FooterWidget extends StatelessWidget {
                         color: AppColors.primary))),
           ])),
         const Spacer(),
-        _Btn(icon: Icons.auto_awesome_rounded, label: 'Generate Questions',
-            primary: true, onTap: onGenerate),
+        _Btn(icon: Icons.auto_awesome_rounded, label: canGenerate ? 'Generate Questions' : 'No content yet',
+            primary: true, disabled: !canGenerate, onTap: canGenerate ? onGenerate : null),
         const SizedBox(width: 8),
         InkWell(onTap: onClose, borderRadius: BorderRadius.circular(6),
             child: const Padding(padding: EdgeInsets.all(7),
@@ -593,11 +784,11 @@ class _ModulePanelWidget extends StatelessWidget {
   final ModuleItem module; final List<MaterialItem> materials;
   final bool uploading; final double uploadProgress;
   final VoidCallback onUpload; final void Function(MaterialItem) onMaterialTap;
-  final VoidCallback? onRename, onTogglePublish, onDelete;
+  final VoidCallback? onRename, onTogglePublish, onDelete, onShare;
   const _ModulePanelWidget({required this.module, required this.materials,
       required this.uploading, required this.uploadProgress,
       required this.onUpload, required this.onMaterialTap,
-      this.onRename, this.onTogglePublish, this.onDelete});
+      this.onRename, this.onTogglePublish, this.onDelete, this.onShare});
 
   @override
   Widget build(BuildContext context) {
@@ -609,14 +800,14 @@ class _ModulePanelWidget extends StatelessWidget {
         if (uploading) ...[_UploadProgressWidget(progress: uploadProgress), const SizedBox(height: 14)],
 
         _CardWidget(
-          header: _HdrWidget(icon: Icons.tune_rounded, iconColor: AppColors.primary, title: 'Preferences'),
+          header: const _HdrWidget(icon: Icons.tune_rounded, iconColor: AppColors.primary, title: 'Preferences'),
           child: Column(children: [
             _PRow(icon: Icons.drive_file_rename_outline_rounded, iconBg: _K.blueSoft,
                 iconFg: AppColors.primary, label: 'Rename Module', sub: module.title, onTap: onRename),
             _DivW(),
             _PRow(icon: Icons.notes_rounded, iconBg: _K.blueSoft, iconFg: AppColors.primary,
                 label: 'Edit Description',
-                sub: (module.description?.isNotEmpty == true) ? module.description! : 'No description yet',
+                sub: (module.description?.isNotEmpty ?? false) ? module.description! : 'No description yet',
                 onTap: onRename),
             _DivW(),
             _PRow(icon: module.isPublished ? Icons.visibility_off_rounded : Icons.visibility_rounded,
@@ -632,7 +823,14 @@ class _ModulePanelWidget extends StatelessWidget {
             _DivW(),
             _PRow(icon: Icons.swap_vert_rounded, iconBg: _K.greenSoft, iconFg: _K.green,
                 label: 'Change Position',
-                sub: 'Currently #${module.orderIndex + 1} in the course', onTap: null),
+                sub: 'Currently #${module.orderIndex + 1} in the course'),
+            _DivW(),
+            _PRow(icon: Icons.share_rounded, iconBg: const Color(0xFFF0FDF4), iconFg: const Color(0xFF16A34A),
+                label: 'Share with Another Course',
+                sub: module.sharedWithCourseIds.isEmpty
+                    ? 'Not shared with any other course'
+                    : 'Shared with ${module.sharedWithCourseIds.length} course${module.sharedWithCourseIds.length == 1 ? "" : "s"}',
+                onTap: onShare),
             _DivW(),
             _PRow(icon: Icons.delete_outline_rounded,
                 iconBg: const Color(0xFFFEE2E2), iconFg: const Color(0xFFEF4444),
@@ -814,23 +1012,99 @@ class _MatListItemWidget extends StatelessWidget {
 class _MaterialPanelWidget extends StatelessWidget {
   final ModuleItem module; final MaterialItem material;
   final List<TopicItem> topics; final bool topicsLoading;
+  final List<LearningOutcome> outcomes;
   final String? downloadUrl; final bool urlLoading;
   final void Function(TopicItem) onTopicTap;
   final VoidCallback onAddTopicManual, onGenerateTopicsAI, onRefreshUrl;
   const _MaterialPanelWidget({required this.module, required this.material,
-      required this.topics, required this.topicsLoading,
+      required this.topics, required this.topicsLoading, required this.outcomes,
       required this.downloadUrl, required this.urlLoading,
       required this.onTopicTap, required this.onAddTopicManual,
       required this.onGenerateTopicsAI, required this.onRefreshUrl});
 
   @override
   Widget build(BuildContext context) {
+    final mappedOutcomeIds = <String>{};
+    for (final topic in topics) {
+      mappedOutcomeIds.addAll(topic.linkedOutcomeIds);
+      if (topic.linkedOutcomeId != null) mappedOutcomeIds.add(topic.linkedOutcomeId!);
+    }
+    final readyCount = topics.where((t) => t.readiness == TopicReadiness.ready).length;
     return Container(color: _K.bg, child: Column(children: [
       _MatHeaderWidget(module: module, material: material),
-      Expanded(child: _FilePreviewWidget(material: material, downloadUrl: downloadUrl,
-          loading: urlLoading, onRefresh: onRefreshUrl)),
+      Padding(
+        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
+        child: _MaterialInsightsStrip(
+          topicCount: topics.length,
+          readyCount: readyCount,
+          mappedOutcomeCount: mappedOutcomeIds.length,
+          totalOutcomeCount: outcomes.length,
+        ),
+      ),
+      Expanded(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(child: _FilePreviewWidget(material: material, downloadUrl: downloadUrl,
+            loading: urlLoading, onRefresh: onRefreshUrl)),
+        Container(
+          width: 280,
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            border: Border(left: BorderSide(color: _K.div)),
+          ),
+          child: _TopicsSidebarWidget(
+            topics: topics,
+            loading: topicsLoading,
+            onTopicTap: onTopicTap,
+            onAddManual: onAddTopicManual,
+            onGenerateAI: onGenerateTopicsAI,
+          ),
+        ),
+      ])),
     ]));
   }
+}
+
+class _MaterialInsightsStrip extends StatelessWidget {
+  final int topicCount;
+  final int readyCount;
+  final int mappedOutcomeCount;
+  final int totalOutcomeCount;
+
+  const _MaterialInsightsStrip({
+    required this.topicCount,
+    required this.readyCount,
+    required this.mappedOutcomeCount,
+    required this.totalOutcomeCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(spacing: 10, runSpacing: 10, children: [
+      _InsightPill(icon: Icons.tag_rounded, label: '$topicCount topic${topicCount == 1 ? '' : 's'}'),
+      _InsightPill(icon: Icons.task_alt_rounded, label: '$readyCount ready'),
+      _InsightPill(icon: Icons.flag_outlined, label: totalOutcomeCount == 0 ? 'No outcomes yet' : '$mappedOutcomeCount / $totalOutcomeCount LOs mapped'),
+    ]);
+  }
+}
+
+class _InsightPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _InsightPill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+    decoration: BoxDecoration(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(999),
+      border: Border.all(color: _K.div),
+    ),
+    child: Row(mainAxisSize: MainAxisSize.min, children: [
+      Icon(icon, size: 13, color: AppColors.primary),
+      const SizedBox(width: 6),
+      Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+    ]),
+  );
 }
 
 class _MatHeaderWidget extends StatelessWidget {
@@ -894,19 +1168,24 @@ class _FilePreviewWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return _LoaderW(label: 'Loading preview…');
-    if (material.isProcessing) return _PlaceholderW(icon: Icons.hourglass_top_rounded,
+    if (loading) return const _LoaderW(label: 'Loading preview…');
+    if (material.isProcessing) {
+      return const _PlaceholderW(icon: Icons.hourglass_top_rounded,
         iconColor: _K.amber, iconBg: _K.amberSoft, title: 'Processing…',
         sub: 'Your file is being processed. Preview will be available shortly.');
-    if (material.isError) return _PlaceholderW(icon: Icons.error_outline_rounded,
+    }
+    if (material.isError) {
+      return _PlaceholderW(icon: Icons.error_outline_rounded,
         iconColor: AppColors.dangerText, iconBg: _K.redSoft, title: 'Processing failed',
         sub: 'Something went wrong processing this file.',
         actionLabel: 'Retry', onAction: onRefresh);
-    if (downloadUrl == null || downloadUrl!.isEmpty)
+    }
+    if (downloadUrl == null || downloadUrl!.isEmpty) {
       return _PlaceholderW(icon: Icons.link_off_rounded, iconColor: AppColors.textMuted,
           iconBg: _K.bg, title: 'Preview unavailable',
           sub: 'Could not load a URL for this file.',
           actionLabel: 'Retry', onAction: onRefresh);
+    }
 
     final url = downloadUrl!;
     return switch (_kind) {
@@ -987,8 +1266,10 @@ class _PdfPreviewWidget extends StatelessWidget {
               TextButton.icon(
                 onPressed: () async {
                   await Clipboard.setData(ClipboardData(text: url));
-                  if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('URL copied to clipboard'), duration: Duration(seconds: 2)));
+                  }
                 },
                 icon: const Icon(Icons.copy_rounded, size: 13),
                 label: const Text('Copy URL'),
@@ -1034,8 +1315,8 @@ class _VideoPreviewWidget extends StatelessWidget {
             borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div)),
         child: ClipRRect(borderRadius: BorderRadius.circular(13),
             child: Stack(alignment: Alignment.center, children: [
-          Container(decoration: BoxDecoration(gradient: RadialGradient(
-              colors: [const Color(0xFF1A2332), const Color(0xFF0D1117)]))),
+          Container(decoration: const BoxDecoration(gradient: RadialGradient(
+              colors: [Color(0xFF1A2332), Color(0xFF0D1117)]))),
           Column(mainAxisSize: MainAxisSize.min, children: [
             Container(width: 80, height: 80,
                 decoration: BoxDecoration(color: Colors.white.withOpacity(0.1),
@@ -1188,11 +1469,13 @@ class _OBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (big) return ElevatedButton.icon(onPressed: _open,
+    if (big) {
+      return ElevatedButton.icon(onPressed: _open,
         icon: const Icon(Icons.open_in_new_rounded, size: 14), label: const Text('Open'),
         style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary,
             foregroundColor: Colors.white, elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))));
+    }
     return Material(color: AppColors.primary, borderRadius: BorderRadius.circular(7),
         child: InkWell(onTap: _open, borderRadius: BorderRadius.circular(7),
             child: const Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -1330,15 +1613,32 @@ class _TopicItemW extends StatelessWidget {
 //  TOPIC DRILL-DOWN PANEL
 // ─────────────────────────────────────────────────────────────────────────────
 class _TopicPanelWidget extends StatelessWidget {
-  final ModuleItem module; final MaterialItem material; final TopicItem topic;
-  final bool canPop; final VoidCallback onBack, onGenerate;
-  const _TopicPanelWidget({required this.module, required this.material,
-      required this.topic, required this.canPop, required this.onBack, required this.onGenerate});
+  final ModuleItem module;
+  final MaterialItem material;
+  final TopicItem topic;
+  final List<LearningOutcome> outcomes;
+  final bool canPop;
+  final VoidCallback onBack, onGenerate, onAddManualQuestion, onEditTopic;
+
+  const _TopicPanelWidget({
+    required this.module,
+    required this.material,
+    required this.topic,
+    required this.outcomes,
+    required this.canPop,
+    required this.onBack,
+    required this.onGenerate,
+    required this.onAddManualQuestion,
+    required this.onEditTopic,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final mappedOutcomes = outcomes
+        .where((o) => topic.linkedOutcomeIds.contains(o.id) || topic.linkedOutcomeId == o.id)
+        .toList();
+
     return Container(color: _K.bg, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // nav bar
       Container(height: 48, padding: const EdgeInsets.symmetric(horizontal: 16),
           decoration: const BoxDecoration(color: Colors.white,
               border: Border(bottom: BorderSide(color: _K.div))),
@@ -1357,14 +1657,24 @@ class _TopicPanelWidget extends StatelessWidget {
             const Icon(Icons.tag_rounded, size: 14, color: _K.purple), const SizedBox(width: 6),
             Expanded(child: Text(topic.title, maxLines: 1, overflow: TextOverflow.ellipsis,
                 style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle))),
+            TextButton.icon(
+              onPressed: onEditTopic,
+              icon: const Icon(Icons.edit_outlined, size: 14),
+              label: const Text('Manage'),
+            ),
           ])),
 
       Expanded(child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Wrap(spacing: 6, children: [
-            _Pill(l: 'TOPIC', fg: _K.purple, bg: _K.purpleSoft),
-            if (topic.isRequired) _Pill(l: 'REQUIRED', fg: _K.blue, bg: _K.blueMid),
+          Wrap(spacing: 6, runSpacing: 6, children: [
+            const _Pill(l: 'TOPIC', fg: _K.purple, bg: _K.purpleSoft),
+            if (topic.isRequired) const _Pill(l: 'REQUIRED', fg: _K.blue, bg: _K.blueMid),
+            _Pill(
+              l: topic.readiness.label.toUpperCase(),
+              fg: topic.readiness == TopicReadiness.ready ? _K.green : (topic.readiness == TopicReadiness.review ? _K.amber : AppColors.textMuted),
+              bg: topic.readiness == TopicReadiness.ready ? _K.greenSoft : (topic.readiness == TopicReadiness.review ? _K.amberSoft : const Color(0xFFF1F5F9)),
+            ),
           ]),
           const SizedBox(height: 14),
           Text(topic.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
@@ -1381,9 +1691,9 @@ class _TopicPanelWidget extends StatelessWidget {
           ]),
           const SizedBox(height: 20),
 
-          if (topic.description?.isNotEmpty == true) ...[
+          if (topic.description?.isNotEmpty ?? false) ...[
             _CardWidget(
-              header: _HdrWidget(icon: Icons.description_outlined, iconColor: AppColors.primary, title: 'Description'),
+              header: const _HdrWidget(icon: Icons.description_outlined, iconColor: AppColors.primary, title: 'Description'),
               child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
                   child: Text(topic.description!, style: const TextStyle(
                       fontSize: 13, color: AppColors.textMuted, height: 1.6)))),
@@ -1391,44 +1701,96 @@ class _TopicPanelWidget extends StatelessWidget {
           ],
 
           _CardWidget(
-            header: _HdrWidget(icon: Icons.info_outline_rounded, iconColor: AppColors.primary, title: 'Details'),
+            header: const _HdrWidget(icon: Icons.info_outline_rounded, iconColor: AppColors.primary, title: 'Teaching Context'),
             child: Column(children: [
-              if (topic.estimatedDurationMinutes != null)
-                _MRowW(icon: Icons.timer_outlined, label: 'Est. Duration', value: '${topic.estimatedDurationMinutes} min'),
+              _MRowW(icon: Icons.track_changes_rounded, label: 'Readiness', value: topic.readiness.label),
+              _MRowW(icon: Icons.signal_cellular_alt_rounded, label: 'Difficulty', value: topic.difficulty.label),
               _MRowW(icon: Icons.sort_rounded, label: 'Order', value: '#${topic.orderIndex + 1}'),
-              if (topic.parentTopicId != null)
-                _MRowW(icon: Icons.account_tree_outlined, label: 'Sub-topic of', value: 'Topic #${topic.parentTopicId}'),
+              _MRowW(icon: Icons.flag_outlined, label: 'Mapped outcomes', value: mappedOutcomes.isEmpty ? 'Not mapped yet' : '${mappedOutcomes.length} outcome(s)'),
               _MRowW(icon: Icons.calendar_today_outlined, label: 'Created',
                   value: '${topic.createdAt.day}/${topic.createdAt.month}/${topic.createdAt.year}', isLast: true),
             ])),
           const SizedBox(height: 16),
 
-          // generate CTA
-          _CardWidget(noPadding: true, child: InkWell(onTap: onGenerate,
-            borderRadius: BorderRadius.circular(12), child: Padding(padding: const EdgeInsets.all(16),
-              child: Row(children: [
-                Container(width: 42, height: 42, decoration: BoxDecoration(
-                    color: _K.purpleSoft, borderRadius: BorderRadius.circular(11)),
-                    child: const Icon(Icons.auto_awesome_rounded, size: 20, color: _K.purple)),
-                const SizedBox(width: 12),
-                const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text('Generate Questions', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-                  SizedBox(height: 2),
-                  Text('Create AI-generated questions for this topic.',
-                      style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-                ])),
-                const SizedBox(width: 10),
-                Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                    decoration: BoxDecoration(color: _K.purple, borderRadius: BorderRadius.circular(8)),
-                    child: const Text('Generate', style: TextStyle(
-                        fontSize: 12.5, fontWeight: FontWeight.w700, color: Colors.white))),
-              ])))),
+          _CardWidget(
+            header: const _HdrWidget(icon: Icons.flag_outlined, iconColor: AppColors.primary, title: 'Learning Outcome Alignment'),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: mappedOutcomes.isEmpty
+                  ? const Text('This topic is not mapped yet. Use Manage to align it to one or more course outcomes.',
+                      style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5))
+                  : Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: mappedOutcomes.map((lo) => Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: _K.blueSoft,
+                          borderRadius: BorderRadius.circular(999),
+                          border: Border.all(color: _K.blueMid),
+                        ),
+                        child: Text('${lo.code} • ${lo.description}',
+                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                      )).toList(),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          _CardWidget(
+            header: const _HdrWidget(icon: Icons.sticky_note_2_outlined, iconColor: AppColors.primary, title: 'Instructor Notes'),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+              child: Text(
+                (topic.instructorNotes?.trim().isNotEmpty ?? false)
+                    ? topic.instructorNotes!.trim()
+                    : 'No notes yet. Use Manage to add delivery notes, examples, or assessment guidance.',
+                style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.6),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          Row(children: [
+            Expanded(
+              child: _CardWidget(noPadding: true, child: InkWell(onTap: onAddManualQuestion,
+                borderRadius: BorderRadius.circular(12), child: Padding(padding: const EdgeInsets.all(16),
+                  child: Row(children: [
+                    Container(width: 42, height: 42, decoration: BoxDecoration(
+                        color: _K.blueSoft, borderRadius: BorderRadius.circular(11)),
+                        child: const Icon(Icons.edit_note_rounded, size: 20, color: AppColors.primary)),
+                    const SizedBox(width: 12),
+                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Add Manual Question', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                      SizedBox(height: 2),
+                      Text('Create a question draft linked to this topic.',
+                          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+                    ])),
+                  ])))),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: _CardWidget(noPadding: true, child: InkWell(onTap: onGenerate,
+                borderRadius: BorderRadius.circular(12), child: Padding(padding: const EdgeInsets.all(16),
+                  child: Row(children: [
+                    Container(width: 42, height: 42, decoration: BoxDecoration(
+                        color: _K.purpleSoft, borderRadius: BorderRadius.circular(11)),
+                        child: const Icon(Icons.auto_awesome_rounded, size: 20, color: _K.purple)),
+                    const SizedBox(width: 12),
+                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text('Generate Questions', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                      SizedBox(height: 2),
+                      Text('Open scoped generation for this topic.',
+                          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+                    ])),
+                  ])))),
+            ),
+          ]),
         ]),
       )),
     ]));
   }
 }
-
 // ─────────────────────────────────────────────────────────────────────────────
 //  DIALOGS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1461,10 +1823,25 @@ class _ModuleDialogWidget extends StatelessWidget {
     ]);
 }
 
-class _AddTopicDialogWidget extends StatelessWidget {
+class _AddTopicDialogWidget extends StatefulWidget {
   final String moduleTitle;
   final TextEditingController titleCtrl, descCtrl;
-  const _AddTopicDialogWidget({required this.moduleTitle, required this.titleCtrl, required this.descCtrl});
+  final ValueChanged<TopicDifficulty> onDifficultyChanged;
+  const _AddTopicDialogWidget({required this.moduleTitle, required this.titleCtrl,
+      required this.descCtrl, required this.onDifficultyChanged});
+  @override
+  State<_AddTopicDialogWidget> createState() => _AddTopicDialogWidgetState();
+}
+
+class _AddTopicDialogWidgetState extends State<_AddTopicDialogWidget> {
+  TopicDifficulty _diff = TopicDifficulty.beginner;
+
+  static const _diffColors = {
+    TopicDifficulty.beginner:     (Color(0xFF16A34A), Color(0xFFDCFCE7)),
+    TopicDifficulty.intermediate: (Color(0xFFD97706), Color(0xFFFEF3C7)),
+    TopicDifficulty.advanced:     (Color(0xFFDC2626), Color(0xFFFEE2E2)),
+  };
+
   @override
   Widget build(BuildContext context) => AlertDialog(
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1472,9 +1849,9 @@ class _AddTopicDialogWidget extends StatelessWidget {
       const Row(children: [Icon(Icons.tag_rounded, size: 17, color: _K.purple), SizedBox(width: 8),
           Text('Add Topic', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800))]),
       const SizedBox(height: 3),
-      Text('in "$moduleTitle"', style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w400)),
+      Text('in "${widget.moduleTitle}"', style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w400)),
     ]),
-    content: Column(mainAxisSize: MainAxisSize.min, children: [
+    content: SizedBox(width: 440, child: Column(mainAxisSize: MainAxisSize.min, children: [
       Container(padding: const EdgeInsets.fromLTRB(12, 10, 12, 10), margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(color: _K.purpleSoft, borderRadius: BorderRadius.circular(10),
               border: Border.all(color: _K.purpleBd)),
@@ -1482,22 +1859,53 @@ class _AddTopicDialogWidget extends StatelessWidget {
               SizedBox(width: 8),
               Expanded(child: Text('Tip: Use AI to auto-generate topics from your PDF.',
                   style: TextStyle(fontSize: 11.5, color: _K.purple, fontWeight: FontWeight.w500, height: 1.4)))])),
-      TextField(controller: titleCtrl, autofocus: true, decoration: InputDecoration(
+      TextField(controller: widget.titleCtrl, autofocus: true, decoration: InputDecoration(
           hintText: 'e.g. Introduction to Cryptography', labelText: 'Topic Title *',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
       const SizedBox(height: 12),
-      TextField(controller: descCtrl, maxLines: 3, decoration: InputDecoration(
+      TextField(controller: widget.descCtrl, maxLines: 2, decoration: InputDecoration(
           hintText: 'Optional description…', labelText: 'Description',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
           contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
-    ]),
+      const SizedBox(height: 14),
+      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('Difficulty', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+        const SizedBox(height: 8),
+        Row(children: TopicDifficulty.values.map((d) {
+          final (fg, bg) = _diffColors[d]!;
+          final sel = _diff == d;
+          final isLast = d == TopicDifficulty.advanced;
+          return Expanded(child: Padding(
+            padding: EdgeInsets.only(right: isLast ? 0 : 8),
+            child: GestureDetector(
+              onTap: () { setState(() => _diff = d); widget.onDifficultyChanged(d); },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 120),
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                decoration: BoxDecoration(
+                  color: sel ? bg : const Color(0xFFF8FAFC),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: sel ? fg : const Color(0xFFE2E8F0), width: sel ? 1.5 : 1),
+                ),
+                child: Center(child: Text(d.label,
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
+                        color: sel ? fg : AppColors.textMuted))),
+              ),
+            ),
+          ));
+        }).toList()),
+      ]),
+    ])),
     actions: [
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
       ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: _K.purple, foregroundColor: Colors.white,
               elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
-          onPressed: () { if (titleCtrl.text.trim().isEmpty) return; Navigator.pop(context, true); },
+          onPressed: () {
+            if (widget.titleCtrl.text.trim().isEmpty) return;
+            Navigator.pop(context, {'difficulty': _diff});
+          },
           child: const Text('Add Topic')),
     ]);
 }
@@ -1683,20 +2091,60 @@ class _IBtn extends StatelessWidget {
 }
 
 class _Btn extends StatelessWidget {
-  final IconData icon; final String label; final bool primary; final VoidCallback? onTap;
-  const _Btn({required this.icon, required this.label, this.primary = false, this.onTap});
+  final IconData icon;
+  final String label;
+  final bool primary;
+  final bool disabled;
+  final VoidCallback? onTap;
+
+  const _Btn({
+    required this.icon,
+    required this.label,
+    this.primary = false,
+    this.disabled = false,
+    this.onTap,
+  });
+
   @override
-  Widget build(BuildContext context) => Material(
-    color: primary ? AppColors.primary : Colors.transparent,
-    borderRadius: BorderRadius.circular(8),
-    child: InkWell(onTap: onTap, borderRadius: BorderRadius.circular(8),
-        child: Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-            decoration: primary ? null : BoxDecoration(
-                border: Border.all(color: _K.div), borderRadius: BorderRadius.circular(8)),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              Icon(icon, size: 13, color: primary ? Colors.white : AppColors.textTitle),
+  Widget build(BuildContext context) {
+    final fg = disabled
+        ? AppColors.textHint
+        : (primary ? Colors.white : AppColors.textTitle);
+    final bg = disabled
+        ? const Color(0xFFE5E7EB)
+        : (primary ? AppColors.primary : Colors.transparent);
+
+    return Material(
+      color: bg,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: disabled ? null : onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: primary || disabled
+              ? null
+              : BoxDecoration(
+                  border: Border.all(color: _K.div),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 13, color: fg),
               const SizedBox(width: 6),
-              Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700,
-                  color: primary ? Colors.white : AppColors.textTitle)),
-            ]))));
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: fg,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }

@@ -16,8 +16,10 @@ class AuthApi {
       Endpoints.login,
       data: request.toJson(),
     );
+
     final payload = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
-    return LoginResponse.fromJson(payload);
+    final response = LoginResponse.fromJson(payload);
+    return response;
   }
 
   Future<void> signup({
@@ -26,7 +28,6 @@ class AuthApi {
     required String password,
     required String systemRole,
   }) async {
-    // ignore: inference_failure_on_function_invocation
     await _client.post(
       Endpoints.signup,
       data: {
@@ -46,8 +47,6 @@ class AuthApi {
     return _readMessage(res.data);
   }
 
-  /// Resend the verification email.
-  /// Backend: POST /auth/send-verification-email  { email }
   Future<String> resendVerificationEmail(String email) async {
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.resendVerification,
@@ -56,26 +55,17 @@ class AuthApi {
     return _readMessage(res.data);
   }
 
-  /// Check if the user's email is verified (no auth required).
-  ///
-  /// Backend: POST /auth/check-email-verified  { email }
-  /// Expected response: { "is_verified": true/false }
-  ///
-  /// ⚠️  Backend constraint note:
-  /// The current backend does NOT have this endpoint. A lightweight addition
-  /// is required: `POST /auth/check-email-verified` that accepts { email }
-  /// and returns { "is_verified": bool }. It should NOT leak whether the
-  /// email exists (return false for unknown emails). Rate-limit recommended.
-  /// See technical report for the minimal backend code needed.
   Future<bool> checkEmailVerified(String email) async {
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.checkEmailVerified,
       data: {'email': email.trim()},
     );
+
     final payload = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
     final root = (payload['data'] is Map<String, dynamic>)
         ? payload['data'] as Map<String, dynamic>
         : payload;
+
     return root['is_verified'] == true;
   }
 
@@ -114,23 +104,30 @@ class AuthApi {
   }
 
   Future<String> refresh() async {
-    final res = await _client.post<Map<String, dynamic>>(Endpoints.refresh);
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.refresh,
+    );
+
     final payload = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
     final root = (payload['data'] is Map<String, dynamic>)
         ? payload['data'] as Map<String, dynamic>
         : payload;
-    final newToken =
+
+    final newAccess =
         (root['access_token'] ?? root['token'] ?? root['accessToken'])
             ?.toString();
-    if (newToken == null || newToken.trim().isEmpty) {
+
+    if (newAccess == null || newAccess.trim().isEmpty) {
       throw Exception('Missing access token in refresh response');
     }
-    return newToken.trim();
+
+    return newAccess.trim();
   }
 
   Future<void> logout() async {
-    // ignore: inference_failure_on_function_invocation
-    await _client.post(Endpoints.logout);
+    await _client.post(
+      Endpoints.logout,
+    );
   }
 
   // ─── Helpers ──────────────────────────────────────────────────────────────

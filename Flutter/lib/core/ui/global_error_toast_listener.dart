@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../error/app_error_bus.dart';
 import '../error/app_failure.dart';
@@ -31,13 +32,11 @@ class _GlobalErrorToastListenerState
     ref.listen<AppFailure?>(appErrorProvider, (prev, next) {
       if (next == null) return;
 
-      // Validation errors are handled inline — no global handling.
       if (next.type == AppFailureType.validation) {
         AppErrorReporter.clear(ref);
         return;
       }
 
-      // Dedup: same error fired twice in rapid succession.
       final key =
           '${next.type}:${next.message}:${next.statusCode ?? ''}:${next.code ?? ''}';
       if (_lastKey == key) return;
@@ -46,7 +45,16 @@ class _GlobalErrorToastListenerState
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
 
-        final navCtx = rootNavigatorKey.currentContext;
+        final navCtx = rootNavigatorKey.currentContext ?? context;
+
+        void go(String location) {
+          try {
+            GoRouter.of(navCtx).go(location);
+          } catch (_) {
+            // Fallback (should be rare)
+            GoRouter.of(context).go(location);
+          }
+        }
 
         // ── AUTH (401) → session-expired dialog + logout + login ──────────
         if (next.isAuthIssue) {
@@ -55,7 +63,7 @@ class _GlobalErrorToastListenerState
             return;
           }
           _authDialogOpen = true;
-          await _showSessionExpiredDialog(navCtx ?? context, next);
+          await _showSessionExpiredDialog(navCtx, next);
           _authDialogOpen = false;
           AppErrorReporter.clear(ref);
           return;
@@ -68,7 +76,7 @@ class _GlobalErrorToastListenerState
           if (email.isNotEmpty) {
             TokenStorage.setPendingVerificationEmail(email);
           }
-          appRouter.go(Routes.verifyEmailSentFor(email));
+          go(Routes.verifyEmailSentFor(email));
           return;
         }
 
@@ -77,7 +85,7 @@ class _GlobalErrorToastListenerState
           AppErrorReporter.clear(ref);
           final errorType = _errorTypeString(next.type);
           final errorId = _generateErrorId();
-          appRouter.go(Routes.errorPage(
+          go(Routes.errorPage(
             type: errorType,
             message: next.message,
             errorId: errorId,
@@ -86,23 +94,22 @@ class _GlobalErrorToastListenerState
         }
 
         // ── Everything else → toast ────────────────────────────────────────
-        final toastCtx = navCtx ?? context;
         if (next.type == AppFailureType.warning) {
           AppToast.warning(
-            toastCtx,
+            navCtx,
             title: AppFailurePresenter.title(next),
             message: next.message,
           );
         } else {
           AppToast.error(
-            toastCtx,
+            navCtx,
             title: AppFailurePresenter.title(next),
             message: next.message,
           );
         }
 
         AppErrorReporter.clear(ref);
-        _lastKey = null; // reset so same error can show again after being cleared
+        _lastKey = null;
       });
     });
 
@@ -127,7 +134,9 @@ class _GlobalErrorToastListenerState
   }
 
   Future<void> _showSessionExpiredDialog(
-      BuildContext ctx, AppFailure f) async {
+    BuildContext ctx,
+    AppFailure f,
+  ) async {
     try {
       TokenStorage.clear();
       UserStorage.clear();
@@ -153,8 +162,7 @@ class _GlobalErrorToastListenerState
         ),
         actions: [
           TextButton(
-            onPressed: () =>
-                Navigator.of(ctx, rootNavigator: true).pop(),
+            onPressed: () => Navigator.of(ctx, rootNavigator: true).pop(),
             child: const Text('OK'),
           ),
         ],
@@ -162,7 +170,7 @@ class _GlobalErrorToastListenerState
     );
 
     try {
-      appRouter.go(Routes.login);
+      GoRouter.of(ctx).go(Routes.login);
     } catch (_) {}
   }
 }

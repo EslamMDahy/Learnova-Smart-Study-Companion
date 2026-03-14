@@ -96,7 +96,8 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
 
     bool semesterOk(MyCourseItem c) {
       if (selectedSemester == 'All Semesters') return true;
-      return true; // TODO: wire to API once semester field is available in the model
+      
+      return true; 
     }
 
     bool typeOk(MyCourseItem c) {
@@ -1211,7 +1212,7 @@ String _slug(MyCourseItem c) {
             ? const LinearGradient(colors: [Color(0xFF9CA3AF), Color(0xFF6B7280)])
             : const LinearGradient(colors: [Color(0xFF134E4A), Color(0xFF0891B2)]));
     final enrollCount = widget.course.enrollmentCount ?? 0;
-    final modulesCount = (widget.course.pendingInvites ?? 0).clamp(0, 99); // fallback field
+    final modulesCount = widget.course.moduleCount ?? 0;
     final code = (widget.course.courseCode?.isNotEmpty ?? false) ? widget.course.courseCode! : '—';
     final metaLeft = widget.course.category ?? 'General';
     final metaRight = widget.course.courseType;

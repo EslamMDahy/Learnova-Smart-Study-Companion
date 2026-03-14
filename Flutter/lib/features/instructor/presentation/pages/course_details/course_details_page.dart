@@ -6,8 +6,11 @@ import '../../../data/courses_models.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../widgets/course_tabs/overview_tab.dart';
 import '../../widgets/course_tabs/materials_tab.dart';
+
+import '../../widgets/course_tabs/outcomes_tab.dart';
 import '../../widgets/course_tabs/question_bank_tab.dart';
 import '../../widgets/course_tabs/students_tab.dart';
+
 class CourseDetailsPage extends ConsumerStatefulWidget {
   final String courseSlug;
   final MyCourseItem course;
@@ -30,6 +33,7 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
   static const _tabs = [
     _TabDef(icon: Icons.dashboard_outlined,     label: 'Overview'),
     _TabDef(icon: Icons.folder_open_outlined,   label: 'Materials'),
+    _TabDef(icon: Icons.flag_outlined,          label: 'Outcomes'),
     _TabDef(icon: Icons.quiz_outlined,          label: 'Question Bank'),
     _TabDef(icon: Icons.people_outline_rounded, label: 'Students'),
   ];
@@ -89,6 +93,7 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
           children: [
             CourseOverviewTab(course: widget.course),
             CourseMaterialsTab(course: widget.course),
+            CourseOutcomesTab(course: widget.course),
             CourseQuestionBankTab(course: widget.course),
             CourseStudentsTab(course: widget.course),
           ],
@@ -115,7 +120,6 @@ class _PillTabBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Align(
-      alignment: Alignment.center,
       child: Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(

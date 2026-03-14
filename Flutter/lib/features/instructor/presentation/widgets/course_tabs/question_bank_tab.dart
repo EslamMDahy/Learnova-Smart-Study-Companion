@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/ui/toast.dart';
 import '../../../data/courses_models.dart';
+import '../../../data/materials_models.dart';
 import '../../../data/question_models.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../controllers/course_details_state.dart';
@@ -11,6 +12,7 @@ import '../add_question_sheet.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  CourseQuestionBankTab — matches Figma (images 3 & 4)
+//  NOW WIRED: Sync to Backend button calls the real API.
 // ─────────────────────────────────────────────────────────────────────────────
 
 class CourseQuestionBankTab extends ConsumerStatefulWidget {
@@ -29,6 +31,11 @@ class _CourseQuestionBankTabState
   QuestionDifficulty? _filterDiff;
   int? _filterModuleId;
 
+  // Tracks user-selected materialId for sync context.
+  // The instructor must pick which material the questions belong to.
+  int? _selectedModuleId;
+  int? _selectedMaterialId;
+
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(courseDetailsControllerProvider(widget.course.id));
@@ -39,9 +46,9 @@ class _CourseQuestionBankTabState
       child: Column(children: [
         // ── AI Generator banner ───────────────────────────────────────────
         Container(
-          color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
           decoration: const BoxDecoration(
+              color: Colors.white,
               border: Border(bottom: BorderSide(color: AppColors.border))),
           child: Row(children: [
             Container(
@@ -56,18 +63,21 @@ class _CourseQuestionBankTabState
                   size: 16, color: AppColors.primary),
             ),
             const SizedBox(width: 12),
-            const Expanded(
+            Expanded(
               child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                Text('Question Bank (Local Draft)',
+                const Text('Question Bank',
                     style: TextStyle(
                         fontSize: 13.5,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textTitle)),
                 Text(
-                    'Questions added here are stored locally in this build and won\'t sync to the server yet.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                    state.lastSyncedCount != null
+                        ? '${state.lastSyncedCount} question(s) synced to backend successfully.'
+                        : 'Add questions manually, then sync them to the backend.',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textMuted)),
               ]),
             ),
             const SizedBox(width: 16),
@@ -80,9 +90,9 @@ class _CourseQuestionBankTabState
 
         // ── Toolbar ───────────────────────────────────────────────────────
         Container(
-          color: Colors.white,
           padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
           decoration: const BoxDecoration(
+              color: Colors.white,
               border: Border(bottom: BorderSide(color: AppColors.border))),
           child: Row(children: [
             // Search
@@ -113,7 +123,7 @@ class _CourseQuestionBankTabState
               ),
             ),
             const SizedBox(width: 10),
-            // Filter dropdowns (matching prototype)
+            // Filter dropdowns
             _DropFilter<int?>(
               label: 'All Topics',
               value: _filterModuleId,
@@ -153,9 +163,9 @@ class _CourseQuestionBankTabState
 
         // ── Stats bar ─────────────────────────────────────────────────────
         Container(
-          color: const Color(0xFFFAFBFC),
           padding: const EdgeInsets.fromLTRB(16, 7, 16, 7),
           decoration: const BoxDecoration(
+              color: Color(0xFFFAFBFC),
               border: Border(bottom: BorderSide(color: AppColors.border))),
           child: Row(children: [
             const Text('AVAILABLE QUESTIONS',
@@ -165,6 +175,18 @@ class _CourseQuestionBankTabState
                     color: AppColors.textHint,
                     letterSpacing: 0.5)),
             const Spacer(),
+            // Show sync error if present
+            if (state.questionsError != null) ...[
+              const Icon(Icons.error_outline,
+                  size: 13, color: AppColors.dangerText),
+              const SizedBox(width: 4),
+              Text(state.questionsError!,
+                  style: const TextStyle(
+                      fontSize: 11,
+                      color: AppColors.dangerText,
+                      fontWeight: FontWeight.w600)),
+              const SizedBox(width: 12),
+            ],
             Text('${filtered.length} questions',
                 style: const TextStyle(
                     fontSize: 12,
@@ -182,7 +204,6 @@ class _CourseQuestionBankTabState
                   itemCount: filtered.length + 1,
                   separatorBuilder: (_, __) => const SizedBox(height: 8),
                   itemBuilder: (ctx, i) {
-                    // Last item = Add New Question button
                     if (i == filtered.length) {
                       return _AddNewBtn(
                         onTap: () => _showAddQuestion(state),
@@ -208,8 +229,8 @@ class _CourseQuestionBankTabState
         // ── Bottom action ─────────────────────────────────────────────────
         Container(
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          color: Colors.white,
           decoration: const BoxDecoration(
+              color: Colors.white,
               border: Border(top: BorderSide(color: AppColors.border))),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -219,13 +240,27 @@ class _CourseQuestionBankTabState
                 icon: const Icon(Icons.add, size: 15),
                 label: const Text('Add New Question'),
               ),
+              // ── WIRED: Sync to Backend button ───────────────────────────
               ElevatedButton.icon(
-                onPressed: state.questions.isEmpty
+                onPressed: (state.questions.isEmpty || state.questionsLoading)
                     ? null
-                    : () => _showSummary(state),
-                icon: const Icon(Icons.summarize_outlined, size: 15),
+                    : () => _showSyncDialog(state),
+                icon: state.questionsLoading
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor:
+                              AlwaysStoppedAnimation<Color>(Colors.white),
+                        ),
+                      )
+                    : const Icon(Icons.cloud_upload_outlined, size: 15),
                 label: Text(
-                    '${state.questions.length} question${state.questions.length == 1 ? '' : 's'} in bank'),
+                  state.questionsLoading
+                      ? 'Syncing…'
+                      : '${state.questions.length} question${state.questions.length == 1 ? '' : 's'} — Sync to Backend',
+                ),
               ),
             ],
           ),
@@ -293,59 +328,215 @@ class _CourseQuestionBankTabState
   }
 
   void _showAddQuestion(CourseDetailsState state) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (_) => AddQuestionSheet(
-        modules: state.modules,
-        onAdd: (q) {
-          ref
-              .read(courseDetailsControllerProvider(widget.course.id).notifier)
-              .addQuestion(q);
-          if (mounted) {
-            AppToast.success(context,
-                title: 'Question added',
-                message: 'Added to Question Bank.');
-          }
-        },
-      ),
+    showAddQuestionDialog(
+      context,
+      modules: state.modules,
+      onAdd: (q) {
+        ref
+            .read(courseDetailsControllerProvider(widget.course.id).notifier)
+            .addQuestion(q);
+        if (mounted) {
+          AppToast.success(context,
+              title: 'Question added',
+              message: 'Added to Question Bank.');
+        }
+      },
     );
   }
 
   void _generateWithAI(CourseDetailsState state) {
-    // Backend endpoints for AI generation/review aren't exposed in this project build.
-    // Avoid implying server-side workflows are available.
     AppToast.info(
       context,
       title: 'Coming soon',
-      message: 'AI generation / review will appear here when it is enabled on the server.',
+      message:
+          'AI generation / review will appear here when it is enabled on the server.',
     );
   }
 
-  void _showSummary(CourseDetailsState state) {
-    final easy   = state.questions.where((q) => q.difficulty == QuestionDifficulty.easy).length;
-    final medium = state.questions.where((q) => q.difficulty == QuestionDifficulty.medium).length;
-    final hard   = state.questions.where((q) => q.difficulty == QuestionDifficulty.hard).length;
+  // ── Sync Dialog ───────────────────────────────────────────────────────────
+  //
+  // The backend endpoint requires a materialId to associate questions with a
+  // specific uploaded material. We show a picker so the instructor selects
+  // which material to link the questions to.
+
+  void _showSyncDialog(CourseDetailsState state) {
+    // Flatten all materials across modules.
+    final allMaterials = <_MaterialOption>[];
+    for (final module in state.modules) {
+      final mats = state.materials[module.id] ?? [];
+      for (final mat in mats) {
+        allMaterials.add(_MaterialOption(
+          moduleId: module.id,
+          moduleTitle: module.title,
+          material: mat,
+        ));
+      }
+    }
+
+    // Count MCQ-only questions (only type supported by backend endpoint).
+    final mcqCount = state.questions
+        .where((q) => q.type == QuestionType.multipleChoice)
+        .length;
+
+    int? pickedModuleId = _selectedModuleId;
+    int? pickedMaterialId = _selectedMaterialId;
+
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Question Bank Summary',
-            style: TextStyle(fontWeight: FontWeight.w800)),
-        content: Column(mainAxisSize: MainAxisSize.min, children: [
-          _SummaryRow('Total questions', '${state.questions.length}'),
-          _SummaryRow('Easy', '$easy'),
-          _SummaryRow('Medium', '$medium'),
-          _SummaryRow('Hard', '$hard'),
-        ]),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Close')),
-        ],
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) => AlertDialog(
+          title: const Text('Sync Questions to Backend',
+              style: TextStyle(fontWeight: FontWeight.w800)),
+          content: SizedBox(
+            width: 420,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              // MCQ note
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFFBEB),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: const Color(0xFFFDE68A)),
+                ),
+                child: Row(children: [
+                  const Icon(Icons.info_outline_rounded,
+                      size: 16, color: Color(0xFFB45309)),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '$mcqCount of ${state.questions.length} question(s) '
+                      'are MCQ and will be synced. '
+                      'Other types are not yet supported by the API.',
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.textMuted),
+                    ),
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 16),
+              // Material picker
+              if (allMaterials.isEmpty) ...[
+                const Text(
+                  'No materials found. Upload a material first so questions can be linked to it.',
+                  style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+                ),
+              ] else ...[
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text('Link to material:',
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w700)),
+                ),
+                const SizedBox(height: 8),
+                DropdownButtonFormField<int>(
+                  value: pickedMaterialId,
+                  hint: const Text('Select a material',
+                      style: TextStyle(fontSize: 13)),
+                  isExpanded: true,
+                  decoration: InputDecoration(
+                    contentPadding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide:
+                            const BorderSide(color: AppColors.border)),
+                  ),
+                  items: allMaterials.map((opt) {
+                    return DropdownMenuItem<int>(
+                      value: opt.material.id,
+                      child: Text(
+                        '${opt.moduleTitle} › ${opt.material.displayTitle}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    );
+                  }).toList(),
+                  onChanged: (v) => setDialogState(() {
+                    pickedMaterialId = v;
+                    pickedModuleId = allMaterials
+                        .firstWhere((o) => o.material.id == v)
+                        .moduleId;
+                  }),
+                ),
+              ],
+            ]),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: (pickedMaterialId == null ||
+                      pickedModuleId == null ||
+                      mcqCount == 0)
+                  ? null
+                  : () async {
+                      setState(() {
+                        _selectedModuleId = pickedModuleId;
+                        _selectedMaterialId = pickedMaterialId;
+                      });
+                      Navigator.pop(ctx);
+                      await _doSync(
+                        moduleId: pickedModuleId!,
+                        materialId: pickedMaterialId!,
+                      );
+                    },
+              child: const Text('Sync'),
+            ),
+          ],
+        ),
       ),
     );
   }
+
+  Future<void> _doSync({
+    required int moduleId,
+    required int materialId,
+  }) async {
+    final ok = await ref
+        .read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .syncQuestionsToBackend(
+          moduleId: moduleId,
+          materialId: materialId,
+        );
+
+    if (!mounted) return;
+
+    final state =
+        ref.read(courseDetailsControllerProvider(widget.course.id));
+
+    if (ok) {
+      AppToast.success(
+        context,
+        title: 'Questions synced',
+        message:
+            '${state.lastSyncedCount} question(s) saved to the backend successfully.',
+      );
+    } else {
+      AppToast.error(
+        context,
+        title: 'Sync failed',
+        message: state.questionsError ??
+            'Could not sync questions. Please try again.',
+      );
+    }
+  }
+}
+
+// ── Helper data class ─────────────────────────────────────────────────────────
+
+class _MaterialOption {
+  final int moduleId;
+  final String moduleTitle;
+  final MaterialItem material;
+
+  const _MaterialOption({
+    required this.moduleId,
+    required this.moduleTitle,
+    required this.material,
+  });
 }
 
 // ── Question Card ──────────────────────────────────────────────────────────────
@@ -357,17 +548,21 @@ class _QuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isSynced = question.remoteId != null;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(
+          color: isSynced
+              ? const Color(0xFF86EFAC) // green border for synced
+              : AppColors.border,
+        ),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Header row
         Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          // Checkbox (visual only — for quiz selection later)
           Container(
             width: 18,
             height: 18,
@@ -386,6 +581,23 @@ class _QuestionCard extends StatelessWidget {
                     height: 1.4)),
           ),
           const SizedBox(width: 8),
+          // Synced badge
+          if (isSynced) ...[
+            Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(
+                color: const Color(0xFFDCFCE7),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Text('Synced',
+                  style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF16A34A))),
+            ),
+            const SizedBox(width: 6),
+          ],
           _DiffBadge(question.difficulty),
           const SizedBox(width: 6),
           InkWell(
@@ -402,7 +614,7 @@ class _QuestionCard extends StatelessWidget {
 
         // Meta chips
         Row(children: [
-          const SizedBox(width: 28), // align with text
+          const SizedBox(width: 28),
           _MetaChip(Icons.category_outlined, question.typeLabel),
           const SizedBox(width: 6),
           _MetaChip(Icons.location_on_outlined, question.contextLabel),
@@ -483,14 +695,20 @@ class _DiffBadge extends StatelessWidget {
     String label;
     switch (diff) {
       case QuestionDifficulty.easy:
-        bg = const Color(0xFFDCFCE7); fg = const Color(0xFF16A34A);
-        label = 'Easy'; break;
+        bg = const Color(0xFFDCFCE7);
+        fg = const Color(0xFF16A34A);
+        label = 'Easy';
+        break;
       case QuestionDifficulty.medium:
-        bg = const Color(0xFFFEF3C7); fg = const Color(0xFFD97706);
-        label = 'Medium'; break;
+        bg = const Color(0xFFFEF3C7);
+        fg = const Color(0xFFD97706);
+        label = 'Medium';
+        break;
       case QuestionDifficulty.hard:
-        bg = AppColors.dangerBg; fg = AppColors.dangerText;
-        label = 'Hard'; break;
+        bg = AppColors.dangerBg;
+        fg = AppColors.dangerText;
+        label = 'Hard';
+        break;
     }
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -520,8 +738,8 @@ class _MetaChip extends StatelessWidget {
         Icon(icon, size: 10, color: AppColors.textMuted),
         const SizedBox(width: 4),
         Text(label,
-            style: const TextStyle(
-                fontSize: 11, color: AppColors.textMuted)),
+            style:
+                const TextStyle(fontSize: 11, color: AppColors.textMuted)),
       ]),
     );
   }
@@ -559,20 +777,28 @@ class _AddNewBtn extends StatelessWidget {
           color: Colors.white,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-              color: AppColors.primary.withOpacity(0.3)),
+            color: AppColors.primary.withOpacity(0.3),
+          ),
         ),
         child: const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-          Icon(Icons.add_circle_outline_rounded,
-              size: 18, color: AppColors.primary),
-          SizedBox(width: 8),
-          Text('Add New Question',
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.add_circle_outline_rounded,
+              size: 18,
+              color: AppColors.primary,
+            ),
+            SizedBox(width: 8),
+            Text(
+              'Add New Question',
               style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.primary)),
-        ]),
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.primary,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -601,23 +827,29 @@ class _DropFilter<T> extends StatelessWidget {
         decoration: BoxDecoration(
           color: isActive ? const Color(0xFFEFF6FF) : Colors.white,
           border: Border.all(
-              color: isActive ? AppColors.primary : AppColors.border),
+            color: isActive ? AppColors.primary : AppColors.border,
+          ),
           borderRadius: BorderRadius.circular(6),
         ),
-        child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Text(
-            isActive ? (options[value] ?? label) : label,
-            style: TextStyle(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              isActive ? (options[value] ?? label) : label,
+              style: TextStyle(
                 fontSize: 12.5,
                 fontWeight: FontWeight.w600,
-                color:
-                    isActive ? AppColors.primary : AppColors.textMuted),
-          ),
-          const SizedBox(width: 4),
-          Icon(Icons.keyboard_arrow_down_rounded,
+                color: isActive ? AppColors.primary : AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.keyboard_arrow_down_rounded,
               size: 14,
-              color: isActive ? AppColors.primary : AppColors.textMuted),
-        ]),
+              color: isActive ? AppColors.primary : AppColors.textMuted,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -647,27 +879,5 @@ class _DropFilter<T> extends StatelessWidget {
           .toList(),
     );
     if (result != null) onChanged(result);
-  }
-}
-
-class _SummaryRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _SummaryRow(this.label, this.value);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Row(children: [
-        Expanded(
-            child: Text(label,
-                style: const TextStyle(color: AppColors.textMuted))),
-        Text(value,
-            style: const TextStyle(
-                fontWeight: FontWeight.w700,
-                color: AppColors.textTitle)),
-      ]),
-    );
   }
 }

@@ -13,7 +13,10 @@ import 'settings_state.dart';
 
 final settingsControllerProvider =
     StateNotifierProvider<SettingsController, SettingsState>(
-  (ref) => SettingsController(ref),
+  (ref) {
+    ref.keepAlive();
+    return SettingsController(ref);
+  },
 );
 
 class SettingsController extends StateNotifier<SettingsState> {
@@ -74,42 +77,67 @@ class SettingsController extends StateNotifier<SettingsState> {
     }
   }
 
-  Future<void> load() async {
-    
-    if (state.loading) return;
+Future<void> load() async {
+  if (state.loading) return;
 
-    clearMessages();
+  clearMessages();
 
-    _hydrateProfileFromStorageIfPossible();
+  _hydrateProfileFromStorageIfPossible();
 
-    _resetLoadCancel();
+  _resetLoadCancel();
 
-    
-    final hasData = state.profile != null && state.preferences != null;
-    state = state.copyWith(loading: !hasData);
+  final hasData = state.profile != null && state.preferences != null;
+  state = state.copyWith(loading: !hasData);
 
+  try {
+    final settingsApi = ref.read(settingsApiProvider);
+    final profile = await settingsApi.me(cancelToken: _loadCancel);
+
+    // ── Merge: don't overwrite existing rich data with sparse /me fields ──
+    // /auth/me only returns 4 fields. Login saved the full profile.
+    // We merge: existing values are kept; non-null new values override.
+    final currentMe = UserStorage.meJson ?? <String, dynamic>{};
+    final existingUser = (currentMe['user'] is Map)
+        ? (currentMe['user'] as Map).cast<String, dynamic>()
+        : <String, dynamic>{};
+
+    final profileJson = profile.toJson();
+    final mergedUser = <String, dynamic>{...existingUser};
+    profileJson.forEach((k, v) {
+      if (v != null) mergedUser[k] = v;
+    });
+
+    UserStorage.saveMe(
+      {
+        ...currentMe,
+        'user': mergedUser,
+      },
+      persist: TokenStorage.isPersisted,
+    );
+
+    // Re-read from storage to get the fully merged profile
+    final mergedProfile = UserProfile.fromJson(mergedUser);
+
+    UserPreferences prefs;
     try {
-      
-      final profile = await _repo.me(cancelToken: _loadCancel);
+      prefs = await _repo.getPreferences(cancelToken: _loadCancel);
+    } catch (_) {
+      prefs = state.preferences ?? UserPreferences.defaults();
+    }
 
-      // 2) preferences
-      UserPreferences prefs;
-      try {
-        prefs = await _repo.getPreferences(cancelToken: _loadCancel);
-      } catch (_) {
-        
-        prefs = state.preferences ?? UserPreferences.defaults();
-      }
-
-      state = state.copyWith(
-        loading: false,
-        profile: profile,
-        preferences: prefs,
-      );
-    } catch (e) {
+    state = state.copyWith(
+      loading: false,
+      profile: mergedProfile,
+      preferences: prefs,
+    );
+  } catch (e) {
+    if (state.profile != null) {
+      state = state.copyWith(loading: false);
+    } else {
       _handleError(e);
     }
   }
+}
 
   /// Upload avatar: 3-step flow
   /// 1) Get signed upload URL from backend
@@ -264,7 +292,7 @@ class SettingsController extends StateNotifier<SettingsState> {
           ...currentMe,
           'user': mergedProfile.toJson(),
         },
-        persist: true,
+        persist: TokenStorage.isPersisted,
       );
 
       // preferences

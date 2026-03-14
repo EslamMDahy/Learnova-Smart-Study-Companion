@@ -101,35 +101,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     super.initState();
 
     final st = ref.read(settingsControllerProvider);
-    if (!_hydrated && st.profile != null && st.preferences != null) {
-      _hydrated = true;
-
-      final full = st.profile!.fullName.trim();
-      final parts = full.split(RegExp(r'\s+'));
-      firstName.text = parts.isNotEmpty ? parts.first : '';
-      lastName.text = parts.length > 1 ? parts.sublist(1).join(' ') : '';
-
-      universityEmailCtrl.text = st.profile!.universityEmail ?? st.profile!.email;
-      studentIdCtrl.text = st.profile!.studentId ?? '';
-      phoneNumber.text = st.profile!.phoneNumber ?? '';
-      bio.text = st.profile!.bio ?? '';
-
-      _language = _mapLangCodeToUi(st.profile!.languagePreference);
-
-      emailNotifications = st.preferences!.emailNotifications;
-      assignmentAlerts = st.preferences!.assignmentAlerts;
-      courseUpdates = st.preferences!.courseUpdates;
-      announcementNotifications = st.preferences!.announcementNotifications;
-      gradingNotifications = st.preferences!.gradingNotifications;
-      deadlineReminders = st.preferences!.deadlineReminders;
-
-      themeMode = st.preferences!.themeMode;
-      profileVisibility = st.preferences!.profileVisibility;
-      showOnlineStatus = st.preferences!.showOnlineStatus;
-
-      _takeSnapshot();
+    if (!_hydrated && st.profile != null) {
+      if (st.preferences != null) {
+        _hydrated = true;
+      }
+      _hydrateFields(st);
     }
-
 
     Future.microtask(() => ref.read(settingsControllerProvider.notifier).load());
 
@@ -435,6 +412,32 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
       );
     }
     ref.listen(settingsControllerProvider, (prev, next) {
+      // ── Hydrate fields as soon as profile data arrives ──────────────────
+      // Don't wait for preferences — hydrate immediately when profile loads,
+      // then update again when preferences arrive.
+      if (!_hydrated && next.profile != null && !next.loading) {
+        if (next.preferences != null) {
+          // Both arrived together — full hydrate
+          _hydrated = true;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _hydrateFields(next);
+          });
+        } else {
+          // Profile arrived first — hydrate profile fields now
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) return;
+            _hydrateFields(next);
+          });
+        }
+      } else if (_hydrated && prev?.preferences == null && next.preferences != null) {
+        // Preferences arrived after profile — re-hydrate to fill pref fields
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          _hydrateFields(next);
+        });
+      }
+
       final err = next.error;
       final ok = next.success;
 
@@ -1159,6 +1162,41 @@ return PopScope(
   // =========================
   // Snapshot helpers
   // =========================
+
+  /// Populate all form fields from a loaded [SettingsState].
+  /// Called from initState (cache hit) AND from ref.listen (async load).
+  void _hydrateFields(SettingsState st) {
+    if (st.profile == null) return;
+
+    final full = st.profile!.fullName.trim();
+    final parts = full.split(RegExp(r'\s+'));
+    firstName.text = parts.isNotEmpty ? parts.first : '';
+    lastName.text = parts.length > 1 ? parts.sublist(1).join(' ') : '';
+
+    universityEmailCtrl.text = st.profile!.universityEmail ?? st.profile!.email;
+    studentIdCtrl.text = st.profile!.studentId ?? '';
+    phoneNumber.text = st.profile!.phoneNumber ?? '';
+    bio.text = st.profile!.bio ?? '';
+
+    setState(() {
+      _language = _mapLangCodeToUi(st.profile!.languagePreference);
+
+      // Only update prefs if they've loaded
+      if (st.preferences != null) {
+        emailNotifications        = st.preferences!.emailNotifications;
+        assignmentAlerts          = st.preferences!.assignmentAlerts;
+        courseUpdates             = st.preferences!.courseUpdates;
+        announcementNotifications = st.preferences!.announcementNotifications;
+        gradingNotifications      = st.preferences!.gradingNotifications;
+        deadlineReminders         = st.preferences!.deadlineReminders;
+        themeMode                 = st.preferences!.themeMode;
+        profileVisibility         = st.preferences!.profileVisibility;
+        showOnlineStatus          = st.preferences!.showOnlineStatus;
+      }
+    });
+
+    _takeSnapshot();
+  }
 
   void _takeSnapshot() {
     _initialFirstName = firstName.text.trim();

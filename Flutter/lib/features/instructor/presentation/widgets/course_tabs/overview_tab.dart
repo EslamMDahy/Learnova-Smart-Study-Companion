@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../data/courses_models.dart';
 import '../../controllers/course_details_controller.dart';
+import '../course_outcomes_panel.dart';
+import '../generate_questions_dialog.dart';
 
 class CourseOverviewTab extends ConsumerWidget {
   final MyCourseItem course;
@@ -134,11 +136,11 @@ class CourseOverviewTab extends ConsumerWidget {
                         ),
                 ),
                 const SizedBox(height: 12),
-                const _SectionCard(
+                _SectionCard(
                   title: 'Quick Actions',
                   icon: Icons.bolt_rounded,
-                  iconColor: Color(0xFFD97706),
-                  child: _QuickActions(),
+                  iconColor: const Color(0xFFD97706),
+                  child: _QuickActions(courseId: course.id),
                 ),
               ]),
             ),
@@ -634,65 +636,82 @@ class _ModuleTile extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Quick actions
 // ─────────────────────────────────────────────────────────────────────────────
-class _QuickActions extends StatelessWidget {
-  const _QuickActions();
+class _QuickActions extends ConsumerWidget {
+  final int courseId;
+  const _QuickActions({required this.courseId});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final state = ref.watch(courseDetailsControllerProvider(courseId));
+    final materialCount = state.materials.values.fold<int>(0, (sum, list) => sum + list.length);
+    final canGenerate = materialCount > 0;
+
     final actions = [
-      (Icons.add_box_outlined,     AppColors.primary,       const Color(0xFFEFF6FF), 'Create Module',   'Add a new content module'),
-      (Icons.upload_file_outlined, const Color(0xFF9333EA), const Color(0xFFF3E8FF), 'Upload Material', 'Add videos, PDFs, or docs'),
-      (Icons.quiz_outlined,        const Color(0xFFEA580C), const Color(0xFFFFEDD5), 'Add Question',    'Grow your question bank'),
-      (Icons.person_add_outlined,  const Color(0xFF16A34A), const Color(0xFFDCFCE7), 'Invite Students', 'Send course invitations'),
+      (Icons.add_box_outlined,     AppColors.primary,       const Color(0xFFEFF6FF), 'Create Module',        'Add a new content module',        () {}, true),
+      (Icons.upload_file_outlined, const Color(0xFF9333EA), const Color(0xFFF3E8FF), 'Upload Material',      'Add videos, PDFs, or docs',       () {}, true),
+      (Icons.flag_outlined,        const Color(0xFF16A34A), const Color(0xFFDCFCE7), 'Learning Outcomes',    'Manage course learning goals',    () => showCourseOutcomesDialog(context, ref, courseId), true),
+      (Icons.auto_awesome_rounded, const Color(0xFF7C3AED), const Color(0xFFF3E8FF), 'Generate Questions',   canGenerate ? 'Select mixed course content scope' : 'Add materials before generating questions', () {
+        if (!canGenerate) return;
+        showDialog(
+          context: context,
+          builder: (_) => GenerateQuestionsDialog(courseId: courseId),
+        );
+      }, canGenerate),
+      (Icons.quiz_outlined,        const Color(0xFFEA580C), const Color(0xFFFFEDD5), 'Add Question',         'Grow your question bank',         () {}, true),
+      (Icons.person_add_outlined,  const Color(0xFF0EA5E9), const Color(0xFFE0F2FE), 'Invite Students',      'Send course invitations',         () {}, true),
     ];
 
     return Column(
       children: List.generate(actions.length, (i) {
         final a = actions[i];
         final isLast = i == actions.length - 1;
+        final enabled = a.$7;
         return Padding(
           padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
           child: Material(
             color: Colors.transparent,
-            child: InkWell(
-              borderRadius: BorderRadius.circular(8),
-              onTap: () {},
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                decoration: BoxDecoration(
-                  border: Border.all(color: AppColors.border),
-                  borderRadius: BorderRadius.circular(8),
+            child: Opacity(
+              opacity: enabled ? 1 : 0.55,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(8),
+                onTap: enabled ? a.$6 : null,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    border: Border.all(color: AppColors.border),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(children: [
+                    Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                          color: a.$3,
+                          borderRadius: BorderRadius.circular(8)),
+                      alignment: Alignment.center,
+                      child: Icon(a.$1, size: 15, color: a.$2),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                        Text(a.$4,
+                            style: const TextStyle(
+                                fontSize: 12.5,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textTitle)),
+                        Text(a.$5,
+                            style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textMuted)),
+                      ]),
+                    ),
+                    Icon(Icons.arrow_forward_ios_rounded,
+                        size: 11, color: enabled ? AppColors.textHint : AppColors.border),
+                  ]),
                 ),
-                child: Row(children: [
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                        color: a.$3,
-                        borderRadius: BorderRadius.circular(8)),
-                    alignment: Alignment.center,
-                    child: Icon(a.$1, size: 15, color: a.$2),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                      Text(a.$4,
-                          style: const TextStyle(
-                              fontSize: 12.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textTitle)),
-                      Text(a.$5,
-                          style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textMuted)),
-                    ]),
-                  ),
-                  const Icon(Icons.arrow_forward_ios_rounded,
-                      size: 11, color: AppColors.textHint),
-                ]),
               ),
             ),
           ),

@@ -55,6 +55,11 @@ class Endpoints {
   static String moduleTopics(int courseId, int moduleId) =>
       '$_courses/$courseId/modules/$moduleId/topics';
 
+  // ─── QUESTIONS (NEW — G-02) ───────────────────────────────────────────────
+  /// POST /courses/{courseId}/modules/{moduleId}/materials/{materialId}/questions
+  static String batchCreateQuestions(int courseId, int moduleId, int materialId) =>
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId/questions';
+
   // ─── SETTINGS ────────────────────────────────────────────────────────────
   static const updateProfile     = '$_settings/profile';
   static const updatePassword    = '$_settings/password';

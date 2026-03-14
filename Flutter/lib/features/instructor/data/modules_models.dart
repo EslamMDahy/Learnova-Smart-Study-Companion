@@ -1,16 +1,19 @@
 // ─────────────────────────────────────────────────────────────────────────────
-//  Modules — data models (mirrors backend schemas exactly)
+//  Modules — data models (updated to support sharing across courses)
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ModuleItem {
   final int id;
-  final int courseId;
+  final int courseId; // primary course this module belongs to
   final String title;
   final String? description;
   final int orderIndex;
   final bool isPublished;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  // New: a module may be linked to multiple courses
+  final List<int> sharedWithCourseIds;
 
   const ModuleItem({
     required this.id,
@@ -21,9 +24,38 @@ class ModuleItem {
     required this.isPublished,
     required this.createdAt,
     required this.updatedAt,
+    this.sharedWithCourseIds = const [],
   });
 
+  ModuleItem copyWith({
+    int? id,
+    int? courseId,
+    String? title,
+    String? description,
+    int? orderIndex,
+    bool? isPublished,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    List<int>? sharedWithCourseIds,
+  }) {
+    return ModuleItem(
+      id: id ?? this.id,
+      courseId: courseId ?? this.courseId,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      orderIndex: orderIndex ?? this.orderIndex,
+      isPublished: isPublished ?? this.isPublished,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      sharedWithCourseIds: sharedWithCourseIds ?? this.sharedWithCourseIds,
+    );
+  }
+
   factory ModuleItem.fromJson(Map<String, dynamic> json) {
+    final shared = (json['shared_with_course_ids'] as List?)
+            ?.map((e) => (e as num).toInt())
+            .toList() ??
+        const [];
     return ModuleItem(
       id: (json['id'] as num).toInt(),
       courseId: (json['course_id'] as num).toInt(),
@@ -35,8 +67,12 @@ class ModuleItem {
           DateTime.fromMillisecondsSinceEpoch(0),
       updatedAt: DateTime.tryParse((json['updated_at'] ?? '').toString()) ??
           DateTime.fromMillisecondsSinceEpoch(0),
+      sharedWithCourseIds: shared,
     );
   }
+
+  /// Whether this module is shared (used in multiple courses)
+  bool get isShared => sharedWithCourseIds.isNotEmpty;
 }
 
 class ModuleListResponse {
@@ -70,4 +106,17 @@ class ModuleCreateRequest {
     }
     return m;
   }
+}
+
+/// Request to link an existing module to another course
+class ModuleLinkRequest {
+  final int moduleId;
+  final int targetCourseId;
+
+  const ModuleLinkRequest({required this.moduleId, required this.targetCourseId});
+
+  Map<String, dynamic> toJson() => {
+        'module_id': moduleId,
+        'target_course_id': targetCourseId,
+      };
 }

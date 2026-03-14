@@ -7,24 +7,26 @@ import '../controllers/course_details_controller.dart';
 import '../controllers/course_details_state.dart';
 import '../../data/materials_models.dart';
 import '../../data/modules_models.dart';
+import '../../data/topics_models.dart';
 
-/// Course-level multi-select "Generate Questions" UI.
-/// Backend generation endpoints are not available in the current backend zip,
-/// so the Generate action is disabled with a clear explanation.
+/// Scoped multi-select question-generation dialog.
 ///
-/// If you later add a client method for generation (without changing backend here),
-/// you can wire it in from the controller and optionally run sequential requests
-/// per selected topic/material id with progress.
+/// The current backend bundle does not expose AI generation endpoints, so this
+/// dialog focuses on correct instructor-side scope selection and preparation.
+/// It supports mixed selection across materials and topics while keeping the
+/// existing visual style intact.
 class GenerateQuestionsDialog extends ConsumerStatefulWidget {
   final int courseId;
-
-  /// If provided, materials list is pre-filtered to this module.
   final int? initialModuleId;
+  final int? initialMaterialId;
+  final int? initialTopicId;
 
   const GenerateQuestionsDialog({
     super.key,
     required this.courseId,
     this.initialModuleId,
+    this.initialMaterialId,
+    this.initialTopicId,
   });
 
   @override
@@ -32,22 +34,20 @@ class GenerateQuestionsDialog extends ConsumerStatefulWidget {
       _GenerateQuestionsDialogState();
 }
 
-class _GenerateQuestionsDialogState extends ConsumerState<GenerateQuestionsDialog>
+class _GenerateQuestionsDialogState
+    extends ConsumerState<GenerateQuestionsDialog>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
-  // Selections
-  final Set<int> _selectedMaterialIds = {};
-  final Set<int> _selectedTopicIds = {}; // Topics API not available yet.
+  final Set<int> _selectedMaterialIds = <int>{};
+  final Set<int> _selectedTopicIds = <int>{};
 
-  // Filters/search
   String _materialsQuery = '';
   String _topicsQuery = '';
-  String _materialTypeFilter = 'all'; // all | pdf | video | document | ...
+  String _materialTypeFilter = 'all';
 
-  // Settings (UI-only until backend supports it)
   final Set<String> _types = {'MCQ'};
-  String _difficulty = 'mixed'; // easy|medium|hard|mixed
+  String _difficulty = 'mixed';
   int _count = 10;
 
   final bool _submitting = false;
@@ -58,6 +58,15 @@ class _GenerateQuestionsDialogState extends ConsumerState<GenerateQuestionsDialo
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    if (widget.initialMaterialId != null) {
+      _selectedMaterialIds.add(widget.initialMaterialId!);
+    }
+    if (widget.initialTopicId != null) {
+      _selectedTopicIds.add(widget.initialTopicId!);
+      _tabController.index = 0;
+    } else if (widget.initialMaterialId != null) {
+      _tabController.index = 1;
+    }
   }
 
   @override
@@ -71,10 +80,19 @@ class _GenerateQuestionsDialogState extends ConsumerState<GenerateQuestionsDialo
     final state = ref.watch(courseDetailsControllerProvider(widget.courseId));
     final modules = state.modules;
     final allMaterials = _flattenMaterials(state);
+    final allTopics = _flattenTopics(state, modules, allMaterials);
 
     final materials = widget.initialModuleId == null
         ? allMaterials
-        : allMaterials.where((m) => m.moduleId == widget.initialModuleId).toList();
+        : allMaterials
+            .where((m) => m.moduleId == widget.initialModuleId)
+            .toList();
+
+    final topics = widget.initialModuleId == null
+        ? allTopics
+        : allTopics
+            .where((t) => t.module.id == widget.initialModuleId)
+            .toList();
 
     final filteredMaterials = materials.where((m) {
       final q = _materialsQuery.trim().toLowerCase();
@@ -86,7 +104,17 @@ class _GenerateQuestionsDialogState extends ConsumerState<GenerateQuestionsDialo
       return matchesQuery && matchesType;
     }).toList();
 
-    const canGenerate = false; // No backend API in current zip.
+    final filteredTopics = topics.where((t) {
+      final q = _topicsQuery.trim().toLowerCase();
+      if (q.isEmpty) return true;
+      return t.topic.title.toLowerCase().contains(q) ||
+          (t.topic.description ?? '').toLowerCase().contains(q) ||
+          t.material.displayTitle.toLowerCase().contains(q) ||
+          t.module.title.toLowerCase().contains(q);
+    }).toList();
+
+    final canSubmit =
+        _selectedMaterialIds.isNotEmpty || _selectedTopicIds.isNotEmpty;
 
     return Dialog(
       insetPadding: const EdgeInsets.all(18),
@@ -99,8 +127,8 @@ class _GenerateQuestionsDialogState extends ConsumerState<GenerateQuestionsDialo
             _Header(
               title: 'Generate Questions',
               subtitle: widget.initialModuleId == null
-                  ? 'Select topics and/or materials across the whole course.'
-                  : 'Select topics and/or materials for this module.',
+                  ? 'Select a mixed scope across the whole course.'
+                  : 'Select materials and topics inside this module.',
               onClose: () => Navigator.of(context).pop(),
             ),
             Container(
@@ -109,10 +137,10 @@ class _GenerateQuestionsDialogState extends ConsumerState<GenerateQuestionsDialo
                 children: [
                   const _InfoBanner(
                     icon: Icons.info_outline_rounded,
-                    title: 'Not available in current backend',
+                    title: 'Selection is ready, backend generation is not',
                     message:
-                        'The current backend API bundle does not expose question generation endpoints. '
-                        'This UI is ready; once the endpoint exists, we can run generation sequentially per selected item with progress—without changing the backend here.',
+                        'The current backend ZIP does not include AI question-generation endpoints. '
+                        'This dialog now supports correct scope selection so the frontend flow is ready once that endpoint exists.',
                   ),
                   const SizedBox(height: 10),
                   Align(
@@ -138,15 +166,22 @@ class _GenerateQuestionsDialogState extends ConsumerState<GenerateQuestionsDialo
                 controller: _tabController,
                 children: [
                   _TopicsTab(
-                    enabled: false,
                     query: _topicsQuery,
+                    items: filteredTopics,
+                    selectedIds: _selectedTopicIds,
                     onQueryChanged: (v) => setState(() => _topicsQuery = v),
-                    selectedCount: _selectedTopicIds.length,
-                    onSelectAll: () => AppToast.info(
-                      context,
-                      title: 'Coming soon',
-                      message: 'Topics selection requires topics API support.',
-                    ),
+                    onToggle: (id, sel) => setState(() {
+                      if (sel) {
+                        _selectedTopicIds.add(id);
+                      } else {
+                        _selectedTopicIds.remove(id);
+                      }
+                    }),
+                    onSelectAll: () => setState(() {
+                      for (final item in filteredTopics) {
+                        _selectedTopicIds.add(item.topic.id);
+                      }
+                    }),
                     onClear: () => setState(_selectedTopicIds.clear),
                   ),
                   _MaterialsTab(
@@ -185,9 +220,12 @@ class _GenerateQuestionsDialogState extends ConsumerState<GenerateQuestionsDialo
                       } else {
                         _types.add(t);
                       }
+                      if (_types.isEmpty) {
+                        _types.add('MCQ');
+                      }
                     }),
                     onDifficultyChanged: (d) => setState(() => _difficulty = d),
-                    onCountChanged: (c) => setState(() => _count = c),
+                    onCountChanged: (c) => setState(() => _count = c < 1 ? 1 : (c > 100 ? 100 : c)),
                   ),
                 ],
               ),
@@ -198,15 +236,18 @@ class _GenerateQuestionsDialogState extends ConsumerState<GenerateQuestionsDialo
               progressLabel: _progressLabel,
               summary:
                   'Selected: ${_selectedTopicIds.length} topic(s), ${_selectedMaterialIds.length} material(s)',
-              canSubmit: canGenerate,
+              canSubmit: canSubmit,
               onCancel: () => Navigator.of(context).pop(),
-              onSubmit: () async {
-                // Currently disabled due to missing backend API.
+              onSubmit: () {
+                final typeLabels = _types.toList()..sort();
                 AppToast.info(
                   context,
-                  title: 'Coming soon',
+                  title: 'Scope prepared',
                   message:
-                      'Question generation endpoints are not available in the current backend.',
+                      '${_selectedTopicIds.length} topic(s) and ${_selectedMaterialIds.length} material(s) selected. '
+                      'Types: ${typeLabels.join(', ')} • Difficulty: $_difficulty • Count: $_count. '
+                      'No request was sent because the current backend bundle does not expose the generation endpoint yet.',
+                  duration: const Duration(seconds: 5),
                 );
               },
             ),
@@ -224,6 +265,57 @@ class _GenerateQuestionsDialogState extends ConsumerState<GenerateQuestionsDialo
     out.sort((a, b) => b.createdAt.compareTo(a.createdAt));
     return out;
   }
+
+  List<_TopicSelectionItem> _flattenTopics(
+    CourseDetailsState state,
+    List<ModuleItem> modules,
+    List<MaterialItem> materials,
+  ) {
+    final moduleById = {for (final m in modules) m.id: m};
+    final materialById = {for (final m in materials) m.id: m};
+    final out = <_TopicSelectionItem>[];
+
+    for (final entry in state.topics.entries) {
+      final module = moduleById[entry.key];
+      if (module == null) continue;
+      for (final topic in entry.value) {
+        final materialId = topic.materialId;
+        if (materialId == null) continue;
+        final material = materialById[materialId];
+        if (material == null) continue;
+        out.add(_TopicSelectionItem(
+          module: module,
+          material: material,
+          topic: topic,
+        ));
+      }
+    }
+
+    out.sort((a, b) {
+      final moduleCmp = a.module.title.toLowerCase().compareTo(
+            b.module.title.toLowerCase(),
+          );
+      if (moduleCmp != 0) return moduleCmp;
+      final materialCmp = a.material.displayTitle.toLowerCase().compareTo(
+            b.material.displayTitle.toLowerCase(),
+          );
+      if (materialCmp != 0) return materialCmp;
+      return a.topic.orderIndex.compareTo(b.topic.orderIndex);
+    });
+    return out;
+  }
+}
+
+class _TopicSelectionItem {
+  final ModuleItem module;
+  final MaterialItem material;
+  final TopicItem topic;
+
+  const _TopicSelectionItem({
+    required this.module,
+    required this.material,
+    required this.topic,
+  });
 }
 
 class _Header extends StatelessWidget {
@@ -250,15 +342,22 @@ class _Header extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textTitle)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textTitle,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(subtitle,
-                    style: const TextStyle(
-                        fontSize: 12.5, color: AppColors.textMuted)),
+                Text(
+                  subtitle,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textMuted,
+                  ),
+                ),
               ],
             ),
           ),
@@ -303,15 +402,23 @@ class _InfoBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textTitle)),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textTitle,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(message,
-                    style: const TextStyle(
-                        fontSize: 12.5, color: AppColors.textMuted, height: 1.35)),
+                Text(
+                  message,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textMuted,
+                    height: 1.35,
+                  ),
+                ),
               ],
             ),
           ),
@@ -322,18 +429,20 @@ class _InfoBanner extends StatelessWidget {
 }
 
 class _TopicsTab extends StatelessWidget {
-  final bool enabled;
   final String query;
+  final List<_TopicSelectionItem> items;
+  final Set<int> selectedIds;
   final ValueChanged<String> onQueryChanged;
-  final int selectedCount;
+  final void Function(int id, bool selected) onToggle;
   final VoidCallback onSelectAll;
   final VoidCallback onClear;
 
   const _TopicsTab({
-    required this.enabled,
     required this.query,
+    required this.items,
+    required this.selectedIds,
     required this.onQueryChanged,
-    required this.selectedCount,
+    required this.onToggle,
     required this.onSelectAll,
     required this.onClear,
   });
@@ -345,25 +454,60 @@ class _TopicsTab extends StatelessWidget {
       child: Column(
         children: [
           _SearchField(
-            hint: 'Search topics…',
+            hint: 'Search topics, materials, or modules…',
             value: query,
             onChanged: onQueryChanged,
-            enabled: enabled,
           ),
           const SizedBox(height: 10),
           _SelectBar(
-            selectedCount: selectedCount,
-            onSelectAll: enabled ? onSelectAll : null,
-            onClear: enabled ? onClear : null,
+            selectedCount: selectedIds.length,
+            onSelectAll: items.isEmpty ? null : onSelectAll,
+            onClear: selectedIds.isEmpty ? null : onClear,
           ),
           const SizedBox(height: 12),
-          const Expanded(
-            child: _EmptyPanel(
-              icon: Icons.topic_outlined,
-              title: 'Topics selection is coming soon',
-              subtitle:
-                  'The current backend bundle does not expose topics endpoints yet, so we can’t reliably load topics for selection.',
-            ),
+          Expanded(
+            child: items.isEmpty
+                ? const _EmptyPanel(
+                    icon: Icons.topic_outlined,
+                    title: 'No topics found',
+                    subtitle:
+                        'Add topics inside materials first, then select them here for mixed-scope generation.',
+                  )
+                : ListView.separated(
+                    itemCount: items.length,
+                    separatorBuilder: (_, __) =>
+                        const Divider(height: 1, color: AppColors.border),
+                    itemBuilder: (_, i) {
+                      final item = items[i];
+                      final topic = item.topic;
+                      final selected = selectedIds.contains(topic.id);
+                      return CheckboxListTile(
+                        value: selected,
+                        onChanged: (v) => onToggle(topic.id, v ?? false),
+                        controlAffinity: ListTileControlAffinity.leading,
+                        dense: true,
+                        title: Text(
+                          topic.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textTitle,
+                          ),
+                        ),
+                        subtitle: Text(
+                          '${item.module.title} • ${item.material.displayTitle} • ${topic.readiness.label}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
           ),
         ],
       ),
@@ -452,16 +596,19 @@ class _MaterialsTab extends StatelessWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textTitle),
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textTitle,
+                          ),
                         ),
                         subtitle: Text(
                           '${resolveModuleTitle(m.moduleId)} • ${m.type.toUpperCase()} • ${_fmtSize(m.fileSize)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
-                              fontSize: 12, color: AppColors.textMuted),
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
                         ),
                       );
                     },
@@ -532,11 +679,14 @@ class _SettingsTab extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: ListView(
         children: [
-          const Text('Question types',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textTitle)),
+          const Text(
+            'Question types',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textTitle,
+            ),
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -560,11 +710,14 @@ class _SettingsTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          const Text('Difficulty',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textTitle)),
+          const Text(
+            'Difficulty',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textTitle,
+            ),
+          ),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -592,11 +745,14 @@ class _SettingsTab extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 18),
-          const Text('Count',
-              style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textTitle)),
+          const Text(
+            'Count',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textTitle,
+            ),
+          ),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -604,21 +760,28 @@ class _SettingsTab extends StatelessWidget {
                 onPressed: count <= 1 ? null : () => onCountChanged(count - 1),
                 icon: const Icon(Icons.remove_circle_outline_rounded),
               ),
-              Text('$count',
-                  style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textTitle)),
+              Text(
+                '$count',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textTitle,
+                ),
+              ),
               IconButton(
-                onPressed: () => onCountChanged(count + 1),
+                onPressed: count >= 100 ? null : () => onCountChanged(count + 1),
                 icon: const Icon(Icons.add_circle_outline_rounded),
               ),
             ],
           ),
           const SizedBox(height: 10),
           const Text(
-            'These settings will become active once the backend generation endpoint is available.',
-            style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.35),
+            'These settings will be forwarded once the backend generation endpoint is available.',
+            style: TextStyle(
+              fontSize: 12.5,
+              color: AppColors.textMuted,
+              height: 1.35,
+            ),
           ),
         ],
       ),
@@ -719,11 +882,14 @@ class _SelectBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Text('Selected: $selectedCount',
-            style: const TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textTitle)),
+        Text(
+          'Selected: $selectedCount',
+          style: const TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textTitle,
+          ),
+        ),
         const Spacer(),
         TextButton(
           onPressed: onSelectAll,
@@ -765,17 +931,25 @@ class _EmptyPanel extends StatelessWidget {
         children: [
           Icon(icon, size: 34, color: AppColors.primary),
           const SizedBox(height: 10),
-          Text(title,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 14.5,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textTitle)),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 14.5,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textTitle,
+            ),
+          ),
           const SizedBox(height: 6),
-          Text(subtitle,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                  fontSize: 12.5, color: AppColors.textMuted, height: 1.35)),
+          Text(
+            subtitle,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 12.5,
+              color: AppColors.textMuted,
+              height: 1.35,
+            ),
+          ),
         ],
       ),
     );
@@ -821,9 +995,13 @@ class _Footer extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 10),
-                Text(progressLabel ?? 'Generating…',
-                    style: const TextStyle(
-                        fontSize: 12.5, color: AppColors.textMuted)),
+                Text(
+                  progressLabel ?? 'Generating…',
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textMuted,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -831,11 +1009,18 @@ class _Footer extends StatelessWidget {
           Row(
             children: [
               Expanded(
-                child: Text(summary,
-                    style: const TextStyle(
-                        fontSize: 12.5, color: AppColors.textMuted)),
+                child: Text(
+                  summary,
+                  style: const TextStyle(
+                    fontSize: 12.5,
+                    color: AppColors.textMuted,
+                  ),
+                ),
               ),
-              TextButton(onPressed: submitting ? null : onCancel, child: const Text('Cancel')),
+              TextButton(
+                onPressed: submitting ? null : onCancel,
+                child: const Text('Cancel'),
+              ),
               const SizedBox(width: 8),
               ElevatedButton(
                 onPressed: canSubmit ? onSubmit : null,

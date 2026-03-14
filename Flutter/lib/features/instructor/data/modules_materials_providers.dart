@@ -3,6 +3,7 @@ import '../../auth/data/auth_providers.dart';
 import 'modules_api.dart';
 import 'materials_api.dart';
 import 'topics_api.dart';
+import 'questions_api.dart'; // NEW
 
 final modulesApiProvider = Provider<ModulesApi>((ref) {
   return ModulesApi(ref.read(apiClientProvider));
@@ -14,4 +15,9 @@ final materialsApiProvider = Provider<MaterialsApi>((ref) {
 
 final topicsApiProvider = Provider<TopicsApi>((ref) {
   return TopicsApi(ref.read(apiClientProvider));
+});
+
+// NEW — wires the batch question-create endpoint (G-01/G-02/G-03)
+final questionsApiProvider = Provider<QuestionsApi>((ref) {
+  return QuestionsApi(ref.read(apiClientProvider));
 });

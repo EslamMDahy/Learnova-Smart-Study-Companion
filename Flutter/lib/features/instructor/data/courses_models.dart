@@ -22,6 +22,7 @@ class MyCourseItem {
 
   final int? enrollmentCount;
   final int? pendingInvites;
+  final int? moduleCount;
 
   const MyCourseItem({
     required this.id,
@@ -40,6 +41,7 @@ class MyCourseItem {
     required this.updatedAt,
     required this.enrollmentCount,
     required this.pendingInvites,
+    this.moduleCount,
   });
 
   /// Helpers (UI-friendly)
@@ -69,6 +71,7 @@ class MyCourseItem {
     DateTime? updatedAt,
     int? enrollmentCount,
     int? pendingInvites,
+    int? moduleCount,
   }) {
     return MyCourseItem(
       id: id ?? this.id,
@@ -87,6 +90,7 @@ class MyCourseItem {
       updatedAt: updatedAt ?? this.updatedAt,
       enrollmentCount: enrollmentCount ?? this.enrollmentCount,
       pendingInvites: pendingInvites ?? this.pendingInvites,
+      moduleCount: moduleCount ?? this.moduleCount,
     );
   }
 
@@ -118,6 +122,9 @@ class MyCourseItem {
       pendingInvites: json['pending_invites'] == null
           ? null
           : (json['pending_invites'] as num).toInt(),
+      moduleCount: json['module_count'] == null
+          ? null
+          : (json['module_count'] as num).toInt(),
     );
   }
 }
@@ -195,20 +202,15 @@ class CourseCreateRequest {
       'organization_id': organizationId,
       'title': title,
       'description': description,
-      'cover_image_url': coverImageUrl,
-      'banner_image_url': bannerImageUrl,
-      'is_public': isPublic,
+      'course_code': courseCode,
+      // Backend expects enrollment openness, not an is_public flag.
+      'is_open_for_enrollment': isPublic,
       'visibility_level': visibilityLevel,
       'requires_enrollment_approval': requiresEnrollmentApproval,
       'learning_outcomes': learningOutcomes,
-      'tags': tags,
+      'tags': (tags != null && tags!.isNotEmpty) ? tags : null,
       'category': category,
-
-      
       'status': status,
-
-      
-      'course_code': courseCode,
     };
 
     map.removeWhere((k, v) => v == null);
