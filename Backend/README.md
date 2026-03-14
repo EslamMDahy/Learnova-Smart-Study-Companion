@@ -117,7 +117,7 @@ DATABASE_URL=postgresql+psycopg://postgres:<PASSWORD>@localhost:5432/learnova
 
 # SMTP (Gmail App Password)
 SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
+SMTP_PORT=YOUR_PORT
 SMTP_USER=your_email@gmail.com
 SMTP_PASS=your_gmail_app_password
 SMTP_FROM=your_email@gmail.com
