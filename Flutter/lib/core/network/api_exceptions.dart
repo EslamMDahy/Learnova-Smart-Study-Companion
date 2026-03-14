@@ -47,6 +47,6 @@ class ApiException implements Exception {
   String toString() {
     final sc = statusCode == null ? '' : 'statusCode: $statusCode, ';
     final c = cleanCode == null ? '' : 'code: ${cleanCode!}, ';
-    return 'ApiException(${c}${sc}message: $message)';
+    return 'ApiException($c${sc}message: $message)';
   }
 }

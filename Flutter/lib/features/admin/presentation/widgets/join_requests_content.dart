@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -21,17 +23,19 @@ class JoinRequestsContent extends ConsumerStatefulWidget {
   const JoinRequestsContent({
     super.key,
     String? organizationId,
-    String? orgId, // ✅ backward compatible
-  }) : organizationId = (organizationId ?? orgId);
+    String? orgId, 
+  }) : organizationId = organizationId ?? orgId;
 
   @override
   ConsumerState<JoinRequestsContent> createState() => _JoinRequestsContentState();
 }
 
 class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
-  String selectedRole = "All Roles";
-  String selectedStatus = "All Status";
+  String selectedRole = 'All Roles';
+  String selectedStatus = 'All Status';
   final TextEditingController _search = TextEditingController();
+  Timer? _searchDebounce;
+  String _searchText = '';
 
   String get _orgId {
     final fromWidget = (widget.organizationId ?? '').trim();
@@ -47,19 +51,20 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
       if (_orgId.isEmpty) return;
       await ref.read(joinRequestsControllerProvider.notifier).init(
             organizationId: _orgId,
-            view: 'pending',
           );
     });
   }
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _search.dispose();
     super.dispose();
   }
 
   Future<void> _refresh() async {
     if (_orgId.isEmpty) return;
+    _searchDebounce?.cancel();
     FocusScope.of(context).unfocus();
     await ref.read(joinRequestsControllerProvider.notifier).refresh();
   }
@@ -78,25 +83,30 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
           child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const FigmaUmPageHeader(
-                    title: "Join Requests",
+                  const AppSectionHeader(
+                    title: 'Join Requests',
                     subtitle:
-                        "Manage student and instructor accounts, roles, and permissions.",
+                        'Manage student and instructor accounts, roles, and permissions.',
                   ),
                   const SizedBox(height: 24),
 
                   _StatsRow(isNarrow: isNarrow, users: state.users),
                   const SizedBox(height: 16),
 
-                  // ✅ نفس FiltersBar بتاع UserManagement (UI)
-                  // ✅ الوظيفة: search/role/status + refresh الحقيقي
+                  
+                  
                   FigmaUmFiltersBar(
                     controller: _search,
                     selectedRole: selectedRole,
                     selectedStatus: selectedStatus,
                     isNarrow: isNarrow,
                     onSearchChanged: (v) {
-                      ref.read(joinRequestsControllerProvider.notifier).search(v);
+                      _searchDebounce?.cancel();
+                      _searchDebounce = Timer(const Duration(milliseconds: 280), () {
+                        if (!mounted) return;
+                        setState(() => _searchText = v);
+                        ref.read(joinRequestsControllerProvider.notifier).search(v);
+                      });
                     },
                     onRoleChanged: (v) => setState(() => selectedRole = v),
                     onStatusChanged: (v) => setState(() => selectedStatus = v),
@@ -134,13 +144,13 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
   }
 
   List<JoinRequestUser> _applyFilters(List<JoinRequestUser> users) {
-    final q = _search.text.trim().toLowerCase();
+    final q = _searchText.trim().toLowerCase();
 
     return users.where((u) {
-      final roleOk = selectedRole == "All Roles" ||
+      final roleOk = selectedRole == 'All Roles' ||
           u.systemRole.toLowerCase() == selectedRole.toLowerCase();
 
-      final statusOk = selectedStatus == "All Status" ||
+      final statusOk = selectedStatus == 'All Status' ||
           jrNormalizeStatus(u.status) == jrNormalizeStatus(selectedStatus);
 
       final searchOk = q.isEmpty ||
@@ -153,7 +163,7 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
 }
 
 /* ============================================================
-   STATS ROW (نفس شكل UserManagement)
+   STATS ROW
 ============================================================ */
 class _StatsRow extends StatelessWidget {
   final bool isNarrow;
@@ -161,6 +171,7 @@ class _StatsRow extends StatelessWidget {
   final String? error;
   final VoidCallback? onRetry;
 
+  // ignore: unused_element_parameter
   const _StatsRow({required this.isNarrow, required this.users, this.error, this.onRetry});
 
   @override
@@ -169,45 +180,45 @@ class _StatsRow extends StatelessWidget {
 
     final instructors = users.where((e) {
       final r = e.systemRole.toLowerCase();
-      return r == "teacher" || r == "instructor";
+      return r == 'teacher' || r == 'instructor';
     }).length;
 
-    final students = users.where((e) => e.systemRole.toLowerCase() == "student").length;
+    final students = users.where((e) => e.systemRole.toLowerCase() == 'student').length;
 
-    final pending = users.where((e) => jrNormalizeStatus(e.status) == "pending").length;
+    final pending = users.where((e) => jrNormalizeStatus(e.status) == 'pending').length;
 
     final cards = [
       FigmaUmStatCard(
-        title: "Total Requests",
-        value: "$total",
-        subtitle: "All join requests",
+        title: 'Total Requests',
+        value: '$total',
+        subtitle: 'All join requests',
         subtitleColor: AppColors.cGray500,
         iconBg: const Color(0x1A137FEC),
         icon: Icons.people_alt_outlined,
         iconColor: const Color(0xFF137FEC),
       ),
       FigmaUmStatCard(
-        title: "Instructors",
-        value: "$instructors",
-        subtitle: "Teacher / Instructor",
+        title: 'Instructors',
+        value: '$instructors',
+        subtitle: 'Teacher / Instructor',
         subtitleColor: AppColors.cGray500,
         iconBg: const Color(0xFFFAF5FF),
         icon: Icons.school_outlined,
         iconColor: const Color(0xFF9333EA),
       ),
       FigmaUmStatCard(
-        title: "Students",
-        value: "$students",
-        subtitle: "Student requests",
+        title: 'Students',
+        value: '$students',
+        subtitle: 'Student requests',
         subtitleColor: AppColors.cGray500,
         iconBg: const Color(0xFFFFF7ED),
         icon: Icons.groups_outlined,
         iconColor: const Color(0xFFEA580C),
       ),
       FigmaUmStatCard(
-        title: "Pending",
-        value: "$pending",
-        subtitle: "Requires attention",
+        title: 'Pending',
+        value: '$pending',
+        subtitle: 'Requires attention',
         subtitleColor: const Color(0xFFCA8A04),
         iconBg: const Color(0xFFFEFCE8),
         icon: Icons.hourglass_bottom_rounded,
@@ -235,7 +246,7 @@ class _StatsRow extends StatelessWidget {
 }
 
 /* ============================================================
-   TABLE (نفس شكل UserManagement) + Actions (Accept/Decline)
+   TABLE + Actions (Accept/Decline)
 ============================================================ */
 class _JoinRequestsTableFigma extends StatelessWidget {
   final bool isNarrow;
@@ -289,14 +300,14 @@ class _JoinRequestsTableFigma extends StatelessWidget {
               color: AppColors.cSurface,
               border: Border(bottom: BorderSide(color: AppColors.cBorderSoft)),
             ),
-            child: Row(
+            child: const Row(
               children: [
                 Expanded(
                   child: Text(
-                    "Join Requests",
+                    'Join Requests',
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontFamily: "Manrope",
+                    style: TextStyle(
+                      fontFamily: 'Inter',
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
                       color: AppColors.cText,
@@ -324,10 +335,10 @@ class _JoinRequestsTableFigma extends StatelessWidget {
                 orgId: orgId,
               ),
             ),
-          ), // ✅ مهم: قفلة AsyncStateView
+          ), 
 
           FigmaUmTableFooter(
-            showingText: "Showing $from-$safeTo of $total requests",
+            showingText: 'Showing $from-$safeTo of $total requests',
             onPrev: onPrev,
             onNext: onNext,
           ),
@@ -392,7 +403,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                       child: Text(
                         _initials(user.fullName),
                         style: const TextStyle(
-                          fontFamily: "Manrope",
+                          fontFamily: 'Inter',
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           height: 20 / 14,
@@ -410,7 +421,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                             user.fullName,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontFamily: "Manrope",
+                              fontFamily: 'Inter',
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
                               height: 20 / 14,
@@ -422,7 +433,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                             user.email,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
-                              fontFamily: "Manrope",
+                              fontFamily: 'Inter',
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
                               height: 16 / 12,
@@ -431,9 +442,9 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                           ),
                           const SizedBox(height: 2),
                           const Text(
-                            "ID: —",
+                            'ID: —',
                             style: TextStyle(
-                              fontFamily: "Inter",
+                              fontFamily: 'Inter',
                               fontSize: 10,
                               fontWeight: FontWeight.w400,
                               height: 20 / 10,
@@ -467,10 +478,10 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                 child: Padding(
                   padding: EdgeInsets.only(left: _kCellLeftPad),
                   child: Text(
-                    "—",
+                    '—',
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: "Manrope",
+                      fontFamily: 'Inter',
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
                       height: 20 / 14,
@@ -486,10 +497,10 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                 child: Padding(
                   padding: EdgeInsets.only(left: _kCellLeftPad),
                   child: Text(
-                    "—",
+                    '—',
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      fontFamily: "Manrope",
+                      fontFamily: 'Inter',
                       fontSize: 12,
                       fontWeight: FontWeight.w400,
                       height: 16 / 12,
@@ -508,7 +519,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
               ),
             ),
 
-            // Actions (✅ same function: accept/decline, UI changed فقط)
+            
             SizedBox(
               width: _kActionsColW,
               child: Align(
@@ -516,9 +527,9 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                 child: isPending
                     ? _JoinRequestActionsMenu(orgId: orgId, user: user)
                     : const Text(
-                        "—",
+                        '—',
                         style: TextStyle(
-                          fontFamily: "Manrope",
+                          fontFamily: 'Inter',
                           fontSize: 12,
                           fontWeight: FontWeight.w400,
                           height: 16 / 12,
@@ -534,17 +545,17 @@ class _JoinRequestRowFigma extends ConsumerWidget {
   }
 
   static String _initials(String name) {
-    final parts = name.trim().split(RegExp(r"\s+"));
-    if (parts.isEmpty) return "—";
-    final a = parts[0].isNotEmpty ? parts[0][0] : "";
-    final b = parts.length > 1 && parts[1].isNotEmpty ? parts[1][0] : "";
+    final parts = name.trim().split(RegExp(r'\s+'));
+    if (parts.isEmpty) return '—';
+    final a = parts[0].isNotEmpty ? parts[0][0] : '';
+    final b = parts.length > 1 && parts[1].isNotEmpty ? parts[1][0] : '';
     final res = (a + b).toUpperCase();
-    return res.isEmpty ? "—" : res;
+    return res.isEmpty ? '—' : res;
   }
 }
 
 /* ============================================================
-   ACTIONS MENU (Accept/Decline) - نفس الوظيفة
+   ACTIONS MENU (Accept/Decline)
 ============================================================ */
 class _JoinRequestActionsMenu extends ConsumerStatefulWidget {
   final String orgId;
@@ -577,13 +588,13 @@ class _JoinRequestActionsMenuState extends ConsumerState<_JoinRequestActionsMenu
     final ctrl = ref.read(joinRequestsControllerProvider.notifier);
 
     return PopupMenuButton<int>(
-      tooltip: "Actions",
+      tooltip: 'Actions',
       offset: const Offset(0, 36),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       enabled: !_busy,
       itemBuilder: (_) => const [
-        PopupMenuItem(value: 0, child: Text("Accept")),
-        PopupMenuItem(value: 1, child: Text("Decline")),
+        PopupMenuItem(value: 0, child: Text('Accept')),
+        PopupMenuItem(value: 1, child: Text('Decline')),
       ],
       onSelected: (v) async {
         if (v == 0) {
@@ -611,7 +622,7 @@ class _JoinRequestActionsMenuState extends ConsumerState<_JoinRequestActionsMenu
         }
       },
 
-      // ✅ نفس شكل زر الأكشن بتاع UM (3 نقط)
+      
       child: SizedBox(
         width: 28,
         height: 28,

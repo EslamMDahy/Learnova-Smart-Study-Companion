@@ -26,7 +26,7 @@ class JoinRequestsResponse {
   }
 
   factory JoinRequestsResponse.fromJson(Map<String, dynamic> json) {
-    final rawUsers = (json["users"] as List?) ?? const [];
+    final rawUsers = (json['users'] as List?) ?? const [];
 
     final users = <JoinRequestUser>[];
     for (final item in rawUsers) {
@@ -36,7 +36,7 @@ class JoinRequestsResponse {
             JoinRequestUser.fromJson(item.cast<String, dynamic>()),
           );
         } catch (_) {
-          // ✅ Skip invalid entries (keeps the rest working)
+          
         }
       }
     }
@@ -45,12 +45,12 @@ class JoinRequestsResponse {
     // - {count, users} (legacy)
     // - {total, page, page_size, users} (paginated)
     // - {count, page, page_size, users} (paginated)
-    final page = _toInt(json["page"]) ?? 1;
+    final page = _toInt(json['page']) ?? 1;
     final pageSize =
-        _toInt(json["page_size"]) ?? _toInt(json["pageSize"]) ?? users.length;
+        _toInt(json['page_size']) ?? _toInt(json['pageSize']) ?? users.length;
 
     final count =
-        _toInt(json["total"]) ?? _toInt(json["count"]) ?? users.length;
+        _toInt(json['total']) ?? _toInt(json['count']) ?? users.length;
 
     return JoinRequestsResponse(
       count: count,

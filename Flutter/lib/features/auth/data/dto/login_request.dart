@@ -24,7 +24,7 @@ class LoginRequest {
   Map<String, dynamic> toJson() => {
         'email': email,
         'password': password,
-        'remember_me': rememberMe, // ✅ backend expects this
+        'remember_me': rememberMe, 
       };
 
   @override

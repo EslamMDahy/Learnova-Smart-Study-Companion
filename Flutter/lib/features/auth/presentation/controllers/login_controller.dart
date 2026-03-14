@@ -21,45 +21,51 @@ class LoginController extends StateNotifier<LoginState> {
 
   void clearError() {
     if (state.error != null) {
-      state = state.copyWith(error: null);
+      state = state.copyWith(clearError: true);
     }
   }
 
-  Future<bool> login(
+  Future<LoginResult> login(
     String email,
     String password, {
     required bool persist,
   }) async {
     clearError();
-
     state = state.copyWith(loading: true);
 
     try {
       await _repo.login(
-        email: email,
+        email: email.trim(),
         password: password,
         persist: persist,
       );
 
       state = state.copyWith(loading: false);
-      print("TOKEN=${TokenStorage.token}");
-      return true;
+      return LoginResult.success;
     } catch (e) {
-      final failure = mapApiFailure(e);
+      final failure = mapApiFailure(e, email: email.trim());
 
-      // On auth screens we keep inline error, but if a stale session exists and backend returns auth issue
-      // we still trigger global handler to force re-login.
+      // Email not verified → store pending email + redirect to verify screen.
+      if (failure.isEmailNotVerified) {
+        TokenStorage.setPendingVerificationEmail(email.trim());
+        state = state.copyWith(loading: false, clearError: true);
+        return LoginResult.emailNotVerified;
+      }
+
+      // Stale session + auth issue → global handler (logout + login redirect).
       if (TokenStorage.hasToken && failure.isAuthIssue) {
-        state = state.copyWith(loading: false);
+        state = state.copyWith(loading: false, clearError: true);
         AppErrorReporter.report(ref, failure);
-        return false;
+        return LoginResult.authError;
       }
 
       state = state.copyWith(
         loading: false,
         error: failure.message,
       );
-      return false;
+      return LoginResult.error;
     }
   }
 }
+
+enum LoginResult { success, emailNotVerified, authError, error }

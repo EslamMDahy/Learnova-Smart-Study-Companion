@@ -18,7 +18,7 @@ class OrganizationsApi {
     final d = description.trim();
     final l = logoUrl?.trim();
 
-    // ✅ final validation (prevents 422)
+    
     if (n.isEmpty) {
       throw ArgumentError('Organization name is required.');
     }
@@ -27,9 +27,9 @@ class OrganizationsApi {
     }
 
     final payload = <String, dynamic>{
-      "name": n,
-      "description": d,
-      if (l != null && l.isNotEmpty) "logo_url": l,
+      'name': n,
+      'description': d,
+      if (l != null && l.isNotEmpty) 'logo_url': l,
     };
 
     final res = await _client.post<Map<String, dynamic>>(
@@ -41,7 +41,7 @@ class OrganizationsApi {
     final data = res.data;
     if (data is Map<String, dynamic>) return data;
 
-    // ✅ if backend returns invalid shape
+    
     throw const FormatException('Invalid response from createOrganization.');
   }
 
@@ -69,10 +69,10 @@ class OrganizationsApi {
     final safePageSize = pageSize <= 0 ? 10 : pageSize;
 
     final q = <String, dynamic>{
-      "view": safeView,
-      "page": safePage,
-      "page_size": safePageSize,
-      if (search != null && search.trim().isNotEmpty) "search": search.trim(),
+      'view': safeView,
+      'page': safePage,
+      'page_size': safePageSize,
+      if (search != null && search.trim().isNotEmpty) 'search': search.trim(),
     };
 
     final res = await _client.get<Map<String, dynamic>>(
@@ -107,7 +107,7 @@ class OrganizationsApi {
       throw ArgumentError('newStatus is required.');
     }
 
-    // ✅ lock allowed values (prevents server validation errors)
+    
     const allowed = {'pending', 'accepted', 'rejected', 'approved'};
     if (!allowed.contains(status)) {
       throw ArgumentError('Invalid newStatus value: $status');
@@ -115,7 +115,7 @@ class OrganizationsApi {
 
     final res = await _client.patch<Map<String, dynamic>>(
       Endpoints.updateMemberStatus(orgId, mId),
-      data: {"new_status": status},
+      data: {'new_status': status},
     );
 
     final data = res.data;

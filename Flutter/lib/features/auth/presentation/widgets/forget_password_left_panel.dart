@@ -5,21 +5,23 @@ class ForgetPasswordLeftPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final dpr = MediaQuery.of(context).devicePixelRatio;
+    final w = MediaQuery.sizeOf(context).width;
+    final bgCacheWidth = (w * dpr).clamp(800.0, 2000.0).round();
     return Container(
       width: double.infinity,
       height: double.infinity,
 
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         image: DecorationImage(
-          image: AssetImage('assets/book.png'),
+          image: ResizeImage(const AssetImage('assets/book.webp'), width: bgCacheWidth),
 
-          // ✅ يخلي الصورة واضحة
+          
           fit: BoxFit.cover,
-          alignment: Alignment.center,
 
-          // ✅ تحسين التباين بدل الطمس
-          colorFilter: ColorFilter.mode(
-            Color.fromRGBO(0, 0, 0, 0.25), // overlay خفيف جدًا
+          
+          colorFilter: const ColorFilter.mode(
+            Color.fromRGBO(0, 0, 0, 0.25), 
             BlendMode.darken,
           ),
         ),
@@ -34,7 +36,7 @@ class ForgetPasswordLeftPanel extends StatelessWidget {
             /// Logo
             Row(
               children: [
-                Image.asset("assets/logo.png", height: 40),
+                Image.asset('assets/logo.webp', height: 40, cacheWidth: (40 * MediaQuery.of(context).devicePixelRatio).round()),
                 const SizedBox(width: 10),
                 const Text(
                   'Learnova',

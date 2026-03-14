@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:learnova/core/ui/toast.dart';
 import '../widgets/app_ui_components.dart';
 
 class NotificationsPage extends StatefulWidget {
@@ -20,12 +21,12 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
   @override
   Widget build(BuildContext context) {
-    final chips = const [
-      "All",
-      "High Priority",
-      "Assignments",
-      "Grades",
-      "Mentions",
+    const chips = [
+      'All',
+      'High Priority',
+      'Assignments',
+      'Grades',
+      'Mentions',
     ];
 
     return Container(
@@ -43,24 +44,25 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    Expanded(
+                    const Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text("Notifications", style: AppText.h1),
+                        children: [
+                          Text('Notifications', style: AppText.h1),
                           SizedBox(height: 8),
                           Text(
-                            "Stay updated with your courses and system alerts",
+                            'Stay updated with your courses and system alerts',
                             style: AppText.subtitle,
                           ),
                         ],
                       ),
                     ),
                     const SizedBox(width: 16),
-                    AppPrimarySoftButton(
-                      label: "Mark all as read",
+                    AppButton(
+                      label: 'Mark all as read',
+                      variant: AppButtonVariant.primarySoft,
                       onTap: () {
-                        // TODO: hook logic
+                        AppToast.info(context, title: 'Coming soon', message: 'Mark all as read will be available soon.');
                       },
                     ),
                   ],
@@ -71,7 +73,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 // Search
                 AppSearchField(
                   controller: _search,
-                  hintText: "Search notifications by keyword, professor, or date...",
+                  hintText: 'Search notifications by keyword, professor, or date...',
                 ),
 
                 const SizedBox(height: 12),
@@ -95,19 +97,19 @@ class _NotificationsPageState extends State<NotificationsPage> {
 
                 const SizedBox(height: 16),
 
-                // List (مثال)
+                
                 const AppNotificationCard(
-                  title: "Assignment Due Soon: Neural Networks",
+                  title: 'Assignment Due Soon: Neural Networks',
                   subtitle:
                       'Reminder: The project "Backpropagation Implementation" is due tomorrow at 11:59 PM.',
-                  rightTag: "Yesterday",
+                  rightTag: 'Yesterday',
                 ),
 
                 const SizedBox(height: 20),
 
                 const Center(
                   child: Text(
-                    "End of notifications",
+                    'End of notifications',
                     style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,

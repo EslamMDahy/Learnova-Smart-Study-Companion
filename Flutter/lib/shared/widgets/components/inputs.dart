@@ -125,7 +125,7 @@ class AppLabeledPassword extends StatelessWidget {
     return AppLabeledTextField(
       label: label,
       controller: controller,
-      hint: "••••••••••••",
+      hint: '••••••••••••',
       obscureText: true,
       helper: helper,
     );
@@ -334,7 +334,6 @@ class AppHeaderSearchField extends StatelessWidget {
                 alignment: Alignment.centerLeft,
                 child: TextField(
                   onChanged: onChanged,
-                  maxLines: 1,
                   textAlignVertical: TextAlignVertical.center,
                   cursorHeight: 18,
                   style: const TextStyle(
@@ -387,15 +386,15 @@ class FigmaUmSearch40 extends StatelessWidget {
         controller: controller,
         onChanged: onChanged,
         style: const TextStyle(
-          fontFamily: "Manrope",
+          fontFamily: 'Inter',
           fontSize: 14,
           height: 19 / 14,
           color: AppColors.cGray700,
         ),
         decoration: InputDecoration(
-          hintText: "Search by name, ID, or email...",
+          hintText: 'Search by name, ID, or email...',
           hintStyle: const TextStyle(
-            fontFamily: "Manrope",
+            fontFamily: 'Inter',
             fontSize: 14,
             height: 19 / 14,
             color: AppColors.cGray500,
@@ -437,7 +436,7 @@ class JrInlineHint extends StatelessWidget {
           child: Text(
             text,
             style: const TextStyle(
-              fontFamily: "Manrope",
+              fontFamily: 'Inter',
               fontSize: 14,
               fontWeight: FontWeight.w600,
               color: Color(0xFF6B7280),

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../widgets/left_panel.dart';
 import '../widgets/login_form.dart';
-import 'package:go_router/go_router.dart';
-import '../../../../core/routing/routes.dart';
 
 
 
@@ -15,10 +13,10 @@ class LoginPage extends StatelessWidget {
       body: LayoutBuilder(
         builder: (context, constraints) {
           if (constraints.maxWidth > 900) {
-            return Row(
-              children: const [
+            return const Row(
+              children: [
                 Expanded(flex: 5, child: LeftPanel()),
-                Expanded(flex: 5, child: LoginForm(isMobile: false)),
+                Expanded(flex: 5, child: LoginForm()),
               ],
             );
           }

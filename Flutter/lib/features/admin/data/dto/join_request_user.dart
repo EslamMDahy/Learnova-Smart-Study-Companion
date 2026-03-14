@@ -23,15 +23,15 @@ class JoinRequestUser {
   });
 
   factory JoinRequestUser.fromJson(Map<String, dynamic> json) {
-    final id = (json["id"] ?? json["_id"] ?? json["user_id"] ?? json["userId"])
+    final id = (json['id'] ?? json['_id'] ?? json['user_id'] ?? json['userId'])
         ?.toString()
         .trim();
 
-    final memberId = (json["org_member_id"] ??
-            json["orgMemberId"] ??
-            json["member_id"] ??
-            json["memberId"] ??
-            json["organization_member_id"])
+    final memberId = (json['org_member_id'] ??
+            json['orgMemberId'] ??
+            json['member_id'] ??
+            json['memberId'] ??
+            json['organization_member_id'])
         ?.toString()
         .trim();
 
@@ -41,21 +41,21 @@ class JoinRequestUser {
       );
     }
 
-    final fallbackUserId = (json["id"] ?? json["_id"])?.toString().trim();
+    final fallbackUserId = (json['id'] ?? json['_id'])?.toString().trim();
 
     return JoinRequestUser(
       id: (id == null || id.isEmpty) ? (fallbackUserId ?? '') : id,
       orgMemberId: memberId,
-      fullName: (json["full_name"] ?? json["fullName"] ?? json["name"] ?? "")
+      fullName: (json['full_name'] ?? json['fullName'] ?? json['name'] ?? '')
           .toString()
           .trim(),
-      email: (json["email"] ?? "").toString().trim(),
-      avatarUrl: (json["avatar_url"] ?? json["avatarUrl"])?.toString().trim(),
-      systemRole: (json["system_role"] ?? json["systemRole"] ?? "")
+      email: (json['email'] ?? '').toString().trim(),
+      avatarUrl: (json['avatar_url'] ?? json['avatarUrl'])?.toString().trim(),
+      systemRole: (json['system_role'] ?? json['systemRole'] ?? '')
           .toString()
           .trim()
           .toLowerCase(),
-      status: (json["status"] ?? "").toString().trim().toLowerCase(),
+      status: (json['status'] ?? '').toString().trim().toLowerCase(),
     );
   }
 }

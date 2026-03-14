@@ -6,7 +6,7 @@ class ForgotPasswordState extends Equatable {
   final String? message;
   final String? error;
 
-  /// آخر إيميل اتبعت عليه (عشان resend)
+  
   final String? lastEmail;
 
   const ForgotPasswordState({

@@ -69,13 +69,13 @@ class AdminDashboardController extends StateNotifier<AdminDashboardState> {
 
       final orgId = org.id.toString().trim();
 
-      // ✅ Update controller state
+      
       state = state.copyWith(
         loading: false,
         organizationId: orgId,
       );
 
-      // ✅ Persist: organizations + selected_organization_id
+      
       final current = UserStorage.meJson ?? <String, dynamic>{};
       final merged = <String, dynamic>{...current};
 
@@ -99,10 +99,10 @@ class AdminDashboardController extends StateNotifier<AdminDashboardState> {
 
       final failure = mapApiFailure(e);
 
-      // ✅ Global toast (one system for the whole app)
+      
       AppErrorReporter.report(_ref, failure);
 
-      // ✅ Keep state.error if any UI depends on it (optional but safe)
+      
       state = state.copyWith(
         loading: false,
         error: failure.message,

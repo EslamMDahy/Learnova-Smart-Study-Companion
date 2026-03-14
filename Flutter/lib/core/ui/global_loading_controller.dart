@@ -24,13 +24,13 @@ class GlobalLoadingController extends StateNotifier<bool> {
   void begin() {
     _counter++;
 
-    // لو أصلاً ظاهر، خلاص
+    
     if (state == true) return;
 
-    // جدولة الظهور بعد Delay بسيط لتجنب الفلاش
+    
     _showDelayTimer?.cancel();
     _showDelayTimer = Timer(_showDelay, () {
-      // لو لسه في شغل شغال
+      
       if (_counter > 0 && state == false) {
         state = true;
         _shownAt = DateTime.now();
@@ -43,15 +43,15 @@ class GlobalLoadingController extends StateNotifier<bool> {
     if (_counter <= 0) return;
     _counter--;
 
-    if (_counter > 0) return; // لسه في عمليات شغالة
+    if (_counter > 0) return; 
 
-    // لو لم يظهر أساساً، الغي أي مؤقت
+    
     if (state == false) {
       _showDelayTimer?.cancel();
       return;
     }
 
-    // ظاهر: لازم يفضل على الأقل 1 ثانية
+    
     final shownAt = _shownAt ?? DateTime.now();
     final elapsed = DateTime.now().difference(shownAt);
 

@@ -1,692 +1,893 @@
 import 'package:flutter/material.dart';
+import 'package:learnova/core/theme/app_theme.dart';
+import 'package:learnova/core/ui/toast.dart';
+import 'package:learnova/features/instructor/data/courses_models.dart';
+import 'package:learnova/features/instructor/data/learning_outcomes_models.dart';
+import 'package:learnova/shared/widgets/components/dropdowns.dart';
+import 'learning_outcomes_section.dart';
+
+class CreateCourseDialogResult {
+  final CourseCreateRequest request;
+  final bool needsInvites;
+  final List<LearningOutcome> learningOutcomes;
+  const CreateCourseDialogResult({
+    required this.request,
+    required this.needsInvites,
+    required this.learningOutcomes,
+  });
+}
+
+enum _PublishChoice    { published, draft }
+enum _VisibilityChoice { publicCourse, privateCourse }
 
 class CreateCourseDialog extends StatefulWidget {
   const CreateCourseDialog({super.key});
-
   @override
   State<CreateCourseDialog> createState() => _CreateCourseDialogState();
 }
 
 class _CreateCourseDialogState extends State<CreateCourseDialog> {
-  _VisibilityChoice selected = _VisibilityChoice.draft;
+  final _titleCtrl = TextEditingController();
+  final _codeCtrl  = TextEditingController();
+  final _descCtrl  = TextEditingController();
+
+  String _selectedTerm = 'Fall 2025';
+  _PublishChoice    _publish    = _PublishChoice.draft;
+  _VisibilityChoice _visibility = _VisibilityChoice.privateCourse;
+
+  String? _titleError;
+  String? _codeError;
+  bool _titleTouched = false;
+  bool _codeTouched  = false;
+
+  List<LearningOutcome> _outcomes = [];
+
+  static final _codeRx = RegExp(r'^[A-Za-z0-9][A-Za-z0-9\-_\/ ]*$');
+
+  static const _terms = [
+    'Fall 2023', 'Spring 2024', 'Fall 2024',
+    'Spring 2025', 'Fall 2025', 'Spring 2026',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl.addListener(_onTitleChanged);
+    _codeCtrl.addListener(_onCodeChanged);
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.removeListener(_onTitleChanged);
+    _codeCtrl.removeListener(_onCodeChanged);
+    _titleCtrl.dispose();
+    _codeCtrl.dispose();
+    _descCtrl.dispose();
+    super.dispose();
+  }
+
+  void _onTitleChanged() {
+    if (!_titleTouched) return;
+    _validateTitle();
+  }
+
+  void _onCodeChanged() {
+    if (!_codeTouched) return;
+    _validateCode();
+  }
+
+  void _validateTitle() {
+    final err = _titleCtrl.text.trim().isEmpty ? 'Course title is required.' : null;
+    if (err == _titleError) return;
+    if (mounted) setState(() => _titleError = err);
+  }
+
+  void _validateCode() {
+    final c = _codeCtrl.text.trim();
+    String? err;
+    if (c.isNotEmpty) {
+      if (c.length < 2 || c.length > 31)  err = 'Course code must be 2–31 characters.';
+      else if (!_codeRx.hasMatch(c))       err = 'Use letters/numbers and - _ / only.';
+    }
+    if (err == _codeError) return;
+    if (mounted) setState(() => _codeError = err);
+  }
+
+  void _validateAll() {
+    setState(() { _titleTouched = true; _codeTouched = true; });
+    _validateTitle();
+    _validateCode();
+  }
+
+  bool get _canSubmit =>
+      _titleCtrl.text.trim().isNotEmpty && _titleError == null && _codeError == null;
+
+  void _submit() {
+    _validateAll();
+    if (!_canSubmit) {
+      AppToast.error(context, title: 'Validation Error',
+          message: _titleError ?? _codeError ?? 'Fix highlighted fields.');
+      return;
+    }
+    final isPublic = _visibility == _VisibilityChoice.publicCourse;
+    final status   = _publish == _PublishChoice.published ? 'published' : 'draft';
+    final request  = CourseCreateRequest(
+      courseType: 'individual',
+      organizationId: null,
+      title: _titleCtrl.text.trim(),
+      description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
+      coverImageUrl: null,
+      bannerImageUrl: null,
+      isPublic: isPublic,
+      visibilityLevel: isPublic ? 'public' : 'private',
+      requiresEnrollmentApproval: !isPublic,
+      learningOutcomes: _outcomes.map((o) => '${o.code}: ${o.description}').toList(),
+      tags: const [],
+      category: null,
+      status: status,
+      courseCode: _codeCtrl.text.trim().isEmpty ? null : _codeCtrl.text.trim(),
+      academicTerm: _selectedTerm,
+      localStatus: status,
+    );
+    Navigator.of(context).pop(CreateCourseDialogResult(
+      request: request,
+      needsInvites: !isPublic,
+      learningOutcomes: _outcomes,
+    ));
+  }
 
   @override
   Widget build(BuildContext context) {
-    // Figma size: 979 x 1293 (with padding 32 50) :contentReference[oaicite:1]{index=1}
+    final size = MediaQuery.of(context).size;
+    final maxW = size.width < 800 ? size.width * 0.96 : 740.0;
+    final maxH = size.height * 0.92;
+
     return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 979),
+          constraints: BoxConstraints(maxWidth: maxW, maxHeight: maxH),
           child: Container(
             decoration: BoxDecoration(
-              color: const Color(0xFFF0F2F4),
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.pageBg,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: const [
+                BoxShadow(color: Color(0x22000000), blurRadius: 40, offset: Offset(0, 16)),
+              ],
             ),
-            padding: const EdgeInsets.symmetric(horizontal: 50, vertical: 32),
-            child: LayoutBuilder(
-              builder: (context, c) {
-                // لو الشاشة قصيرة، نخليها scroll مرة واحدة فقط على مستوى الديالوج
-                return ConstrainedBox(
-                  constraints: BoxConstraints(
-                    maxHeight: MediaQuery.of(context).size.height - 40,
-                  ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _buildHeader(),
+                Flexible(
                   child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(24, 20, 24, 4),
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Header
-                        const _DialogHeader(),
-                        const SizedBox(height: 32),
-
-                        // Course Details card
-                        _FormCard(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const _SectionTitle(
-                                icon: Icons.description_outlined,
-                                title: "Course Details",
-                              ),
-                              const SizedBox(height: 24),
-
-                              const _FieldLabel("Course Title *"),
-                              const SizedBox(height: 8),
-                              const _FigmaTextField(
-                                hint: "e.g. Introduction to Artificial Intelligence",
-                              ),
-
-                              const SizedBox(height: 24),
-
-                              Row(
-                                children: const [
-                                  Expanded(
-                                    child: _LabeledField(
-                                      label: "Course Code",
-                                      suffixHint: "(Optional)",
-                                      child: _FigmaTextField(hint: "e.g. CS-101"),
-                                    ),
-                                  ),
-                                  SizedBox(width: 24),
-                                  Expanded(
-                                    child: _LabeledField(
-                                      label: "Academic Term",
-                                      child: _FigmaDropdown(value: "Fall 2023"),
-                                    ),
-                                  ),
-                                ],
-                              ),
-
-                              const SizedBox(height: 24),
-
-                              const _FieldLabel("Course Description"),
-                              const SizedBox(height: 8),
-                              const _RichEditor(),
-
-                              const SizedBox(height: 12),
-
-                              const _AiTip(),
-                            ],
-                          ),
-                        ),
-
-                        const SizedBox(height: 24),
-
-                        // Bottom row: Configuration + Course Cover
-                        LayoutBuilder(
-                          builder: (context, cc) {
-                            final isStack = cc.maxWidth < 860;
-                            if (isStack) {
-                              return Column(
-                                children: [
-                                  _ConfigurationCard(
-                                    selected: selected,
-                                    onChange: (v) => setState(() => selected = v),
-                                  ),
-                                  const SizedBox(height: 24),
-                                  const _CourseCoverCard(),
-                                ],
-                              );
-                            }
-
-                            return Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(
-                                  flex: 10,
-                                  child: _ConfigurationCard(
-                                    selected: selected,
-                                    onChange: (v) => setState(() => selected = v),
-                                  ),
-                                ),
-                                const SizedBox(width: 24),
-                                const Expanded(
-                                  flex: 6,
-                                  child: _CourseCoverCard(),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-
-                        const SizedBox(height: 32),
-
-                        // Footer actions
-                        _FooterActions(
-                          onCancel: () => Navigator.pop(context),
-                          onCreate: () {},
-                        ),
+                        _buildCourseDetailsCard(),
+                        const SizedBox(height: 16),
+                        _buildLearningOutcomesCard(),
+                        const SizedBox(height: 16),
+                        _buildBottomRow(),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ------------------------------------------------------------
-// TOKENS (match Figma)
-// ------------------------------------------------------------
-class _T {
-  static const card = Colors.white;
-
-  static const text = Color(0xFF0D141B);
-  static const muted = Color(0xFF4C739A);
-  static const hint = Color(0xFF6B7280);
-
-  static const inputBg = Color(0xFFF6F7F8);
-  static const border = Color(0xFFE7EDF3);
-
-  static const blue = Color(0xFF137FEC);
-
-  static const r12 = 12.0;
-  static const r8 = 8.0;
-
-  static const shadow = [
-    BoxShadow(color: Color(0x1A000000), blurRadius: 3, offset: Offset(0, 1)),
-    BoxShadow(color: Color(0x0F000000), blurRadius: 2, offset: Offset(0, 1)),
-  ];
-
-  static const inputShadow = [
-    BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
-  ];
-}
-
-// ------------------------------------------------------------
-// Header
-// ------------------------------------------------------------
-class _DialogHeader extends StatelessWidget {
-  const _DialogHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: const [
-        Text(
-          "Create New Course",
-          style: TextStyle(
-            fontFamily: "Manrope",
-            fontSize: 30,
-            height: 36 / 30,
-            fontWeight: FontWeight.w700,
-            color: _T.text,
-          ),
-        ),
-        SizedBox(height: 8),
-        SizedBox(
-          width: 672,
-          child: Text(
-            "Fill in the details below to set up a new learning module for your students. The AI assistant will use this information to generate relevant quizzes.",
-            style: TextStyle(
-              fontFamily: "Manrope",
-              fontSize: 16,
-              height: 24 / 16,
-              fontWeight: FontWeight.w400,
-              color: _T.muted,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ------------------------------------------------------------
-// Cards
-// ------------------------------------------------------------
-class _FormCard extends StatelessWidget {
-  final Widget child;
-  const _FormCard({required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _T.card,
-        borderRadius: BorderRadius.circular(_T.r12),
-        boxShadow: _T.shadow,
-      ),
-      padding: const EdgeInsets.all(32),
-      child: child,
-    );
-  }
-}
-
-class _SectionTitle extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  const _SectionTitle({required this.icon, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: _T.blue.withOpacity(0.10),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Icon(icon, size: 22, color: _T.blue),
-        ),
-        const SizedBox(width: 12),
-        Text(
-          title,
-          style: const TextStyle(
-            fontFamily: "Manrope",
-            fontSize: 18,
-            height: 28 / 18,
-            fontWeight: FontWeight.w700,
-            color: _T.text,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ------------------------------------------------------------
-// Fields
-// ------------------------------------------------------------
-class _FieldLabel extends StatelessWidget {
-  final String text;
-  const _FieldLabel(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontFamily: "Manrope",
-        fontSize: 14,
-        height: 20 / 14,
-        fontWeight: FontWeight.w500,
-        color: _T.text,
-      ),
-    );
-  }
-}
-
-class _LabeledField extends StatelessWidget {
-  final String label;
-  final String? suffixHint;
-  final Widget child;
-
-  const _LabeledField({
-    required this.label,
-    required this.child,
-    this.suffixHint,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Text(
-              label,
-              style: const TextStyle(
-                fontFamily: "Manrope",
-                fontSize: 14,
-                height: 20 / 14,
-                fontWeight: FontWeight.w500,
-                color: _T.text,
-              ),
-            ),
-            if (suffixHint != null) ...[
-              const SizedBox(width: 6),
-              Text(
-                suffixHint!,
-                style: const TextStyle(
-                  fontFamily: "Manrope",
-                  fontSize: 12,
-                  height: 16 / 12,
-                  fontWeight: FontWeight.w400,
-                  color: _T.muted,
                 ),
-              ),
-            ]
-          ],
-        ),
-        const SizedBox(height: 8),
-        child,
-      ],
-    );
-  }
-}
-
-class _FigmaTextField extends StatelessWidget {
-  final String hint;
-  const _FigmaTextField({required this.hint});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: _T.inputBg,
-        borderRadius: BorderRadius.circular(_T.r8),
-        border: Border.all(color: _T.border, width: 1),
-        boxShadow: _T.inputShadow,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      alignment: Alignment.centerLeft,
-      child: TextField(
-        style: const TextStyle(
-          fontFamily: "Manrope",
-          fontSize: 16,
-          height: 22 / 16,
-          fontWeight: FontWeight.w400,
-          color: _T.text,
-        ),
-        decoration: InputDecoration(
-          border: InputBorder.none,
-          hintText: hint,
-          hintStyle: const TextStyle(
-            fontFamily: "Manrope",
-            fontSize: 16,
-            height: 22 / 16,
-            fontWeight: FontWeight.w400,
-            color: _T.hint,
-          ),
-          isCollapsed: true,
-        ),
-      ),
-    );
-  }
-}
-
-class _FigmaDropdown extends StatelessWidget {
-  final String value;
-  const _FigmaDropdown({required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 50,
-      decoration: BoxDecoration(
-        color: _T.inputBg,
-        borderRadius: BorderRadius.circular(_T.r8),
-        border: Border.all(color: _T.border, width: 1),
-        boxShadow: _T.inputShadow,
-      ),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontFamily: "Manrope",
-                fontSize: 16,
-                height: 24 / 16,
-                fontWeight: FontWeight.w400,
-                color: _T.text,
-              ),
-            ),
-          ),
-          const Icon(Icons.keyboard_arrow_down_rounded, color: _T.hint),
-        ],
-      ),
-    );
-  }
-}
-
-// ------------------------------------------------------------
-// Rich Editor (toolbar + textarea + no nested scroll issues)
-// ------------------------------------------------------------
-class _RichEditor extends StatelessWidget {
-  const _RichEditor();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: _T.inputBg,
-        borderRadius: BorderRadius.circular(_T.r8),
-        border: Border.all(color: _T.border),
-      ),
-      child: Column(
-        children: [
-          Container(
-            height: 45,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                bottom: BorderSide(color: _T.border),
-              ),
-              borderRadius: BorderRadius.only(
-                topLeft: Radius.circular(_T.r8),
-                topRight: Radius.circular(_T.r8),
-              ),
-            ),
-            child: Row(
-              children: const [
-                _ToolIcon(Icons.format_bold_rounded),
-                SizedBox(width: 10),
-                _ToolIcon(Icons.format_italic_rounded),
-                SizedBox(width: 10),
-                _ToolIcon(Icons.format_list_bulleted_rounded),
-                SizedBox(width: 10),
-                SizedBox(width: 8),
-                VerticalDivider(width: 18, thickness: 1, color: _T.border),
-                _ToolIcon(Icons.link_rounded),
+                _buildFooter(),
               ],
             ),
           ),
-          // Textarea (بدون Scroll داخلي، يشتغل مع Scroll الخارجي للديالوج لو احتاج)
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              maxLines: 5,
-              style: const TextStyle(
-                fontFamily: "Manrope",
-                fontSize: 14,
-                height: 20 / 14,
-                fontWeight: FontWeight.w400,
-                color: _T.text,
-              ),
-              decoration: const InputDecoration(
-                border: InputBorder.none,
-                isCollapsed: true,
-                hintText:
-                    "Enter a detailed description of the course content, objectives, and prerequisites...",
-                hintStyle: TextStyle(
-                  fontFamily: "Manrope",
-                  fontSize: 14,
-                  height: 20 / 14,
-                  fontWeight: FontWeight.w400,
-                  color: _T.hint,
-                ),
-              ),
+        ),
+      ),
+    );
+  }
+
+  // ── Header ────────────────────────────────────────────────────────────────
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 18, 16, 16),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(bottom: BorderSide(color: Color(0xFFF0F2F4))),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38, height: 38,
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              border: Border.all(color: const Color(0xFFDBEAFE)),
+              borderRadius: BorderRadius.circular(10),
             ),
+            child: const Icon(Icons.add_box_outlined, size: 18, color: Color(0xFF137FEC)),
+          ),
+          const SizedBox(width: 12),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Create New Course',
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
+                        color: Color(0xFF111418))),
+                SizedBox(height: 1),
+                Text('Fill in the details to set up a new learning module.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF617589))),
+              ],
+            ),
+          ),
+          _HoverIconBtn(
+            icon: Icons.close_rounded,
+            onTap: () => Navigator.of(context).pop(),
           ),
         ],
       ),
     );
   }
-}
 
-class _ToolIcon extends StatelessWidget {
-  final IconData icon;
-  const _ToolIcon(this.icon);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 28,
-      height: 28,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Icon(icon, size: 18, color: _T.muted),
-    );
-  }
-}
-
-class _AiTip extends StatelessWidget {
-  const _AiTip();
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: const [
-        Icon(Icons.auto_awesome_rounded, size: 14, color: _T.blue),
-        SizedBox(width: 6),
-        Text(
-          "AI Tip: A detailed description helps generate better quiz questions.",
-          style: TextStyle(
-            fontFamily: "Manrope",
-            fontSize: 12,
-            height: 16 / 12,
-            fontWeight: FontWeight.w400,
-            color: _T.muted,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ------------------------------------------------------------
-// Configuration
-// ------------------------------------------------------------
-enum _VisibilityChoice { draft, publish, privateC, publicC }
-
-class _ConfigurationCard extends StatelessWidget {
-  final _VisibilityChoice selected;
-  final ValueChanged<_VisibilityChoice> onChange;
-
-  const _ConfigurationCard({
-    required this.selected,
-    required this.onChange,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return _FormCard(
+  // ── Course Details card ───────────────────────────────────────────────────
+  Widget _buildCourseDetailsCard() {
+    return _SectionCard(
+      icon: Icons.article_outlined,
+      title: 'Course Details',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const _SectionTitle(
-            icon: Icons.tune_rounded,
-            title: "Configuration",
+          // Course Title
+          _buildFieldLabel('Course Title', required: true),
+          const SizedBox(height: 6),
+          _TitledInputWithError(
+            controller: _titleCtrl,
+            hint: 'e.g. Introduction to Artificial Intelligence',
+            prefixIcon: Icons.school_outlined,
+            error: _titleError,
+            onBlur: () {
+              if (!_titleTouched) setState(() => _titleTouched = true);
+              _validateTitle();
+            },
           ),
-          const SizedBox(height: 24),
-          const _FieldLabel("Visibility Status"),
           const SizedBox(height: 16),
 
+          // Code + Term row
           Row(
-            children: [
-              Expanded(
-                child: _ChoiceTile(
-                  title: "Save as Draft",
-                  subtitle: "Only visible to instructors",
-                  selected: selected == _VisibilityChoice.draft,
-                  onTap: () => onChange(_VisibilityChoice.draft),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _ChoiceTile(
-                  title: "Publish Now",
-                  subtitle: "Visible to enrolled students",
-                  selected: selected == _VisibilityChoice.publish,
-                  onTap: () => onChange(_VisibilityChoice.publish),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          Container(height: 1, color: _T.border),
-          const SizedBox(height: 16),
-          Row(
-            children: [
-              Expanded(
-                child: _ChoiceTile(
-                  title: "Set as Private",
-                  subtitle: "For specific Student",
-                  selected: selected == _VisibilityChoice.privateC,
-                  onTap: () => onChange(_VisibilityChoice.privateC),
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _ChoiceTile(
-                  title: "Set as Public",
-                  subtitle: "For Public Studnet",
-                  selected: selected == _VisibilityChoice.publicC,
-                  onTap: () => onChange(_VisibilityChoice.publicC),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChoiceTile extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ChoiceTile({
-    required this.title,
-    required this.subtitle,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(_T.r8),
-        child: Container(
-          height: 76,
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: _T.inputBg,
-            borderRadius: BorderRadius.circular(_T.r8),
-            border: Border.all(
-              color: selected ? _T.blue : _T.border,
-              width: selected ? 2 : 1,
-            ),
-            boxShadow: _T.inputShadow,
-          ),
-          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(
                 child: Column(
-                  mainAxisAlignment: MainAxisAlignment.end,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      title,
-                      style: const TextStyle(
-                        fontFamily: "Manrope",
-                        fontSize: 14,
-                        height: 20 / 14,
-                        fontWeight: FontWeight.w500,
-                        color: _T.text,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: const TextStyle(
-                        fontFamily: "Manrope",
-                        fontSize: 12,
-                        height: 16 / 12,
-                        fontWeight: FontWeight.w400,
-                        color: _T.muted,
-                      ),
+                    _buildFieldLabel('Course Code', optional: true),
+                    const SizedBox(height: 6),
+                    _TitledInputWithError(
+                      controller: _codeCtrl,
+                      hint: 'e.g. CS-101',
+                      prefixIcon: Icons.tag_rounded,
+                      error: _codeError,
+                      onBlur: () {
+                        if (!_codeTouched) setState(() => _codeTouched = true);
+                        _validateCode();
+                      },
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              Icon(
-                selected ? Icons.radio_button_checked : Icons.radio_button_off,
-                size: 18,
-                color: selected ? _T.blue : _T.muted,
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildFieldLabel('Academic Term'),
+                    const SizedBox(height: 6),
+                    // Use the shared FigmaUmDropdown40 which is already pixel-perfect
+                    FigmaUmDropdown40(
+                      width: double.infinity,
+                      value: _selectedTerm,
+                      items: _terms,
+                      onChanged: (v) => setState(() => _selectedTerm = v),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Description
+          _buildFieldLabel('Course Description'),
+          const SizedBox(height: 6),
+          _DescriptionField(controller: _descCtrl),
+          const SizedBox(height: 10),
+
+          // AI tip
+          Container(
+            padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFDBEAFE)),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded, size: 14, color: Color(0xFF137FEC)),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'AI Tip: A detailed description helps generate better quiz questions.',
+                    style: TextStyle(fontSize: 12, color: Color(0xFF137FEC),
+                        fontWeight: FontWeight.w500),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Learning Outcomes card ────────────────────────────────────────────────
+  Widget _buildLearningOutcomesCard() {
+    return _SectionCard(
+      icon: Icons.flag_outlined,
+      title: 'Learning Outcomes',
+      badge: _outcomes.isEmpty ? null : '${_outcomes.length}',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'Define what students will achieve. Topics will be linked to these outcomes.',
+            style: TextStyle(fontSize: 13, color: Color(0xFF617589), height: 1.5),
+          ),
+          const SizedBox(height: 14),
+          LearningOutcomesSection(
+            initialOutcomes: _outcomes,
+            onChanged: (list) => setState(() => _outcomes = list),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Config + Cover row ────────────────────────────────────────────────────
+  Widget _buildBottomRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: _SectionCard(
+            icon: Icons.tune_rounded,
+            title: 'Configuration',
+            child: _ConfigSection(
+              publish: _publish,
+              visibility: _visibility,
+              onPublishChanged: (v) => setState(() => _publish = v),
+              onVisibilityChanged: (v) => setState(() => _visibility = v),
+            ),
+          ),
+        ),
+        const SizedBox(width: 14),
+        SizedBox(
+          width: 210,
+          child: _SectionCard(
+            icon: Icons.image_outlined,
+            title: 'Course Cover',
+            child: _CoverUpload(),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ── Footer ────────────────────────────────────────────────────────────────
+  Widget _buildFooter() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 14, 24, 18),
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
+        border: Border(top: BorderSide(color: Color(0xFFF0F2F4))),
+      ),
+      child: Row(
+        children: [
+          if (_outcomes.isNotEmpty) ...[
+            const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF16A34A)),
+            const SizedBox(width: 5),
+            Text(
+              '${_outcomes.length} outcome${_outcomes.length == 1 ? "" : "s"} added',
+              style: const TextStyle(fontSize: 12, color: Color(0xFF16A34A),
+                  fontWeight: FontWeight.w600),
+            ),
+          ],
+          const Spacer(),
+          _OutlineBtn(label: 'Cancel', onTap: () => Navigator.of(context).pop()),
+          const SizedBox(width: 10),
+          _PrimaryBtn(label: '+ Create Course', onTap: _canSubmit ? _submit : null),
+        ],
+      ),
+    );
+  }
+
+  // ── Helper: field label ───────────────────────────────────────────────────
+  Widget _buildFieldLabel(String label, {bool required = false, bool optional = false}) {
+    return Row(
+      children: [
+        Text(label,
+            style: AppText.label.copyWith(fontSize: 13, fontWeight: FontWeight.w600)),
+        if (required)
+          const Text(' *',
+              style: TextStyle(fontSize: 13, color: Color(0xFFEF4444), fontWeight: FontWeight.w600)),
+        if (optional) ...[
+          const SizedBox(width: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: const Text('Optional',
+                style: TextStyle(fontSize: 10.5, color: Color(0xFF137FEC),
+                    fontWeight: FontWeight.w600)),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Section card ──────────────────────────────────────────────────────────────
+class _SectionCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final Widget child;
+  final String? badge;
+
+  const _SectionCard({
+    required this.icon,
+    required this.title,
+    required this.child,
+    this.badge,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 32, height: 32,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  border: Border.all(color: const Color(0xFFDBEAFE)),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(icon, size: 15, color: const Color(0xFF137FEC)),
+              ),
+              const SizedBox(width: 10),
+              Text(title,
+                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                      color: Color(0xFF111418))),
+              if (badge != null) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF137FEC),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Text(badge!,
+                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+                ),
+              ],
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(height: 1, color: const Color(0xFFF0F2F4)),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+// ── Input with error display (uses AppLabeledTextField internals) ─────────────
+class _TitledInputWithError extends StatefulWidget {
+  final TextEditingController controller;
+  final String hint;
+  final IconData? prefixIcon;
+  final String? error;
+  final VoidCallback? onBlur;
+
+  const _TitledInputWithError({
+    required this.controller,
+    required this.hint,
+    this.prefixIcon,
+    this.error,
+    this.onBlur,
+  });
+
+  @override
+  State<_TitledInputWithError> createState() => _TitledInputWithErrorState();
+}
+
+class _TitledInputWithErrorState extends State<_TitledInputWithError> {
+  final _focus = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (!mounted) return;
+      final hasFocus = _focus.hasFocus;
+      setState(() => _focused = hasFocus);
+      if (!hasFocus) widget.onBlur?.call();
+    });
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final hasErr = (widget.error ?? '').isNotEmpty;
+    final borderColor = hasErr
+        ? const Color(0xFFEF4444)
+        : _focused
+            ? AppColors.primary
+            : AppColors.borderSoft;
+    final borderWidth = _focused && !hasErr ? 1.5 : 1.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          height: 44,
+          padding: const EdgeInsets.symmetric(horizontal: 12),
+          decoration: BoxDecoration(
+            color: hasErr ? const Color(0xFFFEF2F2) : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: borderColor, width: borderWidth),
+          ),
+          child: Row(
+            children: [
+              if (widget.prefixIcon != null) ...[
+                Icon(widget.prefixIcon, size: 16,
+                    color: hasErr
+                        ? const Color(0xFFEF4444)
+                        : _focused
+                            ? AppColors.primary
+                            : AppColors.muted),
+                const SizedBox(width: 8),
+              ],
+              Expanded(
+                child: TextFormField(
+                  controller: widget.controller,
+                  focusNode: _focus,
+                  style: AppText.input,
+                  decoration: InputDecoration(
+                    hintText: widget.hint,
+                    hintStyle: AppText.hint,
+                    isCollapsed: true,
+                    contentPadding: EdgeInsets.zero,
+                    border: InputBorder.none,
+                    enabledBorder: InputBorder.none,
+                    focusedBorder: InputBorder.none,
+                    errorBorder: InputBorder.none,
+                    focusedErrorBorder: InputBorder.none,
+                    filled: false,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        if (hasErr) ...[
+          const SizedBox(height: 4),
+          Row(
+            children: [
+              const Icon(Icons.error_outline_rounded, size: 12, color: Color(0xFFEF4444)),
+              const SizedBox(width: 4),
+              Text(widget.error!,
+                  style: const TextStyle(fontSize: 11.5, color: Color(0xFFEF4444),
+                      fontWeight: FontWeight.w500)),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+// ── Description field (toolbar + textarea) ────────────────────────────────────
+class _DescriptionField extends StatefulWidget {
+  final TextEditingController controller;
+  const _DescriptionField({required this.controller});
+  @override
+  State<_DescriptionField> createState() => _DescriptionFieldState();
+}
+
+class _DescriptionFieldState extends State<_DescriptionField> {
+  final _focus = FocusNode();
+  bool _focused = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _focus.addListener(() {
+      if (mounted) setState(() => _focused = _focus.hasFocus);
+    });
+  }
+
+  @override
+  void dispose() {
+    _focus.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: _focused ? AppColors.primary : AppColors.borderSoft,
+          width: _focused ? 1.5 : 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(9),
+        child: Column(
+          children: [
+            // Toolbar
+            Container(
+              height: 38,
+              color: AppColors.surfaceBg,
+              padding: const EdgeInsets.symmetric(horizontal: 8),
+              child: Row(
+                children: [
+                  _TbBtn(icon: Icons.format_bold_rounded),
+                  _TbBtn(icon: Icons.format_italic_rounded),
+                  _TbBtn(icon: Icons.format_list_bulleted_rounded),
+                  _TbBtn(icon: Icons.link_rounded),
+                ],
+              ),
+            ),
+            Container(height: 1, color: const Color(0xFFF0F2F4)),
+            // Text area
+            SizedBox(
+              height: 110,
+              child: TextFormField(
+                controller: widget.controller,
+                focusNode: _focus,
+                maxLines: null,
+                expands: true,
+                textAlignVertical: TextAlignVertical.top,
+                style: AppText.input.copyWith(height: 1.55),
+                decoration: InputDecoration(
+                  hintText: 'Enter a detailed description of the course content, objectives, and prerequisites...',
+                  hintStyle: AppText.hint.copyWith(height: 1.55),
+                  isCollapsed: true,
+                  contentPadding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  border: InputBorder.none,
+                  enabledBorder: InputBorder.none,
+                  focusedBorder: InputBorder.none,
+                  filled: false,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TbBtn extends StatefulWidget {
+  final IconData icon;
+  const _TbBtn({required this.icon});
+  @override
+  State<_TbBtn> createState() => _TbBtnState();
+}
+
+class _TbBtnState extends State<_TbBtn> {
+  bool _h = false;
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    cursor: SystemMouseCursors.click,
+    onEnter: (_) => setState(() => _h = true),
+    onExit: (_) => setState(() => _h = false),
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 80),
+      width: 32, height: 32,
+      decoration: BoxDecoration(
+        color: _h ? AppColors.border : Colors.transparent,
+        borderRadius: BorderRadius.circular(5),
+      ),
+      child: Center(child: Icon(widget.icon, size: 16, color: _h ? AppColors.text : AppColors.muted)),
+    ),
+  );
+}
+
+// ── Config section ────────────────────────────────────────────────────────────
+class _ConfigSection extends StatelessWidget {
+  final _PublishChoice publish;
+  final _VisibilityChoice visibility;
+  final ValueChanged<_PublishChoice> onPublishChanged;
+  final ValueChanged<_VisibilityChoice> onVisibilityChanged;
+
+  const _ConfigSection({
+    required this.publish,
+    required this.visibility,
+    required this.onPublishChanged,
+    required this.onVisibilityChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Visibility Status',
+            style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600,
+                color: Color(0xFF617589), letterSpacing: 0.2)),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: _OptionTile(
+            title: 'Save as Draft',
+            sub: 'Only visible to instructors',
+            selected: publish == _PublishChoice.draft,
+            onTap: () => onPublishChanged(_PublishChoice.draft),
+          )),
+          const SizedBox(width: 8),
+          Expanded(child: _OptionTile(
+            title: 'Publish Now',
+            sub: 'Visible to enrolled students',
+            selected: publish == _PublishChoice.published,
+            onTap: () => onPublishChanged(_PublishChoice.published),
+          )),
+        ]),
+        const SizedBox(height: 10),
+        Row(children: [
+          Expanded(child: _OptionTile(
+            title: 'Set as Private',
+            sub: 'For specific Student',
+            selected: visibility == _VisibilityChoice.privateCourse,
+            onTap: () => onVisibilityChanged(_VisibilityChoice.privateCourse),
+          )),
+          const SizedBox(width: 8),
+          Expanded(child: _OptionTile(
+            title: 'Set as Public',
+            sub: 'For Public Student',
+            selected: visibility == _VisibilityChoice.publicCourse,
+            onTap: () => onVisibilityChanged(_VisibilityChoice.publicCourse),
+          )),
+        ]),
+        if (visibility == _VisibilityChoice.privateCourse) ...[
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: AppColors.surfaceBg,
+              borderRadius: BorderRadius.circular(9),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: const Row(children: [
+              Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF137FEC)),
+              SizedBox(width: 8),
+              Expanded(child: Text('You can invite students after creating the course.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF111418)))),
+            ]),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _OptionTile extends StatefulWidget {
+  final String title, sub;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _OptionTile({
+    required this.title, required this.sub,
+    required this.selected, required this.onTap,
+  });
+
+  @override
+  State<_OptionTile> createState() => _OptionTileState();
+}
+
+class _OptionTileState extends State<_OptionTile> {
+  bool _h = false;
+
+  @override
+  Widget build(BuildContext context) {
+    const blue  = Color(0xFF137FEC);
+    const blueSoft = Color(0xFFEFF6FF);
+
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _h = true),
+      onExit:  (_) => setState(() => _h = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 110),
+          padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
+          decoration: BoxDecoration(
+            color: widget.selected ? blueSoft : _h ? AppColors.pageBg : Colors.white,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: widget.selected ? blue : AppColors.border,
+              width: widget.selected ? 1.5 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              // Text block (left)
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      widget.title,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w600,
+                        color: widget.selected ? blue : AppColors.text,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      widget.sub,
+                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF617589)),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Radio dot (right) — matches Figma exactly
+              Container(
+                width: 18, height: 18,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: widget.selected ? blue : AppColors.border,
+                    width: 2,
+                  ),
+                  color: Colors.white,
+                ),
+                child: widget.selected
+                    ? Center(
+                        child: Container(
+                          width: 8, height: 8,
+                          decoration: const BoxDecoration(
+                            color: blue, shape: BoxShape.circle),
+                        ),
+                      )
+                    : null,
               ),
             ],
           ),
@@ -696,214 +897,166 @@ class _ChoiceTile extends StatelessWidget {
   }
 }
 
-// ------------------------------------------------------------
-// Course Cover
-// ------------------------------------------------------------
-class _CourseCoverCard extends StatelessWidget {
-  const _CourseCoverCard();
+// ── Cover upload ──────────────────────────────────────────────────────────────
+class _CoverUpload extends StatefulWidget {
+  @override
+  State<_CoverUpload> createState() => _CoverUploadState();
+}
+
+class _CoverUploadState extends State<_CoverUpload> {
+  bool _h = false;
 
   @override
   Widget build(BuildContext context) {
-    return _FormCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionTitle(
-            icon: Icons.image_outlined,
-            title: "Course Cover",
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      onEnter: (_) => setState(() => _h = true),
+      onExit: (_) => setState(() => _h = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 28),
+        decoration: BoxDecoration(
+          color: _h ? const Color(0xFFEFF6FF) : const Color(0xFFFAFBFC),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: _h ? const Color(0xFF137FEC) : AppColors.border,
+            width: _h ? 1.5 : 1,
           ),
-          const SizedBox(height: 24),
+        ),
+        child: Column(children: [
           Container(
-            height: 214,
+            width: 46, height: 46,
             decoration: BoxDecoration(
-              color: _T.inputBg,
-              borderRadius: BorderRadius.circular(_T.r8),
-              border: Border.all(color: _T.border, style: BorderStyle.solid),
+              color: _h ? const Color(0xFFEFF6FF) : AppColors.headerBg,
+              borderRadius: BorderRadius.circular(12),
             ),
-            child: DottedBorderLike(
-              radius: _T.r8,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: const [
-                  Icon(Icons.add_photo_alternate_outlined,
-                      size: 48, color: _T.muted),
-                  SizedBox(height: 12),
-                  Text(
-                    "Upload a file",
-                    style: TextStyle(
-                      fontFamily: "Manrope",
-                      fontSize: 14,
-                      height: 24 / 14,
-                      fontWeight: FontWeight.w600,
-                      color: _T.blue,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: 6),
-                  Text(
-                    "or drag and drop",
-                    style: TextStyle(
-                      fontFamily: "Manrope",
-                      fontSize: 14,
-                      height: 24 / 14,
-                      fontWeight: FontWeight.w400,
-                      color: _T.muted,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  SizedBox(height: 10),
-                  Text(
-                    "PNG, JPG, GIF up to 10MB",
-                    style: TextStyle(
-                      fontFamily: "Manrope",
-                      fontSize: 12,
-                      height: 20 / 12,
-                      fontWeight: FontWeight.w400,
-                      color: _T.muted,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
+            child: Icon(Icons.add_photo_alternate_outlined, size: 22,
+                color: _h ? const Color(0xFF137FEC) : AppColors.muted),
           ),
-        ],
+          const SizedBox(height: 10),
+          RichText(text: TextSpan(children: [
+            TextSpan(text: 'Upload a file',
+                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700,
+                    color: _h ? const Color(0xFF137FEC) : AppColors.muted,
+                    fontFamily: 'Inter')),
+            const TextSpan(text: '  or drag and drop',
+                style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF), fontFamily: 'Inter')),
+          ])),
+          const SizedBox(height: 5),
+          const Text('PNG, JPG, GIF up to 10MB',
+              style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
+        ]),
       ),
     );
   }
 }
 
-/// بدل ما نجيب package dotted_border، عملت dashed بسيط بنفس شكل الفيجما.
-class DottedBorderLike extends StatelessWidget {
-  final Widget child;
-  final double radius;
-  const DottedBorderLike({super.key, required this.child, required this.radius});
+// ── Hover close button ────────────────────────────────────────────────────────
+class _HoverIconBtn extends StatefulWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _HoverIconBtn({required this.icon, required this.onTap});
+  @override
+  State<_HoverIconBtn> createState() => _HoverIconBtnState();
+}
 
+class _HoverIconBtnState extends State<_HoverIconBtn> {
+  bool _h = false;
+  @override
+  Widget build(BuildContext context) => MouseRegion(
+    cursor: SystemMouseCursors.click,
+    onEnter: (_) => setState(() => _h = true),
+    onExit: (_) => setState(() => _h = false),
+    child: GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 100),
+        width: 34, height: 34,
+        decoration: BoxDecoration(
+          color: _h ? AppColors.headerBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(widget.icon, size: 18, color: AppColors.muted),
+      ),
+    ),
+  );
+}
+
+// ── Buttons ───────────────────────────────────────────────────────────────────
+class _PrimaryBtn extends StatefulWidget {
+  final String label;
+  final VoidCallback? onTap;
+  const _PrimaryBtn({required this.label, this.onTap});
+  @override
+  State<_PrimaryBtn> createState() => _PrimaryBtnState();
+}
+
+class _PrimaryBtnState extends State<_PrimaryBtn> {
+  bool _h = false;
   @override
   Widget build(BuildContext context) {
-    return CustomPaint(
-      painter: _DashPainter(radius: radius),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(radius),
-        child: child,
+    final enabled = widget.onTap != null;
+    return MouseRegion(
+      cursor: enabled ? SystemMouseCursors.click : MouseCursor.defer,
+      onEnter: (_) => setState(() => _h = true),
+      onExit: (_) => setState(() => _h = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 110),
+          height: 40,
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          decoration: BoxDecoration(
+            color: !enabled
+                ? AppColors.border
+                : _h ? const Color(0xFF0E6FD4) : AppColors.primary,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: Text(widget.label,
+                style: TextStyle(
+                    fontSize: 13.5, fontWeight: FontWeight.w700,
+                    color: enabled ? Colors.white : AppColors.muted)),
+          ),
+        ),
       ),
     );
   }
 }
 
-class _DashPainter extends CustomPainter {
-  final double radius;
-  _DashPainter({required this.radius});
-
+class _OutlineBtn extends StatefulWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _OutlineBtn({required this.label, required this.onTap});
   @override
-  void paint(Canvas canvas, Size size) {
-    final rrect = RRect.fromRectAndRadius(
-      Offset.zero & size,
-      Radius.circular(radius),
-    );
-
-    final paint = Paint()
-      ..color = _T.border
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1;
-
-    const dash = 6.0;
-    const gap = 6.0;
-
-    final path = Path()..addRRect(rrect);
-    final metrics = path.computeMetrics().toList();
-    for (final m in metrics) {
-      double dist = 0;
-      while (dist < m.length) {
-        final len = (dist + dash < m.length) ? dash : (m.length - dist);
-        final seg = m.extractPath(dist, dist + len);
-        canvas.drawPath(seg, paint);
-        dist += dash + gap;
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+  State<_OutlineBtn> createState() => _OutlineBtnState();
 }
 
-// ------------------------------------------------------------
-// Footer buttons
-// ------------------------------------------------------------
-class _FooterActions extends StatelessWidget {
-  final VoidCallback onCancel;
-  final VoidCallback onCreate;
-
-  const _FooterActions({
-    required this.onCancel,
-    required this.onCreate,
-  });
-
+class _OutlineBtnState extends State<_OutlineBtn> {
+  bool _h = false;
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: [
-        // Cancel
-        SizedBox(
-          height: 44,
-          child: TextButton(
-            onPressed: onCancel,
-            style: TextButton.styleFrom(
-              backgroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(_T.r8),
-                side: const BorderSide(color: _T.border),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-            ),
-            child: const Text(
-              "Cancel",
-              style: TextStyle(
-                fontFamily: "Manrope",
-                fontSize: 14,
-                height: 20 / 14,
-                fontWeight: FontWeight.w600,
-                color: _T.text,
-              ),
-            ),
-          ),
+  Widget build(BuildContext context) => MouseRegion(
+    cursor: SystemMouseCursors.click,
+    onEnter: (_) => setState(() => _h = true),
+    onExit: (_) => setState(() => _h = false),
+    child: GestureDetector(
+      onTap: widget.onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 110),
+        height: 40,
+        padding: const EdgeInsets.symmetric(horizontal: 18),
+        decoration: BoxDecoration(
+          color: _h ? AppColors.headerBg : Colors.white,
+          border: Border.all(color: AppColors.border),
+          borderRadius: BorderRadius.circular(8),
         ),
-        const SizedBox(width: 16),
-        // Create
-        SizedBox(
-          height: 44,
-          child: ElevatedButton(
-            onPressed: onCreate,
-            style: ElevatedButton.styleFrom(
-              backgroundColor: _T.blue,
-              elevation: 0,
-              shadowColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(_T.r8),
-              ),
-              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 10),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: const [
-                Icon(Icons.add_circle_outline, size: 18, color: Colors.white),
-                SizedBox(width: 8),
-                Text(
-                  "Create Course",
-                  style: TextStyle(
-                    fontFamily: "Manrope",
-                    fontSize: 14,
-                    height: 20 / 14,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
+        child: Center(
+          child: Text(widget.label,
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600,
+                  color: AppColors.text)),
         ),
-      ],
-    );
-  }
+      ),
+    ),
+  );
 }

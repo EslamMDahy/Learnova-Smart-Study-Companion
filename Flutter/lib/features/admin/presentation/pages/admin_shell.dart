@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/routes.dart';
-import '../../../../core/storage/token_storage.dart';
 import '../../../../core/storage/user_storage.dart';
 import '../../../../core/ui/toast.dart';
+import '../../../../features/auth/data/auth_providers.dart';
 import '../../../../shared/widgets/base_dashboard_shell.dart';
 import '../../../../shared/widgets/top_header.dart';
 
@@ -37,7 +37,7 @@ class _AdminShellState extends ConsumerState<AdminShell> {
     super.dispose();
   }
 
-  // ✅ نفس منطقك بالظبط لاستخراج orgId
+  
   String _resolveOrgId(AdminDashboardState state) {
     final s = (state.organizationId ?? '').trim();
     if (s.isNotEmpty) return s;
@@ -63,7 +63,7 @@ class _AdminShellState extends ConsumerState<AdminShell> {
       final name = user['full_name']?.toString();
       if (name != null && name.trim().isNotEmpty) return name.trim();
     }
-    return "Admin";
+    return 'Admin';
   }
 
   int _selectedIndexFromPath(String path) {
@@ -97,17 +97,15 @@ class _AdminShellState extends ConsumerState<AdminShell> {
 
   Future<void> _logout() async {
     try {
-      TokenStorage.clear();
-      UserStorage.clear();
+      await ref.read(authRepositoryProvider).logout();
       if (!mounted) return;
       context.go(Routes.login);
     } catch (e) {
       if (!mounted) return;
-      AppToast.show(
+      AppToast.error(
         context,
-        title: "Logout failed",
+        title: 'Logout failed',
         message: e.toString(),
-        icon: Icons.error_outline,
       );
     }
   }
@@ -120,32 +118,31 @@ class _AdminShellState extends ConsumerState<AdminShell> {
     final orgId = _resolveOrgId(state);
     final hasOrg = orgId.isNotEmpty;
 
-    return BaseDashboardShell(
-      asideWidth: 288,
-      contentMaxWidth: 1400,
-      contentPadding: const EdgeInsets.symmetric(horizontal: 116, vertical: 32),
-      backgroundColor: const Color(0xFFF6F7F8),
-      dividerColor: const Color(0xFFEDF2F7),
+    return ValueListenableBuilder<int>(
+      valueListenable: UserStorage.listenable as ValueNotifier<int>,
+      builder: (context, _, __) {
+        return BaseDashboardShell(
+          sidebar: AdminSidebarWidget(
+            selectedIndex: _selectedIndexFromPath(path),
+            onItemSelected: _goByIndex,
+          ),
 
-      sidebar: AdminSidebarWidget(
-        selectedIndex: _selectedIndexFromPath(path),
-        onItemSelected: _goByIndex,
-      ),
+          header: TopHeaderWidget(
+            searchController: _search,
+            onSearchChanged: (_) => setState(() {}),
+            searchHint: 'Search users, join requests, or plans...',
+            userName: _displayName(),
+            userSubtitle:
+                hasOrg ? 'Organization Admin Portal' : 'Setup your organization',
+            avatarUrl: UserStorage.avatarUrl,
+            onNotificationsTap: () => context.go(Routes.adminNotifications),
+            onSettings: () => context.go(Routes.adminSettings),
+            onLogout: () async => _logout(),
+          ),
 
-      header: TopHeaderWidget(
-        searchController: _search,
-        onSearchChanged: (_) => setState(() {}),
-        searchHint: "Search users, join requests, or plans...",
-        userName: _displayName(),
-        userSubtitle:
-            hasOrg ? "Organization Admin Portal" : "Setup your organization",
-        notificationsCount: 0,
-        onNotificationsTap: () => context.go(Routes.adminNotifications),
-        onSettings: () => context.go(Routes.adminSettings),
-        onLogout: () async => await _logout(),
-      ),
-
-      child: widget.child,
+          child: widget.child,
+        );
+      },
     );
   }
 }
