@@ -3,9 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/routes.dart';
+import '../../../../core/storage/token_storage.dart';
 import '../controllers/signup_controller.dart';
 
-// ✅ عدّل المسار ده لمكان ملف الـ tokens/components اللي فوق
+
 import '../../../../shared/widgets/app_ui_components.dart';
 
 enum AccountType { user, owner }
@@ -62,7 +63,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
       accountType = type;
       _localError = null;
 
-      // لو رايح Owner: role default مش مهم للـ owner لكن نخليه منظم
+      
       if (type == AccountType.owner) {
         userKind = UserKind.student; // irrelevant for owner
       }
@@ -117,7 +118,11 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
     if (!mounted) return;
 
     if (ok) {
-      context.go('${Routes.login}?signed=1');
+      final email = emailController.text.trim();
+      // Persist so that reopening the browser before verifying
+      // always returns the user to this screen.
+      TokenStorage.setPendingVerificationEmail(email);
+      context.go(Routes.verifyEmailSentFor(email));
     }
   }
 
@@ -238,11 +243,10 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                         obscureText: _obscurePassword,
                         onChanged: (_) {
                           _clearAllErrors();
-                          setState(() {}); // لتحديث chips
+                          setState(() {}); 
                         },
                         validator: _validatePassword,
                         suffix: IconButton(
-                          splashRadius: 18,
                           icon: Icon(
                             _obscurePassword
                                 ? Icons.visibility_off_outlined
@@ -348,13 +352,13 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
-                        "Already have an account? ",
+                        'Already have an account? ',
                         style: AppText.input.copyWith(color: AppColors.title),
                       ),
                       InkWell(
                         onTap: state.loading ? null : () => context.go(Routes.login),
                         child: Text(
-                          "Log in",
+                          'Log in',
                           style: AppText.input.copyWith(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w800,

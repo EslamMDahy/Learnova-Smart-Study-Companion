@@ -24,7 +24,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
   final _nameFocus = FocusNode();
   final _descFocus = FocusNode();
 
-  String _orgType = "Select type...";
+  String _orgType = 'Select type...';
 
   @override
   void initState() {
@@ -57,9 +57,9 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
     final logo = _logoUrl.text.trim();
 
     final payload = <String, dynamic>{
-      "name": _orgName.text.trim(),
-      "description": _orgDesc.text.trim(),
-      if (logo.isNotEmpty) "logo_url": logo,
+      'name': _orgName.text.trim(),
+      'description': _orgDesc.text.trim(),
+      if (logo.isNotEmpty) 'logo_url': logo,
     };
 
     Navigator.pop<Map<String, dynamic>>(context, payload);
@@ -108,9 +108,9 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const AppDialogTitleBlock(
-                      title: "Create New Organization",
+                      title: 'Create New Organization',
                       subtitle:
-                          "Set up a new institutional account for your university, school, or research center.",
+                          'Set up a new institutional account for your university, school, or research center.',
                     ),
                     const SizedBox(height: 22),
 
@@ -120,34 +120,34 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                         children: [
                           const AppCardHeaderRow(
                             icon: Icons.account_balance_outlined,
-                            title: "Organization Details",
+                            title: 'Organization Details',
                           ),
                           const SizedBox(height: 18),
 
                           _twoFields(
                             isNarrow: isNarrow,
                             left: AppLabeledField(
-                              label: "Organization Name",
+                              label: 'Organization Name',
                               child: AppTextField48(
                                 controller: _orgName,
                                 focusNode: _nameFocus,
-                                hint: "e.g. Stanford University",
+                                hint: 'e.g. Stanford University',
                                 textInputAction: TextInputAction.next,
                                 onSubmitted: (_) => _descFocus.requestFocus(),
                                 onChanged: (_) => setState(() {}),
                               ),
                             ),
                             right: AppLabeledField(
-                              label: "Organization Type",
+                              label: 'Organization Type',
                               child: AppDropdown48(
                                 value: _orgType,
                                 items: const [
-                                  "Select type...",
-                                  "University",
-                                  "School",
-                                  "Research Center",
-                                  "Institute",
-                                  "Training Center",
+                                  'Select type...',
+                                  'University',
+                                  'School',
+                                  'Research Center',
+                                  'Institute',
+                                  'Training Center',
                                 ],
                                 onChanged: (v) => setState(() => _orgType = v),
                               ),
@@ -159,18 +159,18 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                           _twoFields(
                             isNarrow: isNarrow,
                             left: AppLabeledField(
-                              label: "Primary Domain",
+                              label: 'Primary Domain',
                               child: AppTextField48(
                                 controller: _primaryDomain,
-                                hint: "e.g. stanford.edu",
+                                hint: 'e.g. stanford.edu',
                                 textInputAction: TextInputAction.next,
                               ),
                             ),
                             right: AppLabeledField(
-                              label: "Location",
+                              label: 'Location',
                               child: AppTextField48(
                                 controller: _location,
-                                hint: "e.g. Palo Alto, CA",
+                                hint: 'e.g. Palo Alto, CA',
                                 textInputAction: TextInputAction.next,
                               ),
                             ),
@@ -179,11 +179,11 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                           const SizedBox(height: 16),
 
                           AppLabeledField(
-                            label: "Description (max 50 chars)",
+                            label: 'Description (max 50 chars)',
                             child: AppTextField48(
                               controller: _orgDesc,
                               focusNode: _descFocus,
-                              hint: "Short description",
+                              hint: 'Short description',
                               maxLen: 50,
                               textInputAction: TextInputAction.done,
                               onSubmitted: (_) => _submit(),
@@ -194,7 +194,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                           const SizedBox(height: 18),
 
                           AppLabeledField(
-                            label: "Organization Logo",
+                            label: 'Organization Logo',
                             child: AppLogoUrlUploader(
                               controller: _logoUrl,
                               onChanged: (_) => setState(() {}),
@@ -205,24 +205,24 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                           const Divider(height: 1, color: Color(0xFFEEF2F4)),
                           const SizedBox(height: 18),
 
-                          const AppSubHeaderText(title: "Primary Administrator"),
+                          const AppSubHeaderText(title: 'Primary Administrator'),
                           const SizedBox(height: 14),
 
                           _twoFields(
                             isNarrow: isNarrow,
                             left: AppLabeledField(
-                              label: "Full Name",
+                              label: 'Full Name',
                               child: AppTextField48(
                                 controller: _adminName,
-                                hint: "e.g. Alex Morgan",
+                                hint: 'e.g. Alex Morgan',
                                 textInputAction: TextInputAction.next,
                               ),
                             ),
                             right: AppLabeledField(
-                              label: "Administrator Email",
+                              label: 'Administrator Email',
                               child: AppTextField48(
                                 controller: _adminEmail,
-                                hint: "admin@university.edu",
+                                hint: 'admin@university.edu',
                                 textInputAction: TextInputAction.done,
                               ),
                             ),
@@ -232,7 +232,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
 
                           const AppInfoInlineBox(
                             message:
-                                "Need help? Chat with our support team or learn more about how organizations work.",
+                                'Need help? Chat with our support team or learn more about how organizations work.',
                           ),
 
                           const SizedBox(height: 22),
@@ -253,7 +253,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                                     ),
                                   ),
                                   child: const Text(
-                                    "Cancel",
+                                    'Cancel',
                                     style:
                                         TextStyle(fontWeight: FontWeight.w800),
                                   ),
@@ -276,7 +276,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                                     ),
                                   ),
                                   child: const Text(
-                                    "Create Organization",
+                                    'Create Organization',
                                     style:
                                         TextStyle(fontWeight: FontWeight.w900),
                                   ),
@@ -292,7 +292,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
 
                     const Center(
                       child: Text(
-                        "© 2024 Learnova Academic Platform. All rights reserved.",
+                        '© 2024 Learnova Academic Platform. All rights reserved.',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 14,

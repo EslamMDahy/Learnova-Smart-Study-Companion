@@ -13,12 +13,12 @@ class EmptyOrgState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AppEmptyState(
-      title: "No Organization Found",
+      title: 'No Organization Found',
       message:
           "Welcome to Learnova. You haven't set up or joined an organization\n"
-          "yet. Create a new organization to start using the Smart Study\n"
-          "Companion management tools.",
-      primaryActionLabel: "Create Your Organization",
+          'yet. Create a new organization to start using the Smart Study\n'
+          'Companion management tools.',
+      primaryActionLabel: 'Create Your Organization',
       onPrimaryAction: onCreateOrganizationPressed,
     );
   }

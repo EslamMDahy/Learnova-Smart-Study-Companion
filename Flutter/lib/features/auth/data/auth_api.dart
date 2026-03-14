@@ -9,7 +9,7 @@ class AuthApi {
   final ApiClient _client;
   AuthApi(this._client);
 
-  // ---------------- Auth ----------------
+  // ─── Auth ─────────────────────────────────────────────────────────────────
 
   Future<LoginResponse> login(LoginRequest request) async {
     final res = await _client.post<Map<String, dynamic>>(
@@ -18,11 +18,10 @@ class AuthApi {
     );
 
     final payload = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
-    return LoginResponse.fromJson(payload);
+    final response = LoginResponse.fromJson(payload);
+    return response;
   }
 
-  /// ✅ Now matches backend RegisterRequest:
-  /// full_name, email, password, system_role
   Future<void> signup({
     required String fullName,
     required String email,
@@ -32,10 +31,10 @@ class AuthApi {
     await _client.post(
       Endpoints.signup,
       data: {
-        "full_name": fullName.trim(),
-        "email": email.trim(),
-        "password": password,
-        "system_role": systemRole.trim(),
+        'full_name': fullName.trim(),
+        'email': email.trim(),
+        'password': password,
+        'system_role': systemRole.trim(),
       },
     );
   }
@@ -43,17 +42,39 @@ class AuthApi {
   Future<String> verifyEmail(String token) async {
     final res = await _client.get<Map<String, dynamic>>(
       Endpoints.verifyEmail,
-      queryParameters: {"token": token.trim()},
+      queryParameters: {'token': token.trim()},
     );
     return _readMessage(res.data);
   }
 
-  // ---------------- Password ----------------
+  Future<String> resendVerificationEmail(String email) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.resendVerification,
+      data: {'email': email.trim()},
+    );
+    return _readMessage(res.data);
+  }
+
+  Future<bool> checkEmailVerified(String email) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.checkEmailVerified,
+      data: {'email': email.trim()},
+    );
+
+    final payload = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
+    final root = (payload['data'] is Map<String, dynamic>)
+        ? payload['data'] as Map<String, dynamic>
+        : payload;
+
+    return root['is_verified'] == true;
+  }
+
+  // ─── Password ─────────────────────────────────────────────────────────────
 
   Future<String> forgotPassword(String email) async {
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.forgotPassword,
-      data: {"email": email.trim()},
+      data: {'email': email.trim()},
     );
     return _readMessage(res.data);
   }
@@ -65,51 +86,54 @@ class AuthApi {
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.resetPassword,
       data: {
-        "token": token.trim(),
-        "new_password": newPassword,
+        'token': token.trim(),
+        'new_password': newPassword,
       },
     );
     return _readMessage(res.data);
   }
 
-  // keep /me for later usage if you want, but DON'T use it in login flow
-  // ✅ Added CancelToken support for Session Bootstrap (Batch 10)
+  // ─── Session ──────────────────────────────────────────────────────────────
+
   Future<Map<String, dynamic>> me({CancelToken? cancelToken}) async {
     final res = await _client.get<Map<String, dynamic>>(
       Endpoints.me,
       cancelToken: cancelToken,
     );
-    final data = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
-    return data;
+    return (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
   }
 
-  Future<String> refresh(String refreshToken) async {
+  Future<String> refresh() async {
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.refresh,
-      data: {"refresh_token": refreshToken},
     );
 
     final payload = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
     final root = (payload['data'] is Map<String, dynamic>)
-        ? (payload['data'] as Map<String, dynamic>)
+        ? payload['data'] as Map<String, dynamic>
         : payload;
 
-    final newToken =
+    final newAccess =
         (root['access_token'] ?? root['token'] ?? root['accessToken'])
             ?.toString();
 
-    if (newToken == null || newToken.trim().isEmpty) {
+    if (newAccess == null || newAccess.trim().isEmpty) {
       throw Exception('Missing access token in refresh response');
     }
 
-    return newToken.trim();
+    return newAccess.trim();
   }
 
-  // ---------------- Helpers ----------------
+  Future<void> logout() async {
+    await _client.post(
+      Endpoints.logout,
+    );
+  }
+
+  // ─── Helpers ──────────────────────────────────────────────────────────────
 
   String _readMessage(Map<String, dynamic>? data) {
     final v = data?['message'] ?? data?['msg'];
-    if (v == null) return '';
-    return v.toString();
+    return v?.toString() ?? '';
   }
 }

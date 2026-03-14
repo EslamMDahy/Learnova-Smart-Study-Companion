@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'design_tokens.dart';
@@ -25,7 +26,7 @@ class AsyncStateView extends StatelessWidget {
     this.errorMessage,
     this.onRetry,
     this.emptyTitle = 'Nothing here yet',
-    this.emptyMessage = 'No data available.', String? error,
+    this.emptyMessage = 'No data available.',
   });
 
   @override
@@ -33,7 +34,7 @@ class AsyncStateView extends StatelessWidget {
     if (loading) {
       return const Padding(
         padding: EdgeInsets.all(24),
-        child: Center(child: CircularProgressIndicator()),
+        child: _LoadingSkeleton(),
       );
     }
 
@@ -187,6 +188,116 @@ class _ErrorCard extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+
+class _LoadingSkeleton extends StatelessWidget {
+  const _LoadingSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    // Shimmer animations can be surprisingly expensive on Flutter Web.
+    // Keep skeleton static (web-friendly) and let pages feel snappy.
+    const base = Color(0xFFE5E7EB);
+    const hi = Color(0xFFF1F5F9);
+
+    // On mobile/desktop you can still get a subtle pulse without a ticker.
+    // On web: lock to a single color to avoid jank.
+    final shimmer = kIsWeb ? base : Color.lerp(base, hi, 0.35)!;
+
+    Widget bar({double? w, double h = 12}) {
+      return Container(
+        width: w,
+        height: h,
+        decoration: BoxDecoration(
+          color: shimmer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Header skeleton
+        Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: shimmer,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  bar(w: 180, h: 14),
+                  const SizedBox(height: 8),
+                  bar(w: 260),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Rows skeleton (table-like)
+        ...List.generate(6, (i) {
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              decoration: BoxDecoration(
+                color: AppColors.card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 16,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: shimmer,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Container(
+                    width: 34,
+                    height: 34,
+                    decoration: BoxDecoration(
+                      color: shimmer,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        bar(w: 220),
+                        const SizedBox(height: 8),
+                        bar(w: 160, h: 11),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  bar(w: 88, h: 22),
+                  const SizedBox(width: 10),
+                  bar(w: 64, h: 22),
+                ],
+              ),
+            ),
+          );
+        }),
+      ],
     );
   }
 }

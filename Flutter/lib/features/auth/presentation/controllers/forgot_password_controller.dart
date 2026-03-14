@@ -20,14 +20,14 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
   AuthRepository get _repo => ref.read(authRepositoryProvider);
 
   void reset() {
-    // لا نمسح error مباشرة؛ لو موجود امسحه عبر clearError فقط
+    
     clearError();
     state = const ForgotPasswordState();
   }
 
   void clearError() {
     if (state.error != null) {
-      state = state.copyWith(error: null);
+      state = state.copyWith();
     }
   }
 
@@ -39,23 +39,21 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
   Future<bool> sendResetLink(String email) async {
     final e = email.trim();
 
-    // كل محاولة جديدة: امسح error عبر clearError فقط
+    
     clearError();
 
-    // loading بدون لمس error مباشرة
+    
     state = state.copyWith(
       loading: true,
       sent: false,
-      message: null,
-      lastEmail: state.lastEmail, // حافظ عليها لحد ما ننجح
+      lastEmail: state.lastEmail, 
     );
 
     if (!_looksLikeEmail(e)) {
       state = state.copyWith(
         loading: false,
         sent: false,
-        message: null,
-        error: "Please enter a valid email address.",
+        error: 'Please enter a valid email address.',
       );
       return false;
     }
@@ -65,27 +63,26 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
 
       final safeMsg = (msg.trim().isNotEmpty)
           ? msg.trim()
-          : "If this email exists, a reset link has been sent.";
+          : 'If this email exists, a reset link has been sent.';
 
       state = state.copyWith(
         loading: false,
         sent: true,
         message: safeMsg,
-        lastEmail: e, // ✅ خزّنه عشان resend
+        lastEmail: e, 
       );
       return true;
     } catch (err) {
       final failure = mapApiFailure(err);
 
       if (TokenStorage.hasToken && failure.isAuthIssue) {
-        state = state.copyWith(loading: false, message: null);
+        state = state.copyWith(loading: false);
         AppErrorReporter.report(ref, failure);
         return false;
       }
 
       state = state.copyWith(
         loading: false,
-        message: null,
         error: failure.message,
       );
       return false;
@@ -97,8 +94,7 @@ class ForgotPasswordController extends StateNotifier<ForgotPasswordState> {
     if (!_looksLikeEmail(e)) {
       state = state.copyWith(
         sent: false,
-        message: null,
-        error: "Email is missing. Please enter your email again.",
+        error: 'Email is missing. Please enter your email again.',
       );
       return false;
     }

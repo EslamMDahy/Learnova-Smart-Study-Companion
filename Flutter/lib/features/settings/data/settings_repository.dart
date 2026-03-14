@@ -10,7 +10,7 @@ class SettingsRepository {
   SettingsRepository(this._api);
 
   Future<UserProfile> me({CancelToken? cancelToken}) async {
-    // ✅ cached-first from login stored user
+    
     final u = UserStorage.userMap;
     if (u != null && (u['id']?.toString().trim().isNotEmpty ?? false)) {
       try {
@@ -42,6 +42,37 @@ class SettingsRepository {
         languagePreference: languagePreference,
         cancelToken: cancelToken,
       );
+
+  // ──────────── Avatar ────────────
+
+  Future<Map<String, dynamic>> getAvatarUploadUrl({
+    required String contentType,
+    required int fileSizeBytes,
+    CancelToken? cancelToken,
+  }) =>
+      _api.getAvatarUploadUrl(
+        contentType: contentType,
+        fileSizeBytes: fileSizeBytes,
+        cancelToken: cancelToken,
+      );
+
+  Future<void> uploadAvatarToSupabase({
+    required String uploadUrl,
+    required List<int> bytes,
+    required String contentType,
+    CancelToken? cancelToken,
+  }) =>
+      _api.uploadAvatarToSupabase(
+        uploadUrl: uploadUrl,
+        bytes: bytes,
+        contentType: contentType,
+        cancelToken: cancelToken,
+      );
+
+  Future<String> confirmAvatarUpload({CancelToken? cancelToken}) =>
+      _api.confirmAvatarUpload(cancelToken: cancelToken);
+
+  // ──────────── rest ────────────
 
   Future<String> updatePassword({
     required String currentPassword,

@@ -1,7 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../core/error/app_error_bus.dart';
-import '../../../../core/storage/token_storage.dart';
 import '../../../../core/network/error_mapper.dart';
 import '../../data/auth_providers.dart';
 import '../../data/auth_repository.dart';
@@ -21,7 +19,7 @@ class VerifyEmailController extends StateNotifier<VerifyEmailState> {
 
   void clearError() {
     if (state.error != null) {
-      state = state.copyWith(error: null);
+      state = state.copyWith();
     }
   }
 
@@ -36,11 +34,11 @@ class VerifyEmailController extends StateNotifier<VerifyEmailState> {
   Future<bool> verify(String token) async {
     final t = token.trim();
     if (t.isEmpty) {
-      setError("Invalid verification link. Please request a new one.");
+      setError('Invalid verification link. Please request a new one.');
       return false;
     }
 
-    // امسح error فقط عبر clearError
+    
     clearError();
 
     state = state.copyWith(
@@ -66,7 +64,7 @@ class VerifyEmailController extends StateNotifier<VerifyEmailState> {
   }
 
   void reset() {
-    // لا نمسح error مباشرة
+    
     clearError();
     state = const VerifyEmailState();
   }

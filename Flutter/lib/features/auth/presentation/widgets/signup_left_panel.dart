@@ -9,6 +9,8 @@ class SignupLeftPanel extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, c) {
         final w = c.maxWidth;
+        final dpr = MediaQuery.of(context).devicePixelRatio;
+        final bgCacheWidth = (w * dpr).clamp(800.0, 2000.0).round();
 
         final hPad = w < 1100 ? 32.0 : 64.0;
         final vPad = w < 1100 ? 32.0 : 48.0;
@@ -18,8 +20,8 @@ class SignupLeftPanel extends StatelessWidget {
         return Container(
           padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
           decoration: BoxDecoration(
-            image: const DecorationImage(
-              image: AssetImage("assets/signup.png"),
+            image: DecorationImage(
+              image: ResizeImage(const AssetImage('assets/signup.webp'), width: bgCacheWidth),
               fit: BoxFit.cover,
             ),
             gradient: LinearGradient(
@@ -37,10 +39,10 @@ class SignupLeftPanel extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Image.asset("assets/logo.png", height: 40),
+                  Image.asset('assets/logo.webp', height: 40, cacheWidth: (40 * dpr).round()),
                   const SizedBox(width: 12),
                   const Text(
-                    "Learnova",
+                    'Learnova',
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 26,
@@ -54,7 +56,7 @@ class SignupLeftPanel extends StatelessWidget {
                 TextSpan(
                   children: [
                     TextSpan(
-                      text: "AI-Powered Learning for the\n",
+                      text: 'AI-Powered Learning for the\n',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: w < 1100 ? 32 : 38,
@@ -63,7 +65,7 @@ class SignupLeftPanel extends StatelessWidget {
                       ),
                     ),
                     TextSpan(
-                      text: "Modern Campus",
+                      text: 'Modern Campus',
                       style: TextStyle(
                         color: const Color(0xFFBFDBFE),
                         fontSize: w < 1100 ? 32 : 38,
@@ -78,7 +80,7 @@ class SignupLeftPanel extends StatelessWidget {
               ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxTextWidth),
                 child: const Text(
-                  "Experience personalized assessments, adaptive question banks, and intelligent insights designed for students, instructors, and administrators.",
+                  'Experience personalized assessments, adaptive question banks, and intelligent insights designed for students, instructors, and administrators.',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 15,
@@ -87,17 +89,17 @@ class SignupLeftPanel extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 30),
-              Wrap(
+              const Wrap(
                 spacing: 12,
                 runSpacing: 12,
-                children: const [
-                  _FeatureTag(title: "Adaptive Learning", icon: Icons.timeline),
+                children: [
+                  _FeatureTag(title: 'Adaptive Learning', icon: Icons.timeline),
                   _FeatureTag(
-                    title: "Real-time Analytics",
+                    title: 'Real-time Analytics',
                     icon: Icons.analytics_outlined,
                   ),
                   _FeatureTag(
-                    title: "Enterprise Grade",
+                    title: 'Enterprise Grade',
                     icon: Icons.shield_outlined,
                   ),
                 ],

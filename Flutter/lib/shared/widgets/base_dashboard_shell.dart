@@ -9,7 +9,7 @@ class BaseDashboardShell extends StatelessWidget {
   final double asideWidth;
   final double contentMaxWidth;
 
-  /// لو wrapChild=true هنستخدم padding/constraints دي
+  
   final EdgeInsets contentPadding;
 
   final Color backgroundColor;
@@ -20,7 +20,7 @@ class BaseDashboardShell extends StatelessWidget {
   final double compactPaddingBreakpoint;
   final EdgeInsets compactPadding;
 
-  /// ✅ الجديد: هل الشِل يلفّ الـ child ب padding/maxWidth ولا الصفحة تتحكم؟
+  
   final bool wrapChild;
 
   const BaseDashboardShell({
@@ -47,7 +47,7 @@ class BaseDashboardShell extends StatelessWidget {
     final w = MediaQuery.sizeOf(context).width;
     final useDrawer = enableResponsive && w < drawerBreakpoint;
 
-    // padding curve (بس لو wrapChild=true)
+    
     final dynamicHorizontal = math.max(16.0, math.min(116.0, w * 0.08));
     final dynamicVertical = w < compactPaddingBreakpoint ? 16.0 : 32.0;
 

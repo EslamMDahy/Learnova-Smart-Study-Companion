@@ -11,7 +11,7 @@ class OrganizationsRepository {
   final OrganizationsApi _api;
   OrganizationsRepository(this._api);
 
-  // ✅ small in-memory cache to reduce flicker & duplicate loads
+  
   static final Map<String, ({DateTime at, JoinRequestsResponse data})> _joinReqCache = {};
   static const Duration _joinReqTtl = Duration(seconds: 20);
 
@@ -34,14 +34,12 @@ class OrganizationsRepository {
       final dto = CreateOrganizationResponse.fromJson(raw);
       return dto.organization;
     } catch (e, st) {
-      // ✅ log for debugging only (do NOT toast here)
+      
       log('❌ createOrganization failed: $e', stackTrace: st);
       rethrow;
     }
   }
 
-  /// ✅ Typed response (no List<Map> anymore)
-    /// ✅ Typed response (no List<Map> anymore)
   /// Supports backend pagination (page/page_size/search). Backward compatible.
   Future<JoinRequestsResponse> getJoinRequests({
     required String organizationId,
@@ -59,7 +57,7 @@ class OrganizationsRepository {
     final safePageSize = pageSize <= 0 ? 10 : pageSize;
     final safeSearch = (search ?? '').trim();
 
-    // ✅ cache per (org, view, page, size, search)
+    
     final cacheKey = '$orgId:$safeView:$safePage:$safePageSize:$safeSearch';
     final cached = _joinReqCache[cacheKey];
 
@@ -122,7 +120,7 @@ class OrganizationsRepository {
     CancelToken? cancelToken,
   }) async {
     try {
-      // ✅ IMPORTANT: "declinate" is wrong.
+      
       // Most backends use "rejected" (or "declined"). We standardize to "rejected".
       final raw = await _api.updateMemberStatus(
         organizationId: organizationId.trim(),

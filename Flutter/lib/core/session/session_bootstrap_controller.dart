@@ -7,12 +7,29 @@ import '../storage/token_storage.dart';
 import '../storage/user_storage.dart';
 import '../../features/auth/data/auth_providers.dart';
 
-/// Bootstraps /me once after a valid token exists.
-/// Goal: prevent role-based flicker & make router guards deterministic.
+/// Bootstraps the session on cold start / hard-refresh / tab re-open.
 ///
-/// - Runs only when TokenStorage.hasToken && !UserStorage.hasMe
-/// - Cancels previous request if re-triggered (reload / route refresh)
-/// - Persists in the same storage location as the token (session vs local)
+/// ── Scenario A ──  Normal in-tab navigation
+///   sessionStorage token present → call /me → populate UserStorage.
+///
+/// ── Scenario B ──  Remember-Me cold start (tab closed & re-opened)
+///   sessionStorage is gone (cleared by browser), but the access token
+///   AND the persist flag are still in localStorage.
+///   → Try a silent POST /auth/refresh (sends the HttpOnly cookie).
+///   → On success  : save new token + call /me.
+///   → On failure  : clear everything → send to login.
+///
+/// ── Scenario C ──  Remember-Me hard-refresh (F5 / Ctrl-R)
+///   Exactly like Scenario B EXCEPT the sessionStorage token IS present
+///   because the browser kept it alive across the reload (Chrome/Edge do
+///   this for F5; they only clear sessionStorage on a "new tab").
+///   We do NOT attempt a silent refresh here — the token is still valid,
+///   so we just call /me directly with the existing token.
+///
+/// This gives us:
+///   • Always-fresh /me data on every reload.
+///   • No unnecessary refresh call when the token is still valid.
+///   • Automatic session restore after tab close (if Remember Me is on).
 final sessionBootstrapControllerProvider =
     NotifierProvider<SessionBootstrapController, AsyncValue<void>>(
   SessionBootstrapController.new,
@@ -26,24 +43,63 @@ class SessionBootstrapController extends Notifier<AsyncValue<void>> {
   AsyncValue<void> build() => const AsyncData(null);
 
   Future<void> ensureBootstrapped() async {
-    final token = TokenStorage.token?.trim();
-    final hasToken = token != null && token.isNotEmpty;
+    // ── Scenario B: Remember-Me, no live session token ──────────────────────
+    // sessionStorage was wiped (tab close). Try silent refresh first.
+    if (!TokenStorage.hasToken && TokenStorage.isPersisted) {
+      await _silentRefreshThenBoot();
+      return;
+    }
 
-    if (!hasToken) {
+    // ── Scenario A / C: live token in memory or sessionStorage ──────────────
+    final token = TokenStorage.token?.trim() ?? '';
+    if (token.isEmpty) {
       _reset();
       return;
     }
 
-    if (UserStorage.hasMe) {
-      _lastToken = token;
+    // Already bootstrapped with this exact token — nothing to do.
+    if (UserStorage.hasMe && _lastToken == token) {
       state = const AsyncData(null);
       return;
     }
 
-    // Guard: if we already tried with the same token and still loading, skip.
+    // Prevent duplicate in-flight bootstraps for the same token.
     if (_lastToken == token && state.isLoading) return;
 
-    // Cancel previous in-flight attempt.
+    // Fetch /me with the existing valid token (no refresh needed).
+    await _fetchMe(token);
+  }
+
+  // ─── Scenario B: silent refresh ───────────────────────────────────────────
+
+  Future<void> _silentRefreshThenBoot() async {
+    state = const AsyncLoading();
+
+    try {
+      final api = ref.read(authApiProvider);
+
+      // withCredentials=true → browser sends the HttpOnly refresh cookie.
+      final newToken = await api.refresh();
+
+      TokenStorage.saveSession(accessToken: newToken, persist: true);
+
+      // Start proactive refresh timer for the new token.
+      ref.read(apiClientProvider).scheduleProactiveRefresh(newToken);
+
+      await _fetchMe(newToken);
+    } catch (e) {
+      // Refresh cookie expired or revoked during a silent restore attempt.
+      // Treat this as a guest state on web instead of showing a session-expired
+      // dialog on public pages.
+      TokenStorage.clear();
+      UserStorage.clear();
+      state = const AsyncData(null);
+    }
+  }
+
+  // ─── /me fetch ─────────────────────────────────────────────────────────────
+
+  Future<void> _fetchMe(String token) async {
     _cancelToken?.cancel('superseded');
     final ct = CancelToken();
     _cancelToken = ct;
@@ -58,37 +114,67 @@ class SessionBootstrapController extends Notifier<AsyncValue<void>> {
 
       final persist = TokenStorage.isPersisted;
       final normalized = _normalizeMePayload(raw);
-      UserStorage.saveMe(normalized, persist: persist);
+
+      // ── Merge with existing UserStorage to preserve login fields ──────────
+      // /auth/me only returns 4 fields (id, email, full_name, system_role).
+      // Login saves the full profile (phone, bio, avatar_url, created_at…).
+      // We must NOT overwrite rich login data with the sparse /me response.
+      final existing = UserStorage.meJson;
+      final Map<String, dynamic> merged;
+
+      if (existing != null) {
+        final existingUser = (existing['user'] is Map)
+            ? (existing['user'] as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
+        final newUser = (normalized['user'] is Map)
+            ? (normalized['user'] as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
+
+        // New data from /me takes priority, but nulls don't overwrite existing values
+        final mergedUser = <String, dynamic>{...existingUser};
+        newUser.forEach((k, v) {
+          if (v != null) mergedUser[k] = v;
+        });
+
+        merged = {
+          ...existing,
+          ...normalized,
+          'user': mergedUser,
+        };
+      } else {
+        merged = normalized;
+      }
+
+      // Save to the correct storage tier so data survives hard-refresh when
+      // Remember Me is on.
+      UserStorage.saveMe(merged, persist: persist);
+
+      // Schedule proactive refresh so the token never expires silently while
+      // the user is active. Only needed after a cold bootstrap — subsequent
+      // token rotations re-schedule this themselves.
+      if (persist) {
+        ref.read(apiClientProvider).scheduleProactiveRefresh(token);
+      }
 
       state = const AsyncData(null);
     } catch (e, st) {
-      // Silent on cancellation.
       if (e is DioException && e.type == DioExceptionType.cancel) {
         state = const AsyncData(null);
         return;
       }
 
       final failure = mapApiFailure(e);
-
-      // Report globally (includes 401/403 dialog + logout + redirect).
       AppErrorReporter.report(ref, failure);
-
-      // Keep state for a local retry UI (optional).
       state = AsyncError(e, st);
     }
   }
 
-  Map<String, dynamic> _normalizeMePayload(Map<String, dynamic> raw) {
-    // Expected shapes:
-    // A) { user: {...}, organizations: [...] }
-    // B) { id, email, system_role, ... }  -> treat as user
-    // C) nested { data: {...} }          -> unwrap if exists
-    Map<String, dynamic> root = raw;
+  // ─── helpers ───────────────────────────────────────────────────────────────
 
+  Map<String, dynamic> _normalizeMePayload(Map<String, dynamic> raw) {
+    Map<String, dynamic> root = raw;
     final data = root['data'];
-    if (data is Map) {
-      root = data.cast<String, dynamic>();
-    }
+    if (data is Map) root = data.cast<String, dynamic>();
 
     Map<String, dynamic> user;
     final u = root['user'];
@@ -98,11 +184,8 @@ class SessionBootstrapController extends Notifier<AsyncValue<void>> {
       user = root;
     }
 
-    final out = <String, dynamic>{
-      'user': user,
-    };
+    final out = <String, dynamic>{'user': user};
 
-    // organizations (optional)
     final orgs = root['organizations'];
     if (orgs is List) {
       out['organizations'] =
@@ -111,8 +194,8 @@ class SessionBootstrapController extends Notifier<AsyncValue<void>> {
       out['organizations'] = [orgs.cast<String, dynamic>()];
     }
 
-    // selected org (front-only convenience)
-    final list = (out['organizations'] is List) ? out['organizations'] as List : const [];
+    final list =
+        (out['organizations'] is List) ? out['organizations'] as List : const [];
     if (list.isNotEmpty && out['selected_organization_id'] == null) {
       final first = list.first;
       if (first is Map) {

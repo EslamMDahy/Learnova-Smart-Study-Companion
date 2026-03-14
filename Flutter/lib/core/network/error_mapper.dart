@@ -3,7 +3,7 @@ import 'package:dio/dio.dart';
 import '../error/app_failure.dart';
 import 'api_exceptions.dart';
 
-AppFailure mapApiFailure(Object e) {
+AppFailure mapApiFailure(Object e, {String? email}) {
   // 1) ApiClient wraps into DioException.error as ApiException
   if (e is DioException && e.error is ApiException) {
     final ex = e.error as ApiException;
@@ -12,6 +12,7 @@ AppFailure mapApiFailure(Object e) {
       message: ex.message,
       debug: ex.toString(),
       code: ex.cleanCode,
+      email: email,
     );
   }
 
@@ -26,10 +27,10 @@ AppFailure mapApiFailure(Object e) {
         statusCode: status,
         message: serverMsg.trim(),
         debug: e.toString(),
+        email: email,
       );
     }
 
-    // Type-first mapping
     switch (e.type) {
       case DioExceptionType.cancel:
         return const AppFailure(
@@ -54,7 +55,6 @@ AppFailure mapApiFailure(Object e) {
           message: 'Secure connection failed. Please try again.',
         );
       case DioExceptionType.badResponse:
-        // continue to status mapping
         break;
       case DioExceptionType.unknown:
         break;
@@ -64,6 +64,7 @@ AppFailure mapApiFailure(Object e) {
       statusCode: status,
       message: 'Something went wrong. Please try again.',
       debug: e.toString(),
+      email: email,
     );
   }
 
@@ -74,6 +75,7 @@ AppFailure mapApiFailure(Object e) {
       message: e.message,
       debug: e.toString(),
       code: e.cleanCode,
+      email: email,
     );
   }
 
@@ -85,7 +87,6 @@ AppFailure mapApiFailure(Object e) {
   );
 }
 
-// Backward compatibility (if any old code expects String)
 String mapApiError(Object e) => mapApiFailure(e).message;
 
 AppFailure _fromStatus({
@@ -93,10 +94,11 @@ AppFailure _fromStatus({
   required String message,
   required String debug,
   String? code,
+  String? email,
 }) {
   final sc = statusCode;
 
-  // TOKEN_EXPIRED custom code (optional)
+  // Custom codes take priority.
   if (code == 'TOKEN_EXPIRED') {
     return AppFailure(
       type: AppFailureType.unauthorized,
@@ -107,10 +109,43 @@ AppFailure _fromStatus({
     );
   }
 
+  // Detect email-not-verified: 403 + any of these backend messages/codes.
+  if (sc == 403) {
+    final lowerMsg = message.toLowerCase();
+    final isEmailNotVerified = code == 'EMAIL_NOT_VERIFIED' ||
+        lowerMsg.contains('not verified') ||
+        lowerMsg.contains('email not verified') ||
+        lowerMsg.contains('verify your email');
+
+    if (isEmailNotVerified) {
+      return AppFailure(
+        type: AppFailureType.emailNotVerified,
+        message: message.isNotEmpty
+            ? message
+            : 'Please verify your email before logging in.',
+        debugMessage: debug,
+        statusCode: sc,
+        code: code ?? 'EMAIL_NOT_VERIFIED',
+        extra: email,
+      );
+    }
+
+    // Generic 403 (access denied, not email-related).
+    return AppFailure(
+      type: AppFailureType.forbidden,
+      message: message.isNotEmpty ? message : 'Access denied.',
+      debugMessage: debug,
+      statusCode: sc,
+      code: code,
+    );
+  }
+
   if (sc == null) {
     return AppFailure(
       type: AppFailureType.unknown,
-      message: message.isNotEmpty ? message : 'Something went wrong. Please try again.',
+      message: message.isNotEmpty
+          ? message
+          : 'Something went wrong. Please try again.',
       debugMessage: debug,
       statusCode: sc,
       code: code,
@@ -121,7 +156,9 @@ AppFailure _fromStatus({
     case 400:
       return AppFailure(
         type: AppFailureType.validation,
-        message: message.isNotEmpty ? message : 'Invalid request. Please check your input.',
+        message: message.isNotEmpty
+            ? message
+            : 'Invalid request. Please check your input.',
         debugMessage: debug,
         statusCode: sc,
         code: code,
@@ -129,16 +166,9 @@ AppFailure _fromStatus({
     case 401:
       return AppFailure(
         type: AppFailureType.unauthorized,
-        message: message.isNotEmpty ? message : 'Your session expired. Please login again.',
-        debugMessage: debug,
-        statusCode: sc,
-        code: code,
-        
-      );
-    case 403:
-      return AppFailure(
-        type: AppFailureType.forbidden,
-        message: message.isNotEmpty ? message : 'Access denied.',
+        message: message.isNotEmpty
+            ? message
+            : 'Your session expired. Please login again.',
         debugMessage: debug,
         statusCode: sc,
         code: code,
@@ -162,7 +192,9 @@ AppFailure _fromStatus({
     case 422:
       return AppFailure(
         type: AppFailureType.validation,
-        message: message.isNotEmpty ? message : 'Some fields are invalid. Please check your input.',
+        message: message.isNotEmpty
+            ? message
+            : 'Some fields are invalid. Please check your input.',
         debugMessage: debug,
         statusCode: sc,
         code: code,
@@ -170,7 +202,9 @@ AppFailure _fromStatus({
     case 429:
       return AppFailure(
         type: AppFailureType.server,
-        message: message.isNotEmpty ? message : 'Too many requests. Please try again later.',
+        message: message.isNotEmpty
+            ? message
+            : 'Too many requests. Please try again later.',
         debugMessage: debug,
         statusCode: sc,
         code: code,
@@ -181,7 +215,9 @@ AppFailure _fromStatus({
     case 504:
       return AppFailure(
         type: AppFailureType.server,
-        message: message.isNotEmpty ? message : 'Server error. Please try again later.',
+        message: message.isNotEmpty
+            ? message
+            : 'Server error. Please try again later.',
         debugMessage: debug,
         statusCode: sc,
         code: code,
@@ -189,7 +225,9 @@ AppFailure _fromStatus({
     default:
       return AppFailure(
         type: AppFailureType.unknown,
-        message: message.isNotEmpty ? message : 'Something went wrong. Please try again.',
+        message: message.isNotEmpty
+            ? message
+            : 'Something went wrong. Please try again.',
         debugMessage: debug,
         statusCode: sc,
         code: code,
@@ -199,9 +237,7 @@ AppFailure _fromStatus({
 
 String? _extractServerMessage(dynamic data) {
   if (data == null) return null;
-
   if (data is String && data.trim().isNotEmpty) return data.trim();
-
   if (data is! Map) return null;
 
   final detail = data['detail'];
@@ -210,15 +246,12 @@ String? _extractServerMessage(dynamic data) {
 
   if (detail is List) {
     final msgs = <String>[];
-
     for (final item in detail) {
       if (item is Map) {
         final msg = item['msg']?.toString().trim();
         final loc = item['loc'];
-
         String? field;
         if (loc is List && loc.isNotEmpty) field = loc.last?.toString();
-
         if (msg != null && msg.isNotEmpty) {
           msgs.add((field != null && field.isNotEmpty) ? '$field: $msg' : msg);
         }
@@ -227,7 +260,6 @@ String? _extractServerMessage(dynamic data) {
         if (s.isNotEmpty) msgs.add(s);
       }
     }
-
     if (msgs.isNotEmpty) return msgs.join('\n');
   }
 

@@ -1,3 +1,8 @@
+import 'dart:async';
+import 'dart:typed_data';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
@@ -16,11 +21,11 @@ class SettingsApi {
       cancelToken: cancelToken,
     );
     final root = (res.data ?? {}).cast<String, dynamic>();
-    final data = (root['user'] ?? root).cast<String, dynamic>();
+    final data = (root['user'] ?? root) as Map<String, dynamic>;
     return UserProfile.fromJson(data);
   }
 
-  // backend expects full_name + phone (مش phone_number)
+  
   Future<UserProfile> updateProfile({
     required String fullName,
     String? phoneNumber,
@@ -33,16 +38,80 @@ class SettingsApi {
     final res = await _client.patch<Map<String, dynamic>>(
       Endpoints.updateProfile,
       data: {
-        "full_name": fullName.trim(),
-        "phone": phoneNumber?.trim(),
-        "bio": bio?.trim(),
-        "student_id": studentId?.trim(),
-        "university_email": universityEmail?.trim(),
-        "language_preference": languagePreference.trim(),
+        'full_name': fullName.trim(),
+        'phone': phoneNumber?.trim(),
+        'bio': bio?.trim(),
+        'student_id': studentId?.trim(),
+        'university_email': universityEmail?.trim(),
+        'language_preference': languagePreference.trim(),
       },
       cancelToken: cancelToken,
     );
     return UserProfile.fromJson((res.data ?? {}).cast<String, dynamic>());
+  }
+
+  // ──────────── Avatar Upload (2-step) ────────────
+
+  /// Step 1: Get a Supabase signed upload URL from the backend
+  Future<Map<String, dynamic>> getAvatarUploadUrl({
+    required String contentType,
+    required int fileSizeBytes,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.avatarUploadUrl,
+      data: {
+        'content_type': contentType,
+        'file_size_bytes': fileSizeBytes,
+      },
+      cancelToken: cancelToken,
+    );
+    return (res.data ?? {}).cast<String, dynamic>();
+  }
+
+  /// Step 2: Upload the file bytes directly to Supabase using the signed URL
+  Future<void> uploadAvatarToSupabase({
+    required String uploadUrl,
+    required List<int> bytes,
+    required String contentType,
+    CancelToken? cancelToken,
+  }) async {
+    final bodyBytes = Uint8List.fromList(bytes);
+    final completer = Completer<void>();
+
+    final xhr = html.HttpRequest()
+      ..open('PUT', uploadUrl)
+      ..setRequestHeader('Content-Type', contentType)
+      ..setRequestHeader('x-upsert', 'true');
+
+    xhr.onLoad.listen((_) {
+      final status = xhr.status ?? 0;
+      if (status >= 200 && status < 400) {
+        completer.complete();
+      } else {
+        completer.completeError(
+          Exception('Supabase upload failed: HTTP $status - ${xhr.responseText}'),
+        );
+      }
+    });
+
+    xhr.onError.listen((_) {
+      completer.completeError(Exception('Supabase upload network error'));
+    });
+
+    xhr.send(bodyBytes.buffer);
+    return completer.future;
+  }
+
+  /// Step 3: Confirm the upload to the backend so it bumps updated_at
+  Future<String> confirmAvatarUpload({CancelToken? cancelToken}) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.avatarConfirm,
+      data: {'uploaded': true},
+      cancelToken: cancelToken,
+    );
+    final data = (res.data ?? {}).cast<String, dynamic>();
+    return data['avatar_url']?.toString() ?? '';
   }
 
   Future<String> updatePassword({
@@ -53,8 +122,8 @@ class SettingsApi {
     final res = await _client.patch<Map<String, dynamic>>(
       Endpoints.updatePassword,
       data: {
-        "current_password": currentPassword,
-        "new_password": newPassword,
+        'current_password': currentPassword,
+        'new_password': newPassword,
       },
       cancelToken: cancelToken,
     );
@@ -67,7 +136,7 @@ class SettingsApi {
   }) async {
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.deleteRequest,
-      data: {"current_password": currentPassword},
+      data: {'current_password': currentPassword},
       cancelToken: cancelToken,
     );
     return _msg(res.data);
@@ -79,13 +148,13 @@ class SettingsApi {
   }) async {
     final res = await _client.delete<Map<String, dynamic>>(
       Endpoints.deleteConfirm,
-      data: {"otp": otp.trim()},
+      data: {'otp': otp.trim()},
       cancelToken: cancelToken,
     );
     return _msg(res.data);
   }
 
-  // ===== user_preferences (لازم تبقى موجودة في الباك)
+  
   Future<UserPreferences> getPreferences({CancelToken? cancelToken}) async {
     final res = await _client.get<Map<String, dynamic>>(
       Endpoints.getPreferences,

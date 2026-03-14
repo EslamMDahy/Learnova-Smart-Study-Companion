@@ -1,84 +1,88 @@
-import 'dart:html' as html;
 import 'package:flutter/foundation.dart';
 
+import 'key_value_store.dart';
+import 'key_value_store_factory.dart';
+
 class TokenStorage {
+  TokenStorage._();
+
   static const _accessKey = 'learnova_access_token';
-  static const _refreshKey = 'learnova_refresh_token';
+  static const _persistKey = 'learnova_persist';
+  static const _pendingKey = 'learnova_pending_verify';
 
   static String? _memoryAccess;
-  static String? _memoryRefresh;
 
-  // عشان GoRouter يعمل refresh لما التوكين يتغير
+  static final KeyValueStore _session = createSessionStore();
+  static final KeyValueStore _local = createLocalStore();
+
   static final ValueNotifier<int> _rev = ValueNotifier<int>(0);
+  static ValueListenable<int> get revision => _rev;
   static Listenable get listenable => _rev;
 
   static String? get token =>
       _memoryAccess ??
-      html.window.sessionStorage[_accessKey] ??
-      html.window.localStorage[_accessKey];
+      _session.getString(_accessKey) ??
+      _local.getString(_accessKey);
 
-  static String? get refreshToken =>
-      _memoryRefresh ??
-      html.window.sessionStorage[_refreshKey] ??
-      html.window.localStorage[_refreshKey];
+  static bool get hasToken => (token ?? '').trim().isNotEmpty;
 
-  static bool get hasToken => (token?.isNotEmpty ?? false);
-  static bool get hasRefresh => (refreshToken?.isNotEmpty ?? false);
-
-  /// detect remember-me (persist) from storage location
+  /// True when the user chose "Remember Me":
+  /// – the explicit persist flag is set, OR
+  /// – the access token is stored in localStorage.
   static bool get isPersisted =>
-      html.window.localStorage.containsKey(_accessKey);
+      _local.containsKey(_persistKey) ||
+      (_local.containsKey(_accessKey) &&
+          (_local.getString(_accessKey) ?? '').trim().isNotEmpty);
 
-  /// persist=true  -> localStorage
-  /// persist=false -> sessionStorage
+  static String? get pendingVerificationEmail {
+    final v = _local.getString(_pendingKey);
+    return (v != null && v.trim().isNotEmpty) ? v.trim() : null;
+  }
+
   static void saveSession({
     required String accessToken,
-    String? refreshToken,
     required bool persist,
   }) {
-    _memoryAccess = accessToken;
-    _memoryRefresh = refreshToken;
+    final trimmed = accessToken.trim();
+    _memoryAccess = trimmed;
+
+    _session.setString(_accessKey, trimmed);
 
     if (persist) {
-      html.window.sessionStorage.remove(_accessKey);
-      html.window.sessionStorage.remove(_refreshKey);
-
-      html.window.localStorage[_accessKey] = accessToken;
-      if (refreshToken != null && refreshToken.trim().isNotEmpty) {
-        html.window.localStorage[_refreshKey] = refreshToken.trim();
-      } else {
-        html.window.localStorage.remove(_refreshKey);
-      }
+      _local.setString(_accessKey, trimmed);
+      _local.setString(_persistKey, '1');
     } else {
-      html.window.localStorage.remove(_accessKey);
-      html.window.localStorage.remove(_refreshKey);
-
-      html.window.sessionStorage[_accessKey] = accessToken;
-      if (refreshToken != null && refreshToken.trim().isNotEmpty) {
-        html.window.sessionStorage[_refreshKey] = refreshToken.trim();
-      } else {
-        html.window.sessionStorage.remove(_refreshKey);
-      }
+      _local.remove(_accessKey);
+      _local.remove(_persistKey);
     }
 
+    _local.remove(_pendingKey);
     _rev.value++;
   }
 
-  /// Backward compat: old callers
   static void saveToken(String token, {required bool persist}) {
-    saveSession(accessToken: token, refreshToken: refreshToken, persist: persist);
+    saveSession(accessToken: token, persist: persist);
+  }
+
+  static void setPendingVerificationEmail(String email) {
+    final trimmed = email.trim();
+    if (trimmed.isNotEmpty) {
+      _local.setString(_pendingKey, trimmed);
+      _rev.value++;
+    }
+  }
+
+  static void clearPendingVerificationEmail() {
+    _local.remove(_pendingKey);
+    _rev.value++;
   }
 
   static void clear() {
     _memoryAccess = null;
-    _memoryRefresh = null;
-
-    html.window.localStorage.remove(_accessKey);
-    html.window.localStorage.remove(_refreshKey);
-
-    html.window.sessionStorage.remove(_accessKey);
-    html.window.sessionStorage.remove(_refreshKey);
-
+    _session.remove(_accessKey);
+    _local.remove(_accessKey);
+    _local.remove(_persistKey);
+    _local.remove(_pendingKey);
     _rev.value++;
   }
 }

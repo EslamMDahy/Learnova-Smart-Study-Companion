@@ -1,14 +1,21 @@
 import 'dart:async';
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import '../config/env.dart';
+import '../log/app_logger.dart';
 import '../storage/token_storage.dart';
 import '../ui/global_loading_bus.dart';
 import 'api_exceptions.dart';
+import 'dio_adapter_config.dart';
 import 'endpoints.dart';
+import 'refresh_client.dart';
 
 class ApiClient {
-  ApiClient({Dio? dio}) : _dio = dio ?? Dio() {
+  ApiClient({Dio? dio, RefreshClient? refreshClient})
+      : _dio = dio ?? Dio(),
+        _refreshClient = refreshClient ?? createRefreshClient() {
     _dio.options = BaseOptions(
       baseUrl: Env.baseUrl,
       connectTimeout: const Duration(seconds: 15),
@@ -19,17 +26,18 @@ class ApiClient {
         'Accept': 'application/json',
       },
     );
+    configureDioAdapter(_dio);
 
     _dio.interceptors.add(
       InterceptorsWrapper(
         onRequest: (options, handler) {
-          // ✅ global loading (unless silent)
           GlobalLoadingBus.beginIfNeeded(options);
 
           final token = TokenStorage.token;
           if (token != null && token.trim().isNotEmpty) {
             options.headers['Authorization'] = 'Bearer ${token.trim()}';
           }
+
           handler.next(options);
         },
         onResponse: (response, handler) {
@@ -43,18 +51,22 @@ class ApiClient {
               final res = await _retryOnce(e.requestOptions);
               return handler.resolve(res);
             } catch (_) {
-              // continue mapping
+              // continue to normal error handling
             }
           }
 
           final status = e.response?.statusCode;
 
-          // Refresh flow (if enabled)
+          // Conditions to attempt a token refresh:
+          // – refresh feature enabled in env
+          // – 401 response
+          // – we have a token (otherwise the user is already logged out)
+          // – not an auth endpoint (avoid refresh-loops)
+          // – not already retried for this request
           final shouldTryRefresh =
               Env.enableRefreshToken &&
-              (status == 401 || status == 403) &&
-              TokenStorage.isPersisted &&
-              TokenStorage.hasRefresh &&
+              status == 401 &&
+              TokenStorage.hasToken &&
               !_isAuthPath(e.requestOptions.path) &&
               !_hasAuthRetried(e.requestOptions);
 
@@ -64,15 +76,18 @@ class ApiClient {
 
               TokenStorage.saveSession(
                 accessToken: newAccess,
-                refreshToken: TokenStorage.refreshToken,
-                persist: true,
+                persist: TokenStorage.isPersisted,
               );
+
+              // Reschedule proactive refresh for the new token lifetime.
+              scheduleProactiveRefresh(newAccess);
 
               final retryResponse =
                   await _retryWithNewToken(e.requestOptions, newAccess);
 
               return handler.resolve(retryResponse);
             } catch (_) {
+              // Refresh failed → clear session, propagate 401.
               TokenStorage.clear();
               GlobalLoadingBus.endIfNeeded(e.requestOptions);
 
@@ -92,7 +107,7 @@ class ApiClient {
             }
           }
 
-          // Normal mapping
+          // Normal error mapping
           GlobalLoadingBus.endIfNeeded(e.requestOptions);
 
           final msg = _pickErrorMessage(e);
@@ -116,10 +131,99 @@ class ApiClient {
   }
 
   final Dio _dio;
+  final RefreshClient _refreshClient;
 
-  // -------------------- public http methods --------------------
+  // ── Proactive refresh timer ─────────────────────────────────────────────────
+  //
+  // Fires 2 minutes before the JWT expires so the user never hits a 401 mid-
+  // session. After every successful refresh (reactive or proactive) we cancel
+  // the old timer and schedule a new one for the replacement token.
+  //
+  // Guard: if the token is already expired (or within 30 s of expiry) when
+  // scheduleProactiveRefresh is called we delay 30 s instead of firing
+  // immediately.  This prevents a burst of refresh calls on page load when
+  // the stored token is very close to expiry.
 
-  /// Matches Dio signature naming (queryParameters) to avoid friction across the app.
+  Timer? _proactiveTimer;
+
+  /// Call once after login / bootstrap with the raw JWT so the timer knows
+  /// when to schedule the next silent refresh.
+  void scheduleProactiveRefresh(String accessToken) {
+    _proactiveTimer?.cancel();
+    _proactiveTimer = null;
+
+    try {
+      final parts = accessToken.split('.');
+      if (parts.length != 3) return;
+
+      // Base64url → base64 padding
+      String pad(String s) {
+        final rem = s.length % 4;
+        return rem == 0 ? s : s + '=' * (4 - rem);
+      }
+
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(pad(parts[1]))),
+      ) as Map<String, dynamic>;
+
+      final exp = payload['exp'];
+      if (exp == null) return;
+
+      final expiry = DateTime.fromMillisecondsSinceEpoch(
+        (exp as num).toInt() * 1000,
+        isUtc: true,
+      );
+      final now = DateTime.now().toUtc();
+
+      // Token already expired — don't schedule; let the reactive interceptor
+      // handle the next 401.
+      if (expiry.isBefore(now)) return;
+
+      // Fire 2 minutes before expiry.
+      // If we're already within 2 min (but not expired), wait at least 30 s
+      // to avoid immediately hammering the refresh endpoint on page load.
+      final fireAt = expiry.subtract(const Duration(minutes: 2));
+      final delay = fireAt.isAfter(now)
+          ? fireAt.difference(now)
+          : const Duration(seconds: 30);
+
+      _proactiveTimer = Timer(delay, _proactiveRefresh);
+    } catch (_) {
+      // Unparseable token → rely on the reactive interceptor.
+    }
+  }
+
+  void cancelProactiveRefresh() {
+    _proactiveTimer?.cancel();
+    _proactiveTimer = null;
+  }
+
+  void dispose() {
+    cancelProactiveRefresh();
+  }
+
+  Future<void> _proactiveRefresh() async {
+    if (!TokenStorage.hasToken) return;
+
+    try {
+      final newToken = await _refreshAccessToken();
+
+      TokenStorage.saveSession(
+        accessToken: newToken,
+        persist: TokenStorage.isPersisted,
+      );
+
+      // Reschedule for the new token's lifetime.
+      scheduleProactiveRefresh(newToken);
+    } catch (_) {
+      // Proactive refresh failed (e.g. no network, cookie expired).
+      // Don't log the user out here — the reactive 401 interceptor will
+      // handle the next failed request and show the session-expired message.
+    }
+  }
+
+  // ── Public HTTP methods ─────────────────────────────────────────────────────
+
   Future<Response<T>> get<T>(
     String path, {
     Map<String, dynamic>? queryParameters,
@@ -193,7 +297,7 @@ class ApiClient {
         cancelToken: cancelToken,
       );
 
-  // -------------------- retry helpers --------------------
+  // ── Retry helpers ───────────────────────────────────────────────────────────
 
   bool _shouldRetryGetOnce(DioException e) {
     if (e.requestOptions.method.toUpperCase() != 'GET') return false;
@@ -231,7 +335,11 @@ class ApiClient {
     );
   }
 
-  // -------------------- refresh token (single-flight) --------------------
+  // ── Refresh token (single-flight) ───────────────────────────────────────────
+  //
+  // A Completer ensures that if multiple requests get a 401 simultaneously,
+  // only ONE refresh call is made to the backend.  All waiting requests share
+  // the same future and retry with the single new token.
 
   Completer<String>? _refreshCompleter;
 
@@ -242,8 +350,7 @@ class ApiClient {
     _refreshCompleter = c;
 
     try {
-      final rt = TokenStorage.refreshToken!;
-      final newToken = await _callRefreshEndpoint(rt);
+      final newToken = await _callRefreshEndpoint();
       c.complete(newToken);
       return newToken;
     } catch (e) {
@@ -254,43 +361,19 @@ class ApiClient {
     }
   }
 
-  Future<String> _callRefreshEndpoint(String refreshToken) async {
-    // Separate Dio to avoid interceptor recursion
-    final d = Dio(
-      BaseOptions(
-        baseUrl: Env.baseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 15),
-        sendTimeout: const Duration(seconds: 15),
-        headers: const {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-      ),
-    );
-
-    final res = await d.post<Map<String, dynamic>>(
-      Endpoints.refresh,
-      data: {'refresh_token': refreshToken},
-    );
-
-    final payload = (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
-    final root = (payload['data'] is Map<String, dynamic>)
-        ? (payload['data'] as Map<String, dynamic>)
-        : payload;
-
-    final newToken =
-        (root['access_token'] ?? root['token'] ?? root['accessToken'])?.toString();
-
-    if (newToken == null || newToken.trim().isEmpty) {
-      throw ApiException(
-        'Invalid refresh response.',
-        statusCode: res.statusCode,
-        code: 'REFRESH_INVALID',
+  Future<String> _callRefreshEndpoint() async {
+    final url = '${Env.baseUrl}${Endpoints.refresh}';
+    try {
+      return await _refreshClient.refresh(url: url);
+    } catch (e, st) {
+      AppLogger.log(
+        'Refresh token call failed.',
+        level: LogLevel.warn,
+        error: e,
+        stackTrace: st,
       );
+      rethrow;
     }
-
-    return newToken.trim();
   }
 
   bool _hasAuthRetried(RequestOptions o) => o.extra['__authRetried'] == true;
@@ -328,57 +411,52 @@ class ApiClient {
   }
 
   bool _isAuthPath(String path) {
-    final p = path.toLowerCase();
-    return p.contains('/login') ||
-        p.contains('/signup') ||
-        p.contains('/register') ||
-        p.contains('/refresh') ||
-        p.contains('/auth');
+    return path.contains(Endpoints.login) ||
+        path.contains(Endpoints.signup) ||
+        path.contains(Endpoints.refresh);
   }
 
   String _pickErrorMessage(DioException e) {
     final data = e.response?.data;
 
-    final server = _extractServerMessage(data);
-    if (server != null && server.trim().isNotEmpty) return server.trim();
-
-    final friendly = _friendlyNetworkMessage(e);
-    if (friendly != null && friendly.trim().isNotEmpty) return friendly.trim();
-
-    final msg = e.message;
-    if (msg != null && msg.trim().isNotEmpty) return msg.trim();
-
-    return 'Something went wrong. Please try again.';
-  }
-
-  String? _extractServerMessage(dynamic data) {
     try {
       if (data is Map) {
-        if (data['message'] is String) return data['message'] as String;
-        if (data['detail'] is String) return data['detail'] as String;
-        if (data['error'] is String) return data['error'] as String;
+        final m = data.cast<String, dynamic>();
+        final direct = (m['message'] ?? m['error'])?.toString();
+        if (direct != null && direct.trim().isNotEmpty) return direct.trim();
 
-        final d = data['data'];
-        if (d is Map) {
-          if (d['message'] is String) return d['message'] as String;
-          if (d['detail'] is String) return d['detail'] as String;
+        final inner = m['data'];
+        if (inner is Map) {
+          final innerMsg = (inner['message'] ?? inner['error'])?.toString();
+          if (innerMsg != null && innerMsg.trim().isNotEmpty) {
+            return innerMsg.trim();
+          }
+        }
+
+        final errs = m['errors'];
+        if (errs is List && errs.isNotEmpty) {
+          final first = errs.first;
+          if (first is Map) {
+            final msg = first['message']?.toString();
+            if (msg != null && msg.trim().isNotEmpty) return msg.trim();
+          }
         }
       }
     } catch (_) {}
-    return null;
-  }
 
-  String? _friendlyNetworkMessage(DioException e) {
-    switch (e.type) {
-      case DioExceptionType.connectionTimeout:
-      case DioExceptionType.receiveTimeout:
-      case DioExceptionType.sendTimeout:
-        return 'Network timeout. Please try again.';
-      case DioExceptionType.connectionError:
-        return 'No internet connection. Please check your network.';
-      default:
-        return null;
+    if (e.type == DioExceptionType.connectionTimeout ||
+        e.type == DioExceptionType.receiveTimeout ||
+        e.type == DioExceptionType.sendTimeout) {
+      return 'Request timed out. Please try again.';
     }
+
+    if (e.type == DioExceptionType.connectionError) {
+      return 'Network error. Check your connection and try again.';
+    }
+
+    return e.message?.trim().isNotEmpty ?? false
+        ? e.message!.trim()
+        : 'Something went wrong. Please try again.';
   }
 
   String _mapCode(int? status, dynamic data) {
@@ -387,11 +465,14 @@ class ApiClient {
     if (status == 401) return 'UNAUTHORIZED';
     if (status == 403) return 'FORBIDDEN';
     if (status == 404) return 'NOT_FOUND';
-    if (status == 409) return 'CONFLICT';
     if (status >= 500) return 'SERVER_ERROR';
 
     try {
-      if (data is Map && data['code'] is String) return data['code'] as String;
+      if (data is Map) {
+        final m = data.cast<String, dynamic>();
+        final code = m['code']?.toString();
+        if (code != null && code.trim().isNotEmpty) return code.trim();
+      }
     } catch (_) {}
     return 'HTTP_$status';
   }

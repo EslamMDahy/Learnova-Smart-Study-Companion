@@ -1,6 +1,6 @@
 class LoginResponse {
   final String accessToken;
-  final String? refreshToken; // ✅ NEW
+  final String? refreshToken; 
   final String? tokenType;
 
   /// User object

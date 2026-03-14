@@ -3,9 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/routing/routes.dart';
-import '../../../../core/storage/token_storage.dart';
 import '../../../../core/storage/user_storage.dart';
 import '../../../../core/ui/toast.dart';
+import '../../../../features/auth/data/auth_providers.dart';
 
 import '../../../../shared/widgets/base_dashboard_shell.dart';
 import '../../../../shared/widgets/top_header.dart';
@@ -38,7 +38,20 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
 
   String _displayName() {
     final name = (UserStorage.userMap?['full_name'] ?? '').toString().trim();
-    return name.isEmpty ? "Instructor" : name;
+    if (name.isNotEmpty) return name;
+    // fallback: show role-based name matching Figma "Prof. Anderson"
+    return 'Instructor';
+  }
+
+  /// Returns org name or role subtitle for the top header.
+  /// Matches Figma: "Computer Science Dept."
+  String _displaySubtitle() {
+    final orgs = UserStorage.organizations;
+    if (orgs.isNotEmpty) {
+      final orgName = (orgs.first['name'] ?? '').toString().trim();
+      if (orgName.isNotEmpty) return orgName;
+    }
+    return 'Instructor Portal';
   }
 
   int _selectedIndexFromPath(String path) {
@@ -77,17 +90,15 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
 
   Future<void> _logout() async {
     try {
-      TokenStorage.clear();
-      UserStorage.clear();
+      await ref.read(authRepositoryProvider).logout();
       if (!mounted) return;
       context.go(Routes.login);
     } catch (e) {
       if (!mounted) return;
-      AppToast.show(
+      AppToast.error(
         context,
-        title: "Logout failed",
+        title: 'Logout failed',
         message: e.toString(),
-        icon: Icons.error_outline,
       );
     }
   }
@@ -96,32 +107,32 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
 
-    return BaseDashboardShell(
-      asideWidth: 288,
-      backgroundColor: const Color(0xFFF6F7F8),
-      dividerColor: const Color(0xFFEDF2F7),
+    return ValueListenableBuilder<int>(
+      valueListenable: UserStorage.listenable as ValueNotifier<int>,
+      builder: (context, _, __) {
+        return BaseDashboardShell(
+          wrapChild: false,
 
-      /// ✅ هنا التغيير الأساسي
-      wrapChild: false,
+          sidebar: InstructorSidebarWidget(
+            selectedIndex: _selectedIndexFromPath(path),
+            onItemSelected: _goByIndex,
+          ),
 
-      sidebar: InstructorSidebarWidget(
-        selectedIndex: _selectedIndexFromPath(path),
-        onItemSelected: _goByIndex,
-      ),
+          header: TopHeaderWidget(
+            searchController: _search,
+            onSearchChanged: (_) => setState(() {}),
+            searchHint: 'Search your courses, lessons, or students...',
+            userName: _displayName(),
+            userSubtitle: _displaySubtitle(),
+            avatarUrl: UserStorage.avatarUrl,
+            onNotificationsTap: () => context.go(Routes.instructorNotifications),
+            onSettings: () => context.go(Routes.instructorSettings),
+            onLogout: () async => _logout(),
+          ),
 
-      header: TopHeaderWidget(
-        searchController: _search,
-        onSearchChanged: (_) => setState(() {}),
-        searchHint: "Search your courses, lessons, or students...",
-        userName: _displayName(),
-        userSubtitle: "Instructor",
-        notificationsCount: 0,
-        onNotificationsTap: () => context.go(Routes.instructorNotifications),
-        onSettings: () => context.go(Routes.instructorSettings),
-        onLogout: () async => await _logout(),
-      ),
-
-      child: widget.child,
+          child: widget.child,
+        );
+      },
     );
   }
 }

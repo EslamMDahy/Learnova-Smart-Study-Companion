@@ -10,10 +10,11 @@ class LoginState {
   LoginState copyWith({
     bool? loading,
     String? error,
+    bool clearError = false,
   }) {
     return LoginState(
       loading: loading ?? this.loading,
-      error: error ?? this.error,
+      error: clearError ? null : (error ?? this.error),
     );
   }
 }

@@ -3,10 +3,11 @@ enum AppFailureType {
   timeout,
   unauthorized,
   forbidden,
+  emailNotVerified, // 403 specifically for unverified email during login
   notFound,
   validation,
   server,
-  unknown,
+  unknown, warning,
 }
 
 class AppFailure {
@@ -20,8 +21,11 @@ class AppFailure {
 
   final int? statusCode;
 
-  /// Optional machine-readable code (e.g. TOKEN_EXPIRED)
+  /// Optional machine-readable code (e.g. TOKEN_EXPIRED, EMAIL_NOT_VERIFIED)
   final String? code;
+
+  /// Optional extra payload (e.g. email for EMAIL_NOT_VERIFIED case).
+  final String? extra;
 
   const AppFailure({
     required this.type,
@@ -29,10 +33,23 @@ class AppFailure {
     this.debugMessage,
     this.statusCode,
     this.code,
+    this.extra,
   });
 
-  bool get isAuthIssue => type == AppFailureType.unauthorized || type == AppFailureType.forbidden;
-  bool get isNetworkLike => type == AppFailureType.network || type == AppFailureType.timeout;
+  /// True only for 401 token expiry — triggers logout + login redirect.
+  bool get isAuthIssue => type == AppFailureType.unauthorized;
+
+  /// True for the specific "email not verified" 403 case.
+  bool get isEmailNotVerified => type == AppFailureType.emailNotVerified;
+
+  /// True for server/network errors that should show the global error page.
+  bool get isServerOrNetworkError =>
+      type == AppFailureType.server ||
+      type == AppFailureType.network ||
+      type == AppFailureType.timeout;
+
+  bool get isNetworkLike =>
+      type == AppFailureType.network || type == AppFailureType.timeout;
 
   AppFailure copyWith({
     AppFailureType? type,
@@ -40,6 +57,7 @@ class AppFailure {
     String? debugMessage,
     int? statusCode,
     String? code,
+    String? extra,
   }) {
     return AppFailure(
       type: type ?? this.type,
@@ -47,6 +65,7 @@ class AppFailure {
       debugMessage: debugMessage ?? this.debugMessage,
       statusCode: statusCode ?? this.statusCode,
       code: code ?? this.code,
+      extra: extra ?? this.extra,
     );
   }
 }
