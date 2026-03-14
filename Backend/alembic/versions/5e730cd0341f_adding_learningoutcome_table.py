@@ -1,18 +1,18 @@
-"""new tables
+"""adding LearningOutcome table
 
-Revision ID: 5e2e2c8b0b06
+Revision ID: 5e730cd0341f
 Revises: 
-Create Date: 2026-02-28 20:53:11.490849
+Create Date: 2026-03-14 15:46:45.699049
 
 """
 from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-
+from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
-revision: str = '5e2e2c8b0b06'
+revision: str = '5e730cd0341f'
 down_revision: Union[str, Sequence[str], None] = None
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
@@ -184,10 +184,9 @@ def upgrade() -> None:
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('cover_image_key', sa.String(length=512), nullable=True),
     sa.Column('banner_image_key', sa.String(length=512), nullable=True),
-    sa.Column('is_public', sa.Boolean(), nullable=False),
+    sa.Column('is_open_for_enrollment', sa.Boolean(), nullable=False),
     sa.Column('visibility_level', sa.Enum('private', 'public', 'unlisted', name='course_visibility_level_enum'), nullable=False),
     sa.Column('requires_enrollment_approval', sa.Boolean(), nullable=False),
-    sa.Column('learning_outcomes', sa.JSON(), nullable=True),
     sa.Column('category', sa.String(length=100), nullable=True),
     sa.Column('tags', sa.JSON(), nullable=True),
     sa.Column('course_type', sa.Enum('individual', 'organization', name='course_type_enum'), nullable=False),
@@ -206,7 +205,7 @@ def upgrade() -> None:
     op.create_index(op.f('ix_courses_course_code'), 'courses', ['course_code'], unique=False)
     op.create_index(op.f('ix_courses_course_type'), 'courses', ['course_type'], unique=False)
     op.create_index('ix_courses_created_by_course_type', 'courses', ['created_by', 'course_type'], unique=False)
-    op.create_index(op.f('ix_courses_is_public'), 'courses', ['is_public'], unique=False)
+    op.create_index(op.f('ix_courses_is_open_for_enrollment'), 'courses', ['is_open_for_enrollment'], unique=False)
     op.create_index('ix_courses_org_id_title', 'courses', ['organization_id', 'title'], unique=False)
     op.create_index(op.f('ix_courses_status'), 'courses', ['status'], unique=False)
     op.create_table('credit_wallets',
@@ -443,6 +442,24 @@ def upgrade() -> None:
     op.create_index(op.f('ix_exams_available_to'), 'exams', ['available_to'], unique=False)
     op.create_index('ix_exams_course_published', 'exams', ['course_id', 'is_published'], unique=False)
     op.create_index(op.f('ix_exams_exam_type'), 'exams', ['exam_type'], unique=False)
+    op.create_table('learning_outcomes',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('course_id', sa.Integer(), nullable=False),
+    sa.Column('title', sa.String(length=255), nullable=False),
+    sa.Column('description', sa.Text(), nullable=True),
+    sa.Column('level', sa.Enum('foundational', 'intermediate', 'advanced', name='learning_outcome_level_enum'), nullable=False),
+    sa.Column('ai_ref_key', sa.String(length=100), nullable=True),
+    sa.Column('is_ai_generated', sa.Boolean(), nullable=False),
+    sa.Column('is_reviewed', sa.Boolean(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(['course_id'], ['courses.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index('ix_learning_outcomes_course_ai_ref', 'learning_outcomes', ['course_id', 'ai_ref_key'], unique=False)
+    op.create_index(op.f('ix_learning_outcomes_course_id'), 'learning_outcomes', ['course_id'], unique=False)
+    op.create_index('ix_learning_outcomes_course_level', 'learning_outcomes', ['course_id', 'level'], unique=False)
+    op.create_index(op.f('ix_learning_outcomes_level'), 'learning_outcomes', ['level'], unique=False)
     op.create_table('modules',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('course_id', sa.Integer(), nullable=False),
@@ -587,24 +604,41 @@ def upgrade() -> None:
     op.create_index('ix_student_exam_attempts_exam_started', 'student_exam_attempts', ['exam_id', 'started_at'], unique=False)
     op.create_index(op.f('ix_student_exam_attempts_status'), 'student_exam_attempts', ['status'], unique=False)
     op.create_index('uq_student_exam_attempts_student_exam_attempt', 'student_exam_attempts', ['student_id', 'exam_id', 'attempt_number'], unique=True)
+    op.create_table('material_chunks',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('material_id', sa.Integer(), nullable=False),
+    sa.Column('chunk_text', sa.Text(), nullable=False),
+    sa.Column('chunk_index', sa.Integer(), nullable=False),
+    sa.Column('start_page', sa.Integer(), nullable=True),
+    sa.Column('start_time_seconds', sa.Integer(), nullable=True),
+    sa.Column('metadata', sa.JSON(), nullable=True),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(['material_id'], ['materials.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id')
+    )
+    op.create_index(op.f('ix_material_chunks_material_id'), 'material_chunks', ['material_id'], unique=False)
+    op.create_index('uq_material_chunks_material_index', 'material_chunks', ['material_id', 'chunk_index'], unique=True)
     op.create_table('topics',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('module_id', sa.Integer(), nullable=False),
+    sa.Column('material_id', sa.Integer(), nullable=False),
     sa.Column('title', sa.String(length=255), nullable=False),
     sa.Column('description', sa.Text(), nullable=True),
     sa.Column('order_index', sa.Integer(), nullable=False),
     sa.Column('parent_topic_id', sa.Integer(), nullable=True),
-    sa.Column('estimated_duration_minutes', sa.Integer(), nullable=True),
-    sa.Column('is_required', sa.Boolean(), nullable=False),
+    sa.Column('is_ai_generated', sa.Boolean(), nullable=False),
+    sa.Column('is_reviewed', sa.Boolean(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['module_id'], ['modules.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['material_id'], ['materials.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['parent_topic_id'], ['topics.id'], ondelete='SET NULL'),
     sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_topics_module_id'), 'topics', ['module_id'], unique=False)
+    op.create_index(op.f('ix_topics_is_ai_generated'), 'topics', ['is_ai_generated'], unique=False)
+    op.create_index(op.f('ix_topics_is_reviewed'), 'topics', ['is_reviewed'], unique=False)
+    op.create_index(op.f('ix_topics_material_id'), 'topics', ['material_id'], unique=False)
+    op.create_index('ix_topics_material_order', 'topics', ['material_id', 'order_index'], unique=False)
+    op.create_index('ix_topics_material_parent', 'topics', ['material_id', 'parent_topic_id'], unique=False)
     op.create_index(op.f('ix_topics_parent_topic_id'), 'topics', ['parent_topic_id'], unique=False)
-    op.create_index('uq_topics_module_order', 'topics', ['module_id', 'order_index'], unique=True)
     op.create_table('ai_question_generation_logs',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('scope', sa.Enum('topic', 'material', 'module', 'course', 'custom', name='question_generation_scope_enum'), nullable=False),
@@ -690,20 +724,6 @@ def upgrade() -> None:
     op.create_index('ix_learning_recommendations_student_course_generated', 'learning_recommendations', ['student_id', 'course_id', 'generated_at'], unique=False)
     op.create_index(op.f('ix_learning_recommendations_target_material_id'), 'learning_recommendations', ['target_material_id'], unique=False)
     op.create_index(op.f('ix_learning_recommendations_target_topic_id'), 'learning_recommendations', ['target_topic_id'], unique=False)
-    op.create_table('material_chunks',
-    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-    sa.Column('material_id', sa.Integer(), nullable=False),
-    sa.Column('chunk_text', sa.Text(), nullable=False),
-    sa.Column('chunk_index', sa.Integer(), nullable=False),
-    sa.Column('start_page', sa.Integer(), nullable=True),
-    sa.Column('start_time_seconds', sa.Integer(), nullable=True),
-    sa.Column('metadata', sa.JSON(), nullable=True),
-    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
-    sa.ForeignKeyConstraint(['material_id'], ['materials.id'], ondelete='CASCADE'),
-    sa.PrimaryKeyConstraint('id')
-    )
-    op.create_index(op.f('ix_material_chunks_material_id'), 'material_chunks', ['material_id'], unique=False)
-    op.create_index('uq_material_chunks_material_index', 'material_chunks', ['material_id', 'chunk_index'], unique=True)
     op.create_table('practice_sessions',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('student_id', sa.Integer(), nullable=False),
@@ -744,6 +764,18 @@ def upgrade() -> None:
     )
     op.create_index(op.f('ix_quick_quiz_topics_topic_id'), 'quick_quiz_topics', ['topic_id'], unique=False)
     op.create_index('uq_quick_quiz_topics_quiz_topic', 'quick_quiz_topics', ['quick_quiz_id', 'topic_id'], unique=True)
+    op.create_table('topic_learning_outcomes',
+    sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
+    sa.Column('topic_id', sa.Integer(), nullable=False),
+    sa.Column('learning_outcome_id', sa.Integer(), nullable=False),
+    sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
+    sa.ForeignKeyConstraint(['learning_outcome_id'], ['learning_outcomes.id'], ondelete='CASCADE'),
+    sa.ForeignKeyConstraint(['topic_id'], ['topics.id'], ondelete='CASCADE'),
+    sa.PrimaryKeyConstraint('id'),
+    sa.UniqueConstraint('topic_id', 'learning_outcome_id', name='uq_topic_learning_outcome')
+    )
+    op.create_index(op.f('ix_topic_learning_outcomes_learning_outcome_id'), 'topic_learning_outcomes', ['learning_outcome_id'], unique=False)
+    op.create_index(op.f('ix_topic_learning_outcomes_topic_id'), 'topic_learning_outcomes', ['topic_id'], unique=False)
     op.create_table('video_timestamps',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('material_id', sa.Integer(), nullable=False),
@@ -783,13 +815,13 @@ def upgrade() -> None:
     op.create_table('questions',
     sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
     sa.Column('course_id', sa.Integer(), nullable=False),
-    sa.Column('topic_id', sa.Integer(), nullable=True),
     sa.Column('module_id', sa.Integer(), nullable=True),
     sa.Column('material_id', sa.Integer(), nullable=True),
+    sa.Column('topic_id', sa.Integer(), nullable=True),
     sa.Column('video_timestamp_id', sa.Integer(), nullable=True),
     sa.Column('question_text', sa.Text(), nullable=False),
     sa.Column('explanation', sa.Text(), nullable=True),
-    sa.Column('options', sa.JSON(), nullable=True),
+    sa.Column('options', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
     sa.Column('type', sa.Enum('multiple_choice', 'multi_select', 'true_false', 'short_answer', 'essay', 'fill_in_the_blank', 'matching', 'ordering', 'numeric', 'code', name='question_type_enum'), nullable=False),
     sa.Column('difficulty', sa.Enum('easy', 'medium', 'hard', name='question_difficulty_enum'), nullable=False),
     sa.Column('source', sa.Enum('manual', 'ai_generated', 'imported', name='question_source_enum'), nullable=False),
@@ -808,7 +840,7 @@ def upgrade() -> None:
     sa.Column('created_by', sa.Integer(), nullable=False),
     sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
     sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False),
-    sa.CheckConstraint('(topic_id IS NOT NULL) OR (module_id IS NOT NULL) OR (material_id IS NOT NULL)', name='ck_questions_scope_required'),
+    sa.CheckConstraint('(topic_id IS NOT NULL) OR (module_id IS NOT NULL) OR (material_id IS NOT NULL) OR (topic_id IS NULL AND module_id IS NULL AND material_id IS NULL)', name='ck_questions_scope_required'),
     sa.ForeignKeyConstraint(['course_id'], ['courses.id'], ondelete='CASCADE'),
     sa.ForeignKeyConstraint(['created_by'], ['users.id'], ondelete='RESTRICT'),
     sa.ForeignKeyConstraint(['material_id'], ['materials.id'], ondelete='SET NULL'),
@@ -1001,6 +1033,9 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_video_timestamps_topic_id'), table_name='video_timestamps')
     op.drop_index('ix_video_timestamps_material_start', table_name='video_timestamps')
     op.drop_table('video_timestamps')
+    op.drop_index(op.f('ix_topic_learning_outcomes_topic_id'), table_name='topic_learning_outcomes')
+    op.drop_index(op.f('ix_topic_learning_outcomes_learning_outcome_id'), table_name='topic_learning_outcomes')
+    op.drop_table('topic_learning_outcomes')
     op.drop_index('uq_quick_quiz_topics_quiz_topic', table_name='quick_quiz_topics')
     op.drop_index(op.f('ix_quick_quiz_topics_topic_id'), table_name='quick_quiz_topics')
     op.drop_table('quick_quiz_topics')
@@ -1011,9 +1046,6 @@ def downgrade() -> None:
     op.drop_index(op.f('ix_practice_sessions_material_id'), table_name='practice_sessions')
     op.drop_index('ix_practice_sessions_course_scope_started', table_name='practice_sessions')
     op.drop_table('practice_sessions')
-    op.drop_index('uq_material_chunks_material_index', table_name='material_chunks')
-    op.drop_index(op.f('ix_material_chunks_material_id'), table_name='material_chunks')
-    op.drop_table('material_chunks')
     op.drop_index(op.f('ix_learning_recommendations_target_topic_id'), table_name='learning_recommendations')
     op.drop_index(op.f('ix_learning_recommendations_target_material_id'), table_name='learning_recommendations')
     op.drop_index('ix_learning_recommendations_student_course_generated', table_name='learning_recommendations')
@@ -1036,10 +1068,16 @@ def downgrade() -> None:
     op.drop_index('ix_ai_qgen_material_topic_created', table_name='ai_question_generation_logs')
     op.drop_index('ix_ai_qgen_course_created', table_name='ai_question_generation_logs')
     op.drop_table('ai_question_generation_logs')
-    op.drop_index('uq_topics_module_order', table_name='topics')
     op.drop_index(op.f('ix_topics_parent_topic_id'), table_name='topics')
-    op.drop_index(op.f('ix_topics_module_id'), table_name='topics')
+    op.drop_index('ix_topics_material_parent', table_name='topics')
+    op.drop_index('ix_topics_material_order', table_name='topics')
+    op.drop_index(op.f('ix_topics_material_id'), table_name='topics')
+    op.drop_index(op.f('ix_topics_is_reviewed'), table_name='topics')
+    op.drop_index(op.f('ix_topics_is_ai_generated'), table_name='topics')
     op.drop_table('topics')
+    op.drop_index('uq_material_chunks_material_index', table_name='material_chunks')
+    op.drop_index(op.f('ix_material_chunks_material_id'), table_name='material_chunks')
+    op.drop_table('material_chunks')
     op.drop_index('uq_student_exam_attempts_student_exam_attempt', table_name='student_exam_attempts')
     op.drop_index(op.f('ix_student_exam_attempts_status'), table_name='student_exam_attempts')
     op.drop_index('ix_student_exam_attempts_exam_started', table_name='student_exam_attempts')
@@ -1066,6 +1104,11 @@ def downgrade() -> None:
     op.drop_index('uq_modules_course_order', table_name='modules')
     op.drop_index(op.f('ix_modules_course_id'), table_name='modules')
     op.drop_table('modules')
+    op.drop_index(op.f('ix_learning_outcomes_level'), table_name='learning_outcomes')
+    op.drop_index('ix_learning_outcomes_course_level', table_name='learning_outcomes')
+    op.drop_index(op.f('ix_learning_outcomes_course_id'), table_name='learning_outcomes')
+    op.drop_index('ix_learning_outcomes_course_ai_ref', table_name='learning_outcomes')
+    op.drop_table('learning_outcomes')
     op.drop_index(op.f('ix_exams_exam_type'), table_name='exams')
     op.drop_index('ix_exams_course_published', table_name='exams')
     op.drop_index(op.f('ix_exams_available_to'), table_name='exams')
@@ -1110,7 +1153,7 @@ def downgrade() -> None:
     op.drop_table('credit_wallets')
     op.drop_index(op.f('ix_courses_status'), table_name='courses')
     op.drop_index('ix_courses_org_id_title', table_name='courses')
-    op.drop_index(op.f('ix_courses_is_public'), table_name='courses')
+    op.drop_index(op.f('ix_courses_is_open_for_enrollment'), table_name='courses')
     op.drop_index('ix_courses_created_by_course_type', table_name='courses')
     op.drop_index(op.f('ix_courses_course_type'), table_name='courses')
     op.drop_index(op.f('ix_courses_course_code'), table_name='courses')

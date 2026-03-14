@@ -14,9 +14,11 @@ from .credit_wallet import CreditWallet
 
 from .enums import *
 
-from .exam import Exam
 from .exam_question import ExamQuestion
 from .exam_sections import ExamSection
+from .exam import Exam
+
+from .learning_outcomes import LearningOutcome
 
 from .learning_recommendations import LearningRecommendation
 from .learning_recommendation_questions import LearningRecommendationQuestion
@@ -49,6 +51,7 @@ from .student_question_progress import StudentQuestionProgress
 
 from .subscription_plans import SubscriptionPlan
 
+from .topic_learning_outcomes import TopicLearningOutcome
 from .topic import Topic
 
 from .users import User

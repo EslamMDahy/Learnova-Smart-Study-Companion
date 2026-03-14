@@ -40,7 +40,7 @@ class CourseCreateRequest(BaseModel):
     visibility_level: CourseVisibilityLevel
     requires_enrollment_approval: bool = False
 
-    learning_outcomes: Optional[list[str]] = None
+    # learning_outcomes: Optional[list[str]] = None
     tags: Optional[list[str]] = None
     category: Optional[str] = Field(default=None, max_length=100)
     status: Optional[CourseStatus] = Field(
