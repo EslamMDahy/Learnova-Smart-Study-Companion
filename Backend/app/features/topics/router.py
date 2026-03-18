@@ -37,19 +37,19 @@ def create_topic(
         current_user=current_user,)
 
 
-# @router.get("", response_model=TopicListResponse, status_code=status.HTTP_200_OK)
-# def list_material_topics(
-#     course_id: int,
-#     module_id: int,
-#     material_id: int,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),):
-#     return service.list_material_topics(
-#         course_id=course_id,
-#         module_id=module_id,
-#         material_id=material_id,
-#         db=db,
-#         current_user=current_user,)
+@router.get("", response_model=TopicListResponse, status_code=status.HTTP_200_OK)
+def list_material_topics(
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.list_material_topics(
+        course_id=course_id,
+        module_id=module_id,
+        material_id=material_id,
+        db=db,
+        current_user=current_user,)
 
 
 # @router.get("/{topic_id}", response_model=TopicGetResponse, status_code=status.HTTP_200_OK)
