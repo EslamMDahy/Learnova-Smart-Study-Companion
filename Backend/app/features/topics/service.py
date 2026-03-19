@@ -647,15 +647,159 @@ def update_topic(*, course_id: int, module_id: int, material_id: int, topic_id: 
     
 
 
-def delete_topic(
-    *,
-    course_id: int,
-    module_id: int,
-    material_id: int,
-    topic_id: int,
-    db: Session,
-    current_user: dict,
-):
+def reorder_topics(*, course_id: int, module_id: int, material_id: int, payload, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can reorder topics")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    topic_ids = getattr(payload, "topic_ids", None)
+    if not isinstance(topic_ids, list) or not topic_ids:
+        raise HTTPException(status_code=400, detail="topic_ids must be a non-empty list")
+
+    try:
+        topic_ids = [int(tid) for tid in topic_ids]
+    except Exception:
+        raise HTTPException(status_code=400, detail="topic_ids must contain valid integers")
+
+    if any(tid <= 0 for tid in topic_ids):
+        raise HTTPException(status_code=400, detail="topic_ids must contain positive integers only")
+
+    if len(topic_ids) != len(set(topic_ids)):
+        raise HTTPException(status_code=400, detail="topic_ids must not contain duplicates")
+
+    # =========================
+    # 2) Validate material -> module -> course + ownership
+    # =========================
+    material_row = db.execute(
+        text("""
+            SELECT
+                m.id AS material_id,
+                m.module_id,
+                mo.course_id,
+                c.created_by
+            FROM materials m
+            JOIN modules mo
+              ON mo.id = m.module_id
+            JOIN courses c
+              ON c.id = mo.course_id
+            WHERE m.id = :material_id
+            LIMIT 1
+        """),
+        {"material_id": material_id},
+    ).mappings().first()
+
+    if not material_row:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    if int(material_row["module_id"]) != int(module_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this module")
+
+    if int(material_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this course")
+
+    if int(material_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only reorder topics for your own course")
+
+    # =========================
+    # 3) Fetch all material topics
+    # =========================
+    db_topic_rows = db.execute(
+        text("""
+            SELECT id
+            FROM topics
+            WHERE material_id = :material_id
+            ORDER BY order_index ASC, id ASC
+        """),
+        {"material_id": material_id},
+    ).mappings().all()
+
+    db_topic_ids = [int(row["id"]) for row in db_topic_rows]
+
+    if not db_topic_ids:
+        raise HTTPException(status_code=404, detail="No topics found for this material")
+
+    # request must include all material topics exactly once
+    if set(topic_ids) != set(db_topic_ids):
+        raise HTTPException(
+            status_code=400,
+            detail="topic_ids must include all material topics exactly once"
+        )
+
+    # =========================
+    # 4) Reorder with two-phase update
+    #    to avoid unique conflict on (material_id, order_index)
+    # =========================
+    try:
+        # phase 1: move to temporary negative order values
+        for idx, topic_id in enumerate(topic_ids):
+            db.execute(
+                text("""
+                    UPDATE topics
+                    SET order_index = :temp_order_index,
+                        updated_at = NOW()
+                    WHERE id = :topic_id
+                      AND material_id = :material_id
+                """),
+                {
+                    "temp_order_index": -(idx + 1),
+                    "topic_id": topic_id,
+                    "material_id": material_id,
+                },
+            )
+
+        # phase 2: assign final order values
+        for idx, topic_id in enumerate(topic_ids):
+            db.execute(
+                text("""
+                    UPDATE topics
+                    SET order_index = :final_order_index,
+                        updated_at = NOW()
+                    WHERE id = :topic_id
+                      AND material_id = :material_id
+                """),
+                {
+                    "final_order_index": idx,
+                    "topic_id": topic_id,
+                    "material_id": material_id,
+                },
+            )
+
+        db.commit()
+
+        return {
+            "course_id": course_id,
+            "module_id": module_id,
+            "material_id": material_id,
+            "topic_ids": topic_ids,
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def delete_topic(*, course_id: int, module_id: int, material_id: int, topic_id: int, db: Session, current_user: dict,):
     # =========================
     # 1) Authorization
     # =========================
@@ -755,3 +899,5 @@ def delete_topic(
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
+    
+

@@ -102,6 +102,24 @@ class TopicUpdateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class TopicReorderRequest(BaseModel):
+    topic_ids: List[int] = Field(
+        ...,
+        min_length=1,
+        description="Final ordered list of all topics IDs in the course"
+    )
+
+    model_config = ConfigDict(extra="forbid")
+
+class TopicReorderResponse(BaseModel):
+    course_id: int
+    module_id: int
+    material_id: int
+    topic_ids: List[int]
+
+    model_config = ConfigDict(extra="forbid")
+
+
 # class TopicGetResponse(BaseModel):
 #     id: int
 #     material_id: int
