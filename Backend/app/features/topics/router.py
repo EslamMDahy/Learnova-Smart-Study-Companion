@@ -69,23 +69,23 @@ def list_material_topics(
 #         current_user=current_user,)
 
 
-# @router.patch("/{topic_id}/update", response_model=TopicUpdateResponse, status_code=status.HTTP_200_OK)
-# def update_topic(
-#     course_id: int,
-#     module_id: int,
-#     material_id: int,
-#     topic_id: int,
-#     payload: TopicUpdateRequest,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),):
-#     return service.update_topic(
-#         course_id=course_id,
-#         module_id=module_id,
-#         material_id=material_id,
-#         topic_id=topic_id,
-#         payload=payload,
-#         db=db,
-#         current_user=current_user,)
+@router.patch("/{topic_id}/update", response_model=TopicUpdateResponse, status_code=status.HTTP_200_OK)
+def update_topic(
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    topic_id: int,
+    payload: TopicUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.update_topic(
+        course_id=course_id,
+        module_id=module_id,
+        material_id=material_id,
+        topic_id=topic_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
 
 
 # @router.delete("/{topic_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
