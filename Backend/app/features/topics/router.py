@@ -10,9 +10,7 @@ from .schemas import (
     TopicCreateResponse,
     TopicUpdateRequest,
     TopicUpdateResponse,
-    TopicListResponse,
-    TopicGetResponse,
-)
+    TopicListResponse)
 
 router = APIRouter(
     prefix="/courses/{course_id}/modules/{module_id}/materials/{material_id}/topics",
@@ -88,18 +86,18 @@ def update_topic(
         current_user=current_user,)
 
 
-# @router.delete("/{topic_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
-# def delete_topic(
-#     course_id: int,
-#     module_id: int,
-#     material_id: int,
-#     topic_id: int,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),):
-#     service.delete_topic(
-#         course_id=course_id,
-#         module_id=module_id,
-#         material_id=material_id,
-#         topic_id=topic_id,
-#         db=db,
-#         current_user=current_user,)
+@router.delete("/{topic_id}/delete", status_code=status.HTTP_204_NO_CONTENT)
+def delete_topic(
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    topic_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    service.delete_topic(
+        course_id=course_id,
+        module_id=module_id,
+        material_id=material_id,
+        topic_id=topic_id,
+        db=db,
+        current_user=current_user,)

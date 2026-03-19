@@ -646,3 +646,112 @@ def update_topic(*, course_id: int, module_id: int, material_id: int, topic_id: 
         raise HTTPException(status_code=500, detail="Database error") from e
     
 
+
+def delete_topic(
+    *,
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    topic_id: int,
+    db: Session,
+    current_user: dict,
+):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can delete topics")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    if not topic_id or topic_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid topic_id")
+
+    try:
+        # =========================
+        # 2) Validate topic -> material -> module -> course + ownership
+        # =========================
+        topic_row = db.execute(
+            text("""
+                SELECT
+                    t.id,
+                    t.material_id,
+                    m.module_id,
+                    mo.course_id,
+                    c.created_by
+                FROM topics t
+                JOIN materials m
+                  ON m.id = t.material_id
+                JOIN modules mo
+                  ON mo.id = m.module_id
+                JOIN courses c
+                  ON c.id = mo.course_id
+                WHERE t.id = :topic_id
+                LIMIT 1
+            """),
+            {"topic_id": topic_id},
+        ).mappings().first()
+
+        if not topic_row:
+            raise HTTPException(status_code=404, detail="Topic not found")
+
+        if int(topic_row["material_id"]) != int(material_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this material")
+
+        if int(topic_row["module_id"]) != int(module_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this module")
+
+        if int(topic_row["course_id"]) != int(course_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this course")
+
+        if int(topic_row["created_by"]) != int(instructor_id):
+            raise HTTPException(status_code=403, detail="You can only delete topics from your own course")
+
+        # =========================
+        # 3) Delete topic relations first
+        # =========================
+        db.execute(
+            text("""
+                DELETE FROM topic_learning_outcomes
+                WHERE topic_id = :topic_id
+            """),
+            {"topic_id": topic_id},
+        )
+
+        # =========================
+        # 4) Delete topic
+        # =========================
+        deleted_row = db.execute(
+            text("""
+                DELETE FROM topics
+                WHERE id = :topic_id
+                RETURNING id
+            """),
+            {"topic_id": topic_id},
+        ).first()
+
+        if not deleted_row:
+            db.rollback()
+            raise HTTPException(status_code=404, detail="Topic not found")
+
+        db.commit()
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e

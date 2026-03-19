@@ -37,6 +37,31 @@ class TopicCreateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class TopicListItem(BaseModel):
+    id: int
+    material_id: int
+    title: str
+    description: Optional[str] = None
+    order_index: int
+    parent_topic_id: Optional[int] = None
+
+    is_ai_generated: bool
+    is_reviewed: bool
+
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(extra="forbid")
+
+class TopicListResponse(BaseModel):
+    course_id: int
+    module_id: int
+    material_id: int
+    topics: List[TopicListItem]
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class TopicUpdateRequest(BaseModel):
     title: Optional[str] = Field(
         default=None,
@@ -77,45 +102,20 @@ class TopicUpdateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class TopicListItem(BaseModel):
-    id: int
-    material_id: int
-    title: str
-    description: Optional[str] = None
-    order_index: int
-    parent_topic_id: Optional[int] = None
+# class TopicGetResponse(BaseModel):
+#     id: int
+#     material_id: int
+#     title: str
+#     description: Optional[str] = None
+#     order_index: int
+#     parent_topic_id: Optional[int] = None
 
-    is_ai_generated: bool
-    is_reviewed: bool
+#     is_ai_generated: bool
+#     is_reviewed: bool
 
-    created_at: datetime
-    updated_at: datetime
+#     created_at: datetime
+#     updated_at: datetime
 
-    model_config = ConfigDict(extra="forbid")
+#     learning_outcome_ids: List[int] = []
 
-class TopicListResponse(BaseModel):
-    course_id: int
-    module_id: int
-    material_id: int
-    topics: List[TopicListItem]
-
-    model_config = ConfigDict(extra="forbid")
-
-
-class TopicGetResponse(BaseModel):
-    id: int
-    material_id: int
-    title: str
-    description: Optional[str] = None
-    order_index: int
-    parent_topic_id: Optional[int] = None
-
-    is_ai_generated: bool
-    is_reviewed: bool
-
-    created_at: datetime
-    updated_at: datetime
-
-    learning_outcome_ids: List[int] = []
-
-    model_config = ConfigDict(extra="forbid")
+#     model_config = ConfigDict(extra="forbid")
