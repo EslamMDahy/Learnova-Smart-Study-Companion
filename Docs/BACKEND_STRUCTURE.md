@@ -33,7 +33,22 @@ Backend/
 |  |  |  ├─ schemas.py
 |  |  |  └─ service.py
 |  |  |
+|  |  ├─ materials/
+|  |  |  ├─ router.py
+|  |  |  ├─ schemas.py
+|  |  |  └─ service.py
+|  |  |
+|  |  ├─ modules/
+|  |  |  ├─ router.py
+|  |  |  ├─ schemas.py
+|  |  |  └─ service.py
+|  |  |
 |  |  ├─ organizations/
+|  |  |  ├─ router.py
+|  |  |  ├─ schemas.py
+|  |  |  └─ service.py
+|  |  |
+|  |  ├─ questions/
 |  |  |  ├─ router.py
 |  |  |  ├─ schemas.py
 |  |  |  └─ service.py
