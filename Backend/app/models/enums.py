@@ -116,6 +116,10 @@ class CourseEnrollmentStatus(str, Enum):
     completed = "completed"
     dropped = "dropped"
 
+class LearningOutcomeLevel(str, Enum):
+    foundational = "foundational"
+    intermediate = "intermediate"
+    advanced = "advanced"
 
 class CourseEnrollmentType(str, Enum):
     self = "self"

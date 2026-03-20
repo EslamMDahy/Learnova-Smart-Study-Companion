@@ -48,7 +48,6 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             is_open_for_enrollment,
             visibility_level,
             requires_enrollment_approval,
-            learning_outcomes,
             category,
             tags,
             course_type,
@@ -68,7 +67,6 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             :is_open_for_enrollment,
             :visibility_level,
             :requires_enrollment_approval,
-            :learning_outcomes,
             :category,
             :tags,
             :course_type,
@@ -83,7 +81,7 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
             id, title, course_code, course_type, organization_id, is_open_for_enrollment, visibility_level,
             requires_enrollment_approval, status, published_at
     """).bindparams(
-        bindparam("learning_outcomes", type_=JSONB),
+        # bindparam("learning_outcomes", type_=JSONB),
         bindparam("tags", type_=JSONB),
     )
 
@@ -96,7 +94,6 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
         "is_open_for_enrollment": payload.is_open_for_enrollment,
         "visibility_level": payload.visibility_level.value,
         "requires_enrollment_approval": payload.requires_enrollment_approval,
-        "learning_outcomes": payload.learning_outcomes,
         "category": payload.category,
         "tags": payload.tags,
         "course_type": payload.course_type.value,

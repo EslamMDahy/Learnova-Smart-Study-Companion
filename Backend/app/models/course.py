@@ -86,10 +86,10 @@ class Course(Base):
         default=False
     )
 
-    learning_outcomes: Mapped[dict | None] = mapped_column(
-        JSON,
-        nullable=True
-    )
+    # learning_outcomes: Mapped[dict | None] = mapped_column(
+    #     JSON,
+    #     nullable=True
+    # )
 
     category: Mapped[str | None] = mapped_column(
         String(100),
