@@ -365,6 +365,153 @@ def list_material_topics(*, course_id: int, module_id: int, material_id: int, db
 
 
 
+def get_topic(*, course_id: int, module_id: int, material_id: int, topic_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authentication
+    # =========================
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    if not topic_id or topic_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid topic_id")
+
+    role = (current_user.get("system_role") or "").strip().lower()
+
+    try:
+        # =========================
+        # 2) Validate topic -> material -> module -> course
+        # =========================
+        topic_row = db.execute(
+            text("""
+                SELECT
+                    t.id,
+                    t.material_id,
+                    t.title,
+                    t.description,
+                    t.order_index,
+                    t.parent_topic_id,
+                    t.is_ai_generated,
+                    t.is_reviewed,
+                    t.created_at,
+                    t.updated_at,
+                    m.module_id,
+                    mo.course_id,
+                    c.created_by
+                FROM topics t
+                JOIN materials m
+                  ON m.id = t.material_id
+                JOIN modules mo
+                  ON mo.id = m.module_id
+                JOIN courses c
+                  ON c.id = mo.course_id
+                WHERE t.id = :topic_id
+                LIMIT 1
+            """),
+            {"topic_id": topic_id},
+        ).mappings().first()
+
+        if not topic_row:
+            raise HTTPException(status_code=404, detail="Topic not found")
+
+        if int(topic_row["material_id"]) != int(material_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this material")
+
+        if int(topic_row["module_id"]) != int(module_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this module")
+
+        if int(topic_row["course_id"]) != int(course_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this course")
+
+        # =========================
+        # 3) Authorization
+        # =========================
+        if role == "instructor":
+            if int(topic_row["created_by"]) != int(user_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="You can only view topics for your own course"
+                )
+
+        elif role == "student":
+            enrollment_row = db.execute(
+                text("""
+                    SELECT 1
+                    FROM course_enrollments
+                    WHERE course_id = :course_id
+                      AND student_id = :student_id
+                      AND status IN ('active', 'completed')
+                    LIMIT 1
+                """),
+                {
+                    "course_id": course_id,
+                    "student_id": user_id,
+                },
+            ).first()
+
+            if not enrollment_row:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You are not allowed to access topics for this course"
+                )
+
+        else:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # =========================
+        # 4) Fetch related learning outcomes
+        # =========================
+        learning_outcome_rows = db.execute(
+            text("""
+                SELECT
+                    lo.id,
+                    lo.title
+                FROM topic_learning_outcomes tlo
+                JOIN learning_outcomes lo
+                  ON lo.id = tlo.learning_outcome_id
+                WHERE tlo.topic_id = :topic_id
+                  AND lo.course_id = :course_id
+                ORDER BY lo.created_at ASC, lo.id ASC
+            """),
+            {
+                "topic_id": topic_id,
+                "course_id": course_id,
+            },
+        ).mappings().all()
+
+        response = {
+            "id": topic_row["id"],
+            "material_id": topic_row["material_id"],
+            "title": topic_row["title"],
+            "description": topic_row["description"],
+            "order_index": topic_row["order_index"],
+            "parent_topic_id": topic_row["parent_topic_id"],
+            "is_ai_generated": topic_row["is_ai_generated"],
+            "is_reviewed": topic_row["is_reviewed"],
+            "created_at": topic_row["created_at"],
+            "updated_at": topic_row["updated_at"],
+            "learning_outcomes": [dict(row) for row in learning_outcome_rows],
+        }
+
+        return response
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
 def update_topic(*, course_id: int, module_id: int, material_id: int, topic_id: int, payload: TopicUpdateRequest, db: Session, current_user: dict,):
     # =========================
     # 1) Authorization
