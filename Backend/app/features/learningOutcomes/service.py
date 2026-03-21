@@ -5,7 +5,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from .schemas import LearningOutcomeCreateRequest
+from .schemas import (LearningOutcomeCreateRequest, 
+                      LearningOutcomeUpdateRequest)
+
 
 
 def create_learning_outcome(*, course_id: int, payload: LearningOutcomeCreateRequest, db: Session, current_user: dict,):
@@ -196,7 +198,6 @@ def create_learning_outcome(*, course_id: int, payload: LearningOutcomeCreateReq
     
 
 
-
 def list_learning_outcomes(*, course_id: int, db: Session, current_user: dict,):
     # =========================
     # 1) Authentication
@@ -294,7 +295,6 @@ def list_learning_outcomes(*, course_id: int, db: Session, current_user: dict,):
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail="Database error") from e
-
 
 
 
@@ -429,4 +429,320 @@ def get_learning_outcome(*, course_id: int, learning_outcome_id: int, db: Sessio
         raise
 
     except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def update_learning_outcome(*, course_id: int, learning_outcome_id: int, payload: LearningOutcomeUpdateRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can update learning outcomes")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not learning_outcome_id or learning_outcome_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid learning_outcome_id")
+
+    # =========================
+    # 2) Validate learning outcome -> course + ownership
+    # =========================
+    learning_outcome_row = db.execute(
+        text("""
+            SELECT
+                lo.id,
+                lo.course_id,
+                c.created_by
+            FROM learning_outcomes lo
+            JOIN courses c
+              ON c.id = lo.course_id
+            WHERE lo.id = :learning_outcome_id
+            LIMIT 1
+        """),
+        {"learning_outcome_id": learning_outcome_id},
+    ).mappings().first()
+
+    if not learning_outcome_row:
+        raise HTTPException(status_code=404, detail="Learning outcome not found")
+
+    if int(learning_outcome_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Learning outcome does not belong to this course")
+
+    if int(learning_outcome_row["created_by"]) != int(instructor_id):
+        raise HTTPException(
+            status_code=403,
+            detail="You can only update learning outcomes in your own course"
+        )
+
+    # =========================
+    # 3) Build dynamic update fields
+    # =========================
+    update_fields = {}
+    provided_fields = payload.model_fields_set
+
+    if "title" in provided_fields and payload.title is not None:
+        title = payload.title.strip()
+        if title == "":
+            raise HTTPException(status_code=422, detail="title cannot be empty")
+        update_fields["title"] = title
+
+    if "description" in provided_fields and payload.description is not None:
+        description = payload.description.strip()
+        update_fields["description"] = description or None
+
+    if "level" in provided_fields and payload.level is not None:
+        level = payload.level.strip()
+        if level == "":
+            raise HTTPException(status_code=422, detail="level cannot be empty")
+        update_fields["level"] = level
+
+    # =========================
+    # 4) Validate topics if provided
+    # =========================
+    replace_topics = False
+    normalized_topic_ids = []
+
+    if "topic_ids" in provided_fields and payload.topic_ids is not None:
+        replace_topics = True
+
+        seen = set()
+        for topic_id in payload.topic_ids:
+            if not isinstance(topic_id, int) or topic_id <= 0:
+                raise HTTPException(
+                    status_code=422,
+                    detail="topic_ids must contain valid positive integers"
+                )
+            if topic_id not in seen:
+                seen.add(topic_id)
+                normalized_topic_ids.append(topic_id)
+
+        if normalized_topic_ids:
+            topic_rows = db.execute(
+                text("""
+                    SELECT
+                        t.id,
+                        mo.course_id
+                    FROM topics t
+                    JOIN materials m
+                      ON m.id = t.material_id
+                    JOIN modules mo
+                      ON mo.id = m.module_id
+                    WHERE t.id = ANY(:topic_ids)
+                """),
+                {"topic_ids": normalized_topic_ids},
+            ).mappings().all()
+
+            if len(topic_rows) != len(normalized_topic_ids):
+                raise HTTPException(status_code=404, detail="One or more topics were not found")
+
+            for row in topic_rows:
+                if int(row["course_id"]) != int(course_id):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="All topics must belong to the same course"
+                    )
+
+    if not update_fields and not replace_topics:
+        raise HTTPException(status_code=400, detail="No updatable fields provided")
+
+    # =========================
+    # 5) Update learning outcome + optional relations replacement
+    # =========================
+    try:
+        updated_learning_outcome = None
+
+        if update_fields:
+            set_clauses = []
+            params = {"learning_outcome_id": learning_outcome_id}
+
+            for col in ["title", "description", "level"]:
+                if col in update_fields:
+                    set_clauses.append(f"{col} = :{col}")
+                    params[col] = update_fields[col]
+
+            set_clauses.append("updated_at = NOW()")
+
+            updated_learning_outcome = db.execute(
+                text(f"""
+                    UPDATE learning_outcomes
+                    SET {", ".join(set_clauses)}
+                    WHERE id = :learning_outcome_id
+                    RETURNING
+                        id,
+                        course_id,
+                        title,
+                        description,
+                        level,
+                        is_ai_generated,
+                        is_reviewed,
+                        created_at,
+                        updated_at
+                """),
+                params,
+            ).mappings().first()
+
+            if not updated_learning_outcome:
+                db.rollback()
+                raise HTTPException(status_code=404, detail="Learning outcome not found")
+        else:
+            updated_learning_outcome = db.execute(
+                text("""
+                    SELECT
+                        id,
+                        course_id,
+                        title,
+                        description,
+                        level,
+                        is_ai_generated,
+                        is_reviewed,
+                        created_at,
+                        updated_at
+                    FROM learning_outcomes
+                    WHERE id = :learning_outcome_id
+                    LIMIT 1
+                """),
+                {"learning_outcome_id": learning_outcome_id},
+            ).mappings().first()
+
+            if not updated_learning_outcome:
+                db.rollback()
+                raise HTTPException(status_code=404, detail="Learning outcome not found")
+
+        if replace_topics:
+            db.execute(
+                text("""
+                    DELETE FROM topic_learning_outcomes
+                    WHERE learning_outcome_id = :learning_outcome_id
+                """),
+                {"learning_outcome_id": learning_outcome_id},
+            )
+
+            for topic_id in normalized_topic_ids:
+                db.execute(
+                    text("""
+                        INSERT INTO topic_learning_outcomes (
+                            topic_id,
+                            learning_outcome_id,
+                            created_at
+                        )
+                        VALUES (
+                            :topic_id,
+                            :learning_outcome_id,
+                            NOW()
+                        )
+                    """),
+                    {
+                        "topic_id": topic_id,
+                        "learning_outcome_id": learning_outcome_id,
+                    },
+                )
+
+        db.commit()
+        return dict(updated_learning_outcome)
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while updating learning outcome") from e
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+    
+
+
+def delete_learning_outcome(*, course_id: int, learning_outcome_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can delete learning outcomes")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not learning_outcome_id or learning_outcome_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid learning_outcome_id")
+
+    try:
+        # =========================
+        # 2) Validate learning outcome -> course + ownership
+        # =========================
+        learning_outcome_row = db.execute(
+            text("""
+                SELECT
+                    lo.id,
+                    lo.course_id,
+                    c.created_by
+                FROM learning_outcomes lo
+                JOIN courses c
+                  ON c.id = lo.course_id
+                WHERE lo.id = :learning_outcome_id
+                LIMIT 1
+            """),
+            {"learning_outcome_id": learning_outcome_id},
+        ).mappings().first()
+
+        if not learning_outcome_row:
+            raise HTTPException(status_code=404, detail="Learning outcome not found")
+
+        if int(learning_outcome_row["course_id"]) != int(course_id):
+            raise HTTPException(status_code=400, detail="Learning outcome does not belong to this course")
+
+        if int(learning_outcome_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only delete learning outcomes from your own course"
+            )
+
+        # =========================
+        # 3) Delete relations first
+        # =========================
+        db.execute(
+            text("""
+                DELETE FROM topic_learning_outcomes
+                WHERE learning_outcome_id = :learning_outcome_id
+            """),
+            {"learning_outcome_id": learning_outcome_id},
+        )
+
+        # =========================
+        # 4) Delete learning outcome
+        # =========================
+        deleted_row = db.execute(
+            text("""
+                DELETE FROM learning_outcomes
+                WHERE id = :learning_outcome_id
+                RETURNING id
+            """),
+            {"learning_outcome_id": learning_outcome_id},
+        ).first()
+
+        if not deleted_row:
+            db.rollback()
+            raise HTTPException(status_code=404, detail="Learning outcome not found")
+
+        db.commit()
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
