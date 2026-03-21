@@ -294,3 +294,139 @@ def list_learning_outcomes(*, course_id: int, db: Session, current_user: dict,):
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+
+def get_learning_outcome(*, course_id: int, learning_outcome_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authentication
+    # =========================
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not learning_outcome_id or learning_outcome_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid learning_outcome_id")
+
+    role = (current_user.get("system_role") or "").strip().lower()
+
+    try:
+        # =========================
+        # 2) Validate course exists
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        # =========================
+        # 3) Authorization
+        # =========================
+        if role == "instructor":
+            if int(course_row["created_by"]) != int(user_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="You can only view learning outcomes for your own course"
+                )
+
+        elif role == "student":
+            enrollment_row = db.execute(
+                text("""
+                    SELECT 1
+                    FROM course_enrollments
+                    WHERE course_id = :course_id
+                      AND student_id = :student_id
+                      AND status IN ('active', 'completed')
+                    LIMIT 1
+                """),
+                {
+                    "course_id": course_id,
+                    "student_id": user_id,
+                },
+            ).first()
+
+            if not enrollment_row:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You are not allowed to access learning outcomes for this course"
+                )
+
+        else:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # =========================
+        # 4) Fetch learning outcome
+        # =========================
+        learning_outcome_row = db.execute(
+            text("""
+                SELECT
+                    id,
+                    course_id,
+                    title,
+                    description,
+                    level,
+                    is_ai_generated,
+                    is_reviewed,
+                    created_at,
+                    updated_at
+                FROM learning_outcomes
+                WHERE id = :learning_outcome_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {
+                "learning_outcome_id": learning_outcome_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not learning_outcome_row:
+            raise HTTPException(status_code=404, detail="Learning outcome not found")
+
+        # =========================
+        # 5) Fetch related topics
+        # =========================
+        topic_rows = db.execute(
+            text("""
+                SELECT
+                    t.id,
+                    t.title
+                FROM topic_learning_outcomes tlo
+                JOIN topics t
+                  ON t.id = tlo.topic_id
+                JOIN materials m
+                  ON m.id = t.material_id
+                JOIN modules mo
+                  ON mo.id = m.module_id
+                WHERE tlo.learning_outcome_id = :learning_outcome_id
+                  AND mo.course_id = :course_id
+                ORDER BY t.order_index ASC, t.id ASC
+            """),
+            {
+                "learning_outcome_id": learning_outcome_id,
+                "course_id": course_id,
+            },
+        ).mappings().all()
+
+        response = dict(learning_outcome_row)
+        response["topics"] = [dict(row) for row in topic_rows]
+
+        return response
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e

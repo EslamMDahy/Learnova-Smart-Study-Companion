@@ -41,19 +41,17 @@ def list_learning_outcomes(
         current_user=current_user,)
 
 
-# @router.get("/{learning_outcome_id}", response_model=LearningOutcomeGetResponse, status_code=status.HTTP_200_OK)
-# def get_learning_outcome(
-#     course_id: int,
-#     learning_outcome_id: int,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),
-# ):
-#     return service.get_learning_outcome(
-#         course_id=course_id,
-#         learning_outcome_id=learning_outcome_id,
-#         db=db,
-#         current_user=current_user,
-#     )
+@router.get("/{learning_outcome_id}", response_model=LearningOutcomeGetResponse, status_code=status.HTTP_200_OK)
+def get_learning_outcome(
+    course_id: int,
+    learning_outcome_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.get_learning_outcome(
+        course_id=course_id,
+        learning_outcome_id=learning_outcome_id,
+        db=db,
+        current_user=current_user,)
 
 
 # @router.patch("/{learning_outcome_id}/update", response_model=LearningOutcomeUpdateResponse, status_code=status.HTTP_200_OK)

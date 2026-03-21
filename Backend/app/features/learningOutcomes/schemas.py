@@ -49,7 +49,6 @@ class LearningOutcomeListItem(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-
 class LearningOutcomeListResponse(BaseModel):
     course_id: int
     learning_outcomes: List[LearningOutcomeListItem]
@@ -63,14 +62,13 @@ class LearningOutcomeRelatedTopicItem(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-
 class LearningOutcomeGetResponse(BaseModel):
     id: int
     course_id: int
     title: str
     description: Optional[str] = None
     level: str
-    ai_ref_key: Optional[str] = None
+    # ai_ref_key: Optional[str] = None
 
     is_ai_generated: bool
     is_reviewed: bool
