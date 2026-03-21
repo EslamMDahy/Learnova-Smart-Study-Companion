@@ -30,17 +30,15 @@ def create_learning_outcome(
         current_user=current_user,)
 
 
-# @router.get("", response_model=LearningOutcomeListResponse, status_code=status.HTTP_200_OK)
-# def list_learning_outcomes(
-#     course_id: int,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),
-# ):
-#     return service.list_learning_outcomes(
-#         course_id=course_id,
-#         db=db,
-#         current_user=current_user,
-#     )
+@router.get("", response_model=LearningOutcomeListResponse, status_code=status.HTTP_200_OK)
+def list_learning_outcomes(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.list_learning_outcomes(
+        course_id=course_id,
+        db=db,
+        current_user=current_user,)
 
 
 # @router.get("/{learning_outcome_id}", response_model=LearningOutcomeGetResponse, status_code=status.HTTP_200_OK)

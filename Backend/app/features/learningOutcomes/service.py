@@ -195,3 +195,102 @@ def create_learning_outcome(*, course_id: int, payload: LearningOutcomeCreateReq
         raise HTTPException(status_code=500, detail="Database error") from e
     
 
+
+
+def list_learning_outcomes(*, course_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authentication
+    # =========================
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    role = (current_user.get("system_role") or "").strip().lower()
+
+    try:
+        # =========================
+        # 2) Validate course exists
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        # =========================
+        # 3) Authorization
+        # =========================
+        if role == "instructor":
+            if int(course_row["created_by"]) != int(user_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="You can only view learning outcomes for your own course"
+                )
+
+        elif role == "student":
+            enrollment_row = db.execute(
+                text("""
+                    SELECT 1
+                    FROM course_enrollments
+                    WHERE course_id = :course_id
+                      AND student_id = :student_id
+                      AND status IN ('active', 'completed')
+                    LIMIT 1
+                """),
+                {
+                    "course_id": course_id,
+                    "student_id": user_id,
+                },
+            ).first()
+
+            if not enrollment_row:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You are not allowed to access learning outcomes for this course"
+                )
+
+        else:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # =========================
+        # 4) Fetch learning outcomes
+        # =========================
+        learning_outcome_rows = db.execute(
+            text("""
+                SELECT
+                    id,
+                    course_id,
+                    title,
+                    description,
+                    level,
+                    is_ai_generated,
+                    is_reviewed,
+                    created_at,
+                    updated_at
+                FROM learning_outcomes
+                WHERE course_id = :course_id
+                ORDER BY created_at ASC, id ASC
+            """),
+            {"course_id": course_id},
+        ).mappings().all()
+
+        return {
+            "course_id": course_id,
+            "learning_outcomes": [dict(row) for row in learning_outcome_rows],
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e

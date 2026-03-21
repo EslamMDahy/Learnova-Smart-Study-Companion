@@ -40,7 +40,6 @@ class LearningOutcomeListItem(BaseModel):
     title: str
     description: Optional[str] = None
     level: str
-    ai_ref_key: Optional[str] = None
 
     is_ai_generated: bool
     is_reviewed: bool
