@@ -10,7 +10,8 @@ from .schemas import (
     TopicCreateResponse,
     TopicUpdateRequest,
     TopicUpdateResponse,
-    TopicListResponse, 
+    TopicListResponse,
+    TopicGetResponse, 
     TopicReorderRequest, 
     TopicReorderResponse)
 
@@ -47,6 +48,22 @@ def list_material_topics(
         course_id=course_id,
         module_id=module_id,
         material_id=material_id,
+        db=db,
+        current_user=current_user,)
+
+@router.get("/{topic_id}", response_model=TopicGetResponse, status_code=status.HTTP_200_OK)
+def get_topic(
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    topic_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.get_topic(
+        course_id=course_id,
+        module_id=module_id,
+        material_id=material_id,
+        topic_id=topic_id,
         db=db,
         current_user=current_user,)
 
@@ -101,18 +118,3 @@ def delete_topic(
         current_user=current_user,)
     
 
-# @router.get("/{topic_id}", response_model=TopicGetResponse, status_code=status.HTTP_200_OK)
-# def get_topic(
-#     course_id: int,
-#     module_id: int,
-#     material_id: int,
-#     topic_id: int,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),):
-#     return service.get_topic(
-#         course_id=course_id,
-#         module_id=module_id,
-#         material_id=material_id,
-#         topic_id=topic_id,
-#         db=db,
-#         current_user=current_user,)
