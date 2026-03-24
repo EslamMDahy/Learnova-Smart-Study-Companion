@@ -4,7 +4,6 @@ from sqlalchemy import (
     Float,
     Text,
     ForeignKey,
-    JSON,
     Enum as SQLEnum,
     Index,
     Boolean,
@@ -38,27 +37,10 @@ class Question(Base):
         index=True
     )
 
-    module_id: Mapped[int | None] = mapped_column(
-        ForeignKey("modules.id", ondelete="CASCADE"),
-        nullable=True,
-        index=True
-    )
-
-    material_id: Mapped[int | None] = mapped_column(
-        ForeignKey("materials.id", ondelete="SET NULL"),
-        nullable=True,
-        index=True
-    )
-
-    topic_id: Mapped[int | None] = mapped_column(
+    topic_id: Mapped[int] = mapped_column(
         ForeignKey("topics.id", ondelete="CASCADE"),
-        nullable=True,
+        nullable=False,
         index=True
-    )
-
-    video_timestamp_id: Mapped[int | None] = mapped_column(
-        ForeignKey("video_timestamps.id", ondelete="SET NULL"),
-        nullable=True
     )
 
     question_text: Mapped[str] = mapped_column(
@@ -71,8 +53,8 @@ class Question(Base):
         nullable=True
     )
 
-    # For choice-based questions (mcq, multi_select, true_false, etc.)
-    # Example: [{"option_text": "...", "is_correct": true, "order_index": 0, "explanation": "..."}]
+    # Used only for choice-based questions like:
+    # multiple_choice / multi_select / true_false / matching / ordering
     options: Mapped[list | None] = mapped_column(
         JSONB,
         nullable=True
@@ -86,12 +68,14 @@ class Question(Base):
     difficulty: Mapped[QuestionDifficulty] = mapped_column(
         SQLEnum(QuestionDifficulty, name="question_difficulty_enum"),
         nullable=False,
-        index=True
+        index=True,
+        default=QuestionDifficulty.medium
     )
 
     source: Mapped[QuestionSource] = mapped_column(
         SQLEnum(QuestionSource, name="question_source_enum"),
-        nullable=False
+        nullable=False,
+        default=QuestionSource.manual
     )
 
     approval_status: Mapped[QuestionApprovalStatus] = mapped_column(
@@ -99,47 +83,36 @@ class Question(Base):
             QuestionApprovalStatus,
             name="question_approval_status_enum"
         ),
+        nullable=False,
         default=QuestionApprovalStatus.approved,
         index=True
     )
 
-    reviewed_by: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="SET NULL"),
-        nullable=True
-    )
-
-    reviewed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True),
-        nullable=True
-    )
-
-    review_notes: Mapped[str | None] = mapped_column(
-        Text,
-        nullable=True
-    )
-
-    expected_answer: Mapped[str | None] = mapped_column(
-        Text,
+    expected_answer: Mapped[dict | list | str | None] = mapped_column(
+        JSONB,
         nullable=True
     )
 
     grading_rubric: Mapped[dict | None] = mapped_column(
-        JSON,
+        JSONB,
         nullable=True
     )
 
     max_score: Mapped[int] = mapped_column(
         Integer,
+        nullable=False,
         default=1
     )
 
     auto_gradable: Mapped[bool] = mapped_column(
         Boolean,
+        nullable=False,
         default=True
     )
 
     usage_count: Mapped[int] = mapped_column(
         Integer,
+        nullable=False,
         default=0,
         index=True
     )
@@ -155,36 +128,34 @@ class Question(Base):
     )
 
     tags: Mapped[list | None] = mapped_column(
-        JSON,
+        JSONB,
         nullable=True
     )
 
     created_by: Mapped[int] = mapped_column(
-        ForeignKey("users.id", ondelete="RESTRICT"),
-        nullable=False
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True
     )
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
+        nullable=False,
         default=datetime.utcnow
     )
 
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
+        nullable=False,
         default=datetime.utcnow,
         onupdate=datetime.utcnow
     )
 
     __table_args__ = (
-        # (course_id, topic_id)
-                # Fast filtering inside a course question bank
         Index("ix_questions_course_topic", "course_id", "topic_id"),
-        Index("ix_questions_course_module", "course_id", "module_id"),
-        Index("ix_questions_course_material", "course_id", "material_id"),
-        # Ensure question is attached to at least a topic or a module
-        CheckConstraint(
-            "(topic_id IS NOT NULL) OR (module_id IS NOT NULL) OR (material_id IS NOT NULL) "
-            "OR (topic_id IS NULL AND module_id IS NULL AND material_id IS NULL)",
-            name="ck_questions_scope_required"
-        ),
+        Index("ix_questions_course_type", "course_id", "type"),
+        Index("ix_questions_topic_type", "topic_id", "type"),
+        Index("ix_questions_course_difficulty", "course_id", "difficulty"),
+        Index("ix_questions_course_approval_status", "course_id", "approval_status"),
+
+        CheckConstraint("max_score > 0", name="ck_questions_max_score_positive"),
     )
