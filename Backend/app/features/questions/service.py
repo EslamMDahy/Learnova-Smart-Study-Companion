@@ -4,6 +4,7 @@ from fastapi import HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+import json
 
 from .schemas import QuestionCreateRequest
 from .helpers import validate_and_normalize_question_payload
@@ -165,14 +166,14 @@ def create_question(*, course_id: int, payload: QuestionCreateRequest, db: Sessi
                 "topic_id": topic_id,
                 "question_text": normalized_data["question_text"],
                 "explanation": normalized_data["explanation"],
-                "options": __import__("json").dumps(normalized_data["options"]),
+                "options": json.dumps(normalized_data["options"]),
                 "type": normalized_data["type"],
                 "difficulty": normalized_data["difficulty"],
                 "source": normalized_data["source"],
                 "approval_status": normalized_data["approval_status"],
-                "expected_answer": __import__("json").dumps(normalized_data["expected_answer"]),
+                "expected_answer": json.dumps(normalized_data["expected_answer"]),
                 "grading_rubric": (
-                    __import__("json").dumps(normalized_data["grading_rubric"])
+                    json.dumps(normalized_data["grading_rubric"])
                     if normalized_data["grading_rubric"] is not None else None
                 ),
                 "max_score": normalized_data["max_score"],
@@ -181,7 +182,7 @@ def create_question(*, course_id: int, payload: QuestionCreateRequest, db: Sessi
                 "success_rate": normalized_data["success_rate"],
                 "average_time_seconds": normalized_data["average_time_seconds"],
                 "tags": (
-                    __import__("json").dumps(normalized_data["tags"])
+                    json.dumps(normalized_data["tags"])
                     if normalized_data["tags"] is not None else None
                 ),
                 "created_by": instructor_id,

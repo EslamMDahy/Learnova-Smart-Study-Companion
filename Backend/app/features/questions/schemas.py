@@ -21,7 +21,7 @@ class QuestionCreateRequest(BaseModel):
 
     explanation: Optional[str] = None
     options: Optional[List[QuestionOptionItem]] = None
-    expected_answer: Optional[str] = None
+    expected_answer: Optional[List[str] | str] = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -37,7 +37,7 @@ class QuestionCreateResponse(BaseModel):
     difficulty: str
     source: str
     approval_status: str
-    expected_answer: Optional[dict | list | str] = None
+    expected_answer: Optional[List[str] | str] = None
     grading_rubric: Optional[dict] = None
     max_score: int
     auto_gradable: bool
