@@ -13,6 +13,8 @@ def validate_and_normalize_question_payload(payload) -> dict[str, Any]:
         "multiple_choice": validate_and_normalize_multiple_choice,
         "multi_select": validate_and_normalize_multi_select,
         "true_false": validate_and_normalize_true_false,
+        "short_answer": validate_and_normalize_short_answer,
+        "essay": validate_and_normalize_essay,
     }
 
     handler = handlers.get(question_type)
@@ -287,6 +289,121 @@ def validate_and_normalize_true_false(payload) -> dict[str, Any]:
             "grading_rubric": None,
             "max_score": 1,
             "auto_gradable": True,
+            "source": "manual",
+            "approval_status": "approved",
+            "usage_count": 0,
+            "success_rate": None,
+            "average_time_seconds": None,
+            "tags": None,
+        }
+    }
+
+
+
+def validate_and_normalize_short_answer(payload) -> dict[str, Any]:
+    question_text = (payload.question_text or "").strip()
+    if not question_text:
+        return {"ok": False, "status_code": 422, "detail": "question_text is required"}
+
+    difficulty = (payload.difficulty or "").strip().lower()
+    if not difficulty:
+        return {"ok": False, "status_code": 422, "detail": "difficulty is required"}
+
+    expected_answer = payload.expected_answer
+    if not isinstance(expected_answer, str):
+        return {
+            "ok": False,
+            "status_code": 422,
+            "detail": "expected_answer is required for short_answer questions and must be a string"
+        }
+
+    expected_answer = expected_answer.strip()
+    if not expected_answer:
+        return {
+            "ok": False,
+            "status_code": 422,
+            "detail": "expected_answer is required for short_answer questions"
+        }
+
+    explanation = payload.explanation
+    if isinstance(explanation, str):
+        explanation = explanation.strip() or None
+
+    grading_rubric = getattr(payload, "grading_rubric", None)
+    if grading_rubric is not None and not isinstance(grading_rubric, dict):
+        return {
+            "ok": False,
+            "status_code": 422,
+            "detail": "grading_rubric must be an object when provided"
+        }
+
+    return {
+        "ok": True,
+        "data": {
+            "question_text": question_text,
+            "type": question_type_from_payload(payload),
+            "difficulty": difficulty,
+            "explanation": explanation,
+            "options": None,
+            "expected_answer": expected_answer,
+            "grading_rubric": grading_rubric,
+            "max_score": 1,
+            "auto_gradable": False,
+            "source": "manual",
+            "approval_status": "approved",
+            "usage_count": 0,
+            "success_rate": None,
+            "average_time_seconds": None,
+            "tags": None,
+        }
+    }
+
+
+
+def validate_and_normalize_essay(payload) -> dict[str, Any]:
+    question_text = (payload.question_text or "").strip()
+    if not question_text:
+        return {"ok": False, "status_code": 422, "detail": "question_text is required"}
+
+    difficulty = (payload.difficulty or "").strip().lower()
+    if not difficulty:
+        return {"ok": False, "status_code": 422, "detail": "difficulty is required"}
+
+    expected_answer = payload.expected_answer
+    if expected_answer is not None:
+        if not isinstance(expected_answer, str):
+            return {
+                "ok": False,
+                "status_code": 422,
+                "detail": "expected_answer must be a string when provided for essay questions"
+            }
+
+        expected_answer = expected_answer.strip() or None
+
+    explanation = payload.explanation
+    if isinstance(explanation, str):
+        explanation = explanation.strip() or None
+
+    grading_rubric = getattr(payload, "grading_rubric", None)
+    if grading_rubric is not None and not isinstance(grading_rubric, dict):
+        return {
+            "ok": False,
+            "status_code": 422,
+            "detail": "grading_rubric must be an object when provided"
+        }
+
+    return {
+        "ok": True,
+        "data": {
+            "question_text": question_text,
+            "type": question_type_from_payload(payload),
+            "difficulty": difficulty,
+            "explanation": explanation,
+            "options": None,
+            "expected_answer": expected_answer,
+            "grading_rubric": grading_rubric,
+            "max_score": 1,
+            "auto_gradable": False,
             "source": "manual",
             "approval_status": "approved",
             "usage_count": 0,

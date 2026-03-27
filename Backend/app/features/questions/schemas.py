@@ -22,7 +22,8 @@ class QuestionCreateRequest(BaseModel):
     explanation: Optional[str] = None
     options: Optional[List[QuestionOptionItem]] = None
     expected_answer: Optional[List[str] | str] = None
-
+    grading_rubric: Optional[dict] = None
+    
     model_config = ConfigDict(extra="forbid")
 
 
