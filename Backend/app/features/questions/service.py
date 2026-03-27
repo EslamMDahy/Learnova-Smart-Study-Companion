@@ -581,3 +581,148 @@ def list_course_questions(*, course_id: int, db: Session, current_user: dict,):
 
 
 
+def get_question(*, course_id: int, question_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    instructor_id = current_user.get("id")
+    role = (current_user.get("system_role") or "").strip().lower()
+
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can view questions")
+
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not question_id or question_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid question_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(status_code=403, detail="You can only view questions for your own course")
+
+        # =========================
+        # 3) Fetch question details + topic info
+        # =========================
+        question_row = db.execute(
+            text("""
+                SELECT
+                    q.id,
+                    q.course_id,
+                    q.topic_id,
+                    t.title AS topic_title,
+                    q.question_text,
+                    q.explanation,
+                    q.options,
+                    q.type,
+                    q.difficulty,
+                    q.source,
+                    q.approval_status,
+                    q.expected_answer,
+                    q.grading_rubric,
+                    q.max_score,
+                    q.auto_gradable,
+                    q.usage_count,
+                    q.success_rate,
+                    q.average_time_seconds,
+                    q.tags,
+                    q.created_by,
+                    q.created_at,
+                    q.updated_at
+                FROM questions q
+                JOIN topics t
+                  ON t.id = q.topic_id
+                JOIN materials m
+                  ON m.id = t.material_id
+                JOIN modules mo
+                  ON mo.id = m.module_id
+                WHERE q.id = :question_id
+                  AND q.course_id = :course_id
+                  AND mo.course_id = :course_id
+                LIMIT 1
+            """),
+            {
+                "question_id": question_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not question_row:
+            raise HTTPException(status_code=404, detail="Question not found")
+
+        # =========================
+        # 4) Fetch related learning outcomes through topic
+        # =========================
+        learning_outcome_rows = db.execute(
+            text("""
+                SELECT
+                    lo.id,
+                    lo.title
+                FROM topic_learning_outcomes tlo
+                JOIN learning_outcomes lo
+                  ON lo.id = tlo.learning_outcome_id
+                WHERE tlo.topic_id = :topic_id
+                  AND lo.course_id = :course_id
+                ORDER BY lo.created_at ASC, lo.id ASC
+            """),
+            {
+                "topic_id": question_row["topic_id"],
+                "course_id": course_id,
+            },
+        ).mappings().all()
+
+        # =========================
+        # 5) Build response
+        # =========================
+        return {
+            "id": question_row["id"],
+            "course_id": question_row["course_id"],
+            "topic_id": question_row["topic_id"],
+            "topic": {
+                "id": question_row["topic_id"],
+                "title": question_row["topic_title"],
+            },
+            "learning_outcomes": [dict(row) for row in learning_outcome_rows],
+            "question_text": question_row["question_text"],
+            "explanation": question_row["explanation"],
+            "options": question_row["options"],
+            "type": question_row["type"],
+            "difficulty": question_row["difficulty"],
+            "source": question_row["source"],
+            "approval_status": question_row["approval_status"],
+            "expected_answer": question_row["expected_answer"],
+            "grading_rubric": question_row["grading_rubric"],
+            "max_score": question_row["max_score"],
+            "auto_gradable": question_row["auto_gradable"],
+            "usage_count": question_row["usage_count"],
+            "success_rate": question_row["success_rate"],
+            "average_time_seconds": question_row["average_time_seconds"],
+            "tags": question_row["tags"],
+            "created_by": question_row["created_by"],
+            "created_at": question_row["created_at"],
+            "updated_at": question_row["updated_at"],
+        }
+
+    except HTTPException:
+        raise
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
