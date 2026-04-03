@@ -280,7 +280,6 @@ class _GenerateQuestionsDialogState
       if (module == null) continue;
       for (final topic in entry.value) {
         final materialId = topic.materialId;
-        if (materialId == null) continue;
         final material = materialById[materialId];
         if (material == null) continue;
         out.add(_TopicSelectionItem(

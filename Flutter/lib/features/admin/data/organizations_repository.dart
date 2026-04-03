@@ -125,7 +125,7 @@ class OrganizationsRepository {
       final raw = await _api.updateMemberStatus(
         organizationId: organizationId.trim(),
         memberId: memberId.trim(),
-        newStatus: 'rejected',
+        newStatus: 'declinate',
         cancelToken: cancelToken,
       );
 

@@ -84,10 +84,6 @@ class CoursesApi {
   }
 
   /// POST /courses/{courseId}/invitations/send
-  ///
-  /// Backend body supports:
-  /// - include_expired: bool
-  /// - force: bool
   Future<Map<String, dynamic>> sendInvitations({
     required String courseId,
     bool includeExpired = true,
@@ -102,9 +98,24 @@ class CoursesApi {
       },
       cancelToken: cancelToken,
     );
-
     final data = res.data;
     if (data is Map<String, dynamic>) return data;
     throw const FormatException('Invalid response from POST /courses/{id}/invitations/send');
+  }
+
+  /// POST /courses/invitations/accept
+  /// Student uses this to accept an invitation by token (from email link).
+  Future<Map<String, dynamic>> acceptInvitation({
+    required String token,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.acceptCourseInvitation,
+      data: {'token': token},
+      cancelToken: cancelToken,
+    );
+    final data = res.data;
+    if (data is Map<String, dynamic>) return data;
+    throw const FormatException('Invalid response from POST /courses/invitations/accept');
   }
 }

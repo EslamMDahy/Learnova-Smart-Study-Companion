@@ -1227,14 +1227,16 @@ String _slug(MyCourseItem c) {
       transform: hover ? (Matrix4.identity()..translate(0.0, -1.0)) : Matrix4.identity(),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: hover ? const Color(0xFFBFDBFE) : AppColors.border,
+          width: hover ? 1.5 : 1.0,
+        ),
         boxShadow: [
           if (hover)
-            const BoxShadow(color: Color(0x1A000000), blurRadius: 24, offset: Offset(0, 8))
+            const BoxShadow(color: Color(0x14137FEC), blurRadius: 28, offset: Offset(0, 10))
           else
-            const BoxShadow(color: Color(0x10000000), blurRadius: 12, offset: Offset(0, 4)),
-          const BoxShadow(color: Color(0x0A000000), blurRadius: 3, offset: Offset(0, 1)),
+            const BoxShadow(color: Color(0x0C000000), blurRadius: 10, offset: Offset(0, 3)),
         ],
       ),
       child: InkWell(
@@ -1245,13 +1247,13 @@ String _slug(MyCourseItem c) {
           context.go(Routes.courseDetails(slug)); // ✅ navigate to course details
         },
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Hero
               SizedBox(
-                height: 128,
+                height: 140,
                 child: Stack(
                   children: [
                     Positioned.fill(
@@ -1335,9 +1337,10 @@ String _slug(MyCourseItem c) {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        fontSize: 14,
+                        fontSize: 14.5,
                         fontWeight: FontWeight.w800,
-                        color: AppColors.text,
+                        letterSpacing: -0.2,
+                        color: AppColors.textTitle,
                       ),
                     ),
                     const SizedBox(height: 4),

@@ -55,10 +55,14 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
   /// Overview statistics are immediately available.
   Future<void> loadModulesAndAllMaterials({bool force = false}) async {
     await loadModules(force: force);
-    final futures = state.modules
-        .where((m) => force || !state.materials.containsKey(m.id))
-        .expand((m) => [loadMaterials(m.id), loadTopics(m.id)]);
-    await Future.wait(futures);
+    final modulesToLoad = state.modules
+        .where((m) => force || !state.materials.containsKey(m.id) || !state.topics.containsKey(m.id))
+        .toList();
+
+    for (final module in modulesToLoad) {
+      await loadMaterials(module.id, force: force);
+      await loadTopics(module.id, force: force);
+    }
   }
 
   Future<ModuleItem?> createModule(String title, {String? description}) async {
@@ -76,10 +80,128 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     }
   }
 
+  Future<ModuleItem?> copyModule({
+    required int sourceCourseId,
+    required int moduleId,
+    int? targetCourseId,
+  }) async {
+    final destinationCourseId = targetCourseId ?? _courseId;
+    try {
+      final copied = await _ref.read(modulesApiProvider).copyModule(
+            courseId: destinationCourseId,
+            moduleId: moduleId,
+          );
+      if (destinationCourseId == _courseId) {
+        final nextModules = [...state.modules, copied]..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+        state = state.copyWith(modules: nextModules);
+      }
+      return copied;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+      return null;
+    }
+  }
+
+  Future<ModuleItem?> updateModule({
+    required int moduleId,
+    String? title,
+    String? description,
+    bool? isPublished,
+  }) async {
+    try {
+      final updated = await _ref.read(modulesApiProvider).updateModule(
+            courseId: _courseId,
+            moduleId: moduleId,
+            payload: ModuleUpdateRequest(
+              title: title,
+              description: description,
+              isPublished: isPublished,
+            ),
+          );
+
+      final nextModules = state.modules
+          .map((module) => module.id == moduleId ? updated : module)
+          .toList()
+        ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+
+      state = state.copyWith(modules: nextModules);
+      return updated;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+      return null;
+    }
+  }
+
+  Future<bool> deleteModule(int moduleId) async {
+    try {
+      await _ref.read(modulesApiProvider).deleteModule(
+            courseId: _courseId,
+            moduleId: moduleId,
+          );
+
+      final nextModules = state.modules.where((module) => module.id != moduleId).toList()
+        ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+      final nextMaterials = Map<int, List<MaterialItem>>.from(state.materials)..remove(moduleId);
+      final nextTopics = Map<int, List<TopicItem>>.from(state.topics)..remove(moduleId);
+      final nextMaterialLoading = Map<int, bool>.from(state.materialsLoading)..remove(moduleId);
+      final nextTopicLoading = Map<int, bool>.from(state.topicsLoading)..remove(moduleId);
+
+      state = state.copyWith(
+        modules: nextModules,
+        materials: nextMaterials,
+        topics: nextTopics,
+        materialsLoading: nextMaterialLoading,
+        topicsLoading: nextTopicLoading,
+      );
+      return true;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+      return false;
+    }
+  }
+
+  Future<bool> reorderModule({
+    required int moduleId,
+    required int newPosition,
+  }) async {
+    final currentModules = [...state.modules]..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    final currentIndex = currentModules.indexWhere((module) => module.id == moduleId);
+    if (currentIndex == -1) return false;
+
+    final targetIndex = newPosition.clamp(0, currentModules.length - 1);
+    if (targetIndex == currentIndex) return true;
+
+    final moved = currentModules.removeAt(currentIndex);
+    currentModules.insert(targetIndex, moved);
+    final moduleIds = currentModules.map((module) => module.id).toList();
+
+    try {
+      await _ref.read(modulesApiProvider).reorderModules(
+            courseId: _courseId,
+            moduleIds: moduleIds,
+          );
+
+      final normalized = [
+        for (var i = 0; i < currentModules.length; i++)
+          currentModules[i].copyWith(orderIndex: i),
+      ];
+      state = state.copyWith(modules: normalized);
+      return true;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+      return false;
+    }
+  }
+
   // ── Materials ─────────────────────────────────────────────────────────────
 
-  Future<void> loadMaterials(int moduleId) async {
+  Future<void> loadMaterials(int moduleId, {bool force = false}) async {
     if (state.materialsLoading[moduleId] ?? false) return;
+    if (state.materials.containsKey(moduleId) && !force) return;
 
     final newLoading = Map<int, bool>.from(state.materialsLoading)
       ..[moduleId] = true;
@@ -117,11 +239,21 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
 
     List<TopicItem> backendTopics = const [];
     try {
-      final res = await _ref.read(topicsApiProvider).listTopics(
-            courseId: _courseId,
-            moduleId: moduleId,
-          );
-      backendTopics = res.topics;
+      // Topics are nested under materials — ensure materials are loaded first.
+      if ((state.materials[moduleId] ?? const <MaterialItem>[]).isEmpty) {
+        await loadMaterials(moduleId, force: force);
+      }
+      final materials = state.materials[moduleId] ?? const <MaterialItem>[];
+      final allTopics = <TopicItem>[];
+      for (final mat in materials) {
+        final res = await _ref.read(topicsApiProvider).listTopics(
+              courseId: _courseId,
+              moduleId: moduleId,
+              materialId: mat.id,
+            );
+        allTopics.addAll(res.topics);
+      }
+      backendTopics = allTopics;
     } catch (_) {
       // Non-fatal — topic authoring is currently handled via local fallback storage.
     }
@@ -132,7 +264,7 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
       for (final topic in localTopics) topic.id: topic,
     }.values.toList()
       ..sort((a, b) {
-        final materialCmp = (a.materialId ?? 0).compareTo(b.materialId ?? 0);
+        final materialCmp = a.materialId.compareTo(b.materialId);
         if (materialCmp != 0) return materialCmp;
         return a.orderIndex.compareTo(b.orderIndex);
       });
@@ -150,10 +282,11 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     required TopicCreateRequest payload,
   }) async {
     try {
-      final topic = await _ref.read(topicMockServiceProvider).createTopic(
-            moduleId,
-            payload,
+      final topic = await _ref.read(topicsApiProvider).createTopic(
+            courseId:   _courseId,
+            moduleId:   moduleId,
             materialId: materialId,
+            payload:    payload,
           );
       final existing = List<TopicItem>.from(state.topics[moduleId] ?? []);
       existing.add(topic);
@@ -170,21 +303,77 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
   }
 
   Future<void> updateTopic(TopicItem topic) async {
-    final updated = await _ref.read(topicMockServiceProvider).updateTopic(topic.moduleId, topic);
-    final existing = List<TopicItem>.from(state.topics[topic.moduleId] ?? const []);
-    final idx = existing.indexWhere((t) => t.id == topic.id);
-    if (idx >= 0) {
-      existing[idx] = updated;
-    } else {
-      existing.add(updated);
+    try {
+      final updated = await _ref.read(topicsApiProvider).updateTopic(
+            courseId:   _courseId,
+            moduleId:   topic.moduleId,
+            materialId: topic.materialId,
+            topicId:    topic.id,
+            payload:    TopicUpdateRequest(
+              title:              topic.title,
+              description:        topic.description,
+              learningOutcomeIds: topic.learningOutcomeIds.isNotEmpty
+                  ? topic.learningOutcomeIds
+                  : topic.linkedOutcomeIds
+                      .map((s) => int.tryParse(s))
+                      .whereType<int>()
+                      .toList(),
+            ),
+          );
+      final mergedUpdated = updated.copyWith(
+        moduleId: topic.moduleId,
+        materialId: topic.materialId,
+        difficulty: topic.difficulty,
+        readiness: topic.readiness,
+        linkedOutcomeId: topic.linkedOutcomeId,
+        linkedOutcomeIds: topic.linkedOutcomeIds,
+        learningOutcomeIds: topic.learningOutcomeIds,
+        instructorNotes: topic.instructorNotes,
+        estimatedDurationMinutes: topic.estimatedDurationMinutes,
+        isRequired: topic.isRequired,
+        source: topic.source,
+      );
+      final existing = List<TopicItem>.from(state.topics[topic.moduleId] ?? const []);
+      final idx = existing.indexWhere((t) => t.id == topic.id);
+      if (idx >= 0) {
+        existing[idx] = mergedUpdated;
+      } else {
+        existing.add(mergedUpdated);
+      }
+      final newTopics = Map<int, List<TopicItem>>.from(state.topics)
+        ..[topic.moduleId] = existing;
+      state = state.copyWith(topics: newTopics);
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
     }
-    final newTopics = Map<int, List<TopicItem>>.from(state.topics)
-      ..[topic.moduleId] = existing;
-    state = state.copyWith(topics: newTopics);
   }
 
-  Future<void> deleteTopic({required int moduleId, required int topicId}) async {
-    await _ref.read(topicMockServiceProvider).deleteTopic(moduleId, topicId);
+  Future<void> deleteTopic({required int moduleId, required int topicId, int? materialId}) async {
+    // materialId is required for the backend URL — find it from state if not provided
+    final matId = materialId ??
+        (state.topics[moduleId] ?? const [])
+            .firstWhere((t) => t.id == topicId,
+                orElse: () => TopicItem(
+                    id: 0,
+                    materialId: 0,
+                    title: '',
+                    orderIndex: 0,
+                    createdAt: DateTime(0),
+                    updatedAt: DateTime(0)))
+            .materialId;
+    try {
+      await _ref.read(topicsApiProvider).deleteTopic(
+            courseId:   _courseId,
+            moduleId:   moduleId,
+            materialId: matId,
+            topicId:    topicId,
+          );
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+      return;
+    }
     final existing = List<TopicItem>.from(state.topics[moduleId] ?? const []);
     final newTopics = Map<int, List<TopicItem>>.from(state.topics)
       ..[moduleId] = existing.where((t) => t.id != topicId).toList();
@@ -316,7 +505,6 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
 
     state = state.copyWith(
       questionsLoading: true,
-      questionsError: null,
     );
 
     try {

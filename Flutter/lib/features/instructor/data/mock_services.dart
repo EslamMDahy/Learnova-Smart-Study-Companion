@@ -95,7 +95,7 @@ class TopicMockService {
     final store = _readTopicStore();
     final items = List<TopicItem>.from(store[moduleId] ?? const []);
     items.sort((a, b) {
-      final materialCmp = (a.materialId ?? 0).compareTo(b.materialId ?? 0);
+      final materialCmp = a.materialId.compareTo(b.materialId);
       if (materialCmp != 0) return materialCmp;
       return a.orderIndex.compareTo(b.orderIndex);
     });
@@ -206,6 +206,7 @@ class LearningOutcomeMockService {
     await Future.delayed(const Duration(milliseconds: 100));
     final store = _readOutcomeStore();
     final list = List<LearningOutcome>.from(store[courseId] ?? const []);
+    // ignore: unrelated_type_equality_checks
     final filtered = list.where((o) => o.id != outcomeId).toList();
     store[courseId] = List.generate(
       filtered.length,

@@ -1,12 +1,18 @@
 import 'dart:async';
+import 'dart:convert';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
+// ignore: undefined_prefixed_name
+import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/storage/key_value_store_factory.dart';
 import '../../../../../core/ui/toast.dart';
+import '../../../../../shared/widgets/app_ui_components.dart';
 import '../../../data/courses_models.dart';
+import '../../../data/courses_providers.dart';
 import '../../../data/modules_models.dart';
 import '../../../data/materials_models.dart';
 import '../../../data/topics_models.dart';
@@ -31,7 +37,6 @@ class _K {
   static const amberSoft  = Color(0xFFFFFBEB);
   static const green      = Color(0xFF16A34A);
   static const greenSoft  = Color(0xFFF0FDF4);
-  static const red        = Color(0xFFDC2626);
   static const redSoft    = Color(0xFFFFF1F2);
   static const blue       = Color(0xFF2563EB);
   static const blueSoft   = Color(0xFFEFF6FF);
@@ -68,20 +73,160 @@ class CourseMaterialsTab extends ConsumerStatefulWidget {
   ConsumerState<CourseMaterialsTab> createState() => _CourseMaterialsTabState();
 }
 
-class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
+class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
+    with AutomaticKeepAliveClientMixin {
   final Set<int>    _expanded = {};
   _Ctx?             _sel;
   final List<_Ctx>  _stack   = [];
   final ScrollController _scroll = ScrollController();
+  late final _session = createSessionStore();
+  bool _restored = false;
 
   @override
-  void dispose() { _scroll.dispose(); super.dispose(); }
+  bool get wantKeepAlive => true;
+
+  String get _uiStateKey => 'course:${widget.course.id}:materials_ui';
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_persistUiState);
+  }
+
+  @override
+  void dispose() { _persistUiState(); _scroll.dispose(); super.dispose(); }
 
   _Ctx? get _active => _stack.isNotEmpty ? _stack.last : _sel;
 
+
+
+  void _persistUiState() {
+    final sel = _sel;
+    final active = _active;
+    final payload = <String, dynamic>{
+      'expanded': _expanded.toList(),
+      'scrollOffset': _scroll.hasClients ? _scroll.offset : 0.0,
+      'selectedType': sel?.type.name,
+      'selectedModuleId': sel?.module?.id,
+      'selectedMaterialId': sel?.material?.id,
+      'selectedTopicId': sel?.topic?.id,
+      'activeTopicId': active?.type == _CType.topic ? active?.topic?.id : null,
+    };
+    _session.setString(_uiStateKey, jsonEncode(payload));
+  }
+
+  void _maybeRestoreUiState(CourseDetailsState st) {
+    if (_restored) return;
+    final raw = _session.getString(_uiStateKey);
+    if (raw == null || raw.isEmpty) {
+      _restored = true;
+      return;
+    }
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final expanded = ((map['expanded'] as List?) ?? const [])
+          .map((e) => (e as num).toInt())
+          .toSet();
+      final selectedType = map['selectedType']?.toString();
+      final selectedModuleId = (map['selectedModuleId'] as num?)?.toInt();
+      final selectedMaterialId = (map['selectedMaterialId'] as num?)?.toInt();
+      final selectedTopicId = (map['selectedTopicId'] as num?)?.toInt();
+      final activeTopicId = (map['activeTopicId'] as num?)?.toInt();
+      final storedOffset = (map['scrollOffset'] as num?)?.toDouble() ?? 0.0;
+
+      ModuleItem? findModule(int? id) {
+        if (id == null) return null;
+        for (final m in st.modules) {
+          if (m.id == id) return m;
+        }
+        return null;
+      }
+
+      MaterialItem? findMaterial(int moduleId, int? materialId) {
+        if (materialId == null) return null;
+        final materials = st.materials[moduleId] ?? const <MaterialItem>[];
+        for (final mat in materials) {
+          if (mat.id == materialId) return mat;
+        }
+        return null;
+      }
+
+      TopicItem? findTopic(int moduleId, int materialId, int? topicId) {
+        if (topicId == null) return null;
+        final topics = st.topics[moduleId] ?? const <TopicItem>[];
+        for (final t in topics) {
+          if (t.id == topicId && t.materialId == materialId) return t;
+        }
+        return null;
+      }
+
+      final module = findModule(selectedModuleId);
+      if (selectedModuleId != null && module == null && st.modules.isNotEmpty) {
+        return;
+      }
+
+      _expanded
+        ..clear()
+        ..addAll(expanded.where((id) => st.modules.any((m) => m.id == id)));
+
+      if (module != null && !st.materials.containsKey(module.id)) {
+        ref.read(courseDetailsControllerProvider(widget.course.id).notifier).loadMaterials(module.id);
+        return;
+      }
+
+      if (module != null && selectedMaterialId != null && ((st.topics[module.id] == null) || (st.topics[module.id]!.isEmpty && selectedTopicId != null))) {
+        ref.read(courseDetailsControllerProvider(widget.course.id).notifier).loadTopics(module.id);
+      }
+
+      _sel = null;
+      _stack.clear();
+
+      if (module != null) {
+        if (selectedType == _CType.module.name) {
+          _sel = _Ctx.module(module);
+        } else {
+          final material = findMaterial(module.id, selectedMaterialId);
+          if (material != null) {
+            if (selectedType == _CType.material.name) {
+              _sel = _Ctx.material(module, material);
+            } else {
+              final topic = findTopic(module.id, material.id, selectedTopicId);
+              _sel = _Ctx.material(module, material);
+              if (topic != null) {
+                _stack.add(_Ctx.topic(module, material, topic));
+                if (activeTopicId != null && activeTopicId != selectedTopicId) {
+                  final activeTopic = findTopic(module.id, material.id, activeTopicId);
+                  if (activeTopic != null) {
+                    _stack
+                      ..clear()
+                      ..add(_Ctx.topic(module, material, activeTopic));
+                  }
+                }
+              }
+              ref.read(courseDetailsControllerProvider(widget.course.id).notifier).fetchDownloadUrl(moduleId: module.id, materialId: material.id);
+            }
+          }
+        }
+      }
+
+      _restored = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scroll.hasClients) return;
+        final max = _scroll.position.maxScrollExtent;
+        final target = storedOffset.clamp(0.0, max);
+        _scroll.jumpTo(target);
+      });
+      if (mounted) setState(() {});
+    } catch (_) {
+      _restored = true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    super.build(context);
     final st = ref.watch(courseDetailsControllerProvider(widget.course.id));
+    _maybeRestoreUiState(st);
     final active = _active ?? _sel;
     return Column(children: [
       Expanded(
@@ -114,7 +259,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
             materialId: active.material?.id,
             topicId: active.topic?.id,
           ),
-          onClose: () => setState(() { _sel = null; _stack.clear(); }),
+          onClose: () => setState(() { _sel = null; _stack.clear(); _persistUiState(); }),
         ),
     ]);
   }
@@ -137,32 +282,37 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
       final alreadySel = _active?.type == _CType.module && _active?.module?.id == m.id;
       if (_expanded.contains(m.id) && alreadySel) {
         _expanded.remove(m.id); _sel = null; _stack.clear();
+        _persistUiState();
       } else {
         _expanded.add(m.id); _sel = _Ctx.module(m); _stack.clear();
         if (!st.materials.containsKey(m.id)) {
           ref.read(courseDetailsControllerProvider(widget.course.id).notifier).loadMaterials(m.id);
         }
+        _persistUiState();
       }
     });
   }
 
   void _tapMaterial(ModuleItem m, MaterialItem mat) {
     setState(() { _sel = _Ctx.material(m, mat); _stack.clear(); });
-    ref.read(courseDetailsControllerProvider(widget.course.id).notifier).loadTopics(m.id);
-    ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
-        .fetchDownloadUrl(moduleId: m.id, materialId: mat.id);
+    _persistUiState();
+    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+    notifier.loadTopics(m.id);
+    notifier.fetchDownloadUrl(moduleId: m.id, materialId: mat.id);
   }
 
   void _tapTopic(ModuleItem m, MaterialItem mat, TopicItem t) {
     setState(() { _sel = _Ctx.material(m, mat); _stack..clear()..add(_Ctx.topic(m, mat, t)); });
+    _persistUiState();
   }
 
   void _drillTopic(TopicItem t) {
     final c = _sel; if (c?.module == null || c?.material == null) return;
     setState(() { _stack.add(_Ctx.topic(c!.module!, c.material!, t)); });
+    _persistUiState();
   }
 
-  void _pop() => setState(() { if (_stack.isNotEmpty) _stack.removeLast(); });
+  void _pop() => setState(() { if (_stack.isNotEmpty) _stack.removeLast(); _persistUiState(); });
 
   // ── Right panel routing ──────────────────────────────────────────────────
   Widget _buildPanel(CourseDetailsState st) {
@@ -176,7 +326,9 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
         onUpload: () => _showUploadSheet(c.module!),
         onMaterialTap: (mat) => _tapMaterial(c.module!, mat),
         onRename: () => _showRenameDialog(c.module!),
+        onEditDescription: () => _showEditDescriptionDialog(c.module!),
         onTogglePublish: () => _togglePublish(c.module!),
+        onChangePosition: () => _showChangePositionDialog(c.module!),
         onDelete: () => _confirmDelete(c.module!),
         onShare: () => _showShareModuleDialog(c.module!),
       );
@@ -186,7 +338,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
       final mid = c.module!.id;
       final matId = c.material!.id;
       final materialTopics = (st.topics[mid] ?? const <TopicItem>[])
-          .where((t) => t.materialId == null || t.materialId == matId)
+          .where((t) => t.materialId == matId)
           .toList();
       final outcomes = ref.watch(courseLOProvider(widget.course.id));
       return _MaterialPanelWidget(
@@ -223,7 +375,8 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
 
   // ── Dialogs ──────────────────────────────────────────────────────────────
   Future<void> _showCreateModuleDialog() async {
-    final result = await showModuleSelectorSheet(context, widget.course.id);
+    final currentModules = ref.read(courseDetailsControllerProvider(widget.course.id)).modules;
+    final result = await showModuleSelectorSheet(context, widget.course.id, currentModules: currentModules);
     if (result == null || !mounted) return;
 
     if (result.isNew) {
@@ -234,10 +387,17 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
         setState(() { _expanded.add(m.id); _sel = _Ctx.module(m); _stack.clear(); });
       }
     } else if (result.existing != null) {
-      // Share an existing module with this course — for now show info toast
-      // (backend endpoint for sharing to be wired when available)
-      AppToast.info(context, title: 'Module linked',
-          message: '"${result.existing!.title}" will be shared with this course.');
+      final src = result.existing!;
+      final copied = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+          .copyModule(sourceCourseId: src.courseId, moduleId: src.id);
+      if (copied != null && mounted) {
+        AppToast.success(context, title: 'Module copied',
+            message: '"${src.title}" has been copied into this course.');
+        setState(() { _expanded.add(copied.id); _sel = _Ctx.module(copied); _stack.clear(); });
+      } else if (mounted) {
+        AppToast.error(context, title: 'Could not copy module',
+            message: 'Please try again.');
+      }
     }
   }
 
@@ -261,23 +421,144 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
   }
 
   Future<void> _showShareModuleDialog(ModuleItem m) async {
-    AppToast.info(context, title: 'Share Module',
-        message: 'Module sharing across courses will be available once the backend endpoint is wired.');
+    final targetCourse = await showDialog<MyCourseItem>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (_) => _ShareModuleDialog(module: m, currentCourseId: widget.course.id),
+    );
+    if (targetCourse == null || !mounted) return;
+
+    final copied = await ref
+        .read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .copyModule(
+          sourceCourseId: widget.course.id,
+          moduleId: m.id,
+          targetCourseId: targetCourse.id,
+        );
+
+    if (!mounted) return;
+    if (copied != null) {
+      AppToast.success(
+        context,
+        title: 'Module copied',
+        message: '"${m.title}" has been copied to "${targetCourse.safeTitle}".',
+      );
+    } else {
+      AppToast.error(context,
+          title: 'Copy failed',
+          message: 'Could not copy module. Please try again.');
+    }
   }
 
   Future<void> _showRenameDialog(ModuleItem m) async {
     final c = TextEditingController(text: m.title);
-    final ok = await showDialog<bool>(context: context,
-        barrierColor: Colors.black.withOpacity(0.35),
-        builder: (_) => _SimpleDialog(title: 'Rename Module', ctrl: c,
-            confirm: 'Rename', confirmColor: AppColors.primary));
-    if (ok != true || !mounted || c.text.trim().isEmpty || c.text.trim() == m.title) return;
-    AppToast.info(context, title: 'Coming soon', message: 'Rename coming soon.');
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (_) => _SimpleDialog(
+        title: 'Rename Module',
+        ctrl: c,
+        confirm: 'Save',
+        confirmColor: AppColors.primary,
+      ),
+    );
+    final title = c.text.trim();
+    if (ok != true || !mounted || title.isEmpty || title == m.title) return;
+
+    final updated = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .updateModule(moduleId: m.id, title: title);
+    if (!mounted) return;
+
+    if (updated != null) {
+      setState(() {
+        if (_active?.type == _CType.module && _active?.module?.id == updated.id) {
+          _sel = _Ctx.module(updated);
+        }
+      });
+      AppToast.success(context, title: 'Module renamed', message: 'The module name was updated.');
+    } else {
+      AppToast.error(context, title: 'Rename failed', message: 'Please try again.');
+    }
   }
 
-  Future<void> _togglePublish(ModuleItem m) async =>
-      AppToast.info(context, title: 'Coming soon',
-          message: '${m.isPublished ? 'Unpublish' : 'Publish'} coming soon.');
+  Future<void> _showEditDescriptionDialog(ModuleItem m) async {
+    final c = TextEditingController(text: m.description ?? '');
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (_) => _DescriptionDialog(ctrl: c),
+    );
+    final description = c.text.trim();
+    final normalizedExisting = (m.description ?? '').trim();
+    if (ok != true || !mounted || description == normalizedExisting) return;
+
+    final updated = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .updateModule(moduleId: m.id, description: description);
+    if (!mounted) return;
+
+    if (updated != null) {
+      setState(() {
+        if (_active?.type == _CType.module && _active?.module?.id == updated.id) {
+          _sel = _Ctx.module(updated);
+        }
+      });
+      AppToast.success(context, title: 'Description updated', message: 'Module description saved successfully.');
+    } else {
+      AppToast.error(context, title: 'Update failed', message: 'Please try again.');
+    }
+  }
+
+  Future<void> _togglePublish(ModuleItem m) async {
+    final updated = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .updateModule(moduleId: m.id, isPublished: !m.isPublished);
+    if (!mounted) return;
+
+    if (updated != null) {
+      setState(() {
+        if (_active?.type == _CType.module && _active?.module?.id == updated.id) {
+          _sel = _Ctx.module(updated);
+        }
+      });
+      AppToast.success(
+        context,
+        title: updated.isPublished ? 'Module published' : 'Module unpublished',
+        message: updated.isPublished ? 'The module is now visible to students.' : 'The module is now hidden from students.',
+      );
+    } else {
+      AppToast.error(context, title: 'Update failed', message: 'Please try again.');
+    }
+  }
+
+  Future<void> _showChangePositionDialog(ModuleItem m) async {
+    final sortedModules = [...ref.read(courseDetailsControllerProvider(widget.course.id)).modules]
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    final selected = await showDialog<int>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (_) => _ChangeModulePositionDialog(
+        module: m,
+        modules: sortedModules,
+      ),
+    );
+    if (selected == null || !mounted) return;
+
+    final success = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .reorderModule(moduleId: m.id, newPosition: selected - 1);
+    if (!mounted) return;
+
+    if (success) {
+      final refreshed = ref.read(courseDetailsControllerProvider(widget.course.id)).modules
+          .firstWhere((module) => module.id == m.id, orElse: () => m);
+      setState(() {
+        if (_active?.type == _CType.module && _active?.module?.id == m.id) {
+          _sel = _Ctx.module(refreshed);
+        }
+      });
+      AppToast.success(context, title: 'Position updated', message: 'Module moved to #$selected.');
+    } else {
+      AppToast.error(context, title: 'Reorder failed', message: 'Please try again.');
+    }
+  }
 
   Future<void> _confirmDelete(ModuleItem m) async {
     final ok = await showDialog<bool>(context: context,
@@ -286,126 +567,623 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
             body: 'Delete "${m.title}"? This will also remove all its materials.',
             confirm: 'Delete', confirmColor: const Color(0xFFEF4444)));
     if (ok != true || !mounted) return;
-    AppToast.info(context, title: 'Coming soon', message: 'Deletion coming soon.');
-  }
 
-  Future<void> _showAddTopicDialog(ModuleItem m, MaterialItem mat) async {
-    final tc = TextEditingController(), dc = TextEditingController();
-    TopicDifficulty selectedDiff = TopicDifficulty.beginner;
-    final result = await showDialog<Map<String, dynamic>>(context: context,
-        builder: (_) => _AddTopicDialogWidget(
-            moduleTitle: m.title, titleCtrl: tc, descCtrl: dc,
-            onDifficultyChanged: (d) => selectedDiff = d));
-    if (result == null || !mounted) return;
-    final difficulty = result['difficulty'] as TopicDifficulty? ?? selectedDiff;
-    final linkedOutcomeId = result['linkedOutcomeId'] as String?;
-    final topic = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
-        .createTopic(
-          moduleId: m.id,
-          materialId: mat.id,
-          payload: TopicCreateRequest(
-            title: tc.text.trim(),
-            description: dc.text.trim().isEmpty ? null : dc.text.trim(),
-            source: TopicSource.manual,
-            difficulty: difficulty,
-            linkedOutcomeId: linkedOutcomeId,
-            linkedOutcomeIds: linkedOutcomeId == null ? const [] : [linkedOutcomeId],
-          ),
-        );
-    if (topic != null && mounted) {
-      AppToast.success(context, title: 'Topic added', message: '"${topic.title}" created under ${mat.displayTitle}.');
+    final success = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .deleteModule(m.id);
+    if (!mounted) return;
+
+    if (success) {
+      setState(() {
+        _expanded.remove(m.id);
+        if (_active?.module?.id == m.id) {
+          _sel = null;
+          _stack.clear();
+        }
+      });
+      AppToast.success(context, title: 'Module deleted', message: '"${m.title}" was removed.');
+    } else {
+      AppToast.error(context, title: 'Delete failed', message: 'Please try again.');
     }
   }
 
-  Future<void> _showEditTopicDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
+  Future<void> _showAddTopicDialog(ModuleItem m, MaterialItem mat) async {
     final outcomes = ref.read(courseLOProvider(widget.course.id));
-    final notesCtrl = TextEditingController(text: topic.instructorNotes ?? '');
-    TopicReadiness readiness = topic.readiness;
-    final selectedOutcomeIds = <String>{...topic.linkedOutcomeIds};
-    final result = await showDialog<bool>(
+    final result = await showDialog<_TopicDialogResult>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Manage Topic', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          content: SizedBox(
-            width: 460,
-            child: SingleChildScrollView(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(topic.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 12),
-                const Text('Readiness', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  children: TopicReadiness.values.map((r) => ChoiceChip(
-                    label: Text(r.label),
-                    selected: readiness == r,
-                    onSelected: (_) => setDialogState(() => readiness = r),
-                  )).toList(),
-                ),
-                const SizedBox(height: 14),
-                const Text('Learning outcomes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-                const SizedBox(height: 6),
-                if (outcomes.isEmpty)
-                  const Text('No course outcomes yet. Add them in the Outcomes tab.', style: TextStyle(fontSize: 12, color: AppColors.textHint))
-                else
-                  ...outcomes.map((lo) => CheckboxListTile(
-                    value: selectedOutcomeIds.contains(lo.id),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('${lo.code} • ${lo.description}', style: const TextStyle(fontSize: 12.5)),
-                    onChanged: (v) => setDialogState(() {
-                      if (v ?? false) {
-                        selectedOutcomeIds.add(lo.id);
-                      } else {
-                        selectedOutcomeIds.remove(lo.id);
-                      }
-                    }),
-                  )),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: notesCtrl,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    labelText: 'Instructor notes',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ]),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
-                    .deleteTopic(moduleId: m.id, topicId: topic.id);
-                if (mounted) Navigator.pop(dialogContext, true);
-              },
-              child: const Text('Delete', style: TextStyle(color: Color(0xFFDC2626))),
-            ),
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                await ref.read(courseDetailsControllerProvider(widget.course.id).notifier).updateTopic(
-                  topic.copyWith(
-                    materialId: mat.id,
-                    linkedOutcomeIds: selectedOutcomeIds.toList(),
-                    linkedOutcomeId: selectedOutcomeIds.isEmpty ? null : selectedOutcomeIds.first,
-                    instructorNotes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-                    readiness: readiness,
-                  ),
-                );
-                if (mounted) Navigator.pop(dialogContext, true);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-              child: const Text('Save'),
-            ),
-          ],
-        ),
+      barrierColor: Colors.black.withOpacity(0.42),
+      builder: (_) => _AddTopicDialogV2(outcomes: outcomes),
+    );
+
+    if (result == null || !mounted) return;
+
+    if (result.mode == _TopicCreateMode.ai) {
+      _openGenerateDialog(moduleId: m.id, materialId: mat.id);
+      return;
+    }
+
+    final title = result.title.trim();
+    if (title.isEmpty) return;
+
+    final notifier =
+        ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+
+    final topic = await notifier.createTopic(
+      moduleId: m.id,
+      materialId: mat.id,
+      payload: TopicCreateRequest(
+        title: title,
+        learningOutcomeIds: result.learningOutcomeIds,
       ),
     );
-    if (result == true && mounted) {
+
+    if (!mounted) return;
+
+    if (topic != null) {
+      AppToast.success(
+        context,
+        title: 'Topic added',
+        message: '"${topic.title}" created successfully.',
+      );
+    } else {
+      AppToast.error(
+        context,
+        title: 'Could not add topic',
+        message: 'Please try again.',
+      );
+    }
+  }
+  Future<void> _showEditTopicDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
+    final outcomes = ref.read(courseLOProvider(widget.course.id));
+    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+
+    final titleCtrl = TextEditingController(text: topic.title);
+    final descriptionCtrl = TextEditingController(text: topic.description ?? '');
+    final notesCtrl = TextEditingController(text: topic.instructorNotes ?? '');
+    TopicDifficulty difficulty = topic.difficulty;
+    TopicReadiness readiness = topic.readiness;
+    final selectedOutcomeIds = <int>{...topic.learningOutcomeIds};
+
+    Future<bool> confirmDelete(BuildContext context) async {
+      final ok = await showDialog<bool>(
+            context: context,
+            barrierColor: Colors.black.withOpacity(0.4),
+            builder: (_) => _ConfirmDialogWidget(
+              title: 'Delete Topic',
+              body: 'Delete "${topic.title}"? This action cannot be undone.',
+              confirm: 'Delete',
+              confirmColor: const Color(0xFFDC2626),
+            ),
+          ) ??
+          false;
+      return ok;
+    }
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.42),
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) {
+          final selectedOutcomes = outcomes
+              .where((lo) => selectedOutcomeIds.contains(lo.id))
+              .toList();
+
+          Color readinessFg(TopicReadiness value) {
+            switch (value) {
+              case TopicReadiness.ready:
+                return _K.green;
+              case TopicReadiness.review:
+                return _K.amber;
+              case TopicReadiness.draft:
+                return AppColors.textMuted;
+            }
+          }
+
+          Color readinessBg(TopicReadiness value) {
+            switch (value) {
+              case TopicReadiness.ready:
+                return _K.greenSoft;
+              case TopicReadiness.review:
+                return _K.amberSoft;
+              case TopicReadiness.draft:
+                return const Color(0xFFF1F5F9);
+            }
+          }
+
+          Color difficultyColor(TopicDifficulty value) {
+            switch (value) {
+              case TopicDifficulty.advanced:
+                return const Color(0xFFDC2626);
+              case TopicDifficulty.intermediate:
+                return _K.amber;
+              case TopicDifficulty.beginner:
+                return _K.blue;
+            }
+          }
+
+          Color difficultyBg(TopicDifficulty value) {
+            switch (value) {
+              case TopicDifficulty.advanced:
+                return const Color(0xFFFEF2F2);
+              case TopicDifficulty.intermediate:
+                return const Color(0xFFFFFBEB);
+              case TopicDifficulty.beginner:
+                return const Color(0xFFEFF6FF);
+            }
+          }
+
+          return Dialog(
+            backgroundColor: Colors.transparent,
+            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 760, maxHeight: 760),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: const Color(0xFFE5E7EB)),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x1A0F172A),
+                    blurRadius: 36,
+                    offset: Offset(0, 18),
+                  ),
+                ],
+              ),
+              child: Column(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xFFF8FAFF), Color(0xFFFFFFFF)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Container(
+                              width: 52,
+                              height: 52,
+                              decoration: BoxDecoration(
+                                gradient: const LinearGradient(
+                                  colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                                  begin: Alignment.topLeft,
+                                  end: Alignment.bottomRight,
+                                ),
+                                borderRadius: BorderRadius.circular(16),
+                              ),
+                              child: const Icon(Icons.tune_rounded, color: Colors.white, size: 24),
+                            ),
+                            const SizedBox(width: 14),
+                            const Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Manage Topic',
+                                    style: TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textTitle,
+                                    ),
+                                  ),
+                                  SizedBox(height: 4),
+                                  Text(
+                                    'Edit topic details, map outcomes, and prepare this topic for delivery.',
+                                    style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Close',
+                              onPressed: () => Navigator.pop(dialogContext, false),
+                              icon: const Icon(Icons.close_rounded),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 18),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _TopicStatusChip(
+                              icon: Icons.auto_awesome_rounded,
+                              label: topic.source == TopicSource.ai ? 'AI-generated topic' : 'Manual topic',
+                              fg: _K.purple,
+                              bg: _K.purpleSoft,
+                            ),
+                            _TopicStatusChip(
+                              icon: Icons.signal_cellular_alt_rounded,
+                              label: difficulty.label,
+                              fg: difficultyColor(difficulty),
+                              bg: difficultyBg(difficulty),
+                            ),
+                            _TopicStatusChip(
+                              icon: Icons.track_changes_rounded,
+                              label: readiness.label,
+                              fg: readinessFg(readiness),
+                              bg: readinessBg(readiness),
+                            ),
+                            _TopicStatusChip(
+                              icon: Icons.flag_outlined,
+                              label: selectedOutcomeIds.isEmpty
+                                  ? 'No outcomes linked'
+                                  : '${selectedOutcomeIds.length} outcome(s) linked',
+                              fg: _K.blue,
+                              bg: _K.blueSoft,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _CardWidget(
+                            child: Padding(
+                              padding: const EdgeInsets.all(18),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Core details',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textTitle,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  TextField(
+                                    controller: titleCtrl,
+                                    decoration: InputDecoration(
+                                      labelText: 'Topic title',
+                                      hintText: 'Write a concise, teachable topic name',
+                                      prefixIcon: const Icon(Icons.title_rounded),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  TextField(
+                                    controller: descriptionCtrl,
+                                    maxLines: 3,
+                                    decoration: InputDecoration(
+                                      labelText: 'Description',
+                                      hintText: 'Add a short summary, scope, or teaching angle for this topic',
+                                      alignLabelWithHint: true,
+                                      prefixIcon: const Padding(
+                                        padding: EdgeInsets.only(bottom: 52),
+                                        child: Icon(Icons.notes_rounded),
+                                      ),
+                                      border: OutlineInputBorder(
+                                        borderRadius: BorderRadius.circular(14),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: _CardWidget(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(18),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Delivery setup',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.textTitle,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 14),
+                                        const Text(
+                                          'Difficulty',
+                                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: TopicDifficulty.values.map((value) {
+                                            final selected = difficulty == value;
+                                            return ChoiceChip(
+                                              label: Text(value.label),
+                                              selected: selected,
+                                              onSelected: (_) => setDialogState(() => difficulty = value),
+                                              avatar: Icon(
+                                                value == TopicDifficulty.beginner
+                                                    ? Icons.wb_sunny_outlined
+                                                    : value == TopicDifficulty.intermediate
+                                                        ? Icons.stacked_bar_chart_rounded
+                                                        : Icons.local_fire_department_outlined,
+                                                size: 16,
+                                                color: selected ? Colors.white : difficultyColor(value),
+                                              ),
+                                              labelStyle: TextStyle(
+                                                color: selected ? Colors.white : AppColors.textTitle,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                              selectedColor: difficultyColor(value),
+                                              backgroundColor: difficultyBg(value),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                                            );
+                                          }).toList(),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        const Text(
+                                          'Readiness',
+                                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 8,
+                                          children: TopicReadiness.values.map((value) {
+                                            final selected = readiness == value;
+                                            return ChoiceChip(
+                                              label: Text(value.label),
+                                              selected: selected,
+                                              onSelected: (_) => setDialogState(() => readiness = value),
+                                              avatar: Icon(Icons.circle, size: 10, color: selected ? Colors.white : readinessFg(value)),
+                                              labelStyle: TextStyle(
+                                                color: selected ? Colors.white : AppColors.textTitle,
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                              selectedColor: readinessFg(value),
+                                              backgroundColor: readinessBg(value),
+                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                                            );
+                                          }).toList(),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: _CardWidget(
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(18),
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Instructor notes',
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w800,
+                                            color: AppColors.textTitle,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        const Text(
+                                          'Capture explanations, examples, pacing cues, or common misconceptions.',
+                                          style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.5),
+                                        ),
+                                        const SizedBox(height: 12),
+                                        TextField(
+                                          controller: notesCtrl,
+                                          maxLines: 8,
+                                          decoration: InputDecoration(
+                                            hintText: 'Example: Start with a concrete scenario, then introduce the abstract rule.',
+                                            alignLabelWithHint: true,
+                                            border: OutlineInputBorder(
+                                              borderRadius: BorderRadius.circular(14),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+                          _CardWidget(
+                            child: Padding(
+                              padding: const EdgeInsets.all(18),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Learning outcome alignment',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textTitle,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  const Text(
+                                    'Select the outcomes this topic supports. These mappings are available in the backend update flow.',
+                                    style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.5),
+                                  ),
+                                  const SizedBox(height: 14),
+                                  if (outcomes.isEmpty)
+                                    Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(14),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFF8FAFC),
+                                        borderRadius: BorderRadius.circular(14),
+                                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                                      ),
+                                      child: const Text(
+                                        'No course outcomes yet. Add them in the Outcomes tab first.',
+                                        style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                                      ),
+                                    )
+                                  else ...[
+                                    if (selectedOutcomes.isNotEmpty) ...[
+                                      Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: selectedOutcomes
+                                            .map(
+                                              (lo) => Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                                decoration: BoxDecoration(
+                                                  color: _K.blueSoft,
+                                                  borderRadius: BorderRadius.circular(999),
+                                                  border: Border.all(color: _K.blueMid),
+                                                ),
+                                                child: Text(
+                                                  '${lo.code} • ${lo.title}',
+                                                  style: const TextStyle(
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.w700,
+                                                    color: AppColors.primary,
+                                                  ),
+                                                ),
+                                              ),
+                                            )
+                                            .toList(),
+                                      ),
+                                      const SizedBox(height: 14),
+                                    ],
+                                    Wrap(
+                                      spacing: 10,
+                                      runSpacing: 10,
+                                      children: outcomes.map((lo) {
+                                        final selected = selectedOutcomeIds.contains(lo.id);
+                                        return FilterChip(
+                                          selected: selected,
+                                          onSelected: (value) => setDialogState(() {
+                                            if (value) {
+                                              selectedOutcomeIds.add(lo.id);
+                                            } else {
+                                              selectedOutcomeIds.remove(lo.id);
+                                            }
+                                          }),
+                                          label: Text('${lo.code} • ${lo.title}'),
+                                          labelStyle: TextStyle(
+                                            color: selected ? AppColors.primary : AppColors.textTitle,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                          selectedColor: const Color(0xFFE0ECFF),
+                                          backgroundColor: Colors.white,
+                                          side: BorderSide(
+                                            color: selected ? _K.blue : const Color(0xFFE5E7EB),
+                                          ),
+                                          avatar: Icon(
+                                            selected ? Icons.check_circle_rounded : Icons.flag_outlined,
+                                            size: 16,
+                                            color: selected ? _K.blue : AppColors.textMuted,
+                                          ),
+                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                                        );
+                                      }).toList(),
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(24, 18, 24, 22),
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFCFCFD),
+                      border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
+                      borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
+                    ),
+                    child: Row(
+                      children: [
+                        TextButton.icon(
+                          onPressed: () async {
+                            final ok = await confirmDelete(dialogContext);
+                            if (!ok) return;
+                            await notifier.deleteTopic(
+                              moduleId: m.id,
+                              topicId: topic.id,
+                              materialId: mat.id,
+                            );
+                            if (mounted) Navigator.pop(dialogContext, true);
+                          },
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          label: const Text('Delete topic'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: const Color(0xFFDC2626),
+                          ),
+                        ),
+                        const Spacer(),
+                        TextButton(
+                          onPressed: () => Navigator.pop(dialogContext, false),
+                          child: const Text('Cancel'),
+                        ),
+                        const SizedBox(width: 10),
+                        ElevatedButton.icon(
+                          onPressed: () async {
+                            final title = titleCtrl.text.trim();
+                            if (title.isEmpty) {
+                              AppToast.error(
+                                context,
+                                title: 'Topic title required',
+                                message: 'Please enter a title before saving.',
+                              );
+                              return;
+                            }
+                            await notifier.updateTopic(
+                              topic.copyWith(
+                                moduleId: m.id,
+                                materialId: mat.id,
+                                title: title,
+                                description: descriptionCtrl.text.trim().isEmpty ? null : descriptionCtrl.text.trim(),
+                                learningOutcomeIds: selectedOutcomeIds.toList(),
+                                linkedOutcomeId: selectedOutcomeIds.isEmpty ? null : selectedOutcomeIds.first.toString(),
+                                linkedOutcomeIds: selectedOutcomeIds.map((id) => id.toString()).toList(),
+                                instructorNotes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                                difficulty: difficulty,
+                                readiness: readiness,
+                              ),
+                            );
+                            if (mounted) Navigator.pop(dialogContext, true);
+                          },
+                          icon: const Icon(Icons.save_outlined, size: 18),
+                          label: const Text('Save changes'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+
+    if ((result ?? false) && mounted) {
       AppToast.success(
         context,
         title: 'Topic updated',
@@ -488,6 +1266,7 @@ class _SidebarWidget extends StatelessWidget {
               : state.modules.isEmpty
                   ? _SidebarEmpty(onAdd: onAddModule)
                   : ListView.builder(
+                      key: const PageStorageKey('course-materials-sidebar-scroll'),
                       controller: scroll,
                       padding: const EdgeInsets.symmetric(vertical: 6),
                       itemCount: state.modules.length,
@@ -630,7 +1409,7 @@ class _ModuleRowWidget extends StatelessWidget {
       final matSel = active?.material?.id == mat.id &&
           (active?.type == _CType.material || active?.type == _CType.topic);
       final scopedTopics = moduleTopics
-          .where((t) => t.materialId == null || t.materialId == mat.id)
+          .where((t) => t.materialId == mat.id)
           .toList();
       return _MatRowWidget(material: mat, topics: scopedTopics, isSelected: matSel,
           active: active, onTap: () => onMaterialTap(mat), onTopicTap: (t) => onTopicTap(mat, t));
@@ -784,11 +1563,11 @@ class _ModulePanelWidget extends StatelessWidget {
   final ModuleItem module; final List<MaterialItem> materials;
   final bool uploading; final double uploadProgress;
   final VoidCallback onUpload; final void Function(MaterialItem) onMaterialTap;
-  final VoidCallback? onRename, onTogglePublish, onDelete, onShare;
+  final VoidCallback? onRename, onEditDescription, onTogglePublish, onChangePosition, onDelete, onShare;
   const _ModulePanelWidget({required this.module, required this.materials,
       required this.uploading, required this.uploadProgress,
       required this.onUpload, required this.onMaterialTap,
-      this.onRename, this.onTogglePublish, this.onDelete, this.onShare});
+      this.onRename, this.onEditDescription, this.onTogglePublish, this.onChangePosition, this.onDelete, this.onShare});
 
   @override
   Widget build(BuildContext context) {
@@ -808,7 +1587,7 @@ class _ModulePanelWidget extends StatelessWidget {
             _PRow(icon: Icons.notes_rounded, iconBg: _K.blueSoft, iconFg: AppColors.primary,
                 label: 'Edit Description',
                 sub: (module.description?.isNotEmpty ?? false) ? module.description! : 'No description yet',
-                onTap: onRename),
+                onTap: onEditDescription),
             _DivW(),
             _PRow(icon: module.isPublished ? Icons.visibility_off_rounded : Icons.visibility_rounded,
                 iconBg: module.isPublished ? _K.amberSoft : _K.greenSoft,
@@ -823,7 +1602,8 @@ class _ModulePanelWidget extends StatelessWidget {
             _DivW(),
             _PRow(icon: Icons.swap_vert_rounded, iconBg: _K.greenSoft, iconFg: _K.green,
                 label: 'Change Position',
-                sub: 'Currently #${module.orderIndex + 1} in the course'),
+                sub: 'Currently #${module.orderIndex + 1} in the course',
+                onTap: onChangePosition),
             _DivW(),
             _PRow(icon: Icons.share_rounded, iconBg: const Color(0xFFF0FDF4), iconFg: const Color(0xFF16A34A),
                 label: 'Share with Another Course',
@@ -1029,37 +1809,68 @@ class _MaterialPanelWidget extends StatelessWidget {
       mappedOutcomeIds.addAll(topic.linkedOutcomeIds);
       if (topic.linkedOutcomeId != null) mappedOutcomeIds.add(topic.linkedOutcomeId!);
     }
-    final readyCount = topics.where((t) => t.readiness == TopicReadiness.ready).length;
-    return Container(color: _K.bg, child: Column(children: [
-      _MatHeaderWidget(module: module, material: material),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-        child: _MaterialInsightsStrip(
-          topicCount: topics.length,
-          readyCount: readyCount,
-          mappedOutcomeCount: mappedOutcomeIds.length,
-          totalOutcomeCount: outcomes.length,
-        ),
+    return Container(
+      color: _K.bg,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 20, 24, 100),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+
+          // ── Material Hero (mirrors module hero style) ──────────────────
+          _MaterialHeroWidget(module: module, material: material),
+          const SizedBox(height: 16),
+
+          const SizedBox(height: 4),
+
+                    // ── File preview ───────────────────────────────
+          _CardWidget(
+            noPadding: true,
+            header: _HdrWidget(
+              icon: Icons.preview_rounded,
+              iconColor: AppColors.primary,
+              title: 'File Preview',
+              trailing: material.pageCount != null
+                  ? _Pill(l: '${material.pageCount} pages', fg: AppColors.primary, bg: _K.blueSoft)
+                  : null,
+            ),
+            child: SizedBox(
+              height: 480,
+              child: _FilePreviewWidget(
+                material: material,
+                downloadUrl: downloadUrl,
+                loading: urlLoading,
+                onRefresh: onRefreshUrl,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+
+          // ── Topics (full-width, clean list) ─────────────
+          _CardWidget(
+            noPadding: true,
+            header: _HdrWidget(
+              icon: Icons.tag_rounded,
+              iconColor: const Color(0xFF8B5CF6),
+              title: 'Topics',
+              badge: topics.isNotEmpty ? '${topics.length}' : null,
+              trailing: _AddTopicUnifiedBtn(
+                onTap: onAddTopicManual,
+              ),
+            ),
+            child: topicsLoading
+                ? const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator(strokeWidth: 2)))
+                : topics.isEmpty
+                    ? _TopicsEmptyW(onAddManual: onAddTopicManual, onGenerateAI: onGenerateTopicsAI)
+                    : Column(
+                        children: topics.asMap().entries.map((e) =>
+                            _TopicItemW(topic: e.value, index: e.key, onTap: () => onTopicTap(e.value))
+                        ).toList(),
+                      ),
+          ),
+        ]),
       ),
-      Expanded(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(child: _FilePreviewWidget(material: material, downloadUrl: downloadUrl,
-            loading: urlLoading, onRefresh: onRefreshUrl)),
-        Container(
-          width: 280,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(left: BorderSide(color: _K.div)),
-          ),
-          child: _TopicsSidebarWidget(
-            topics: topics,
-            loading: topicsLoading,
-            onTopicTap: onTopicTap,
-            onAddManual: onAddTopicManual,
-            onGenerateAI: onGenerateTopicsAI,
-          ),
-        ),
-      ])),
-    ]));
+    );
   }
 }
 
@@ -1146,6 +1957,122 @@ class _MatHeaderWidget extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+//  Material Hero — mirrors _ModuleHeroWidget layout
+// ─────────────────────────────────────────────────────────────────────────────
+class _MaterialHeroWidget extends StatelessWidget {
+  final ModuleItem module;
+  final MaterialItem material;
+  const _MaterialHeroWidget({required this.module, required this.material});
+
+  static const _gradients = {
+    'pdf'  : [Color(0xFF1565C0), Color(0xFF137FEC), Color(0xFF60A5FA)],
+    'video': [Color(0xFF065F46), Color(0xFF059669), Color(0xFF34D399)],
+    'image': [Color(0xFF6D28D9), Color(0xFF7C3AED), Color(0xFFA78BFA)],
+    'audio': [Color(0xFF0F766E), Color(0xFF0D9488), Color(0xFF5EEAD4)],
+    'quiz' : [Color(0xFF5B21B6), Color(0xFF7C3AED), Color(0xFFC4B5FD)],
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final t = material.type.toLowerCase();
+    final colors = _gradients[t] ??
+        [const Color(0xFF374151), const Color(0xFF4B5563), const Color(0xFF9CA3AF)];
+
+    final statusLabel = material.isReady || material.status == 'uploaded'
+        ? '● Ready'
+        : material.isProcessing
+            ? '● Processing'
+            : '● Processing';
+    final statusColor = material.isReady || material.status == 'uploaded'
+        ? const Color(0xFF4ADE80)
+        : const Color(0xFFFBBF24);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: colors,
+        ),
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: Color(colors[1].value).withOpacity(0.22),
+            blurRadius: 20,
+            offset: const Offset(0, 6),
+          ),
+        ],
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Wrap(spacing: 6, children: [
+              _HPill(statusLabel, statusColor),
+              _HPill(material.type.toUpperCase(), Colors.white70),
+              _HPill('In "${module.title}"', Colors.white60),
+            ]),
+            const SizedBox(height: 10),
+            Text(
+              material.displayTitle,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                height: 1.25,
+              ),
+            ),
+            if (material.fileName != null) ...[
+              const SizedBox(height: 5),
+              Text(
+                material.fileName!,
+                style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.7)),
+              ),
+            ],
+          ]),
+        ),
+        const SizedBox(width: 12),
+        // File size / pages info box
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
+          ),
+          child: Column(children: [
+            Text(
+              material.pageCount != null ? 'Pages' : 'Size',
+              style: TextStyle(
+                fontSize: 10,
+                color: Colors.white.withOpacity(0.7),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 3),
+            Text(
+              material.pageCount != null
+                  ? '${material.pageCount}'
+                  : material.fileSize != null
+                      ? '${(material.fileSize! / 1024 / 1024).toStringAsFixed(1)}MB'
+                      : '—',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+
+// ─────────────────────────────────────────────────────────────────────────────
 //  FILE PREVIEW
 // ─────────────────────────────────────────────────────────────────────────────
 enum _PK { pdf, image, video, audio, link, other }
@@ -1169,12 +2096,12 @@ class _FilePreviewWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) return const _LoaderW(label: 'Loading preview…');
-    if (material.isProcessing) {
+    if (material.isProcessing && material.status != 'uploaded') {
       return const _PlaceholderW(icon: Icons.hourglass_top_rounded,
         iconColor: _K.amber, iconBg: _K.amberSoft, title: 'Processing…',
         sub: 'Your file is being processed. Preview will be available shortly.');
     }
-    if (material.isError) {
+    if (material.isError && material.status != 'uploaded') {
       return _PlaceholderW(icon: Icons.error_outline_rounded,
         iconColor: AppColors.dangerText, iconBg: _K.redSoft, title: 'Processing failed',
         sub: 'Something went wrong processing this file.',
@@ -1199,87 +2126,49 @@ class _FilePreviewWidget extends StatelessWidget {
   }
 }
 
-class _PdfPreviewWidget extends StatelessWidget {
+class _PdfPreviewWidget extends StatefulWidget {
   final String url; final MaterialItem material;
   const _PdfPreviewWidget({required this.url, required this.material});
   @override
+  State<_PdfPreviewWidget> createState() => _PdfPreviewWidgetState();
+}
+
+// Registry to avoid double-registering iframes
+final _registeredPdfViews = <String>{};
+
+class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
+  late final String _viewId;
+
+  @override
+  void initState() {
+    super.initState();
+    _viewId = 'pdf-iframe-${widget.material.id}';
+    _registerView();
+  }
+
+  void _registerView() {
+    if (_registeredPdfViews.contains(_viewId)) return;
+    _registeredPdfViews.add(_viewId);
+    // Register the iframe as a platform view for Flutter Web
+    // ignore: undefined_prefixed_name
+    ui_web.platformViewRegistry.registerViewFactory(_viewId, (int viewId) {
+      // ignore: avoid_web_libraries_in_flutter
+      final pdfUrl = '${widget.url}#toolbar=0&navpanes=0&scrollbar=1';
+      final iframe = html.IFrameElement()
+        ..src = pdfUrl
+        ..style.border = 'none'
+        ..style.width = '100%'
+        ..style.height = '100%';
+      return iframe;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Padding(padding: const EdgeInsets.all(20), child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _MetaStripW(material: material), const SizedBox(height: 14),
-      Expanded(child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _K.div),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04),
-                blurRadius: 12, offset: const Offset(0, 4))]),
-        child: Column(children: [
-          // toolbar
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 11, 14, 11),
-            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div)),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(13))),
-            child: Row(children: [
-              Container(width: 30, height: 30, decoration: BoxDecoration(
-                  color: _K.redSoft, borderRadius: BorderRadius.circular(7)),
-                  child: const Icon(Icons.picture_as_pdf_rounded, size: 15, color: _K.red)),
-              const SizedBox(width: 10),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(material.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-                if (material.pageCount != null)
-                  Text('${material.pageCount} pages',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-              ])),
-              _OBtn(url: url),
-            ]),
-          ),
-          // body
-          Expanded(child: Container(
-            decoration: const BoxDecoration(color: Color(0xFFF8F9FB),
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(13))),
-            child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 80, height: 80,
-                  decoration: BoxDecoration(color: _K.redSoft, borderRadius: BorderRadius.circular(20)),
-                  child: const Icon(Icons.picture_as_pdf_rounded, size: 40, color: _K.red)),
-              const SizedBox(height: 16),
-              const Text('PDF Document', style: TextStyle(fontSize: 16,
-                  fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-              const SizedBox(height: 6),
-              const Text('Tap "Open" to view this PDF in your browser.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textMuted), textAlign: TextAlign.center),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final uri = Uri.tryParse(url);
-                  if (uri != null && await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
-                icon: const Icon(Icons.open_in_new_rounded, size: 15),
-                label: const Text('Open PDF in Browser'),
-                style: ElevatedButton.styleFrom(backgroundColor: _K.red, foregroundColor: Colors.white,
-                    elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-                    textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
-              ),
-              const SizedBox(height: 10),
-              TextButton.icon(
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: url));
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('URL copied to clipboard'), duration: Duration(seconds: 2)));
-                  }
-                },
-                icon: const Icon(Icons.copy_rounded, size: 13),
-                label: const Text('Copy URL'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
-              ),
-            ])),
-          )),
-        ]),
-      )),
-    ]));
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(13)),
+      child: HtmlElementView(viewType: _viewId),
+    );
   }
 }
 
@@ -1551,6 +2440,907 @@ class _TopicsSidebarWidget extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Unified "Add Topic" button — opens a tabbed dialog (Manual | AI)
+// ─────────────────────────────────────────────────────────────────────────────
+class _AddTopicUnifiedBtn extends StatelessWidget {
+  final VoidCallback onTap;
+  const _AddTopicUnifiedBtn({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return MouseRegion(
+      cursor: SystemMouseCursors.click,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF137FEC), Color(0xFF8B5CF6)],
+            ),
+            borderRadius: BorderRadius.circular(8),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x22137FEC),
+                blurRadius: 8,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+          child: const Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.add_rounded, size: 14, color: Colors.white),
+              SizedBox(width: 5),
+              Text(
+                'Add Topic',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+enum _TopicCreateMode { manual, ai }
+
+class _TopicDialogResult {
+  final String title;
+  final _TopicCreateMode mode;
+  final List<int> learningOutcomeIds;
+
+  const _TopicDialogResult.manual(this.title, {this.learningOutcomeIds = const []})
+      : mode = _TopicCreateMode.manual;
+  const _TopicDialogResult.ai()
+      : mode = _TopicCreateMode.ai,
+        title = '',
+        learningOutcomeIds = const [];
+}
+
+class _AddTopicDialogV2 extends StatefulWidget {
+  final List<LearningOutcome> outcomes;
+  const _AddTopicDialogV2({super.key, this.outcomes = const []});
+
+  @override
+  State<_AddTopicDialogV2> createState() => _AddTopicDialogV2State();
+}
+
+class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
+  final TextEditingController _titleCtrl = TextEditingController();
+  bool _submitted = false;
+  final Set<int> _selectedOutcomeIds = {};
+
+  bool get _isManual => _tabController.index == 0;
+
+  String? get _titleError {
+    if (!_submitted) return null;
+    if (_titleCtrl.text.trim().isEmpty) return 'Topic name is required';
+    return null;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 2, vsync: this);
+    _tabController.addListener(() {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    _titleCtrl.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_isManual) {
+      setState(() => _submitted = true);
+      final title = _titleCtrl.text.trim();
+      if (title.isEmpty) return;
+      Navigator.pop(context, _TopicDialogResult.manual(title, learningOutcomeIds: _selectedOutcomeIds.toList()));
+      return;
+    }
+    Navigator.pop(context, const _TopicDialogResult.ai());
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 500),
+          child: Container(
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.16),
+                  blurRadius: 30,
+                  offset: const Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _dialogHeader(),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                  child: _dialogTabs(),
+                ),
+                Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 180),
+                    child: _isManual ? _manualBody() : _aiBody(),
+                  ),
+                ),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                  decoration: const BoxDecoration(
+                    border: Border(top: BorderSide(color: _K.div)),
+                  ),
+                  child: Row(children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(context),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                          side: const BorderSide(color: _K.div),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: ElevatedButton.icon(
+                        onPressed: _submit,
+                        icon: Icon(
+                          _isManual ? Icons.add_rounded : Icons.auto_awesome_rounded,
+                          size: 16,
+                        ),
+                        label: Text(_isManual ? 'Create Topic' : 'Generate with AI'),
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 13),
+                          backgroundColor: _isManual ? AppColors.primary : _K.purple,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                  ]),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _dialogHeader() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
+      decoration: const BoxDecoration(
+          border: Border(bottom: BorderSide(color: _K.div))),
+      child: Row(children: [
+        Container(
+          width: 38, height: 38,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+                colors: [Color(0xFF137FEC), Color(0xFF8B5CF6)]),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: const Icon(Icons.tag_rounded, color: Colors.white, size: 18),
+        ),
+        const SizedBox(width: 12),
+        const Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text('Add Topic', style: TextStyle(
+                fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+            SizedBox(height: 2),
+            Text('Create a topic manually or let AI extract one for you.',
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
+          ]),
+        ),
+        IconButton(
+          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.close_rounded, size: 18),
+          splashRadius: 20,
+        ),
+      ]),
+    );
+  }
+
+  Widget _dialogTabs() {
+    return Container(
+      height: 42,
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F6),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      padding: const EdgeInsets.all(4),
+      child: TabBar(
+        controller: _tabController,
+        dividerColor: Colors.transparent,
+        indicator: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(10),
+          boxShadow: const [
+            BoxShadow(color: Color(0x12000000), blurRadius: 4, offset: Offset(0, 1)),
+          ],
+        ),
+        labelPadding: EdgeInsets.zero,
+        tabs: [
+          Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.edit_rounded, size: 14,
+                color: _isManual ? AppColors.primary : AppColors.textHint),
+            const SizedBox(width: 6),
+            Text('Manual', style: TextStyle(
+                fontSize: 12.5, fontWeight: FontWeight.w700,
+                color: _isManual ? AppColors.primary : AppColors.textMuted)),
+          ])),
+          Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.auto_awesome_rounded, size: 14,
+                color: !_isManual ? _K.purple : AppColors.textHint),
+            const SizedBox(width: 6),
+            Text('AI Generate', style: TextStyle(
+                fontSize: 12.5, fontWeight: FontWeight.w700,
+                color: !_isManual ? _K.purple : AppColors.textMuted)),
+          ])),
+        ],
+      ),
+    );
+  }
+
+  Widget _manualBody() {
+    final outcomes = widget.outcomes;
+    return Column(
+      key: const ValueKey('manual'),
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('Topic name', style: TextStyle(
+            fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _titleCtrl,
+          autofocus: true,
+          onSubmitted: (_) => _submit(),
+          decoration: InputDecoration(
+            hintText: 'e.g. Introduction to Robotics',
+            errorText: _titleError,
+            prefixIcon: const Icon(Icons.tag_rounded, size: 16, color: _K.purple),
+            filled: true,
+            fillColor: const Color(0xFFF8FAFC),
+            border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: _K.div)),
+            enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: _K.div)),
+            focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          ),
+        ),
+        if (outcomes.isNotEmpty) ...[
+          const SizedBox(height: 18),
+          Row(children: [
+            const Text('Link to Learning Outcomes',
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+            const SizedBox(width: 6),
+            Text('(optional)',
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted.withOpacity(0.7))),
+          ]),
+          const SizedBox(height: 8),
+          Container(
+            constraints: const BoxConstraints(maxHeight: 160),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: _K.div),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: ListView.builder(
+                shrinkWrap: true,
+                padding: EdgeInsets.zero,
+                itemCount: outcomes.length,
+                itemBuilder: (_, i) {
+                  final lo = outcomes[i];
+                  final selected = _selectedOutcomeIds.contains(lo.id);
+                  Color dotColor;
+                  switch (lo.difficulty) {
+                    case OutcomeDifficulty.intermediate: dotColor = const Color(0xFFD97706); break;
+                    case OutcomeDifficulty.advanced: dotColor = const Color(0xFFDC2626); break;
+                    default: dotColor = const Color(0xFF16A34A);
+                  }
+                  return InkWell(
+                    onTap: () => setState(() {
+                      if (selected) {
+                        _selectedOutcomeIds.remove(lo.id);
+                      } else {
+                        _selectedOutcomeIds.add(lo.id);
+                      }
+                    }),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                      decoration: BoxDecoration(
+                        color: selected ? AppColors.primary.withOpacity(0.06) : Colors.transparent,
+                        border: i < outcomes.length - 1
+                            ? const Border(bottom: BorderSide(color: Color(0xFFEEEEEE)))
+                            : null,
+                      ),
+                      child: Row(children: [
+                        Container(
+                          width: 16, height: 16,
+                          decoration: BoxDecoration(
+                            color: selected ? AppColors.primary : Colors.transparent,
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                              color: selected ? AppColors.primary : const Color(0xFFCBD5E1),
+                              width: 1.5,
+                            ),
+                          ),
+                          child: selected
+                              ? const Icon(Icons.check, size: 11, color: Colors.white)
+                              : null,
+                        ),
+                        const SizedBox(width: 10),
+                        Container(
+                          width: 7, height: 7,
+                          decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                        ),
+                        const SizedBox(width: 7),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.badgeBlueBg,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(lo.code,
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg)),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(child: Text(lo.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              color: selected ? AppColors.textTitle : AppColors.textMuted,
+                              fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                            ))),
+                      ]),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ),
+          if (_selectedOutcomeIds.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text('${_selectedOutcomeIds.length} outcome${_selectedOutcomeIds.length == 1 ? '' : 's'} linked',
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w600)),
+            ),
+        ],
+        const SizedBox(height: 14),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: _K.blueSoft,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _K.blueMid),
+          ),
+          child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Icon(Icons.info_outline_rounded, size: 16, color: AppColors.primary),
+            SizedBox(width: 8),
+            Expanded(child: Text(
+              'Use clear topic names so question generation and analytics stay well organized.',
+              style: TextStyle(fontSize: 12, height: 1.5,
+                  color: AppColors.primary, fontWeight: FontWeight.w500),
+            )),
+          ]),
+        ),
+      ],
+    );
+  }
+
+  Widget _aiBody() {
+    return Column(
+      key: const ValueKey('ai'),
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+                colors: [Color(0xFFF5F3FF), Color(0xFFEEF2FF)]),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: _K.purpleBd),
+          ),
+          child: Column(children: [
+            Container(
+              width: 52, height: 52,
+              decoration: BoxDecoration(
+                  color: Colors.white, borderRadius: BorderRadius.circular(16)),
+              child: const Icon(Icons.auto_awesome_rounded, color: _K.purple, size: 24),
+            ),
+            const SizedBox(height: 12),
+            const Text('Generate Topics with AI', style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.w800, color: _K.purple)),
+            const SizedBox(height: 6),
+            const Text(
+              'AI will analyze the selected material and extract suggested topics automatically.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 12.5, height: 1.6, color: AppColors.textMuted),
+            ),
+          ]),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFFFAFAFA),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: _K.div),
+          ),
+          child: const Row(children: [
+            Icon(Icons.bolt_rounded, size: 15, color: _K.purple),
+            SizedBox(width: 8),
+            Expanded(child: Text(
+              'You can review and refine the generated topics later.',
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+            )),
+          ]),
+        ),
+      ],
+    );
+  }
+}
+
+
+
+bool _isDangerActionColor(Color color) => color.red >= 180 && color.green <= 120;
+
+class _PreferencesDialogShell extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final Widget child;
+  final double maxWidth;
+  final EdgeInsetsGeometry padding;
+  final Widget? leading;
+
+  const _PreferencesDialogShell({
+    required this.title,
+    required this.child,
+    this.subtitle,
+    this.maxWidth = 620,
+    this.padding = const EdgeInsets.fromLTRB(20, 20, 20, 20),
+    this.leading,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.white,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: maxWidth),
+        child: Padding(
+          padding: padding,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (leading != null) ...[leading!, const SizedBox(width: 12)],
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.textTitle,
+                          ),
+                        ),
+                        if (subtitle != null) ...[
+                          const SizedBox(height: 8),
+                          Text(
+                            subtitle!,
+                            style: const TextStyle(
+                              fontSize: 12.5,
+                              height: 1.45,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  InkWell(
+                    borderRadius: BorderRadius.circular(10),
+                    onTap: () => Navigator.pop(context),
+                    child: const Padding(
+                      padding: EdgeInsets.all(6),
+                      child: Icon(
+                        Icons.close_rounded,
+                        size: 20,
+                        color: AppColors.textMuted,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              child,
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hintText;
+  final bool multiline;
+  final bool autofocus;
+
+  const _DialogTextField({
+    required this.controller,
+    required this.hintText,
+    this.multiline = false,
+    this.autofocus = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: BoxConstraints(minHeight: multiline ? 104 : 48),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      padding: EdgeInsets.symmetric(
+        horizontal: 16,
+        vertical: multiline ? 14 : 0,
+      ),
+      alignment: multiline ? Alignment.topLeft : Alignment.centerLeft,
+      child: TextField(
+        controller: controller,
+        autofocus: autofocus,
+        minLines: multiline ? 4 : 1,
+        maxLines: multiline ? 5 : 1,
+        style: AppText.input,
+        decoration: InputDecoration(
+          hintText: hintText,
+          hintStyle: AppText.hint,
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          isCollapsed: true,
+          contentPadding: EdgeInsets.zero,
+        ),
+      ),
+    );
+  }
+}
+
+class _DialogActions extends StatelessWidget {
+  final String cancelLabel;
+  final String confirmLabel;
+  final VoidCallback onCancel;
+  final VoidCallback? onConfirm;
+  final AppButtonVariant confirmVariant;
+
+  const _DialogActions({
+    this.cancelLabel = 'Cancel',
+    required this.confirmLabel,
+    required this.onCancel,
+    required this.onConfirm,
+    this.confirmVariant = AppButtonVariant.primary,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: AppButton(
+            label: cancelLabel,
+            onTap: onCancel,
+            variant: AppButtonVariant.soft,
+            fullWidth: true,
+            height: 40,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: AppButton(
+            label: confirmLabel,
+            onTap: onConfirm,
+            variant: confirmVariant,
+            fullWidth: true,
+            height: 40,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  _ShareModuleDialog — lets the instructor choose the target course
+// ─────────────────────────────────────────────────────────────────────────────
+final _shareTargetCoursesProvider = FutureProvider.family<List<MyCourseItem>, int>((ref, currentCourseId) async {
+  final res = await ref.read(coursesApiProvider).myCourses();
+  final items = [...res.items]
+    ..removeWhere((course) => course.id == currentCourseId)
+    ..sort((a, b) => a.safeTitle.toLowerCase().compareTo(b.safeTitle.toLowerCase()));
+  return items;
+});
+
+class _ShareModuleDialog extends ConsumerStatefulWidget {
+  final ModuleItem module;
+  final int currentCourseId;
+  const _ShareModuleDialog({required this.module, required this.currentCourseId, super.key});
+
+  @override
+  ConsumerState<_ShareModuleDialog> createState() => _ShareModuleDialogState();
+}
+
+class _ShareModuleDialogState extends ConsumerState<_ShareModuleDialog> {
+  MyCourseItem? _selectedCourse;
+
+  @override
+  Widget build(BuildContext context) {
+    final coursesAsync = ref.watch(_shareTargetCoursesProvider(widget.currentCourseId));
+    return _PreferencesDialogShell(
+      title: 'Share with Another Course',
+      subtitle: 'Choose which course should receive a copied module',
+      leading: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF5F3FF),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: const Icon(Icons.copy_all_rounded, size: 18, color: Color(0xFF7C3AED)),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: const Icon(Icons.folder_rounded, size: 18, color: Color(0xFF137FEC)),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(widget.module.title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                  if (widget.module.description != null && widget.module.description!.isNotEmpty)
+                    Text(widget.module.description!, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                ]),
+              ),
+            ]),
+          ),
+          const SizedBox(height: 16),
+          coursesAsync.when(
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: 18),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (error, _) => Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF1F2),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFECDD3)),
+              ),
+              child: Text('Could not load your courses: $error', style: const TextStyle(fontSize: 12, color: Color(0xFF9F1239))),
+            ),
+            data: (courses) {
+              if (courses.isEmpty) {
+                return Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFFBEB),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFFDE68A)),
+                  ),
+                  child: const Text('No other instructor courses are available for sharing yet.', style: TextStyle(fontSize: 12, color: Color(0xFF92400E))),
+                );
+              }
+
+              _selectedCourse ??= courses.first;
+              final currentValue = courses.contains(_selectedCourse) ? _selectedCourse! : courses.first;
+              return AppModernDropdown<MyCourseItem>(
+                label: 'Target course',
+                value: currentValue,
+                items: [
+                  for (final course in courses)
+                    DropdownMenuItem<MyCourseItem>(
+                      value: course,
+                      child: Text(course.safeTitle, overflow: TextOverflow.ellipsis),
+                    ),
+                ],
+                onChanged: (value) => setState(() => _selectedCourse = value),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFFFBEB),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: const Color(0xFFFDE68A)),
+            ),
+            child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFFD97706)),
+              SizedBox(width: 8),
+              Expanded(child: Text(
+                'This creates an independent copy in the selected course using the current backend copy endpoint.',
+                style: TextStyle(fontSize: 12, height: 1.5, color: Color(0xFF92400E)),
+              )),
+            ]),
+          ),
+          const SizedBox(height: 20),
+          _DialogActions(
+            onCancel: () => Navigator.pop(context),
+            onConfirm: _selectedCourse == null ? null : () => Navigator.pop(context, _selectedCourse),
+            confirmLabel: 'Copy Module',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DescriptionDialog extends StatelessWidget {
+  final TextEditingController ctrl;
+  const _DescriptionDialog({required this.ctrl});
+
+  @override
+  Widget build(BuildContext context) {
+    return _PreferencesDialogShell(
+      title: 'Edit Description',
+      subtitle: 'Update the module description shown in preferences and sharing flows.',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DialogTextField(
+            controller: ctrl,
+            hintText: 'Write a short helpful description',
+            multiline: true,
+          ),
+          const SizedBox(height: 16),
+          _DialogActions(
+            onCancel: () => Navigator.pop(context, false),
+            onConfirm: () => Navigator.pop(context, true),
+            confirmLabel: 'Save',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ChangeModulePositionDialog extends StatefulWidget {
+  final ModuleItem module;
+  final List<ModuleItem> modules;
+  const _ChangeModulePositionDialog({required this.module, required this.modules});
+
+  @override
+  State<_ChangeModulePositionDialog> createState() => _ChangeModulePositionDialogState();
+}
+
+class _ChangeModulePositionDialogState extends State<_ChangeModulePositionDialog> {
+  late int _selectedPosition = widget.module.orderIndex + 1;
+
+  @override
+  Widget build(BuildContext context) {
+    return _PreferencesDialogShell(
+      title: 'Change Position',
+      subtitle: 'Move "${widget.module.title}" to a new order inside this course.',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AppModernDropdown<int>(
+            label: 'Position',
+            value: _selectedPosition,
+            items: [
+              for (var i = 0; i < widget.modules.length; i++)
+                DropdownMenuItem<int>(
+                  value: i + 1,
+                  child: Text('#${i + 1}'),
+                ),
+            ],
+            onChanged: (value) {
+              if (value != null) setState(() => _selectedPosition = value);
+            },
+          ),
+          const SizedBox(height: 16),
+          _DialogActions(
+            onCancel: () => Navigator.pop(context),
+            onConfirm: () => Navigator.pop(context, _selectedPosition),
+            confirmLabel: 'Save',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ManualTabContent extends StatelessWidget {
+  final TextEditingController ctrl;
+  final String? error;
+  const _ManualTabContent({required this.ctrl, this.error, super.key});
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink(); // unused, kept for compat
+}
+
+class _AITabContent extends StatelessWidget {
+  const _AITabContent({super.key});
+  @override
+  Widget build(BuildContext context) => const SizedBox.shrink(); // unused, kept for compat
+}
+
+
 class _AddTopicBtnW extends StatelessWidget {
   final IconData icon; final String label; final VoidCallback onTap;
   final Color color, bg;
@@ -1571,17 +3361,35 @@ class _TopicsEmptyW extends StatelessWidget {
   final VoidCallback onAddManual, onGenerateAI;
   const _TopicsEmptyW({required this.onAddManual, required this.onGenerateAI});
   @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(14),
-    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Container(width: 44, height: 44, decoration: BoxDecoration(
-          color: _K.purpleSoft, borderRadius: BorderRadius.circular(12)),
-          child: const Icon(Icons.auto_awesome_rounded, size: 22, color: _K.purple)),
-      const SizedBox(height: 10),
-      const Text('No topics yet', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-      const SizedBox(height: 5),
-      const Text('Add manually or let AI generate topics from this material.',
-          textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: AppColors.textMuted, height: 1.5)),
-    ]));
+  Widget build(BuildContext context) => SizedBox(
+    width: double.infinity,
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            width: 48, height: 48,
+            decoration: BoxDecoration(
+              color: _K.purpleSoft,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.tag_rounded, size: 22, color: _K.purple),
+          ),
+          const SizedBox(height: 12),
+          const Text('No topics yet',
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+          const SizedBox(height: 6),
+          const Text(
+            'Use the "Add Topic" button above\nto create topics manually or with AI.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.6),
+          ),
+        ],
+      ),
+    ),
+  );
 }
 
 class _TopicItemW extends StatelessWidget {
@@ -1635,162 +3443,878 @@ class _TopicPanelWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final mappedOutcomes = outcomes
-        .where((o) => topic.linkedOutcomeIds.contains(o.id) || topic.linkedOutcomeId == o.id)
+        .where((o) => topic.linkedOutcomeIds.contains(o.id.toString()) || topic.linkedOutcomeId == o.id.toString())
         .toList();
 
-    return Container(color: _K.bg, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(height: 48, padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: const BoxDecoration(color: Colors.white,
-              border: Border(bottom: BorderSide(color: _K.div))),
-          child: Row(children: [
-            if (canPop) InkWell(onTap: onBack, borderRadius: BorderRadius.circular(7),
-                child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(color: _K.bg, borderRadius: BorderRadius.circular(7),
-                        border: Border.all(color: _K.div)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.arrow_back_ios_new_rounded, size: 11, color: AppColors.textMuted),
-                      const SizedBox(width: 5),
-                      Text(material.displayTitle, style: const TextStyle(
-                          fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
-                    ]))),
-            if (canPop) const SizedBox(width: 10),
-            const Icon(Icons.tag_rounded, size: 14, color: _K.purple), const SizedBox(width: 6),
-            Expanded(child: Text(topic.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle))),
-            TextButton.icon(
-              onPressed: onEditTopic,
-              icon: const Icon(Icons.edit_outlined, size: 14),
-              label: const Text('Manage'),
+    final readinessMeta = _topicReadinessMeta(topic.readiness);
+    final difficultyMeta = _topicDifficultyMeta(topic.difficulty);
+
+    final actionCards = [
+      _TopicActionData(
+        icon: Icons.auto_awesome_rounded,
+        title: 'Generate questions',
+        subtitle: 'Open scoped AI generation with this topic as the anchor.',
+        accent: _K.purple,
+        softColor: _K.purpleSoft,
+        onTap: onGenerate,
+      ),
+      _TopicActionData(
+        icon: Icons.edit_note_rounded,
+        title: 'Draft manual question',
+        subtitle: 'Create a hand-authored question tied directly to this topic.',
+        accent: _K.blue,
+        softColor: _K.blueSoft,
+        onTap: onAddManualQuestion,
+      ),
+      _TopicActionData(
+        icon: Icons.tune_rounded,
+        title: 'Refine topic setup',
+        subtitle: 'Update title, mappings, notes, and delivery status.',
+        accent: _K.green,
+        softColor: _K.greenSoft,
+        onTap: onEditTopic,
+      ),
+    ];
+
+    final timeline = [
+      const _TimelineEntry(
+        icon: Icons.add_task_rounded,
+        title: 'Topic created',
+        subtitle: 'Structured under this material and ready for instructor refinement.',
+      ),
+      _TimelineEntry(
+        icon: Icons.flag_outlined,
+        title: mappedOutcomes.isEmpty ? 'Outcome mapping pending' : 'Outcome alignment in place',
+        subtitle: mappedOutcomes.isEmpty
+            ? 'Use Manage to connect this topic to one or more course outcomes.'
+            : '${mappedOutcomes.length} mapped outcome(s) are already linked to this topic.',
+      ),
+      _TimelineEntry(
+        icon: topic.readiness == TopicReadiness.ready ? Icons.rocket_launch_rounded : Icons.rule_folder_outlined,
+        title: topic.readiness == TopicReadiness.ready ? 'Delivery-ready topic' : 'Preparation still in progress',
+        subtitle: topic.readiness == TopicReadiness.ready
+            ? 'This topic can move straight into assessment and delivery workflows.'
+            : 'Keep refining content, notes, and alignment before live delivery.',
+      ),
+    ];
+
+    return Container(
+      color: _K.bg,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            height: 48,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              border: Border(bottom: BorderSide(color: _K.div)),
             ),
-          ])),
-
-      Expanded(child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            const _Pill(l: 'TOPIC', fg: _K.purple, bg: _K.purpleSoft),
-            if (topic.isRequired) const _Pill(l: 'REQUIRED', fg: _K.blue, bg: _K.blueMid),
-            _Pill(
-              l: topic.readiness.label.toUpperCase(),
-              fg: topic.readiness == TopicReadiness.ready ? _K.green : (topic.readiness == TopicReadiness.review ? _K.amber : AppColors.textMuted),
-              bg: topic.readiness == TopicReadiness.ready ? _K.greenSoft : (topic.readiness == TopicReadiness.review ? _K.amberSoft : const Color(0xFFF1F5F9)),
-            ),
-          ]),
-          const SizedBox(height: 14),
-          Text(topic.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
-              color: AppColors.textTitle, height: 1.3)),
-          const SizedBox(height: 6),
-          Row(children: [
-            const Icon(Icons.folder_outlined, size: 12, color: AppColors.textHint), const SizedBox(width: 5),
-            Text(module.title, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-            const Padding(padding: EdgeInsets.symmetric(horizontal: 5),
-                child: Text('›', style: TextStyle(fontSize: 12, color: AppColors.textHint))),
-            const Icon(Icons.article_outlined, size: 12, color: AppColors.textHint), const SizedBox(width: 5),
-            Expanded(child: Text(material.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: AppColors.textMuted))),
-          ]),
-          const SizedBox(height: 20),
-
-          if (topic.description?.isNotEmpty ?? false) ...[
-            _CardWidget(
-              header: const _HdrWidget(icon: Icons.description_outlined, iconColor: AppColors.primary, title: 'Description'),
-              child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                  child: Text(topic.description!, style: const TextStyle(
-                      fontSize: 13, color: AppColors.textMuted, height: 1.6)))),
-            const SizedBox(height: 14),
-          ],
-
-          _CardWidget(
-            header: const _HdrWidget(icon: Icons.info_outline_rounded, iconColor: AppColors.primary, title: 'Teaching Context'),
-            child: Column(children: [
-              _MRowW(icon: Icons.track_changes_rounded, label: 'Readiness', value: topic.readiness.label),
-              _MRowW(icon: Icons.signal_cellular_alt_rounded, label: 'Difficulty', value: topic.difficulty.label),
-              _MRowW(icon: Icons.sort_rounded, label: 'Order', value: '#${topic.orderIndex + 1}'),
-              _MRowW(icon: Icons.flag_outlined, label: 'Mapped outcomes', value: mappedOutcomes.isEmpty ? 'Not mapped yet' : '${mappedOutcomes.length} outcome(s)'),
-              _MRowW(icon: Icons.calendar_today_outlined, label: 'Created',
-                  value: '${topic.createdAt.day}/${topic.createdAt.month}/${topic.createdAt.year}', isLast: true),
-            ])),
-          const SizedBox(height: 16),
-
-          _CardWidget(
-            header: const _HdrWidget(icon: Icons.flag_outlined, iconColor: AppColors.primary, title: 'Learning Outcome Alignment'),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-              child: mappedOutcomes.isEmpty
-                  ? const Text('This topic is not mapped yet. Use Manage to align it to one or more course outcomes.',
-                      style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5))
-                  : Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: mappedOutcomes.map((lo) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _K.blueSoft,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: _K.blueMid),
-                        ),
-                        child: Text('${lo.code} • ${lo.description}',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                      )).toList(),
+            child: Row(
+              children: [
+                if (canPop)
+                  InkWell(
+                    onTap: onBack,
+                    borderRadius: BorderRadius.circular(7),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: _K.bg,
+                        borderRadius: BorderRadius.circular(7),
+                        border: Border.all(color: _K.div),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.arrow_back_ios_new_rounded, size: 11, color: AppColors.textMuted),
+                          const SizedBox(width: 5),
+                          Text(
+                            material.displayTitle,
+                            style: const TextStyle(
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
+                  ),
+                if (canPop) const SizedBox(width: 10),
+                const Icon(Icons.tag_rounded, size: 14, color: _K.purple),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    topic.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13.5,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textTitle,
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: onEditTopic,
+                  icon: const Icon(Icons.edit_outlined, size: 14),
+                  label: const Text('Manage'),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          _CardWidget(
-            header: const _HdrWidget(icon: Icons.sticky_note_2_outlined, iconColor: AppColors.primary, title: 'Instructor Notes'),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-              child: Text(
-                (topic.instructorNotes?.trim().isNotEmpty ?? false)
-                    ? topic.instructorNotes!.trim()
-                    : 'No notes yet. Use Manage to add delivery notes, examples, or assessment guidance.',
-                style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.6),
+          Expanded(
+            child: SingleChildScrollView(
+              padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _TopicHeroCard(
+                    module: module,
+                    material: material,
+                    topic: topic,
+                    mappedOutcomesCount: mappedOutcomes.length,
+                    readinessMeta: readinessMeta,
+                    difficultyMeta: difficultyMeta,
+                    onManage: onEditTopic,
+                  ),
+                  const SizedBox(height: 18),
+                  _TopicInsightsGrid(
+                    topic: topic,
+                    mappedOutcomesCount: mappedOutcomes.length,
+                    readinessMeta: readinessMeta,
+                    difficultyMeta: difficultyMeta,
+                  ),
+                  const SizedBox(height: 18),
+                  _TopicSmartActionsCard(actions: actionCards),
+                  const SizedBox(height: 18),
+                  if (topic.description?.isNotEmpty ?? false) ...[
+                    _CardWidget(
+                      header: const _HdrWidget(
+                        icon: Icons.description_outlined,
+                        iconColor: AppColors.primary,
+                        title: 'Topic Brief',
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                        child: Text(
+                          topic.description!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textMuted,
+                            height: 1.6,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
+                  _CardWidget(
+                    header: const _HdrWidget(
+                      icon: Icons.flag_outlined,
+                      iconColor: AppColors.primary,
+                      title: 'Learning Outcome Alignment',
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                      child: mappedOutcomes.isEmpty
+                          ? const Text(
+                              'This topic is not mapped yet. Use Manage to align it to one or more course outcomes.',
+                              style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
+                            )
+                          : Wrap(
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: mappedOutcomes
+                                  .map(
+                                    (lo) => Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: _K.blueSoft,
+                                        borderRadius: BorderRadius.circular(999),
+                                        border: Border.all(color: _K.blueMid),
+                                      ),
+                                      child: Text(
+                                        '${lo.code} • ${lo.description}',
+                                        style: const TextStyle(
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.primary,
+                                        ),
+                                      ),
+                                    ),
+                                  )
+                                  .toList(),
+                            ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _CardWidget(
+                    header: const _HdrWidget(
+                      icon: Icons.sticky_note_2_outlined,
+                      iconColor: AppColors.primary,
+                      title: 'Instructor Notes',
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                      child: Text(
+                        (topic.instructorNotes?.trim().isNotEmpty ?? false)
+                            ? topic.instructorNotes!.trim()
+                            : 'No notes yet. Use Manage to add delivery notes, examples, or assessment guidance.',
+                        style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.6),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  _TopicTimelineCard(entries: timeline),
+                ],
               ),
             ),
           ),
-          const SizedBox(height: 16),
-
-          Row(children: [
-            Expanded(
-              child: _CardWidget(noPadding: true, child: InkWell(onTap: onAddManualQuestion,
-                borderRadius: BorderRadius.circular(12), child: Padding(padding: const EdgeInsets.all(16),
-                  child: Row(children: [
-                    Container(width: 42, height: 42, decoration: BoxDecoration(
-                        color: _K.blueSoft, borderRadius: BorderRadius.circular(11)),
-                        child: const Icon(Icons.edit_note_rounded, size: 20, color: AppColors.primary)),
-                    const SizedBox(width: 12),
-                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Add Manual Question', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-                      SizedBox(height: 2),
-                      Text('Create a question draft linked to this topic.',
-                          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-                    ])),
-                  ])))),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _CardWidget(noPadding: true, child: InkWell(onTap: onGenerate,
-                borderRadius: BorderRadius.circular(12), child: Padding(padding: const EdgeInsets.all(16),
-                  child: Row(children: [
-                    Container(width: 42, height: 42, decoration: BoxDecoration(
-                        color: _K.purpleSoft, borderRadius: BorderRadius.circular(11)),
-                        child: const Icon(Icons.auto_awesome_rounded, size: 20, color: _K.purple)),
-                    const SizedBox(width: 12),
-                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Generate Questions', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-                      SizedBox(height: 2),
-                      Text('Open scoped generation for this topic.',
-                          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-                    ])),
-                  ])))),
-            ),
-          ]),
-        ]),
-      )),
-    ]));
+        ],
+      ),
+    );
   }
 }
+
+class _TopicHeroCard extends StatelessWidget {
+  final ModuleItem module;
+  final MaterialItem material;
+  final TopicItem topic;
+  final int mappedOutcomesCount;
+  final _TopicMeta readinessMeta;
+  final _TopicMeta difficultyMeta;
+  final VoidCallback onManage;
+
+  const _TopicHeroCard({
+    required this.module,
+    required this.material,
+    required this.topic,
+    required this.mappedOutcomesCount,
+    required this.readinessMeta,
+    required this.difficultyMeta,
+    required this.onManage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final created = '${topic.createdAt.day}/${topic.createdAt.month}/${topic.createdAt.year}';
+    final statusChips = [
+      const _TopicStatusChip(icon: Icons.sell_outlined, label: 'Topic', fg: _K.purple, bg: _K.purpleSoft),
+      if (topic.isRequired)
+        const _TopicStatusChip(icon: Icons.check_circle_outline_rounded, label: 'Required', fg: _K.blue, bg: _K.blueSoft),
+      _TopicStatusChip(icon: readinessMeta.icon, label: readinessMeta.label, fg: readinessMeta.fg, bg: readinessMeta.bg),
+      _TopicStatusChip(icon: difficultyMeta.icon, label: difficultyMeta.label, fg: difficultyMeta.fg, bg: difficultyMeta.bg),
+    ];
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [Color(0xFF0F172A), Color(0xFF1D4ED8), Color(0xFF7C3AED)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x1A1D4ED8),
+            blurRadius: 30,
+            offset: Offset(0, 16),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Wrap(spacing: 8, runSpacing: 8, children: statusChips),
+            const SizedBox(height: 16),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.14),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: Colors.white.withOpacity(0.14)),
+                  ),
+                  child: const Icon(Icons.auto_stories_rounded, color: Colors.white, size: 28),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        topic.title,
+                        style: const TextStyle(
+                          fontSize: 25,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                          height: 1.2,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 8,
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: [
+                          _TopicBreadcrumb(icon: Icons.folder_outlined, text: module.title),
+                          _TopicBreadcrumb(icon: Icons.article_outlined, text: material.displayTitle),
+                          _TopicBreadcrumb(icon: Icons.calendar_today_outlined, text: 'Created $created'),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                FilledButton.icon(
+                  onPressed: onManage,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF111827),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  ),
+                  icon: const Icon(Icons.tune_rounded, size: 18),
+                  label: const Text('Manage'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: _HeroStat(
+                    label: 'Mapped outcomes',
+                    value: mappedOutcomesCount == 0 ? 'Unmapped' : '$mappedOutcomesCount linked',
+                    helper: mappedOutcomesCount == 0 ? 'Needs alignment' : 'Aligned with course goals',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _HeroStat(
+                    label: 'Question workflow',
+                    value: topic.readiness == TopicReadiness.ready ? 'Generation-ready' : 'Preparation mode',
+                    helper: topic.readiness == TopicReadiness.ready ? 'Safe to build assessment coverage' : 'Refine topic first',
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: _HeroStat(
+                    label: 'Topic type',
+                    value: topic.source == TopicSource.ai ? 'AI-assisted' : 'Instructor-led',
+                    helper: topic.source == TopicSource.ai ? 'Generated from material context' : 'Created manually',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopicInsightsGrid extends StatelessWidget {
+  final TopicItem topic;
+  final int mappedOutcomesCount;
+  final _TopicMeta readinessMeta;
+  final _TopicMeta difficultyMeta;
+
+  const _TopicInsightsGrid({
+    required this.topic,
+    required this.mappedOutcomesCount,
+    required this.readinessMeta,
+    required this.difficultyMeta,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cards = [
+      _TopicInsightData(
+        title: 'Delivery status',
+        value: readinessMeta.label,
+        caption: topic.readiness == TopicReadiness.ready
+            ? 'Ready for live teaching'
+            : topic.readiness == TopicReadiness.review
+                ? 'Needs final QA pass'
+                : 'Still being prepared',
+        icon: readinessMeta.icon,
+        accent: readinessMeta.fg,
+        softColor: readinessMeta.bg,
+      ),
+      _TopicInsightData(
+        title: 'Difficulty',
+        value: difficultyMeta.label,
+        caption: topic.difficulty == TopicDifficulty.beginner
+            ? 'Accessible introduction'
+            : topic.difficulty == TopicDifficulty.intermediate
+                ? 'Balanced depth'
+                : 'Advanced treatment',
+        icon: difficultyMeta.icon,
+        accent: difficultyMeta.fg,
+        softColor: difficultyMeta.bg,
+      ),
+      _TopicInsightData(
+        title: 'Outcome coverage',
+        value: mappedOutcomesCount == 0 ? 'Pending' : '$mappedOutcomesCount linked',
+        caption: mappedOutcomesCount == 0
+            ? 'No outcome alignment yet'
+            : 'Connected to measurable outcomes',
+        icon: Icons.flag_outlined,
+        accent: _K.blue,
+        softColor: _K.blueSoft,
+      ),
+      _TopicInsightData(
+        title: 'Instructor notes',
+        value: (topic.instructorNotes?.trim().isNotEmpty ?? false) ? 'Available' : 'Missing',
+        caption: (topic.instructorNotes?.trim().isNotEmpty ?? false)
+            ? 'Delivery guidance has been added'
+            : 'Add notes for examples and pacing',
+        icon: Icons.sticky_note_2_outlined,
+        accent: _K.purple,
+        softColor: _K.purpleSoft,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final crossAxisCount = constraints.maxWidth > 1100
+            ? 4
+            : constraints.maxWidth > 760
+                ? 2
+                : 1;
+        final itemWidth = (constraints.maxWidth - (crossAxisCount - 1) * 14) / crossAxisCount;
+        return Wrap(
+          spacing: 14,
+          runSpacing: 14,
+          children: cards
+              .map((card) => SizedBox(
+                    width: itemWidth,
+                    child: _TopicInsightCard(data: card),
+                  ))
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _TopicInsightCard extends StatelessWidget {
+  final _TopicInsightData data;
+
+  const _TopicInsightCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return _CardWidget(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 42,
+              height: 42,
+              decoration: BoxDecoration(
+                color: data.softColor,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(data.icon, color: data.accent, size: 20),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              data.title,
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              data.value,
+              style: const TextStyle(fontSize: 16, color: AppColors.textTitle, fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              data.caption,
+              style: const TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.5),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopicSmartActionsCard extends StatelessWidget {
+  final List<_TopicActionData> actions;
+
+  const _TopicSmartActionsCard({required this.actions});
+
+  @override
+  Widget build(BuildContext context) {
+    return _CardWidget(
+      header: const _HdrWidget(
+        icon: Icons.bolt_rounded,
+        iconColor: AppColors.primary,
+        title: 'Smart Actions',
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+        child: Column(
+          children: actions
+              .map(
+                (action) => Padding(
+                  padding: EdgeInsets.only(bottom: action == actions.last ? 0 : 12),
+                  child: _TopicActionTile(data: action),
+                ),
+              )
+              .toList(),
+        ),
+      ),
+    );
+  }
+}
+
+class _TopicActionTile extends StatelessWidget {
+  final _TopicActionData data;
+
+  const _TopicActionTile({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: data.onTap,
+      borderRadius: BorderRadius.circular(18),
+      child: Ink(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: data.softColor,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(data.icon, color: data.accent, size: 20),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    data.title,
+                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textTitle),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    data.subtitle,
+                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.45),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Icon(Icons.arrow_outward_rounded, size: 18, color: AppColors.textMuted),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TopicTimelineCard extends StatelessWidget {
+  final List<_TimelineEntry> entries;
+
+  const _TopicTimelineCard({required this.entries});
+
+  @override
+  Widget build(BuildContext context) {
+    return _CardWidget(
+      header: const _HdrWidget(
+        icon: Icons.timeline_rounded,
+        iconColor: AppColors.primary,
+        title: 'Delivery Timeline',
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
+        child: Column(
+          children: List.generate(entries.length, (index) {
+            final entry = entries[index];
+            final isLast = index == entries.length - 1;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                SizedBox(
+                  width: 28,
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 28,
+                        height: 28,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFEFF6FF),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Icon(entry.icon, color: AppColors.primary, size: 16),
+                      ),
+                      if (!isLast)
+                        Container(
+                          width: 2,
+                          height: 42,
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          color: const Color(0xFFE2E8F0),
+                        ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          entry.title,
+                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textTitle),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          entry.subtitle,
+                          style: const TextStyle(fontSize: 12.3, color: AppColors.textMuted, height: 1.5),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            );
+          }),
+        ),
+      ),
+    );
+  }
+}
+
+class _TopicStatusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color fg;
+  final Color bg;
+
+  const _TopicStatusChip({
+    required this.icon,
+    required this.label,
+    required this.fg,
+    required this.bg,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(bg == Colors.white ? 1 : 0)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            label.toUpperCase(),
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: fg, letterSpacing: .2),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopicBreadcrumb extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _TopicBreadcrumb({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 13, color: Colors.white70),
+        const SizedBox(width: 6),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 12.5, color: Colors.white70, fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final String helper;
+
+  const _HeroStat({
+    required this.label,
+    required this.value,
+    required this.helper,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.12)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(fontSize: 11.5, color: Colors.white70, fontWeight: FontWeight.w700)),
+          const SizedBox(height: 6),
+          Text(value, style: const TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.w800)),
+          const SizedBox(height: 4),
+          Text(helper, style: const TextStyle(fontSize: 11.5, color: Colors.white70, height: 1.4)),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopicMeta {
+  final String label;
+  final IconData icon;
+  final Color fg;
+  final Color bg;
+
+  const _TopicMeta({
+    required this.label,
+    required this.icon,
+    required this.fg,
+    required this.bg,
+  });
+}
+
+class _TopicInsightData {
+  final String title;
+  final String value;
+  final String caption;
+  final IconData icon;
+  final Color accent;
+  final Color softColor;
+
+  const _TopicInsightData({
+    required this.title,
+    required this.value,
+    required this.caption,
+    required this.icon,
+    required this.accent,
+    required this.softColor,
+  });
+}
+
+class _TopicActionData {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Color accent;
+  final Color softColor;
+  final VoidCallback onTap;
+
+  const _TopicActionData({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.accent,
+    required this.softColor,
+    required this.onTap,
+  });
+}
+
+class _TimelineEntry {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _TimelineEntry({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+  });
+}
+
+_TopicMeta _topicReadinessMeta(TopicReadiness readiness) {
+  switch (readiness) {
+    case TopicReadiness.ready:
+      return const _TopicMeta(
+        label: 'Ready',
+        icon: Icons.check_circle_rounded,
+        fg: _K.green,
+        bg: _K.greenSoft,
+      );
+    case TopicReadiness.review:
+      return const _TopicMeta(
+        label: 'Needs Review',
+        icon: Icons.pending_actions_rounded,
+        fg: _K.amber,
+        bg: _K.amberSoft,
+      );
+    case TopicReadiness.draft:
+      return const _TopicMeta(
+        label: 'Draft',
+        icon: Icons.edit_note_rounded,
+        fg: AppColors.textMuted,
+        bg: Color(0xFFF1F5F9),
+      );
+  }
+}
+
+_TopicMeta _topicDifficultyMeta(TopicDifficulty difficulty) {
+  switch (difficulty) {
+    case TopicDifficulty.beginner:
+      return const _TopicMeta(
+        label: 'Beginner',
+        icon: Icons.wb_sunny_outlined,
+        fg: _K.blue,
+        bg: _K.blueSoft,
+      );
+    case TopicDifficulty.intermediate:
+      return const _TopicMeta(
+        label: 'Intermediate',
+        icon: Icons.stacked_bar_chart_rounded,
+        fg: _K.amber,
+        bg: _K.amberSoft,
+      );
+    case TopicDifficulty.advanced:
+      return const _TopicMeta(
+        label: 'Advanced',
+        icon: Icons.local_fire_department_outlined,
+        fg: Color(0xFFDC2626),
+        bg: Color(0xFFFEF2F2),
+      );
+  }
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  DIALOGS
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1914,47 +4438,245 @@ class _SimpleDialog extends StatelessWidget {
   final String title, confirm; final TextEditingController ctrl; final Color confirmColor;
   const _SimpleDialog({required this.title, required this.ctrl, required this.confirm, required this.confirmColor});
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-    content: TextField(controller: ctrl, autofocus: true, decoration: InputDecoration(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
-    actions: [
-      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-      ElevatedButton(onPressed: () => Navigator.pop(context, true),
-          style: ElevatedButton.styleFrom(backgroundColor: confirmColor, foregroundColor: Colors.white,
-              elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
-          child: Text(confirm)),
-    ]);
+  Widget build(BuildContext context) => _PreferencesDialogShell(
+    title: title,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _DialogTextField(
+          controller: ctrl,
+          hintText: 'Enter value',
+          autofocus: true,
+        ),
+        const SizedBox(height: 16),
+        _DialogActions(
+          onCancel: () => Navigator.pop(context, false),
+          onConfirm: () => Navigator.pop(context, true),
+          confirmLabel: confirm,
+          confirmVariant: _isDangerActionColor(confirmColor) ? AppButtonVariant.danger : AppButtonVariant.primary,
+        ),
+      ],
+    ),
+  );
 }
 
 class _ConfirmDialogWidget extends StatelessWidget {
   final String title, body, confirm; final Color confirmColor;
   const _ConfirmDialogWidget({required this.title, required this.body, required this.confirm, required this.confirmColor});
   @override
-  Widget build(BuildContext context) => AlertDialog(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-    content: Text(body, style: const TextStyle(fontSize: 13.5, height: 1.5)),
-    actions: [
-      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-      ElevatedButton(onPressed: () => Navigator.pop(context, true),
-          style: ElevatedButton.styleFrom(backgroundColor: confirmColor, foregroundColor: Colors.white,
-              elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
-          child: Text(confirm)),
-    ]);
+  Widget build(BuildContext context) => _PreferencesDialogShell(
+    title: title,
+    child: Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(body, style: const TextStyle(fontSize: 13.5, height: 1.5, color: AppColors.textMuted)),
+        const SizedBox(height: 16),
+        _DialogActions(
+          onCancel: () => Navigator.pop(context, false),
+          onConfirm: () => Navigator.pop(context, true),
+          confirmLabel: confirm,
+          confirmVariant: _isDangerActionColor(confirmColor) ? AppButtonVariant.danger : AppButtonVariant.primary,
+        ),
+      ],
+    ),
+  );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  SHARED MICRO WIDGETS
 // ─────────────────────────────────────────────────────────────────────────────
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Module Actions Grid — replaces the vertical list with a 2-col card grid
+// ─────────────────────────────────────────────────────────────────────────────
+class _ModuleActionsGrid extends StatelessWidget {
+  final ModuleItem module;
+  final bool uploading;
+  final VoidCallback? onRename, onTogglePublish, onUpload, onShare, onDelete;
+
+  const _ModuleActionsGrid({
+    required this.module,
+    required this.uploading,
+    this.onRename,
+    this.onTogglePublish,
+    this.onUpload,
+    this.onShare,
+    this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final isPublished = module.isPublished;
+
+    final actions = [
+      _ActionCardData(
+        icon: Icons.drive_file_rename_outline_rounded,
+        iconColor: AppColors.primary,
+        iconBg: _K.blueSoft,
+        label: 'Rename',
+        onTap: onRename,
+      ),
+      _ActionCardData(
+        icon: isPublished ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+        iconColor: isPublished ? _K.amber : _K.green,
+        iconBg: isPublished ? _K.amberSoft : _K.greenSoft,
+        label: isPublished ? 'Unpublish' : 'Publish',
+        onTap: onTogglePublish,
+      ),
+      _ActionCardData(
+        icon: Icons.upload_file_rounded,
+        iconColor: _K.purple,
+        iconBg: _K.purpleSoft,
+        label: 'Upload',
+        onTap: uploading ? null : onUpload,
+      ),
+      const _ActionCardData(
+        icon: Icons.swap_vert_rounded,
+        iconColor: _K.green,
+        iconBg: _K.greenSoft,
+        label: 'Reorder',
+      ),
+      _ActionCardData(
+        icon: Icons.share_rounded,
+        iconColor: const Color(0xFF0EA5E9),
+        iconBg: const Color(0xFFE0F2FE),
+        label: 'Share',
+        onTap: onShare,
+      ),
+      _ActionCardData(
+        icon: Icons.delete_outline_rounded,
+        iconColor: const Color(0xFFEF4444),
+        iconBg: const Color(0xFFFEE2E2),
+        label: 'Delete',
+        onTap: onDelete,
+        danger: true,
+      ),
+    ];
+
+    return LayoutBuilder(builder: (context, c) {
+      // 3 columns on wide, 2 on narrow
+      final cols = c.maxWidth > 600 ? 3 : 2;
+      const gap = 10.0;
+      final cardW = (c.maxWidth - gap * (cols - 1)) / cols;
+
+      return Wrap(
+        spacing: gap,
+        runSpacing: gap,
+        children: actions
+            .map((a) => SizedBox(width: cardW, child: _ActionCard(data: a)))
+            .toList(),
+      );
+    });
+  }
+}
+
+class _ActionCardData {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String label;
+  final VoidCallback? onTap;
+  final bool danger;
+
+  const _ActionCardData({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.label,
+    this.onTap,
+    this.danger = false,
+  });
+}
+
+class _ActionCard extends StatefulWidget {
+  final _ActionCardData data;
+  const _ActionCard({required this.data});
+
+  @override
+  State<_ActionCard> createState() => _ActionCardState();
+}
+
+class _ActionCardState extends State<_ActionCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = widget.data;
+    final disabled = d.onTap == null;
+    final hoverBorderColor = d.danger
+        ? const Color(0xFFFCA5A5)
+        : d.iconColor.withOpacity(0.3);
+    final hoverBg = d.danger
+        ? const Color(0xFFFFF5F5)
+        : d.iconColor.withOpacity(0.04);
+
+    return MouseRegion(
+      cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) { if (!disabled) setState(() => _hovered = true); },
+      onExit:  (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: d.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+          decoration: BoxDecoration(
+            color: _hovered ? hoverBg : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _hovered ? hoverBorderColor : _K.div,
+              width: _hovered ? 1.5 : 1.0,
+            ),
+            boxShadow: _hovered
+                ? [BoxShadow(color: d.iconColor.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 3))]
+                : [const BoxShadow(color: Color(0x07000000), blurRadius: 4, offset: Offset(0, 1))],
+          ),
+          child: Opacity(
+            opacity: disabled ? 0.4 : 1.0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 140),
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: _hovered
+                        ? d.iconColor.withOpacity(0.15)
+                        : d.iconBg,
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(d.icon, size: 17, color: d.iconColor),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  d.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: d.danger
+                        ? const Color(0xFFDC2626)
+                        : (_hovered ? d.iconColor : AppColors.textTitle),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CardWidget extends StatelessWidget {
   final Widget child; final _HdrWidget? header; final bool noPadding;
   const _CardWidget({required this.child, this.header, this.noPadding = false});
   @override
   Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: _K.div)),
+    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div), boxShadow: const [BoxShadow(color: Color(0x07000000), blurRadius: 8, offset: Offset(0, 2))]),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (header != null) ...[header!, const Divider(height: 1, color: _K.div)],
       child,
@@ -2002,27 +4724,80 @@ class _Pill extends StatelessWidget {
     child: Text(l, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg, letterSpacing: 0.1)));
 }
 
-class _PRow extends StatelessWidget {
+class _PRow extends StatefulWidget {
   final IconData icon; final Color iconBg, iconFg;
   final String label, sub; final VoidCallback? onTap; final bool danger;
   const _PRow({required this.icon, required this.iconBg, required this.iconFg,
       required this.label, required this.sub, this.onTap, this.danger = false});
   @override
-  Widget build(BuildContext context) => InkWell(onTap: onTap, child: Opacity(opacity: onTap == null ? 0.45 : 1.0,
-    child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 14, 12), child: Row(children: [
-      Container(width: 32, height: 32, decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(8)),
-          child: Icon(icon, size: 16, color: iconFg)),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-            color: danger ? const Color(0xFFEF4444) : AppColors.textTitle)),
-        const SizedBox(height: 2),
-        Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-      ])),
-      Icon(Icons.chevron_right_rounded, size: 16,
-          color: danger ? const Color(0xFFEF4444).withOpacity(0.4) : AppColors.textHint),
-    ]))));
+  State<_PRow> createState() => _PRowState();
+}
+
+class _PRowState extends State<_PRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = widget.onTap == null;
+    final textColor = widget.danger ? const Color(0xFFDC2626) : AppColors.textTitle;
+    final iconColor = disabled ? AppColors.textHint : widget.iconFg;
+
+    return MouseRegion(
+      cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) { if (!disabled) setState(() => _hovered = true); },
+      onExit:  (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          color: _hovered ? const Color(0xFFF8FAFC) : Colors.transparent,
+          padding: const EdgeInsets.fromLTRB(18, 11, 16, 11),
+          child: Opacity(
+            opacity: disabled ? 0.4 : 1.0,
+            child: Row(children: [
+              // Small icon — not a big chunky box
+              Container(
+                width: 28, height: 28,
+                decoration: BoxDecoration(
+                  color: _hovered && !disabled
+                      ? widget.iconFg.withOpacity(0.12)
+                      : widget.iconBg.withOpacity(0.7),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                alignment: Alignment.center,
+                child: Icon(widget.icon, size: 14, color: iconColor),
+              ),
+              const SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(widget.label, style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                  color: _hovered && !disabled && !widget.danger
+                      ? AppColors.primary
+                      : textColor,
+                )),
+                const SizedBox(height: 1),
+                Text(widget.sub, maxLines: 1, overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
+              ])),
+              // Arrow only visible on hover
+              AnimatedOpacity(
+                duration: const Duration(milliseconds: 120),
+                opacity: _hovered && !disabled ? 1.0 : 0.0,
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 13,
+                  color: widget.danger
+                      ? const Color(0xFFDC2626)
+                      : AppColors.primary,
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _DivW extends StatelessWidget {

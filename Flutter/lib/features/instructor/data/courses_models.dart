@@ -197,23 +197,29 @@ class CourseCreateRequest {
   });
 
   Map<String, dynamic> toJson() {
+    // IMPORTANT: backend uses extra="forbid" — only send fields the schema accepts.
+    // Excluded: learning_outcomes (commented out in backend), cover_image_url,
+    //           banner_image_url, academicTerm, localStatus (UI-only).
     final map = <String, dynamic>{
       'course_type': courseType,
-      'organization_id': organizationId,
       'title': title,
-      'description': description,
-      'course_code': courseCode,
-      // Backend expects enrollment openness, not an is_public flag.
       'is_open_for_enrollment': isPublic,
       'visibility_level': visibilityLevel,
       'requires_enrollment_approval': requiresEnrollmentApproval,
-      'learning_outcomes': learningOutcomes,
-      'tags': (tags != null && tags!.isNotEmpty) ? tags : null,
-      'category': category,
-      'status': status,
     };
 
-    map.removeWhere((k, v) => v == null);
+    // Optional backend fields — only include when non-null/non-empty
+    if (organizationId != null) map['organization_id'] = organizationId;
+    if (courseCode != null && courseCode!.trim().isNotEmpty) {
+      map['course_code'] = courseCode!.trim();
+    }
+    if (description != null && description!.trim().isNotEmpty) {
+      map['description'] = description!.trim();
+    }
+    if (tags != null && tags!.isNotEmpty) map['tags'] = tags;
+    if (category != null && category!.trim().isNotEmpty) map['category'] = category;
+    if (status != null) map['status'] = status;
+
     return map;
   }
 }

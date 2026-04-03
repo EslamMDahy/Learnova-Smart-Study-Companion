@@ -68,92 +68,124 @@ extension TopicReadinessX on TopicReadiness {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+// TopicItem — mirrors backend TopicListItem / TopicCreateResponse exactly,
+// plus UI-only helpers kept for the presentation layer (not sent to backend).
+//
+// Backend fields: id, material_id, title, description, order_index,
+//                 parent_topic_id, is_ai_generated, is_reviewed,
+//                 created_at, updated_at
+//
+// UI-only fields (never serialised to the backend):
+//   moduleId, source, difficulty, readiness, linkedOutcomeId,
+//   linkedOutcomeIds (String list for UI), learningOutcomeIds (int list for API),
+//   instructorNotes, estimatedDurationMinutes, isRequired
+// ─────────────────────────────────────────────────────────────────────────────
 class TopicItem {
+  // ── Backend fields ──────────────────────────────────────────────────────
   final int id;
-  final int moduleId;
-  final int? materialId;
+  final int materialId;
   final String title;
   final String? description;
   final int orderIndex;
   final int? parentTopicId;
-  final int? estimatedDurationMinutes;
-  final bool isRequired;
   final DateTime createdAt;
   final DateTime updatedAt;
+  final bool isAiGenerated;
+  final bool isReviewed;
+
+  // ── UI-only helpers ─────────────────────────────────────────────────────
+  /// The module this topic belongs to (for local state indexing).
+  final int moduleId;
 
   final TopicSource source;
   final TopicDifficulty difficulty;
+  final TopicReadiness readiness;
 
-  /// Legacy single-link field kept for compatibility with older responses.
+  /// Single LO id — legacy / UI convenience (String for UI dropdowns).
   final String? linkedOutcomeId;
 
-  /// Current frontend mapping: a topic may align to multiple LOs.
+  /// Multiple LO ids as strings (UI-side representation).
   final List<String> linkedOutcomeIds;
 
-  /// Instructor-authored planning notes for this topic.
+  /// LO ids as ints — used when calling the backend API.
+  final List<int> learningOutcomeIds;
+
   final String? instructorNotes;
 
-  /// Readiness in the instructor workflow.
-  final TopicReadiness readiness;
+  /// UI-only estimated duration (backend doesn't have this field yet).
+  final int? estimatedDurationMinutes;
+
+  /// UI-only required flag (backend doesn't have this field yet).
+  final bool isRequired;
 
   const TopicItem({
     required this.id,
-    required this.moduleId,
-    this.materialId,
+    required this.materialId,
     required this.title,
     this.description,
     required this.orderIndex,
     this.parentTopicId,
-    this.estimatedDurationMinutes,
-    this.isRequired = true,
     required this.createdAt,
     required this.updatedAt,
-    this.source = TopicSource.ai,
+    this.isAiGenerated = false,
+    this.isReviewed = false,
+    // UI-only
+    this.moduleId = 0,
+    this.source = TopicSource.manual,
     this.difficulty = TopicDifficulty.beginner,
+    this.readiness = TopicReadiness.draft,
     this.linkedOutcomeId,
     this.linkedOutcomeIds = const [],
+    this.learningOutcomeIds = const [],
     this.instructorNotes,
-    this.readiness = TopicReadiness.draft,
+    this.estimatedDurationMinutes,
+    this.isRequired = true,
   });
 
   TopicItem copyWith({
     int? id,
-    int? moduleId,
     int? materialId,
     String? title,
     String? description,
     int? orderIndex,
     int? parentTopicId,
-    int? estimatedDurationMinutes,
-    bool? isRequired,
     DateTime? createdAt,
     DateTime? updatedAt,
+    bool? isAiGenerated,
+    bool? isReviewed,
+    int? moduleId,
     TopicSource? source,
     TopicDifficulty? difficulty,
+    TopicReadiness? readiness,
     String? linkedOutcomeId,
     List<String>? linkedOutcomeIds,
+    List<int>? learningOutcomeIds,
     String? instructorNotes,
-    TopicReadiness? readiness,
+    int? estimatedDurationMinutes,
+    bool? isRequired,
   }) {
     return TopicItem(
       id: id ?? this.id,
-      moduleId: moduleId ?? this.moduleId,
       materialId: materialId ?? this.materialId,
       title: title ?? this.title,
       description: description ?? this.description,
       orderIndex: orderIndex ?? this.orderIndex,
       parentTopicId: parentTopicId ?? this.parentTopicId,
-      estimatedDurationMinutes:
-          estimatedDurationMinutes ?? this.estimatedDurationMinutes,
-      isRequired: isRequired ?? this.isRequired,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      isAiGenerated: isAiGenerated ?? this.isAiGenerated,
+      isReviewed: isReviewed ?? this.isReviewed,
+      moduleId: moduleId ?? this.moduleId,
       source: source ?? this.source,
       difficulty: difficulty ?? this.difficulty,
+      readiness: readiness ?? this.readiness,
       linkedOutcomeId: linkedOutcomeId ?? this.linkedOutcomeId,
       linkedOutcomeIds: linkedOutcomeIds ?? this.linkedOutcomeIds,
+      learningOutcomeIds: learningOutcomeIds ?? this.learningOutcomeIds,
       instructorNotes: instructorNotes ?? this.instructorNotes,
-      readiness: readiness ?? this.readiness,
+      estimatedDurationMinutes: estimatedDurationMinutes ?? this.estimatedDurationMinutes,
+      isRequired: isRequired ?? this.isRequired,
     );
   }
 
@@ -162,74 +194,88 @@ class TopicItem {
         DateTime.tryParse((v ?? '').toString()) ??
         DateTime.fromMillisecondsSinceEpoch(0);
 
-    final linkedIds = ((json['linked_outcome_ids'] as List?) ?? const [])
-        .map((e) => e.toString())
-        .where((e) => e.trim().isNotEmpty)
+    // Backend sends learning_outcome_ids as List<int>
+    final intOutcomeIds = ((json['learning_outcome_ids'] as List?) ?? const [])
+        .map((e) => (e as num).toInt())
         .toList();
-    final legacyLinked = json['linked_outcome_id']?.toString();
-    if (linkedIds.isEmpty && legacyLinked != null && legacyLinked.trim().isNotEmpty) {
-      linkedIds.add(legacyLinked.trim());
-    }
+
+    // Derive UI string list from the int list
+    final strOutcomeIds = intOutcomeIds.map((e) => e.toString()).toList();
+
+    final isAi = (json['is_ai_generated'] as bool?) ?? false;
 
     return TopicItem(
       id: (json['id'] as num).toInt(),
-      moduleId: (json['module_id'] as num).toInt(),
-      materialId: json['material_id'] == null
-          ? null
-          : (json['material_id'] as num).toInt(),
+      materialId: (json['material_id'] as num).toInt(),
       title: (json['title'] ?? '').toString(),
       description: json['description']?.toString(),
       orderIndex: (json['order_index'] as num?)?.toInt() ?? 0,
       parentTopicId: json['parent_topic_id'] == null
           ? null
           : (json['parent_topic_id'] as num).toInt(),
-      estimatedDurationMinutes: json['estimated_duration_minutes'] == null
-          ? null
-          : (json['estimated_duration_minutes'] as num).toInt(),
-      isRequired: (json['is_required'] as bool?) ?? true,
       createdAt: dt(json['created_at']),
       updatedAt: dt(json['updated_at']),
-      source: TopicSourceX.fromString(json['source']?.toString()),
-      difficulty: TopicDifficultyX.fromString(json['difficulty']?.toString()),
-      linkedOutcomeId: legacyLinked,
-      linkedOutcomeIds: linkedIds,
-      instructorNotes: json['instructor_notes']?.toString(),
-      readiness: TopicReadinessX.fromString(json['readiness']?.toString()),
+      isAiGenerated: isAi,
+      isReviewed: (json['is_reviewed'] as bool?) ?? false,
+      // UI-only
+      source: isAi ? TopicSource.ai : TopicSource.manual,
+      learningOutcomeIds: intOutcomeIds,
+      linkedOutcomeIds: strOutcomeIds,
+      linkedOutcomeId: strOutcomeIds.isNotEmpty ? strOutcomeIds.first : null,
+      readiness: (json['is_reviewed'] as bool? ?? false)
+          ? TopicReadiness.ready
+          : TopicReadiness.draft,
     );
   }
 
+  /// Serialise only the backend-relevant fields for logging / caching.
   Map<String, dynamic> toJson() => {
         'id': id,
-        'module_id': moduleId,
-        if (materialId != null) 'material_id': materialId,
+        'material_id': materialId,
         'title': title,
         if (description != null) 'description': description,
         'order_index': orderIndex,
         if (parentTopicId != null) 'parent_topic_id': parentTopicId,
-        if (estimatedDurationMinutes != null)
-          'estimated_duration_minutes': estimatedDurationMinutes,
-        'is_required': isRequired,
+        'is_ai_generated': isAiGenerated,
+        'is_reviewed': isReviewed,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
-        'source': source.label.toLowerCase(),
-        'difficulty': difficulty.label.toLowerCase(),
+        if (learningOutcomeIds.isNotEmpty)
+          'learning_outcome_ids': learningOutcomeIds,
+        // UI-only fields — kept so mock_services can round-trip through JSON
+        'module_id': moduleId,
+        'source': source.name,
+        'difficulty': difficulty.name,
+        'readiness': readiness.name,
         if (linkedOutcomeId != null) 'linked_outcome_id': linkedOutcomeId,
         if (linkedOutcomeIds.isNotEmpty) 'linked_outcome_ids': linkedOutcomeIds,
         if (instructorNotes != null) 'instructor_notes': instructorNotes,
-        'readiness': readiness.name,
+        if (estimatedDurationMinutes != null)
+          'estimated_duration_minutes': estimatedDurationMinutes,
+        'is_required': isRequired,
       };
 }
 
+// ─── List response ────────────────────────────────────────────────────────────
 class TopicListResponse {
+  final int courseId;
   final int moduleId;
+  final int materialId;
   final List<TopicItem> topics;
 
-  const TopicListResponse({required this.moduleId, required this.topics});
+  const TopicListResponse({
+    required this.courseId,
+    required this.moduleId,
+    required this.materialId,
+    required this.topics,
+  });
 
   factory TopicListResponse.fromJson(Map<String, dynamic> json) {
     final raw = (json['topics'] as List?) ?? const [];
     return TopicListResponse(
+      courseId: (json['course_id'] as num).toInt(),
       moduleId: (json['module_id'] as num).toInt(),
+      materialId: (json['material_id'] as num).toInt(),
       topics: raw
           .whereType<Map>()
           .map((e) => TopicItem.fromJson(Map<String, dynamic>.from(e)))
@@ -238,40 +284,133 @@ class TopicListResponse {
   }
 }
 
+// ─── Reorder response ─────────────────────────────────────────────────────────
+class TopicReorderResponse {
+  final int courseId;
+  final int moduleId;
+  final int materialId;
+  final List<int> topicIds;
+
+  const TopicReorderResponse({
+    required this.courseId,
+    required this.moduleId,
+    required this.materialId,
+    required this.topicIds,
+  });
+
+  factory TopicReorderResponse.fromJson(Map<String, dynamic> json) {
+    return TopicReorderResponse(
+      courseId: (json['course_id'] as num).toInt(),
+      moduleId: (json['module_id'] as num).toInt(),
+      materialId: (json['material_id'] as num).toInt(),
+      topicIds: ((json['topic_ids'] as List?) ?? const [])
+          .map((e) => (e as num).toInt())
+          .toList(),
+    );
+  }
+}
+
+// ─── Create request ───────────────────────────────────────────────────────────
+// What gets SENT to backend: title, description, parent_topic_id, learning_outcome_ids
+// UI-only fields (source, difficulty, linkedOutcomeId, linkedOutcomeIds) are
+// kept so the presentation layer can build the object without changes.
 class TopicCreateRequest {
   final String title;
   final String? description;
+  final int? parentTopicId;
+
+  // UI-only (not sent to backend directly — learningOutcomeIds is sent instead)
   final TopicSource source;
   final TopicDifficulty difficulty;
   final String? linkedOutcomeId;
   final List<String> linkedOutcomeIds;
 
+  // Backend field: int ids derived from linkedOutcomeIds when calling the API
+  final List<int> learningOutcomeIds;
+
   const TopicCreateRequest({
     required this.title,
     this.description,
+    this.parentTopicId,
     this.source = TopicSource.manual,
     this.difficulty = TopicDifficulty.beginner,
     this.linkedOutcomeId,
     this.linkedOutcomeIds = const [],
+    this.learningOutcomeIds = const [],
   });
 
   Map<String, dynamic> toJson() {
-    final outcomeIds = <String>{
-      ...linkedOutcomeIds.where((e) => e.trim().isNotEmpty),
-      if (linkedOutcomeId != null && linkedOutcomeId!.trim().isNotEmpty)
-        linkedOutcomeId!.trim(),
-    }.toList();
-
-    final m = <String, dynamic>{
-      'title': title,
-      'source': source.label.toLowerCase(),
-      'difficulty': difficulty.label.toLowerCase(),
-    };
+    final m = <String, dynamic>{'title': title};
     if (description != null && description!.trim().isNotEmpty) {
       m['description'] = description;
     }
-    if (linkedOutcomeId != null) m['linked_outcome_id'] = linkedOutcomeId;
-    if (outcomeIds.isNotEmpty) m['linked_outcome_ids'] = outcomeIds;
+    if (parentTopicId != null) m['parent_topic_id'] = parentTopicId;
+    // Send int outcome ids to backend (prefer explicit learningOutcomeIds,
+    // fall back to parsing linkedOutcomeIds strings if int list is empty)
+    final ids = learningOutcomeIds.isNotEmpty
+        ? learningOutcomeIds
+        : linkedOutcomeIds
+            .map((s) => int.tryParse(s))
+            .whereType<int>()
+            .toList();
+    if (ids.isNotEmpty) m['learning_outcome_ids'] = ids;
     return m;
+  }
+}
+
+// ─── Update request ───────────────────────────────────────────────────────────
+// Backend accepts: title, description, parent_topic_id, learning_outcome_ids (all optional)
+class TopicUpdateRequest {
+  final String? title;
+  final String? description;
+  final int? parentTopicId;
+  final List<int>? learningOutcomeIds;
+
+  const TopicUpdateRequest({
+    this.title,
+    this.description,
+    this.parentTopicId,
+    this.learningOutcomeIds,
+  });
+
+  Map<String, dynamic> toJson() {
+    final m = <String, dynamic>{};
+    if (title != null) m['title'] = title;
+    if (description != null) m['description'] = description;
+    if (parentTopicId != null) m['parent_topic_id'] = parentTopicId;
+    if (learningOutcomeIds != null) m['learning_outcome_ids'] = learningOutcomeIds;
+    return m;
+  }
+}
+
+// ─── Get single response ──────────────────────────────────────────────────────
+// Backend returns the topic plus its linked learning outcomes.
+class TopicLinkedOutcome {
+  final int id;
+  final String title;
+  const TopicLinkedOutcome({required this.id, required this.title});
+
+  factory TopicLinkedOutcome.fromJson(Map<String, dynamic> json) =>
+      TopicLinkedOutcome(
+        id:    (json['id'] as num).toInt(),
+        title: json['title']?.toString() ?? '',
+      );
+}
+
+class TopicGetResponse {
+  final TopicItem topic;
+  final List<TopicLinkedOutcome> learningOutcomes;
+
+  const TopicGetResponse({required this.topic, required this.learningOutcomes});
+
+  factory TopicGetResponse.fromJson(Map<String, dynamic> json) {
+    final raw = (json['learning_outcomes'] as List?) ?? const [];
+    return TopicGetResponse(
+      topic: TopicItem.fromJson(json),
+      learningOutcomes: raw
+          .whereType<Map>()
+          .map((e) => TopicLinkedOutcome.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+    );
   }
 }

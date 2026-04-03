@@ -29,7 +29,7 @@ class AppBootstrapController extends Notifier<AppBootstrapState> {
       //
       // On native: no cookie mechanism — if there is no token and no persist
       // flag the user is definitively a guest.
-      final mightHaveCookie = kIsWeb;
+      const mightHaveCookie = kIsWeb;
 
       if (!hasToken && !isPersisted && !mightHaveCookie) {
         state = AppBootstrapState.done;

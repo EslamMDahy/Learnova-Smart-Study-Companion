@@ -96,4 +96,40 @@ class MaterialsApi {
       return null;
     }
   }
+
+  // ─── DELETE ───────────────────────────────────────────────────────────────
+  /// DELETE /courses/{c}/modules/{m}/materials/{mat}
+  Future<void> deleteMaterial({
+    required int courseId,
+    required int moduleId,
+    required int materialId,
+    CancelToken? cancelToken,
+  }) async {
+    await _client.delete<void>(
+      Endpoints.deleteMaterial(courseId, moduleId, materialId),
+      cancelToken: cancelToken,
+    );
+  }
+
+  // ─── REASSIGN ─────────────────────────────────────────────────────────────
+  /// PATCH /courses/{c}/modules/{m}/materials/{mat}/reassign
+  /// Moves a material to a different module within the same course.
+  Future<MaterialReassignResponse> reassignMaterial({
+    required int courseId,
+    required int moduleId,
+    required int materialId,
+    required int targetModuleId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      Endpoints.reassignMaterial(courseId, moduleId, materialId),
+      data: {'target_module_id': targetModuleId},
+      cancelToken: cancelToken,
+    );
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return MaterialReassignResponse.fromJson(data);
+    }
+    throw const FormatException('Invalid response from PATCH material/reassign');
+  }
 }

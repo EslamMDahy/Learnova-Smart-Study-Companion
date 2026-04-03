@@ -288,6 +288,12 @@ class AppTheme {
         ),
       ),
 
+      // ── Web feel: no mobile ripple, subtle overlay on hover ──────────────
+      splashFactory: NoSplash.splashFactory,
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      hoverColor: const Color(0x08000000), // very subtle global hover
+
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.primary,
@@ -298,6 +304,18 @@ class AppTheme {
           ),
           minimumSize: const Size(0, 40),
           elevation: 0,
+          splashFactory: NoSplash.splashFactory,
+        ).copyWith(
+          mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.hovered)) {
+              return const Color(0x18000000);
+            }
+            if (states.contains(WidgetState.pressed)) {
+              return const Color(0x28000000);
+            }
+            return Colors.transparent;
+          }),
         ),
       ),
 
@@ -310,6 +328,29 @@ class AppTheme {
             borderRadius: BorderRadius.circular(8),
           ),
           minimumSize: const Size(0, 40),
+          splashFactory: NoSplash.splashFactory,
+        ).copyWith(
+          mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.hovered)) {
+              return const Color(0x08000000);
+            }
+            return Colors.transparent;
+          }),
+        ),
+      ),
+
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          splashFactory: NoSplash.splashFactory,
+        ).copyWith(
+          mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
+          overlayColor: WidgetStateProperty.resolveWith((states) {
+            if (states.contains(WidgetState.hovered)) {
+              return AppColors.primary.withOpacity(0.06);
+            }
+            return Colors.transparent;
+          }),
         ),
       ),
 

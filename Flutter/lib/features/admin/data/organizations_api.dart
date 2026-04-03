@@ -108,7 +108,7 @@ class OrganizationsApi {
     }
 
     
-    const allowed = {'pending', 'accepted', 'rejected', 'approved'};
+    const allowed = {'pending', 'accepted', 'suspended', 'declinate'};
     if (!allowed.contains(status)) {
       throw ArgumentError('Invalid newStatus value: $status');
     }

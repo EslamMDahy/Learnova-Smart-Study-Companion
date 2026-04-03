@@ -287,16 +287,16 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Expanded(
     child: Container(
-      padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
         boxShadow: const [
           BoxShadow(
-              color: Color(0x05000000),
-              blurRadius: 4,
-              offset: Offset(0, 2))
+              color: Color(0x08000000),
+              blurRadius: 8,
+              offset: Offset(0, 3))
         ],
       ),
       child: Row(children: [
@@ -362,36 +362,40 @@ class _SectionCard extends StatelessWidget {
     width: double.infinity,
     decoration: BoxDecoration(
       color: Colors.white,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(16),
       border: Border.all(color: AppColors.border),
+      boxShadow: const [
+        BoxShadow(color: Color(0x07000000), blurRadius: 8, offset: Offset(0, 2)),
+      ],
     ),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Padding(
-        padding: const EdgeInsets.fromLTRB(16, 13, 16, 11),
+        padding: const EdgeInsets.fromLTRB(18, 14, 18, 12),
         child: Row(children: [
           Container(
-            width: 26,
-            height: 26,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(
               color: iconColor.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(7),
+              borderRadius: BorderRadius.circular(9),
             ),
             alignment: Alignment.center,
-            child: Icon(icon, size: 14, color: iconColor),
+            child: Icon(icon, size: 15, color: iconColor),
           ),
-          const SizedBox(width: 9),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(title,
                 style: const TextStyle(
-                    fontSize: 13.5,
+                    fontSize: 14,
                     fontWeight: FontWeight.w700,
+                    letterSpacing: -0.1,
                     color: AppColors.textTitle)),
           ),
           if (trailing != null) trailing!,
         ]),
       ),
       const Divider(height: 1, color: AppColors.border),
-      Padding(padding: const EdgeInsets.all(16), child: child),
+      Padding(padding: const EdgeInsets.all(18), child: child),
     ]),
   );
 }
@@ -680,7 +684,8 @@ class _QuickActions extends ConsumerWidget {
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     border: Border.all(color: AppColors.border),
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(10),
+                    color: const Color(0xFFFAFBFC),
                   ),
                   child: Row(children: [
                     Container(

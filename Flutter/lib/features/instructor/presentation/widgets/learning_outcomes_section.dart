@@ -44,9 +44,9 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
     final text = _descCtrl.text.trim();
     if (text.isEmpty) return;
     final lo = LearningOutcome(
-      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      id: 0,  // backend will assign the real id
       code: LearningOutcome.codeForIndex(_counter),
-      description: text,
+      title: text,
       difficulty: _selectedDiff,
     );
     setState(() {
@@ -59,7 +59,7 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
     _focusNode.requestFocus();
   }
 
-  void _delete(String id) {
+  void _delete(int id) {
     setState(() {
       _outcomes = _outcomes.where((o) => o.id != id).toList();
       _outcomes = List.generate(
@@ -120,7 +120,7 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
           // Difficulty label + chips row
-          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Row(children: [
             Text('Difficulty',
                 style: AppText.label.copyWith(
                     fontSize: 12, fontWeight: FontWeight.w700,
@@ -155,7 +155,7 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
           const SizedBox(height: 10),
 
           // Description input row
-          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Row(children: [
             Expanded(
               child: Container(
                 height: 40,
@@ -225,7 +225,7 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(text: widget.outcome.description);
+    _ctrl = TextEditingController(text: widget.outcome.title);
     _diff = widget.outcome.difficulty;
   }
 
@@ -323,7 +323,7 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
                   final t = _ctrl.text.trim();
                   if (t.isEmpty) return;
                   Navigator.pop(context,
-                      widget.outcome.copyWith(description: t, difficulty: _diff));
+                      widget.outcome.copyWith(title: t, difficulty: _diff));
                 },
                 height: 40,
                 padding: const EdgeInsets.symmetric(horizontal: 18),
@@ -398,7 +398,7 @@ class _OutcomeTile extends StatelessWidget {
         const SizedBox(width: 10),
 
         // Description
-        Expanded(child: Text(outcome.description,
+        Expanded(child: Text(outcome.title,
             style: AppText.input.copyWith(fontSize: 12.5, height: 1.4))),
 
         // Edit

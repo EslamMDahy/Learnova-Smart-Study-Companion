@@ -13,8 +13,8 @@ class Endpoints {
   static const forgotPassword      = '$_auth/forgot-password';
   static const resetPassword       = '$_auth/reset-password';
   static const verifyEmail         = '$_auth/verify-email';
-  static const resendVerification  = '$_auth/send-verification-email'; // existing backend
-  static const checkEmailVerified  = '$_auth/check-email-verified';   // NEW — see backend note
+  static const resendVerification  = '$_auth/send-verification-email';
+  static const checkEmailVerified  = '$_auth/check-email-verified';
   static const me                  = '$_auth/me';
   static const refresh             = '$_auth/refresh';
 
@@ -34,12 +34,21 @@ class Endpoints {
       '$_courses/$courseId/invitations/send';
   static String courseInvitationsList(String courseId) =>
       '$_courses/$courseId/invitations';
+  static const acceptCourseInvitation = '$_courses/invitations/accept';
 
   // ─── MODULES ─────────────────────────────────────────────────────────────
   static String courseModules(int courseId) =>
       '$_courses/$courseId/modules';
   static String createModule(int courseId) =>
       '$_courses/$courseId/modules';
+  static String updateModule(int courseId, int moduleId) =>
+      '$_courses/$courseId/modules/$moduleId/update';
+  static String deleteModule(int courseId, int moduleId) =>
+      '$_courses/$courseId/modules/$moduleId/delete';
+  static String copyModule(int courseId, int moduleId) =>
+      '$_courses/$courseId/modules/$moduleId/copy';
+  static String reorderModules(int courseId) =>
+      '$_courses/$courseId/modules/reorder';
 
   // ─── MATERIALS ───────────────────────────────────────────────────────────
   static String moduleMaterials(int courseId, int moduleId) =>
@@ -50,13 +59,35 @@ class Endpoints {
       '/materials/$materialId/confirm-upload';
   static String materialDownloadUrl(int courseId, int moduleId, int materialId) =>
       '$_courses/$courseId/modules/$moduleId/materials/$materialId/download-url';
+  static String deleteMaterial(int courseId, int moduleId, int materialId) =>
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId';
+  static String reassignMaterial(int courseId, int moduleId, int materialId) =>
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId/reassign';
 
   // ─── TOPICS ──────────────────────────────────────────────────────────────
-  static String moduleTopics(int courseId, int moduleId) =>
-      '$_courses/$courseId/modules/$moduleId/topics';
+  static String materialTopics(int courseId, int moduleId, int materialId) =>
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId/topics';
+  static String getTopic(int courseId, int moduleId, int materialId, int topicId) =>
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId/topics/$topicId';
+  static String updateTopic(int courseId, int moduleId, int materialId, int topicId) =>
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId/topics/$topicId/update';
+  static String deleteTopic(int courseId, int moduleId, int materialId, int topicId) =>
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId/topics/$topicId/delete';
+  static String reorderTopics(int courseId, int moduleId, int materialId) =>
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId/topics/reorder';
 
-  // ─── QUESTIONS (NEW — G-02) ───────────────────────────────────────────────
-  /// POST /courses/{courseId}/modules/{moduleId}/materials/{materialId}/questions
+  // ─── LEARNING OUTCOMES ───────────────────────────────────────────────────
+  // Base: /courses/{course_id}/learning-outcomes
+  static String learningOutcomes(int courseId) =>
+      '$_courses/$courseId/learning-outcomes';
+  static String getLearningOutcome(int courseId, int outcomeId) =>
+      '$_courses/$courseId/learning-outcomes/$outcomeId';
+  static String updateLearningOutcome(int courseId, int outcomeId) =>
+      '$_courses/$courseId/learning-outcomes/$outcomeId/update';
+  static String deleteLearningOutcome(int courseId, int outcomeId) =>
+      '$_courses/$courseId/learning-outcomes/$outcomeId/delete';
+
+  // ─── QUESTIONS ───────────────────────────────────────────────────────────
   static String batchCreateQuestions(int courseId, int moduleId, int materialId) =>
       '$_courses/$courseId/modules/$moduleId/materials/$materialId/questions';
 

@@ -321,8 +321,11 @@ String _initialLocationSafe(SessionSnapshot session) {
     if (pending != null && !session.hasAccessToken && !session.isPersisted) {
       return Routes.verifyEmailSentFor(pending);
     }
-    // Guest → landing page.
-    if (!session.hasAccessToken && !session.isPersisted) {
+    // No live token yet → treat as guest for routing purposes.
+    // A remember-me session may still be restored during bootstrap, but we must
+    // not mount protected routes before that finishes. Router will refresh as
+    // soon as bootstrap saves a token.
+    if (!session.hasAccessToken) {
       return Routes.landing;
     }
     // Authenticated → role-based dashboard.

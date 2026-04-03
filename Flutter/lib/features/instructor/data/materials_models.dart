@@ -43,7 +43,8 @@ class MaterialItem {
           : (title ?? fileName)!.trim();
 
   bool get isReady => status == 'ready';
-  bool get isProcessing => status == 'processing' || status == 'uploaded' || status == 'draft_upload';
+  bool get isProcessing => status == 'processing' || status == 'draft_upload';
+  // 'uploaded' = file is on Supabase but not AI-processed yet — still previewable
   bool get isError => status == 'error';
 
   factory MaterialItem.fromJson(Map<String, dynamic> json) {
@@ -192,6 +193,28 @@ class MaterialConfirmUploadResponse {
       updatedAt: DateTime.tryParse((json['updated_at'] ?? '').toString()) ??
           DateTime.fromMillisecondsSinceEpoch(0),
       downloadUrl: json['download_url']?.toString(),
+    );
+  }
+}
+
+// ─── Reassign response ────────────────────────────────────────────────────────
+// Backend: { id, module_id, storage_key }
+class MaterialReassignResponse {
+  final int id;
+  final int moduleId;
+  final String storageKey;
+
+  const MaterialReassignResponse({
+    required this.id,
+    required this.moduleId,
+    required this.storageKey,
+  });
+
+  factory MaterialReassignResponse.fromJson(Map<String, dynamic> json) {
+    return MaterialReassignResponse(
+      id: (json['id'] as num).toInt(),
+      moduleId: (json['module_id'] as num).toInt(),
+      storageKey: (json['storage_key'] ?? '').toString(),
     );
   }
 }

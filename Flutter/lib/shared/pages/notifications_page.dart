@@ -71,6 +71,7 @@ class _NotificationsPageState extends State<NotificationsPage> {
                 const SizedBox(height: 16),
 
                 // Search
+                // ignore: deprecated_member_use_from_same_package
                 AppSearchField(
                   controller: _search,
                   hintText: 'Search notifications by keyword, professor, or date...',

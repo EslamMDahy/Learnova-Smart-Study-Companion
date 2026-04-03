@@ -100,10 +100,10 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
 
     // Generate AI topics (simulated)
     final aiTopics = [
-      TopicCreateRequest(title: 'Introduction & Overview', source: TopicSource.ai, difficulty: TopicDifficulty.beginner),
-      TopicCreateRequest(title: 'Core Concepts & Terminology', source: TopicSource.ai, difficulty: TopicDifficulty.beginner),
-      TopicCreateRequest(title: 'Practical Applications', source: TopicSource.ai, difficulty: TopicDifficulty.intermediate),
-      TopicCreateRequest(title: 'Advanced Techniques', source: TopicSource.ai, difficulty: TopicDifficulty.advanced),
+      const TopicCreateRequest(title: 'Introduction & Overview', source: TopicSource.ai),
+      const TopicCreateRequest(title: 'Core Concepts & Terminology', source: TopicSource.ai),
+      const TopicCreateRequest(title: 'Practical Applications', source: TopicSource.ai, difficulty: TopicDifficulty.intermediate),
+      const TopicCreateRequest(title: 'Advanced Techniques', source: TopicSource.ai, difficulty: TopicDifficulty.advanced),
     ];
 
     // Only add topics not already present
@@ -143,7 +143,6 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
       context: context,
       builder: (_) => _TopicEditDialog(
         outcomes: widget.outcomes,
-        defaultSource: TopicSource.manual,
       ),
     );
     if (result == null || !mounted) return;
@@ -366,7 +365,7 @@ class _TopicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final lo = outcomes.where((o) => o.id == topic.linkedOutcomeId).firstOrNull;
+    final lo = outcomes.where((o) => o.id.toString() == topic.linkedOutcomeId).firstOrNull;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -384,7 +383,7 @@ class _TopicCard extends StatelessWidget {
           const SizedBox(height: 6),
           Wrap(spacing: 6, runSpacing: 4, children: [
             _DifficultyChip(difficulty: topic.difficulty),
-            if (lo != null) _LoChip(code: lo.code, description: lo.description, difficulty: lo.difficulty),
+            if (lo != null) _LoChip(code: lo.code, description: lo.title, difficulty: lo.difficulty),
           ]),
         ])),
         const SizedBox(width: 8),
@@ -429,7 +428,7 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
   late TextEditingController _titleCtrl;
   late TopicSource _source;
   late TopicDifficulty _difficulty;
-  String? _linkedOutcomeId;
+  int? _linkedOutcomeId;
   String? _titleError;
 
   @override
@@ -439,7 +438,7 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
     _titleCtrl  = TextEditingController(text: ex?.title ?? '');
     _source     = ex?.source ?? widget.defaultSource;
     _difficulty = ex?.difficulty ?? TopicDifficulty.beginner;
-    _linkedOutcomeId = ex?.linkedOutcomeId;
+    _linkedOutcomeId = ex?.linkedOutcomeId == null ? null : int.tryParse(ex!.linkedOutcomeId!);
   }
 
   @override
@@ -457,12 +456,12 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
     if (widget.existing != null) {
       Navigator.pop(context, widget.existing!.copyWith(
         title: title, source: _source, difficulty: _difficulty,
-        linkedOutcomeId: _linkedOutcomeId, updatedAt: DateTime.now(),
+        linkedOutcomeId: _linkedOutcomeId?.toString(), updatedAt: DateTime.now(),
       ));
     } else {
       Navigator.pop(context, TopicCreateRequest(
         title: title, source: _source,
-        difficulty: _difficulty, linkedOutcomeId: _linkedOutcomeId,
+        difficulty: _difficulty, linkedOutcomeId: _linkedOutcomeId?.toString(),
       ));
     }
   }
@@ -503,7 +502,7 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
             const SizedBox(height: 22),
 
             // Topic Name
-            _FieldLabel('Topic Name', required: true),
+            const _FieldLabel('Topic Name', required: true),
             const SizedBox(height: 6),
             TextField(
               controller: _titleCtrl,
@@ -522,7 +521,7 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
             const SizedBox(height: 18),
 
             // Source
-            _FieldLabel('Source'),
+            const _FieldLabel('Source'),
             const SizedBox(height: 8),
             Row(children: [
               Expanded(child: _RadioChip(
@@ -540,7 +539,7 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
             const SizedBox(height: 18),
 
             // Difficulty
-            _FieldLabel('Difficulty Level'),
+            const _FieldLabel('Difficulty Level'),
             const SizedBox(height: 8),
             Row(children: [
               Expanded(child: _DifficultyBtn(
@@ -565,12 +564,12 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
             // Learning Outcome link
             if (widget.outcomes.isNotEmpty) ...[
               const SizedBox(height: 18),
-              _FieldLabel('Link to Learning Outcome'),
+              const _FieldLabel('Link to Learning Outcome'),
               const SizedBox(height: 4),
               const Text('Connect this topic to a course learning outcome.',
                   style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
               const SizedBox(height: 8),
-              DropdownButtonFormField<String?>(
+              DropdownButtonFormField<int?>(
                 value: _linkedOutcomeId,
                 decoration: InputDecoration(
                   hintText: 'Select outcome (optional)',
@@ -582,14 +581,14 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
                   isDense: true,
                 ),
                 items: [
-                  const DropdownMenuItem<String?>(
+                  const DropdownMenuItem<int?>(
                       child: Text('— None —', style: TextStyle(color: AppColors.textMuted))),
-                  ...widget.outcomes.map((o) => DropdownMenuItem<String?>(
+                  ...widget.outcomes.map((o) => DropdownMenuItem<int?>(
                     value: o.id,
                     child: Row(children: [
                       _DiffDotInline(o.difficulty),
                       const SizedBox(width: 8),
-                      Expanded(child: Text('${o.code} – ${o.description}',
+                      Expanded(child: Text('${o.code} – ${o.title}',
                           overflow: TextOverflow.ellipsis)),
                     ]),
                   )),

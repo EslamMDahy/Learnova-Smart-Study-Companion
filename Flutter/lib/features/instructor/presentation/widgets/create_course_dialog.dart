@@ -86,8 +86,10 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
     final c = _codeCtrl.text.trim();
     String? err;
     if (c.isNotEmpty) {
-      if (c.length < 2 || c.length > 31)  err = 'Course code must be 2–31 characters.';
-      else if (!_codeRx.hasMatch(c))       err = 'Use letters/numbers and - _ / only.';
+      if (c.length < 2 || c.length > 31) {
+        err = 'Course code must be 2–31 characters.';
+      // ignore: curly_braces_in_flow_control_structures
+      } else if (!_codeRx.hasMatch(c))       err = 'Use letters/numbers and - _ / only.';
     }
     if (err == _codeError) return;
     if (mounted) setState(() => _codeError = err);
@@ -166,8 +168,6 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
                     child: Column(
                       children: [
                         _buildCourseDetailsCard(),
-                        const SizedBox(height: 16),
-                        _buildLearningOutcomesCard(),
                         const SizedBox(height: 16),
                         _buildBottomRow(),
                         const SizedBox(height: 20),
@@ -391,15 +391,6 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
       ),
       child: Row(
         children: [
-          if (_outcomes.isNotEmpty) ...[
-            const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF16A34A)),
-            const SizedBox(width: 5),
-            Text(
-              '${_outcomes.length} outcome${_outcomes.length == 1 ? "" : "s"} added',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF16A34A),
-                  fontWeight: FontWeight.w600),
-            ),
-          ],
           const Spacer(),
           _OutlineBtn(label: 'Cancel', onTap: () => Navigator.of(context).pop()),
           const SizedBox(width: 10),
@@ -661,7 +652,7 @@ class _DescriptionFieldState extends State<_DescriptionField> {
               height: 38,
               color: AppColors.surfaceBg,
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
+              child: const Row(
                 children: [
                   _TbBtn(icon: Icons.format_bold_rounded),
                   _TbBtn(icon: Icons.format_italic_rounded),
@@ -1053,7 +1044,7 @@ class _OutlineBtnState extends State<_OutlineBtn> {
         ),
         child: Center(
           child: Text(widget.label,
-              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600,
+              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600,
                   color: AppColors.text)),
         ),
       ),

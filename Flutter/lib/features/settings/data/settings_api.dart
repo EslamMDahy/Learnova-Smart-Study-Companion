@@ -41,8 +41,6 @@ class SettingsApi {
         'full_name': fullName.trim(),
         'phone': phoneNumber?.trim(),
         'bio': bio?.trim(),
-        'student_id': studentId?.trim(),
-        'university_email': universityEmail?.trim(),
         'language_preference': languagePreference.trim(),
       },
       cancelToken: cancelToken,

@@ -120,3 +120,43 @@ class ModuleLinkRequest {
         'target_course_id': targetCourseId,
       };
 }
+
+// ─── Update request ───────────────────────────────────────────────────────────
+// PATCH /courses/{c}/modules/{m}/update
+// All fields are optional — only send what changed.
+class ModuleUpdateRequest {
+  final String? title;
+  final String? description;
+  final bool? isPublished;
+
+  const ModuleUpdateRequest({
+    this.title,
+    this.description,
+    this.isPublished,
+  });
+
+  Map<String, dynamic> toJson() {
+    final m = <String, dynamic>{};
+    if (title != null) m['title'] = title;
+    if (description != null) m['description'] = description;
+    if (isPublished != null) m['is_published'] = isPublished;
+    return m;
+  }
+}
+
+// ─── Reorder response ─────────────────────────────────────────────────────────
+class ModuleReorderResponse {
+  final int courseId;
+  final List<int> moduleIds;
+
+  const ModuleReorderResponse({required this.courseId, required this.moduleIds});
+
+  factory ModuleReorderResponse.fromJson(Map<String, dynamic> json) {
+    return ModuleReorderResponse(
+      courseId: (json['course_id'] as num).toInt(),
+      moduleIds: ((json['module_ids'] as List?) ?? const [])
+          .map((e) => (e as num).toInt())
+          .toList(),
+    );
+  }
+}

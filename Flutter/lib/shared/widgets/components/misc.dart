@@ -689,7 +689,7 @@ class AppLabeledIconField extends StatelessWidget {
             prefixIcon: Icon(icon, color: AppColors.muted, size: 20),
             suffixIcon: suffix,
             filled: true,
-            fillColor: const Color(0xFFF9FAFB),
+            fillColor: AppColors.pageBg,
             contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             enabledBorder: OutlineInputBorder(
               borderRadius: radius,

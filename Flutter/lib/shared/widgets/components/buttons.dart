@@ -105,10 +105,14 @@ class AppButton extends StatelessWidget {
           )
         : Text(label, style: AppText.button.copyWith(color: fg));
 
-    final btn = InkWell(
-      onTap: (loading ? null : onTap),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
+    final btn = MouseRegion(
+      cursor: (loading || onTap == null)
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
+      child: InkWell(
+        onTap: (loading ? null : onTap),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
         height: h,
         padding: pad,
         alignment: Alignment.center,
@@ -120,6 +124,7 @@ class AppButton extends StatelessWidget {
         ),
         child: child,
       ),
+    ),  // MouseRegion
     );
 
     if (!fullWidth) return btn;
