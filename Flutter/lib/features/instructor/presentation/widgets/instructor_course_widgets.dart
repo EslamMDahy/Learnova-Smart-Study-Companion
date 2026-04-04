@@ -611,10 +611,13 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
           icon:  const Icon(Icons.add, size: 18, color: Colors.white),
           label: const Text('Create New Course',
               style: TextStyle(
+                  height: 1.0,
+                  leadingDistribution: TextLeadingDistribution.even,
                   fontSize:   12.6,
                   fontWeight: FontWeight.w800,
                   color:      Colors.white)),
           style: ElevatedButton.styleFrom(
+            alignment: Alignment.center,
             backgroundColor: _CourseTokens.blue,
             elevation:   0,
             shadowColor: Colors.transparent,

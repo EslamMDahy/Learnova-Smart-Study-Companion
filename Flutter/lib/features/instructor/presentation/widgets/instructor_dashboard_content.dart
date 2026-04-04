@@ -129,7 +129,7 @@ class _Header extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Welcome back, $userName 👋',
+                'Welcome back, $userName ',
                 style: const TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w800,

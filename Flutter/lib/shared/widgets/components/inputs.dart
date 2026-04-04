@@ -206,17 +206,19 @@ class FigmaUmSearch40 extends StatelessWidget {
                 onChanged: onChanged,
                 textAlignVertical: TextAlignVertical.center,
                 cursorHeight: 16,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  height: 19 / 14,
-                  color: _text,
+                style: AppText.input.copyWith(
+                      color: AppColors.textTitle,
+                      height: 1.0, 
+                      leadingDistribution: TextLeadingDistribution.even,
                 ),
                 decoration: InputDecoration(
+                  isDense: true,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
                   hint: Text(
                     hint,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    
                     style: const TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
@@ -224,9 +226,7 @@ class FigmaUmSearch40 extends StatelessWidget {
                       color: _muted,
                     ),
                   ),
-                  isDense: true,
                   isCollapsed: true,
-                  contentPadding: const EdgeInsets.only(right: 14),
                 ),
               ),
             ),

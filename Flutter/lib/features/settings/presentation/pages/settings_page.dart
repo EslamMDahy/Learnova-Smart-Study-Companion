@@ -680,7 +680,7 @@ return PopScope(
   Widget _buildPersonalInfoCard() {
     return AppCard(
       child: Form(
-        key: _profileFormKey,
+        key: _kPersonal,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -805,7 +805,7 @@ return PopScope(
   Widget _buildSecurityCard(SettingsState st) {
     return AppCard(
       child: Form(
-        key: _passwordFormKey,
+        key: _kSecurity,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -955,6 +955,7 @@ return PopScope(
 
   Widget _buildPreferencesCard() {
     return AppCard(
+      key: _kPreferences,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1020,6 +1021,7 @@ return PopScope(
 
   Widget _buildNotificationsCard() {
     return AppCard(
+      key: _kNotifications,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

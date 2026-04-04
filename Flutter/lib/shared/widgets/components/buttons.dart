@@ -103,7 +103,14 @@ class AppButton extends StatelessWidget {
             height: 18,
             child: CircularProgressIndicator(strokeWidth: 2),
           )
-        : Text(label, style: AppText.button.copyWith(color: fg));
+        : Text(
+        label, 
+        style: AppText.button.copyWith(
+          color: fg,
+          height: 1.0,
+          leadingDistribution: TextLeadingDistribution.even,
+        ),
+      );
 
     final btn = MouseRegion(
       cursor: (loading || onTap == null)

@@ -29,12 +29,11 @@ Future<ModuleSelectorResult?> showModuleSelectorSheet(
   List<ModuleItem> currentModules = const [],
 }) {
   final size = MediaQuery.of(context).size;
-  final width = size.width < 900 ? size.width * 0.96 : 860.0;
-  final height = size.height * 0.82;
+  final width = size.width < 600 ? size.width * 0.96 : 860.0;
+  final height = size.height * 0.65;
 
-  return showDialog<ModuleSelectorResult>(
+  return showDialog<ModuleSelectorResult>(  
     context: context,
-    barrierDismissible: true,
     barrierColor: const Color(0xFF0B1A2B).withOpacity(0.55),
     builder: (_) => Dialog(
       elevation: 0,
@@ -180,7 +179,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
   Widget _buildOptions(AsyncValue<List<_ReusableCourse>> reusableAsync) {
     return reusableAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => _ErrorState(message: 'Failed to load reusable modules.'),
+      error: (e, _) => const _ErrorState(message: 'Failed to load reusable modules.'),
       data: (courses) {
         final readyCount = courses.fold<int>(0, (sum, c) {
           final ready = c.modules.where((m) => !_isBlocked(m)).length;
@@ -299,7 +298,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
   Widget _buildChooseCourse(AsyncValue<List<_ReusableCourse>> reusableAsync) {
     return reusableAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => _ErrorState(message: 'Failed to load source courses.'),
+      error: (e, _) => const _ErrorState(message: 'Failed to load source courses.'),
       data: (courses) {
         if (courses.isEmpty) {
           return Padding(
@@ -448,9 +447,9 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: AppColors.border),
                   ),
-                  child: Column(
+                  child: const Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text('Live preview', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1D6FE9))),
                       SizedBox(height: 12),
                       Text('Week 1: Foundations', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle)),

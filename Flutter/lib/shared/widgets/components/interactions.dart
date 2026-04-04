@@ -1,10 +1,4 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-
-/// Web-friendly interaction wrappers (hover / cursor / focus ring).
-///
-/// Use this on any clickable surface (buttons, cards, table rows, sidebar items)
-/// to get consistent pointer cursor + hover feedback + keyboard focus outline.
 
 class AppInteractiveRegion extends StatefulWidget {
   final Widget child;
@@ -12,7 +6,6 @@ class AppInteractiveRegion extends StatefulWidget {
   final BorderRadius borderRadius;
   final bool enabled;
 
-  /// Optional builder to tweak visuals based on hover/focus.
   final Widget Function(
     BuildContext context,
     bool hovered,
@@ -39,52 +32,65 @@ class _AppInteractiveRegionState extends State<AppInteractiveRegion> {
 
   @override
   Widget build(BuildContext context) {
-    final enabled = widget.enabled && widget.onTap != null;
+    final bool isActionEnabled = widget.enabled && widget.onTap != null;
 
-    Widget c = widget.child;
-    if (widget.builder != null) {
-      c = widget.builder!(context, _hovered, _focused, c);
-    }
+    /// 1. بناء المحتوى
+    Widget content = widget.builder != null
+        ? widget.builder!(context, _hovered, _focused, widget.child)
+        : widget.child;
 
-    // Focus outline for keyboard navigation (important on web).
-    c = AnimatedContainer(
-      duration: kIsWeb ? Duration.zero : const Duration(milliseconds: 120),
+    /// 2. Focus Border
+    content = AnimatedContainer(
+      duration: const Duration(milliseconds: 120),
       decoration: BoxDecoration(
         borderRadius: widget.borderRadius,
         border: _focused
             ? Border.all(
-                color: Theme.of(context).colorScheme.primary.withOpacity(0.45),
+                color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
                 width: 2,
               )
             : null,
       ),
-      child: c,
+      child: content,
     );
 
     return FocusableActionDetector(
-      enabled: enabled,
+      enabled: isActionEnabled,
       onShowFocusHighlight: (v) => setState(() => _focused = v),
-      mouseCursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      mouseCursor: isActionEnabled
+          ? SystemMouseCursors.click
+          : SystemMouseCursors.basic,
       child: MouseRegion(
-        cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
-        onEnter: enabled
-            ? (_) {
-                if (!kIsWeb) return;
-                setState(() => _hovered = true);
-              }
-            : null,
-        onExit: enabled
-            ? (_) {
-                if (!kIsWeb) return;
-                setState(() => _hovered = false);
-              }
-            : null,
+        // ✅ FIX 1: مهم جداً
+        hitTestBehavior: HitTestBehavior.deferToChild,
+
+        cursor: isActionEnabled
+            ? SystemMouseCursors.click
+            : SystemMouseCursors.basic,
+
+        // ❌ شيلنا hover من هنا
+        onEnter: null,
+        onExit: null,
+
         child: Material(
-          type: MaterialType.transparency,
+          color: Colors.transparent,
+          clipBehavior: Clip.antiAlias,
+          borderRadius: widget.borderRadius,
           child: InkWell(
-            onTap: enabled ? widget.onTap : null,
+            onTap: isActionEnabled ? widget.onTap : null,
             borderRadius: widget.borderRadius,
-            child: c,
+
+            // ✅ المصدر الوحيد للـ hover
+            onHover: (value) {
+              setState(() => _hovered = value);
+            },
+
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            hoverColor: Colors.transparent,
+            splashFactory: NoSplash.splashFactory,
+
+            child: content,
           ),
         ),
       ),

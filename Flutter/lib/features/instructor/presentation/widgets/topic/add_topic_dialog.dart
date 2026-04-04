@@ -33,39 +33,40 @@ class AddTopicUnifiedButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [Color(0xFF137FEC), Color(0xFF8B5CF6)],
-            ),
-            borderRadius: BorderRadius.circular(8),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x22137FEC),
-                blurRadius: 8,
-                offset: Offset(0, 3),
+    return FocusScope(
+      child: Dialog(
+        child: GestureDetector(
+          onTap: onTap,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF137FEC), Color(0xFF8B5CF6)],
               ),
-            ],
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.add_rounded, size: 14, color: Colors.white),
-              SizedBox(width: 5),
-              Text(
-                'Add Topic',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x22137FEC),
+                  blurRadius: 8,
+                  offset: Offset(0, 3),
                 ),
-              ),
-            ],
+              ],
+            ),
+            child: const Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.add_rounded, size: 14, color: Colors.white),
+                SizedBox(width: 5),
+                Text(
+                  'Add Topic',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -126,7 +127,7 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
     Navigator.pop(context, const TopicDialogResult.ai());
   }
 
-  @override
+ @override
   Widget build(BuildContext context) {
     return Dialog(
       elevation: 0,
@@ -135,73 +136,82 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 500),
-          child: Container(
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.16),
-                  blurRadius: 30,
-                  offset: const Offset(0, 12),
-                ),
-              ],
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _dialogHeader(),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                  child: _dialogTabs(),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: _isManual ? _manualBody() : _aiBody(),
+          child: GestureDetector(
+            onTap: () => FocusScope.of(context).unfocus(),
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(20),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.16),
+                    blurRadius: 30,
+                    offset: const Offset(0, 12),
                   ),
-                ),
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-                  decoration: const BoxDecoration(
-                    border: Border(top: BorderSide(color: _AddTopicColors.divider)),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _dialogHeader(),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+                    child: _dialogTabs(),
                   ),
-                  child: Row(children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () => Navigator.pop(context),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
-                          side: const BorderSide(color: _AddTopicColors.divider),
-                        ),
-                        child: const Text('Cancel'),
-                      ),
+                  Padding(
+                    padding: const EdgeInsets.all(20),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 180),
+                      child: _isManual ? _manualBody(key: const ValueKey('manual_field')) : _aiBody(key: const ValueKey('ai_field')),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: ElevatedButton.icon(
-                        onPressed: _submit,
-                        icon: Icon(
-                          _isManual ? Icons.add_rounded : Icons.auto_awesome_rounded,
-                          size: 16,
-                        ),
-                        label: Text(_isManual ? 'Create Topic' : 'Generate with AI'),
-                        style: ElevatedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 13),
-                          backgroundColor: _isManual ? AppColors.primary : _AddTopicColors.purple,
-                          foregroundColor: Colors.white,
-                          elevation: 0,
-                          shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                    decoration: const BoxDecoration(
+                      border: Border(top: BorderSide(color: _AddTopicColors.divider)),
+                    ),
+                    child: Row(children: [
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () {
+                            FocusScope.of(context).unfocus(); 
+                            Navigator.pop(context);
+                          },
+                          style: OutlinedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                            side: const BorderSide(color: _AddTopicColors.divider),
+                          ),
+                          child: const Text('Cancel'),
                         ),
                       ),
-                    ),
-                  ]),
-                ),
-              ],
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            FocusScope.of(context).unfocus(); // تحرير الفوكس قبل التنفيذ
+                            _submit();
+                          },
+                          icon: Icon(
+                            _isManual ? Icons.add_rounded : Icons.auto_awesome_rounded,
+                            size: 16,
+                          ),
+                          label: Text(_isManual ? 'Create Topic' : 'Generate with AI'),
+                          style: ElevatedButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            backgroundColor: _isManual ? AppColors.primary : _AddTopicColors.purple,
+                            foregroundColor: Colors.white,
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                    ]),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -284,10 +294,10 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
     );
   }
 
-  Widget _manualBody() {
+  Widget _manualBody({Key? key}) {
     final outcomes = widget.outcomes;
     return Column(
-      key: const ValueKey('manual'),
+      key: key,
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -297,6 +307,7 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
         TextField(
           controller: _titleCtrl,
           autofocus: true,
+          onTapOutside: (event) => FocusScope.of(context).requestFocus(FocusNode()),
           onSubmitted: (_) => _submit(),
           decoration: InputDecoration(
             hintText: 'e.g. Introduction to Robotics',
@@ -439,7 +450,7 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
     );
   }
 
-  Widget _aiBody() {
+  Widget _aiBody({required ValueKey<String> key}) {
     return Column(
       key: const ValueKey('ai'),
       mainAxisSize: MainAxisSize.min,

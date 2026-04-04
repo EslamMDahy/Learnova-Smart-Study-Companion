@@ -915,29 +915,50 @@ class _CoverUploadState extends State<_CoverUpload> {
             width: _h ? 1.5 : 1,
           ),
         ),
-        child: Column(children: [
-          Container(
-            width: 46, height: 46,
-            decoration: BoxDecoration(
-              color: _h ? const Color(0xFFEFF6FF) : AppColors.headerBg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.add_photo_alternate_outlined, size: 22,
-                color: _h ? const Color(0xFF137FEC) : AppColors.muted),
-          ),
-          const SizedBox(height: 10),
-          RichText(text: TextSpan(children: [
-            TextSpan(text: 'Upload a file',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700,
-                    color: _h ? const Color(0xFF137FEC) : AppColors.muted,
-                    fontFamily: 'Inter')),
-            const TextSpan(text: '  or drag and drop',
-                style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF), fontFamily: 'Inter')),
-          ])),
-          const SizedBox(height: 5),
-          const Text('PNG, JPG, GIF up to 10MB',
-              style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
-        ]),
+  child: Column(
+  mainAxisSize: MainAxisSize.min,
+  crossAxisAlignment: CrossAxisAlignment.center, 
+  children: [
+    Container(
+      width: 46, height: 63,
+      decoration: BoxDecoration(
+        color: _h ? const Color(0xFFEFF6FF) : AppColors.headerBg,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Icon(Icons.add_photo_alternate_outlined, size: 22,
+          color: _h ? const Color(0xFF137FEC) : AppColors.muted),
+    ),
+    const SizedBox(height: 12),
+    
+    // 2. جعل النصوص تحت بعضها وفي المنتصف
+    Text(
+      'Upload a file',
+      style: TextStyle(
+        fontSize: 13, 
+        fontWeight: FontWeight.w700,
+        color: _h ? const Color(0xFF137FEC) : AppColors.muted,
+        fontFamily: 'Inter'
+      ),
+    ),
+    const SizedBox(height: 4), // مسافة بسيطة بين السطرين
+    const Text(
+      'or drag and drop',
+      style: TextStyle(
+        fontSize: 12, 
+        color: Color(0xFF9CA3AF), 
+        fontFamily: 'Inter'
+      ),
+    ),
+    
+    const SizedBox(height: 8),
+    
+    const Text(
+      'PNG, JPG, GIF up to 10MB',
+      textAlign: TextAlign.center, // تأكيد التوسط
+      style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+    ),
+  ],
+),
       ),
     );
   }

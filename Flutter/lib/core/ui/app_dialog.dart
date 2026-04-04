@@ -58,7 +58,7 @@ class AppDialogSurface extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget content = Dialog(
+    final Widget content = Dialog(
       backgroundColor: Colors.transparent,
       elevation: 0,
       insetPadding: insetPadding ?? AppDialogTokens.insetPadding,
