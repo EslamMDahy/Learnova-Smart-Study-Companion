@@ -12,7 +12,7 @@ class InviteStudentsDialog extends ConsumerStatefulWidget {
 }
 
 class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
-  bool _loading = false;
+  final bool _loading = false;
   PlatformFile? _pickedFile;
   bool _sendAfterUpload = true;
 

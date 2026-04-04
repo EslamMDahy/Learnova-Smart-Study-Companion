@@ -916,8 +916,7 @@ class _CoverUploadState extends State<_CoverUpload> {
           ),
         ),
   child: Column(
-  mainAxisSize: MainAxisSize.min,
-  crossAxisAlignment: CrossAxisAlignment.center, 
+  mainAxisSize: MainAxisSize.min, 
   children: [
     Container(
       width: 46, height: 63,

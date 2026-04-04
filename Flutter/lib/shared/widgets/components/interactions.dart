@@ -68,10 +68,6 @@ class _AppInteractiveRegionState extends State<AppInteractiveRegion> {
             ? SystemMouseCursors.click
             : SystemMouseCursors.basic,
 
-        // ❌ شيلنا hover من هنا
-        onEnter: null,
-        onExit: null,
-
         child: Material(
           color: Colors.transparent,
           clipBehavior: Clip.antiAlias,
