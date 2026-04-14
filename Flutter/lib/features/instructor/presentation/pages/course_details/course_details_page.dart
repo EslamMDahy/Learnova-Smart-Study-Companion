@@ -3,11 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/theme/app_theme.dart';
 import '../../../../../core/storage/key_value_store_factory.dart';
+import '../../../../../core/network/error_mapper.dart';
 import '../../../data/courses_models.dart';
+import '../../../data/courses_providers.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../widgets/course_tabs/overview_tab.dart';
 import '../../widgets/course_tabs/materials_tab.dart';
-
 import '../../widgets/course_tabs/outcomes_tab.dart';
 import '../../widgets/course_outcomes_panel.dart';
 import '../../widgets/course_tabs/question_bank_tab.dart';
@@ -15,12 +16,20 @@ import '../../widgets/course_tabs/students_tab.dart';
 
 class CourseDetailsPage extends ConsumerStatefulWidget {
   final String courseSlug;
-  final MyCourseItem course;
+
+  /// Provide this when the course is already in memory (normal navigation).
+  /// When null the page self-loads via [selectedCourseByIdProvider].
+  final MyCourseItem? cachedCourse;
+
+  /// Numeric course id used as the fallback key for the API fetch when
+  /// [cachedCourse] is null (e.g. after a browser refresh).
+  final int? cachedCourseId;
 
   const CourseDetailsPage({
     super.key,
     required this.courseSlug,
-    required this.course,
+    this.cachedCourse,
+    this.cachedCourseId,
   });
 
   @override
@@ -30,17 +39,32 @@ class CourseDetailsPage extends ConsumerStatefulWidget {
 class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
-  late final List<Widget> _pages;
+  late final List<Widget>? _pages;
   late final _session = createSessionStore();
   int _currentIndex = 0;
 
-  String get _tabKey => 'course:${widget.course.id}:active_tab';
+  List<Widget> _buildPages(MyCourseItem course) => [
+        CourseOverviewTab(
+            key: const PageStorageKey('course-overview-tab'), course: course),
+        CourseMaterialsTab(
+            key: const PageStorageKey('course-materials-tab'), course: course),
+        CourseOutcomesTab(
+            key: const PageStorageKey('course-outcomes-tab'), course: course),
+        CourseQuestionBankTab(
+            key: const PageStorageKey('course-question-bank-tab'),
+            course: course),
+        CourseStudentsTab(
+            key: const PageStorageKey('course-students-tab'), course: course),
+      ];
+
+  String get _tabKey =>
+      'course:${widget.cachedCourse?.id ?? widget.cachedCourseId ?? widget.courseSlug}:active_tab';
 
   static const _tabs = [
-    _TabDef(icon: Icons.dashboard_outlined,     label: 'Overview'),
-    _TabDef(icon: Icons.folder_open_outlined,   label: 'Materials'),
-    _TabDef(icon: Icons.flag_outlined,          label: 'Outcomes'),
-    _TabDef(icon: Icons.quiz_outlined,          label: 'Question Bank'),
+    _TabDef(icon: Icons.dashboard_outlined, label: 'Overview'),
+    _TabDef(icon: Icons.folder_open_outlined, label: 'Materials'),
+    _TabDef(icon: Icons.flag_outlined, label: 'Outcomes'),
+    _TabDef(icon: Icons.quiz_outlined, label: 'Question Bank'),
     _TabDef(icon: Icons.people_outline_rounded, label: 'Students'),
   ];
 
@@ -48,34 +72,33 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
   void initState() {
     super.initState();
     final storedIndex = int.tryParse(_session.getString(_tabKey) ?? '');
-    _currentIndex = storedIndex != null && storedIndex >= 0 && storedIndex < _tabs.length ? storedIndex : 0;
-    _tabController = TabController(length: _tabs.length, vsync: this, initialIndex: _currentIndex);
-    _pages = [
-      CourseOverviewTab(key: const PageStorageKey('course-overview-tab'), course: widget.course),
-      CourseMaterialsTab(key: const PageStorageKey('course-materials-tab'), course: widget.course),
-      CourseOutcomesTab(key: const PageStorageKey('course-outcomes-tab'), course: widget.course),
-      CourseQuestionBankTab(key: const PageStorageKey('course-question-bank-tab'), course: widget.course),
-      CourseStudentsTab(key: const PageStorageKey('course-students-tab'), course: widget.course),
-    ];
+    _currentIndex = storedIndex != null &&
+            storedIndex >= 0 &&
+            storedIndex < _tabs.length
+        ? storedIndex
+        : 0;
+    _tabController = TabController(
+        length: _tabs.length, vsync: this, initialIndex: _currentIndex);
     _tabController.addListener(() {
       if (!_tabController.indexIsChanging) {
         setState(() => _currentIndex = _tabController.index);
         _session.setString(_tabKey, _currentIndex.toString());
       }
     });
-    // Load modules immediately after the first frame so the provider
-    // is available. Using addPostFrameCallback avoids calling read()
-    // before the widget tree is fully mounted while still being
-    // synchronous enough that the Overview stats appear on first paint.
+
+    if (widget.cachedCourse != null) {
+      _loadCourseData(widget.cachedCourse!);
+    }
+  }
+
+  void _loadCourseData(MyCourseItem course) {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted) return;
-
       await ref
-          .read(courseDetailsControllerProvider(widget.course.id).notifier)
+          .read(courseDetailsControllerProvider(course.id).notifier)
           .loadModulesAndAllMaterials();
-
       if (!mounted) return;
-      await ensureCourseLearningOutcomesLoaded(ref, widget.course.id);
+      await ensureCourseLearningOutcomesLoaded(ref, course.id);
     });
   }
 
@@ -87,7 +110,109 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.cachedCourse != null) {
+      return _buildContent(widget.cachedCourse!);
+    }
+
+    if (widget.cachedCourseId != null) {
+      final asyncCourse =
+          ref.watch(selectedCourseByIdProvider(widget.cachedCourseId!));
+      return asyncCourse.when(
+        loading: () => _buildLoadingShell(),
+        error: (e, _) => _buildErrorShell(mapApiFailure(e).message),
+        data: (course) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _loadCourseData(course);
+          });
+          return _buildContent(course);
+        },
+      );
+    }
+
+    return _buildErrorShell(
+      'Course could not be loaded. Please go back and reopen it.',
+    );
+  }
+
+  // ── Loading shell ───────────────────────────────────────────────────────────
+
+  Widget _buildLoadingShell() {
     return Column(children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: AppColors.border)),
+        ),
+        child: const Center(
+          child: SizedBox(
+            height: 36,
+            child: Center(
+              child: SizedBox(
+                width: 20,
+                height: 20,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+      const Expanded(
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.primary),
+        ),
+      ),
+    ]);
+  }
+
+  // ── Error shell ─────────────────────────────────────────────────────────────
+
+  Widget _buildErrorShell(String message) {
+    return Column(children: [
+      Container(
+        height: 52,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          border: Border(bottom: BorderSide(color: AppColors.border)),
+        ),
+      ),
+      Expanded(
+        child: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error_outline,
+                    color: AppColors.dangerText, size: 40),
+                const SizedBox(height: 12),
+                Text(
+                  'Could not load course',
+                  style: AppTextStyles.sectionTitle,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  message,
+                  style: AppTextStyles.muted,
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  // ── Main content ────────────────────────────────────────────────────────────
+
+  Widget _buildContent(MyCourseItem course) {
+    final pages = _buildPages(course);
+    return Column(children: [
+      // ── Tab header — centered, does NOT stretch to full width ─────────────
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: const BoxDecoration(
@@ -109,7 +234,7 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
       Expanded(
         child: IndexedStack(
           index: _currentIndex,
-          children: _pages,
+          children: pages,
         ),
       ),
     ]);
@@ -117,7 +242,7 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Pill tab bar — flush to the left edge
+//  Pill tab bar — wraps its content, centered in the header
 // ─────────────────────────────────────────────────────────────────────────────
 class _PillTabBar extends StatelessWidget {
   final List<_TabDef> tabs;
@@ -132,7 +257,7 @@ class _PillTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
+    return IntrinsicWidth(
       child: Container(
         padding: const EdgeInsets.all(3),
         decoration: BoxDecoration(
@@ -184,7 +309,7 @@ class _PillTabState extends State<_PillTab> {
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
-      onExit:  (_) => setState(() => _hovered = false),
+      onExit: (_) => setState(() => _hovered = false),
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
@@ -209,6 +334,7 @@ class _PillTabState extends State<_PillTab> {
                 : [],
           ),
           child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(
@@ -219,8 +345,8 @@ class _PillTabState extends State<_PillTab> {
                     : AppColors.textMuted,
               ),
               const SizedBox(width: 6),
-              AnimatedDefaultTextStyle(
-                duration: const Duration(milliseconds: 150),
+              Text(
+                widget.label,
                 style: TextStyle(
                   fontSize: 13,
                   fontFamily: 'Inter',
@@ -231,7 +357,6 @@ class _PillTabState extends State<_PillTab> {
                       ? AppColors.textTitle
                       : AppColors.textMuted,
                 ),
-                child: Text(widget.label),
               ),
             ],
           ),

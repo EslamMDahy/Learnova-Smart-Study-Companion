@@ -295,7 +295,7 @@ class AppTheme {
       splashFactory: NoSplash.splashFactory,
       splashColor: Colors.transparent,
       highlightColor: Colors.transparent,
-      hoverColor: const Color(0x08000000), // very subtle global hover
+      hoverColor: Colors.transparent, // remove global material hover overlay
 
       elevatedButtonTheme: ElevatedButtonThemeData(
         style:

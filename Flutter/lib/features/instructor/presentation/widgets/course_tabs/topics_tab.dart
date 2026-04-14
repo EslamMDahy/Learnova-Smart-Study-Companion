@@ -102,7 +102,7 @@ class _CourseTopicsTabState extends ConsumerState<CourseTopicsTab> {
                 final isSelected = m.id == selectedId;
                 return Material(
                   color: Colors.transparent,
-                  child: InkWell(
+                  child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                     borderRadius: BorderRadius.circular(8),
                     onTap: () =>
                         setState(() => _selectedModuleId = m.id),

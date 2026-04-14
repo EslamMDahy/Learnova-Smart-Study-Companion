@@ -60,7 +60,34 @@ class AppBootstrapController extends Notifier<AppBootstrapState> {
 
       final raw = await api.me();
       final normalized = _normalize(raw);
-      UserStorage.saveMe(normalized, persist: TokenStorage.isPersisted);
+
+      final existing = UserStorage.meJson;
+      final Map<String, dynamic> merged;
+
+      if (existing != null) {
+        final existingUser = (existing['user'] is Map)
+            ? (existing['user'] as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
+
+        final newUser = (normalized['user'] is Map)
+            ? (normalized['user'] as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
+
+        final mergedUser = <String, dynamic>{...existingUser};
+        newUser.forEach((k, v) {
+          if (v != null) mergedUser[k] = v;
+        });
+
+        merged = {
+          ...existing,
+          ...normalized,
+          'user': mergedUser,
+        };
+      } else {
+        merged = normalized;
+      }
+
+      UserStorage.saveMe(merged, persist: TokenStorage.isPersisted);
     } catch (_) {
       TokenStorage.clear();
       UserStorage.clear();

@@ -2,6 +2,7 @@ import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
 
+import '../../../core/log/app_logger.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/endpoints.dart';
 import 'courses_models.dart';
@@ -19,9 +20,30 @@ class CoursesApi {
 
     final data = res.data;
     if (data is Map<String, dynamic>) {
+      AppLogger.log('GET ${Endpoints.myCourses} -> $data', level: LogLevel.debug);
       return MyCoursesResponse.fromJson(data);
     }
     throw const FormatException('Invalid response from /courses/my');
+  }
+
+  /// GET /courses/{id}
+  ///
+  /// Used to reload a single course after a browser refresh, so the
+  /// details page is never dependent on the in-memory cache.
+  Future<MyCourseItem> getCourseById(
+    int id, {
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      '/courses/$id',
+      cancelToken: cancelToken,
+    );
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      AppLogger.log('GET /courses/$id -> $data', level: LogLevel.debug);
+      return MyCourseItem.fromJson(data);
+    }
+    throw FormatException('Invalid response from GET /courses/$id');
   }
 
   /// POST /courses

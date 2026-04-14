@@ -359,7 +359,7 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
                     case OutcomeDifficulty.advanced: dotColor = const Color(0xFFDC2626); break;
                     default: dotColor = const Color(0xFF16A34A);
                   }
-                  return InkWell(
+                  return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                     onTap: () => setState(() {
                       if (selected) {
                         _selectedOutcomeIds.remove(lo.id);

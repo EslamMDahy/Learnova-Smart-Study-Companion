@@ -285,7 +285,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               'I agree to the ',
                               style: AppText.input.copyWith(fontSize: 14),
                             ),
-                            InkWell(
+                            InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                               onTap: state.loading ? null : () {},
                               child: Text(
                                 'Terms',
@@ -300,7 +300,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               ' and ',
                               style: AppText.input.copyWith(fontSize: 14),
                             ),
-                            InkWell(
+                            InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                               onTap: state.loading ? null : () {},
                               child: Text(
                                 'Privacy Policy',
@@ -355,7 +355,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                         'Already have an account? ',
                         style: AppText.input.copyWith(color: AppColors.title),
                       ),
-                      InkWell(
+                      InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                         onTap: state.loading ? null : () => context.go(Routes.login),
                         child: Text(
                           'Log in',

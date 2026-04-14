@@ -146,11 +146,16 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
                                 value: _difficulty,
                                 decoration: _inputDecoration('Select difficulty'),
                                 items: TopicDifficulty.values
-                                    .map((d) => DropdownMenuItem(value: d, child: Text(d.label)))
+                                    .map<DropdownMenuItem<TopicDifficulty>>(
+                                      (d) => DropdownMenuItem<TopicDifficulty>(
+                                        value: d,
+                                        child: Text(d.label),
+                                      ),
+                                    )
                                     .toList(),
                                 onChanged: _saving
                                     ? null
-                                    : (v) {
+                                    : (TopicDifficulty? v) {
                                         if (v == null) return;
                                         setState(() => _difficulty = v);
                                       },
@@ -169,11 +174,16 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
                                 value: _readiness,
                                 decoration: _inputDecoration('Select readiness'),
                                 items: TopicReadiness.values
-                                    .map((r) => DropdownMenuItem(value: r, child: Text(r.label)))
+                                    .map<DropdownMenuItem<TopicReadiness>>(
+                                      (r) => DropdownMenuItem<TopicReadiness>(
+                                        value: r,
+                                        child: Text(r.label),
+                                      ),
+                                    )
                                     .toList(),
                                 onChanged: _saving
                                     ? null
-                                    : (v) {
+                                    : (TopicReadiness? v) {
                                         if (v == null) return;
                                         setState(() => _readiness = v);
                                       },
@@ -376,7 +386,7 @@ class _OutcomeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       onTap: onChanged == null ? null : () => onChanged!(!selected),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -430,6 +440,37 @@ class _OutcomeTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+
+class _ChoiceGroup<T> extends StatelessWidget {
+  final List<T> values;
+  final T selected;
+  final String Function(T value) labelBuilder;
+  final ValueChanged<T>? onChanged;
+
+  const _ChoiceGroup({
+    required this.values,
+    required this.selected,
+    required this.labelBuilder,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      children: values.map((value) {
+        final isSelected = value == selected;
+        return ChoiceChip(
+          label: Text(labelBuilder(value)),
+          selected: isSelected,
+          onSelected: onChanged == null ? null : (_) => onChanged!(value),
+        );
+      }).toList(),
     );
   }
 }

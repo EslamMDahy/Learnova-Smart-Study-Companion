@@ -88,6 +88,8 @@ class Endpoints {
       '$_courses/$courseId/learning-outcomes/$outcomeId/delete';
 
   // ─── QUESTIONS ───────────────────────────────────────────────────────────
+  static String courseQuestions(int courseId) =>
+      '$_courses/$courseId/questions';
   static String batchCreateQuestions(int courseId, int moduleId, int materialId) =>
       '$_courses/$courseId/modules/$moduleId/materials/$materialId/questions';
 

@@ -7,20 +7,28 @@ import '../../data/courses_providers.dart';
 import '../../data/modules_materials_providers.dart';
 import '../../data/modules_models.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────────
+//  Result model
+// ─────────────────────────────────────────────────────────────────────────────────
 class ModuleSelectorResult {
   final bool isNew;
   final ModuleItem? existing;
+  /// The course the [existing] module lives in. Required when [isNew] is false
+  /// so the caller knows which course to pass as [sourceCourseId] to the copy
+  /// endpoint: POST /courses/{sourceCourseId}/modules/{moduleId}/copy
+  final int? sourceCourseId;
   final String? newTitle;
   final String? newDescription;
 
-  const ModuleSelectorResult.existing(this.existing)
+  const ModuleSelectorResult.existing(this.existing, this.sourceCourseId)
       : isNew = false,
         newTitle = null,
         newDescription = null;
 
   const ModuleSelectorResult.newModule(this.newTitle, this.newDescription)
       : isNew = true,
-        existing = null;
+        existing = null,
+        sourceCourseId = null;
 }
 
 Future<ModuleSelectorResult?> showModuleSelectorSheet(
@@ -30,9 +38,9 @@ Future<ModuleSelectorResult?> showModuleSelectorSheet(
 }) {
   final size = MediaQuery.of(context).size;
   final width = size.width < 600 ? size.width * 0.96 : 860.0;
-  final height = size.height * 0.65;
+  final height = size.height < 820 ? size.height * 0.82 : 720.0;
 
-  return showDialog<ModuleSelectorResult>(  
+  return showDialog<ModuleSelectorResult>(
     context: context,
     barrierColor: const Color(0xFF0B1A2B).withOpacity(0.55),
     builder: (_) => Dialog(
@@ -148,7 +156,6 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
     );
   }
 
-
   Widget _buildStepContent(AsyncValue<List<_ReusableCourse>> reusableAsync) {
     if (_step == _SelectorStep.chooseCourse) return _buildChooseCourse(reusableAsync);
     if (_step == _SelectorStep.chooseModule) return _buildChooseModule();
@@ -190,106 +197,110 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
           return sum + blocked;
         });
 
-        return SingleChildScrollView(
+        return ListView(
           padding: const EdgeInsets.all(22),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: _ActionCard(
-                      icon: Icons.auto_awesome_rounded,
-                      badge: 'Recommended',
-                      badgeColor: const Color(0xFFE8F1FF),
-                      badgeTextColor: const Color(0xFF1D6FE9),
-                      title: 'Create a fresh module',
-                      description:
-                          'Best for a brand-new chapter, week, or topic group. Title and description are validated before creation.',
-                      cta: 'Start creating',
-                      onTap: () => setState(() => _step = _SelectorStep.create),
-                    ),
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: _ActionCard(
+                    icon: Icons.auto_awesome_rounded,
+                    badge: 'Recommended',
+                    // Both badges use the same blue palette to stay consistent
+                    // with the site’s primary color. The old “From other courses”
+                    // badge was purple which clashed with the rest of the UI.
+                    badgeColor: const Color(0xFFE8F1FF),
+                    badgeTextColor: const Color(0xFF1D6FE9),
+                    iconBg: const Color(0xFFEFF6FF),
+                    iconFg: const Color(0xFF137FEC),
+                    title: 'Create a fresh module',
+                    description:
+                        'Best for a brand-new chapter, week, or topic group. Title and description are validated before creation.',
+                    cta: 'Start creating',
+                    onTap: () => setState(() => _step = _SelectorStep.create),
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: _ActionCard(
-                      icon: Icons.content_copy_rounded,
-                      badge: 'From other courses',
-                      badgeColor: const Color(0xFFF1EAFE),
-                      badgeTextColor: const Color(0xFF7C3AED),
-                      title: 'Reuse from another course',
-                      description: readyCount > 0
-                          ? '$readyCount validated modules can be copied from ${courses.length} ${courses.length == 1 ? 'other course' : 'other courses'}.'
-                          : 'No reusable modules are currently available from your other courses.',
-                      cta: courses.isEmpty ? 'No reusable modules' : 'Browse courses',
-                      enabled: courses.isNotEmpty,
-                      onTap: courses.isEmpty ? null : () => setState(() => _step = _SelectorStep.chooseCourse),
-                    ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: _ActionCard(
+                    icon: Icons.content_copy_rounded,
+                    badge: 'From other courses',
+                    badgeColor: const Color(0xFFE8F1FF),
+                    badgeTextColor: const Color(0xFF1D6FE9),
+                    iconBg: const Color(0xFFEFF6FF),
+                    iconFg: const Color(0xFF137FEC),
+                    title: 'Reuse from another course',
+                    description: readyCount > 0
+                        ? '$readyCount validated modules can be copied from ${courses.length} ${courses.length == 1 ? 'other course' : 'other courses'}.'
+                        : 'No reusable modules are currently available from your other courses.',
+                    cta: courses.isEmpty ? 'No reusable modules' : 'Browse courses',
+                    enabled: courses.isNotEmpty,
+                    onTap: courses.isEmpty ? null : () => setState(() => _step = _SelectorStep.chooseCourse),
                   ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              _SectionCard(
-                title: 'Reusable source courses',
-                subtitle: courses.isEmpty
-                    ? 'No courses currently have modules you can copy.'
-                    : '${courses.length} ${courses.length == 1 ? 'course' : 'courses'} • $readyCount ${readyCount == 1 ? 'module' : 'modules'} ready to copy',
-                actionLabel: courses.isEmpty ? null : 'Open browser',
-                onAction: courses.isEmpty ? null : () => setState(() => _step = _SelectorStep.chooseCourse),
-                child: courses.isEmpty
-                    ? const _EmptyState(
-                        icon: Icons.inbox_outlined,
-                        title: 'No reusable modules yet',
-                        message: 'Create modules in another course first, then return here to copy them.',
-                      )
-                    : Column(
-                        children: [
-                          if (blockedCount > 0)
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(bottom: 14),
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(color: AppColors.border),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.textMuted),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      '$blockedCount ${blockedCount == 1 ? 'module already exists' : 'modules already exist'} in this course and will stay disabled to avoid duplicate copies.',
-                                      style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted),
-                                    ),
-                                  ),
-                                ],
-                              ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _SectionCard(
+              title: 'Reusable source courses',
+              subtitle: courses.isEmpty
+                  ? 'No courses currently have modules you can copy.'
+                  : '${courses.length} ${courses.length == 1 ? 'course' : 'courses'} • $readyCount ${readyCount == 1 ? 'module' : 'modules'} ready to copy',
+              actionLabel: courses.isEmpty ? null : 'Open browser',
+              onAction: courses.isEmpty ? null : () => setState(() => _step = _SelectorStep.chooseCourse),
+              child: courses.isEmpty
+                  ? const _EmptyState(
+                      icon: Icons.inbox_outlined,
+                      title: 'No reusable modules yet',
+                      message: 'Create modules in another course first, then return here to copy them.',
+                    )
+                  : Column(
+                      children: [
+                        if (blockedCount > 0)
+                          Container(
+                            width: double.infinity,
+                            margin: const EdgeInsets.only(bottom: 14),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF8FAFC),
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.border),
                             ),
-                          ...courses.map((course) {
-                            final ready = course.modules.where((m) => !_isBlocked(m)).length;
-                            final blocked = course.modules.length - ready;
-                            return Padding(
-                              padding: const EdgeInsets.only(bottom: 10),
-                              child: _CourseTile(
-                                course: course.course,
-                                readyCount: ready,
-                                blockedCount: blocked,
-                                onTap: () {
-                                  setState(() {
-                                    _selectedCourse = course;
-                                    _step = _SelectorStep.chooseModule;
-                                  });
-                                },
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-              ),
-            ],
-          ),
+                            child: Row(
+                              children: [
+                                const Icon(Icons.info_outline_rounded, size: 16, color: AppColors.textMuted),
+                                const SizedBox(width: 8),
+                                Expanded(
+                                  child: Text(
+                                    '$blockedCount ${blockedCount == 1 ? 'module already exists' : 'modules already exist'} in this course and will stay disabled to avoid duplicate copies.',
+                                    style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ...courses.map((course) {
+                          final ready = course.modules.where((m) => !_isBlocked(m)).length;
+                          final blocked = course.modules.length - ready;
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 10),
+                            child: _CourseTile(
+                              course: course.course,
+                              readyCount: ready,
+                              blockedCount: blocked,
+                              onTap: () {
+                                setState(() {
+                                  _selectedCourse = course;
+                                  _step = _SelectorStep.chooseModule;
+                                });
+                              },
+                            ),
+                          );
+                        }),
+                      ],
+                    ),
+            ),
+          ],
         );
       },
     );
@@ -401,7 +412,15 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                           child: _ModuleTile(
                             module: module,
                             enabled: true,
-                            onTap: () => Navigator.pop(context, ModuleSelectorResult.existing(module)),
+                            // FIX: pass the source course id so the caller can
+                            // build the correct copy endpoint URL.
+                            onTap: () => Navigator.pop(
+                              context,
+                              ModuleSelectorResult.existing(
+                                module,
+                                entry.course.id,
+                              ),
+                            ),
                           ),
                         )),
                   ],
@@ -428,96 +447,179 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
   }
 
   Widget _buildCreateForm() {
-    return SingleChildScrollView(
+    final previewTitle = _titleCtrl.text.trim().isEmpty ? 'New module' : _titleCtrl.text.trim();
+    final previewDescription = _descCtrl.text.trim().isEmpty
+        ? 'This will appear cleanly in the materials sidebar.'
+        : _descCtrl.text.trim();
+
+    Widget quickChip(String label) {
+      return ActionChip(
+        label: Text(label),
+        side: const BorderSide(color: AppColors.border),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+        backgroundColor: Colors.white,
+        onPressed: () {
+          _titleCtrl.text = label;
+          _titleCtrl.selection = TextSelection.collapsed(offset: _titleCtrl.text.length);
+          if (_titleError != null) setState(() => _titleError = null);
+          setState(() {});
+        },
+      );
+    }
+
+    final detailsCard = Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Module details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+          const SizedBox(height: 6),
+          const Text('This section will appear in the course structure.', style: TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.textMuted)),
+          const SizedBox(height: 16),
+          const _FieldLabel('Module title', required: true),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _titleCtrl,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) {
+              if (_titleError != null) setState(() => _titleError = null);
+              setState(() {});
+            },
+            decoration: _inputDecoration(
+              hintText: 'e.g. Chapter 2',
+              errorText: _titleError,
+              helperText: 'Shown directly in the materials sidebar.',
+              prefixIcon: const Icon(Icons.folder_open_outlined, size: 18),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const _FieldLabel('Description'),
+          const SizedBox(height: 6),
+          TextField(
+            controller: _descCtrl,
+            maxLines: 2,
+            minLines: 2,
+            onChanged: (_) {
+              if (_descError != null) setState(() => _descError = null);
+              setState(() {});
+            },
+            decoration: _inputDecoration(
+              hintText: 'Optional note about this module.',
+              errorText: _descError,
+              helperText: 'Optional. Keep it short.',
+              prefixIcon: const Padding(
+                padding: EdgeInsets.only(left: 12, right: 8, bottom: 18),
+                child: Icon(Icons.subject_rounded, size: 18),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final previewCard = Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('Live preview', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEFF6FF),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(Icons.folder_open_rounded, color: Color(0xFF137FEC), size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text(previewTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+                  const SizedBox(height: 4),
+                  Text(previewDescription, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.8, height: 1.4, color: AppColors.textMuted)),
+                ]),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(999)),
+                child: const Text('Module', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF137FEC))),
+              ),
+            ]),
+          ),
+        ],
+      ),
+    );
+
+    return Padding(
       padding: const EdgeInsets.all(22),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _BackLink(label: 'Back to module options', onTap: () => setState(() => _step = _SelectorStep.options)),
-          const SizedBox(height: 18),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                flex: 4,
-                child: Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: const Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('Live preview', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Color(0xFF1D6FE9))),
-                      SizedBox(height: 12),
-                      Text('Week 1: Foundations', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                      SizedBox(height: 10),
-                      Text('Your optional description will appear here to help identify the module later.', style: TextStyle(fontSize: 12.5, height: 1.55, color: AppColors.textMuted)),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                flex: 9,
-                child: Container(
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('Module details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                      const SizedBox(height: 8),
-                      const Text('Use a short, clear title. Add a small description only if it helps instructors recognize the module later.', style: TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.textMuted)),
-                      const SizedBox(height: 18),
-                      const _FieldLabel('Module title', required: true),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _titleCtrl,
-                        textInputAction: TextInputAction.next,
-                        onChanged: (_) {
-                          if (_titleError != null) setState(() => _titleError = null);
-                        },
-                        decoration: _inputDecoration(
-                          hintText: 'e.g. Chapter 2 · Data Structures',
-                          errorText: _titleError,
-                          helperText: 'This name appears in the module list inside the material tab.',
-                          prefixIcon: const Icon(Icons.bookmark_border_rounded, size: 18),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      const _FieldLabel('Description'),
-                      const SizedBox(height: 6),
-                      TextField(
-                        controller: _descCtrl,
-                        maxLines: 4,
-                        minLines: 3,
-                        onChanged: (_) {
-                          if (_descError != null) setState(() => _descError = null);
-                        },
-                        decoration: _inputDecoration(
-                          hintText: 'Optional short note about what this module covers, for example key topics or teaching goals.',
-                          errorText: _descError,
-                          helperText: 'Optional. Keep it concise and helpful.',
-                          prefixIcon: const Padding(
-                            padding: EdgeInsets.only(left: 12, right: 8, bottom: 42),
-                            child: Icon(Icons.subject_rounded, size: 18),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+          const SizedBox(height: 16),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FBFF),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: const Color(0xFFDCEBFF)),
+            ),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('Create a module', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+              const SizedBox(height: 6),
+              const Text('Use a short, clear title. Description is optional and only appears as extra context.', style: TextStyle(fontSize: 12.8, height: 1.45, color: AppColors.textMuted)),
+              const SizedBox(height: 12),
+              Wrap(spacing: 8, runSpacing: 8, children: [
+                quickChip('Chapter 1'),
+                quickChip('Week 2'),
+                quickChip('Assessment Prep'),
+              ]),
+            ]),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final compact = constraints.maxWidth < 760;
+                if (compact) {
+                  return ListView(
+                    padding: EdgeInsets.zero,
+                    children: [detailsCard, const SizedBox(height: 14), previewCard],
+                  );
+                }
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 7, child: detailsCard),
+                    const SizedBox(width: 14),
+                    Expanded(flex: 5, child: previewCard),
+                  ],
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
@@ -527,19 +629,20 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                     foregroundColor: AppColors.textTitle,
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     side: const BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   child: const Text('Cancel'),
                 ),
               ),
               const SizedBox(width: 10),
               Expanded(
+                flex: 2,
                 child: FilledButton.icon(
                   onPressed: _submitCreate,
                   style: FilledButton.styleFrom(
                     backgroundColor: const Color(0xFF137FEC),
                     padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   icon: const Icon(Icons.add_rounded, size: 18),
                   label: const Text('Create module', style: TextStyle(fontWeight: FontWeight.w700)),
@@ -643,6 +746,33 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
   }
 }
 
+
+class _PreviewMiniPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  const _PreviewMiniPill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.08)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: Colors.white70),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(fontSize: 11.8, fontWeight: FontWeight.w600, color: Colors.white70)),
+        ],
+      ),
+    );
+  }
+}
+
 class _Header extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -682,7 +812,7 @@ class _Header extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 12),
-          InkWell(
+          InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent),
             onTap: onClose,
             borderRadius: BorderRadius.circular(99),
             child: Container(
@@ -706,6 +836,8 @@ class _ActionCard extends StatelessWidget {
   final String badge;
   final Color badgeColor;
   final Color badgeTextColor;
+  final Color iconBg;
+  final Color iconFg;
   final String title;
   final String description;
   final String cta;
@@ -717,6 +849,8 @@ class _ActionCard extends StatelessWidget {
     required this.badge,
     required this.badgeColor,
     required this.badgeTextColor,
+    required this.iconBg,
+    required this.iconFg,
     required this.title,
     required this.description,
     required this.cta,
@@ -731,7 +865,7 @@ class _ActionCard extends StatelessWidget {
       child: Material(
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
-        child: InkWell(
+        child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent),
           borderRadius: BorderRadius.circular(10),
           onTap: enabled ? onTap : null,
           child: Container(
@@ -749,12 +883,10 @@ class _ActionCard extends StatelessWidget {
                       width: 42,
                       height: 42,
                       decoration: BoxDecoration(
-                        color: icon == Icons.content_copy_rounded
-                            ? const Color(0xFFF5F3FF)
-                            : const Color(0xFFEFF6FF),
+                        color: iconBg,
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Icon(icon, size: 18, color: icon == Icons.content_copy_rounded ? const Color(0xFF8B5CF6) : const Color(0xFF137FEC)),
+                      child: Icon(icon, size: 18, color: iconFg),
                     ),
                     const Spacer(),
                     Container(
@@ -866,7 +998,7 @@ class _CourseTile extends StatelessWidget {
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(10),
-      child: InkWell(
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: Container(
@@ -1014,7 +1146,7 @@ class _ModuleTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(10),
-      child: InkWell(borderRadius: BorderRadius.circular(10), onTap: onTap, child: card),
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), borderRadius: BorderRadius.circular(10), onTap: onTap, child: card),
     );
   }
 }
@@ -1084,7 +1216,7 @@ class _BackLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
       child: Padding(

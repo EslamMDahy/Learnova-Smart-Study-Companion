@@ -23,7 +23,7 @@ class AppFilterChip extends StatelessWidget {
     final textColor = selected ? Colors.white : const Color(0xFF334155);
     final weight = selected ? FontWeight.w700 : FontWeight.w500;
 
-    return InkWell(
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       borderRadius: BorderRadius.circular(8),
       onTap: onTap,
       child: Container(
@@ -255,7 +255,7 @@ class UpgradeToggleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: AnimatedContainer(

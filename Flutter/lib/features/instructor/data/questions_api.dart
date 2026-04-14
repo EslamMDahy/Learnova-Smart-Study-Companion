@@ -66,7 +66,87 @@ class BatchCreateQuestionsResponse {
   }
 }
 
+
+class CourseQuestionsResponse {
+  final int courseId;
+  final List<QuestionModel> questions;
+
+  const CourseQuestionsResponse({
+    required this.courseId,
+    required this.questions,
+  });
+
+  factory CourseQuestionsResponse.fromJson(Map<String, dynamic> json) {
+    final raw = (json['questions'] as List?) ?? const [];
+    return CourseQuestionsResponse(
+      courseId: (json['course_id'] as num?)?.toInt() ?? 0,
+      questions: raw
+          .whereType<Map>()
+          .map((e) => QuestionModel.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+    );
+  }
+}
+
 // ── Request model matching backend MCQ schema ─────────────────────────────────
+
+
+class CreateQuestionOption {
+  final String id;
+  final String text;
+
+  const CreateQuestionOption({required this.id, required this.text});
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'text': text,
+      };
+}
+
+class CreateQuestionPayload {
+  final int topicId;
+  final String questionText;
+  final String type;
+  final String difficulty;
+  final String? explanation;
+  final List<CreateQuestionOption>? options;
+  final Object? expectedAnswer;
+  final String? gradingRubric;
+
+  const CreateQuestionPayload({
+    required this.topicId,
+    required this.questionText,
+    required this.type,
+    required this.difficulty,
+    this.explanation,
+    this.options,
+    this.expectedAnswer,
+    this.gradingRubric,
+  });
+
+  Map<String, dynamic> toJson() {
+    final data = <String, dynamic>{
+      'topic_id': topicId,
+      'question_text': questionText,
+      'type': type,
+      'difficulty': difficulty,
+    };
+    if (explanation != null && explanation!.trim().isNotEmpty) {
+      data['explanation'] = explanation!.trim();
+    }
+    if (options != null && options!.isNotEmpty) {
+      data['options'] = options!.map((e) => e.toJson()).toList();
+    }
+    if (expectedAnswer != null) {
+      data['expected_answer'] = expectedAnswer;
+    }
+    if (gradingRubric != null && gradingRubric!.trim().isNotEmpty) {
+      data['grading_rubric'] = gradingRubric!.trim();
+    }
+    return data;
+  }
+}
+
 
 class _MCQChoice {
   final String id;   // e.g. "A", "B", "C", "D"
@@ -119,6 +199,42 @@ class _QuestionMCQCreate {
 class QuestionsApi {
   final ApiClient _client;
   QuestionsApi(this._client);
+
+
+  Future<CourseQuestionsResponse> getCourseQuestions({
+    required int courseId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.courseQuestions(courseId),
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return CourseQuestionsResponse.fromJson(data);
+    }
+    throw const FormatException('Invalid response from GET /courses/{id}/questions');
+  }
+
+
+  Future<QuestionModel> createQuestion({
+    required int courseId,
+    required CreateQuestionPayload payload,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.courseQuestions(courseId),
+      data: payload.toJson(),
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return QuestionModel.fromJson(data);
+    }
+    throw const FormatException('Invalid response from POST /courses/{id}/questions');
+  }
 
   /// POST /courses/{courseId}/modules/{moduleId}/materials/{materialId}/questions
   ///

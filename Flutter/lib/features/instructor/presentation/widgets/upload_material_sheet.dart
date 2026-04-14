@@ -770,7 +770,7 @@ class _QueueTile extends StatelessWidget {
               ]),
           ]),
         ),
-        InkWell(
+        InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
           onTap: onRemove,
           borderRadius: BorderRadius.circular(8),
           child: Container(

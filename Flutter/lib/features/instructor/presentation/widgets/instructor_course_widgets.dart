@@ -1242,7 +1242,7 @@ String _slug(MyCourseItem c) {
             const BoxShadow(color: Color(0x0C000000), blurRadius: 10, offset: Offset(0, 3)),
         ],
       ),
-      child: InkWell(
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           final slug = _slug(widget.course);
@@ -1486,7 +1486,7 @@ class _IconBtnSmState extends State<_IconBtnSm> {
     return MouseRegion(
       onEnter: (_) => setState(() => hover = true),
       onExit: (_) => setState(() => hover = false),
-      child: InkWell(
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(10),
         child: AnimatedContainer(
@@ -1828,7 +1828,7 @@ class _IconActionButtonState extends State<_IconActionButton> {
     return MouseRegion(
       onEnter: (_) => setState(() => hover = true),
       onExit:  (_) => setState(() => hover = false),
-      child: InkWell(
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
         onTap: widget.onTap,
         onTapDown: widget.onTapDown == null
             ? null

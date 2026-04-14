@@ -116,7 +116,7 @@ class AppButton extends StatelessWidget {
       cursor: (loading || onTap == null)
           ? SystemMouseCursors.basic
           : SystemMouseCursors.click,
-      child: InkWell(
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
         onTap: (loading ? null : onTap),
         borderRadius: BorderRadius.circular(8),
         child: Container(

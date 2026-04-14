@@ -104,7 +104,7 @@ class AppNotifIconButton extends StatelessWidget {
     return SizedBox(
       width: 24.01,
       height: 27.99,
-      child: InkWell(
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
         onTap: onTap ??
             () {
               AppToast.info(
@@ -312,7 +312,7 @@ class _AppSidebarBrandHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Padding(
@@ -408,7 +408,7 @@ class _AppSidebarNavLinkState extends State<_AppSidebarNavLink> {
 
   static const Color _primary    = Color(0xFF137FEC);
   static const Color _selectedBg = Color(0xFFEBF4FE);
-  static const Color _hoverBg    = Color(0xFFF4F6F8);
+  static const Color _hoverBg    = Colors.transparent;
   static const Color _idleFg     = Color(0xFF64748B);
   static const Color _selectedFg = Color(0xFF137FEC);
   static const Color _hoverFg    = Color(0xFF1E293B);
@@ -982,7 +982,7 @@ class AppBackLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       onTap: onTap,
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -1186,7 +1186,7 @@ class AppSuccessBanner extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 8),
-            InkWell(
+            InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
               borderRadius: BorderRadius.circular(8),
               onTap: onClose,
               child: const Padding(
@@ -1507,7 +1507,7 @@ class AppInfoInlineBox extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
@@ -1747,7 +1747,7 @@ class FigmaUmSquareIconBtn40 extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: tooltip,
-      child: InkWell(
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
         onTap: onTap,
         borderRadius: BorderRadius.circular(8),
         child: Container(

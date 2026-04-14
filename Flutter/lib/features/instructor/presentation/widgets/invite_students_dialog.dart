@@ -146,7 +146,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
   }
 
   Widget _buildUploadZone() {
-    return InkWell(
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       onTap: () {}, // _pickFile
       borderRadius: BorderRadius.circular(20),
       child: Container(

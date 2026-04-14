@@ -72,7 +72,7 @@ class _AppInteractiveRegionState extends State<AppInteractiveRegion> {
           color: Colors.transparent,
           clipBehavior: Clip.antiAlias,
           borderRadius: widget.borderRadius,
-          child: InkWell(
+          child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
             onTap: isActionEnabled ? widget.onTap : null,
             borderRadius: widget.borderRadius,
 
@@ -81,9 +81,6 @@ class _AppInteractiveRegionState extends State<AppInteractiveRegion> {
               setState(() => _hovered = value);
             },
 
-            splashColor: Colors.transparent,
-            highlightColor: Colors.transparent,
-            hoverColor: Colors.transparent,
             splashFactory: NoSplash.splashFactory,
 
             child: content,

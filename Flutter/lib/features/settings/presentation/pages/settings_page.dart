@@ -1909,7 +1909,7 @@ class _NavItem extends StatelessWidget {
     final color = selected ? AppColors.primary : AppColors.muted;
     final weight = selected ? FontWeight.w700 : FontWeight.w500;
 
-    return InkWell(
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       onTap: onTap,
       child: Container(
         height: 56,

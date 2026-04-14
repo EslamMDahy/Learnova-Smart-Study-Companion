@@ -552,7 +552,7 @@ class _UserRowFigma extends StatelessWidget {
                 child: SizedBox(
                   width: 28,
                   height: 28,
-                  child: InkWell(
+                  child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                     onTap: onActionTap,
                     borderRadius: BorderRadius.circular(9999),
                     child: const Icon(

@@ -27,7 +27,7 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
   final int _courseId;
   CancelToken? _cancel;
 
-  // ── Modules ───────────────────────────────────────────────────────────────
+  // ── Modules ──────────────────────────────────────────────────────────────
 
   Future<void> loadModules({bool force = false}) async {
     if (state.modulesLoading) return;
@@ -80,6 +80,10 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     }
   }
 
+  /// Copies [moduleId] into [targetCourseId].
+  ///
+  /// [sourceCourseId] is still accepted because the UI needs to know where the
+  /// module was chosen from, but persistence is driven by the target course.
   Future<ModuleItem?> copyModule({
     required int sourceCourseId,
     required int moduleId,
@@ -88,12 +92,15 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     final destinationCourseId = targetCourseId ?? _courseId;
     try {
       final copied = await _ref.read(modulesApiProvider).copyModule(
-            courseId: destinationCourseId,
+            sourceCourseId: sourceCourseId,
             moduleId: moduleId,
+            targetCourseId: destinationCourseId,
           );
       if (destinationCourseId == _courseId) {
-        final nextModules = [...state.modules, copied]..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
-        state = state.copyWith(modules: nextModules);
+        await loadModules(force: true);
+        for (final module in state.modules) {
+          if (module.id == copied.id) return module;
+        }
       }
       return copied;
     } catch (e) {
@@ -167,30 +174,31 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     required int moduleId,
     required int newPosition,
   }) async {
-    final currentModules = [...state.modules]..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
-    final currentIndex = currentModules.indexWhere((module) => module.id == moduleId);
+    final previousModules = [...state.modules]..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    final currentIndex = previousModules.indexWhere((module) => module.id == moduleId);
     if (currentIndex == -1) return false;
 
-    final targetIndex = newPosition.clamp(0, currentModules.length - 1);
+    final targetIndex = newPosition.clamp(0, previousModules.length - 1);
     if (targetIndex == currentIndex) return true;
 
-    final moved = currentModules.removeAt(currentIndex);
-    currentModules.insert(targetIndex, moved);
-    final moduleIds = currentModules.map((module) => module.id).toList();
+    final reorderedModules = [...previousModules];
+    final moved = reorderedModules.removeAt(currentIndex);
+    reorderedModules.insert(targetIndex, moved);
+    final normalized = [
+      for (var i = 0; i < reorderedModules.length; i++)
+        reorderedModules[i].copyWith(orderIndex: i),
+    ];
+
+    state = state.copyWith(modules: normalized);
 
     try {
       await _ref.read(modulesApiProvider).reorderModules(
             courseId: _courseId,
-            moduleIds: moduleIds,
+            moduleIds: normalized.map((module) => module.id).toList(),
           );
-
-      final normalized = [
-        for (var i = 0; i < currentModules.length; i++)
-          currentModules[i].copyWith(orderIndex: i),
-      ];
-      state = state.copyWith(modules: normalized);
       return true;
     } catch (e) {
+      state = state.copyWith(modules: previousModules);
       final failure = mapApiFailure(e);
       AppErrorReporter.report(_ref, failure);
       return false;
@@ -227,7 +235,7 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     }
   }
 
-  // ── Topics ────────────────────────────────────────────────────────────────
+  // ── Topics ──────────────────────────────────────────────────────────────
 
   Future<void> loadTopics(int moduleId, {bool force = false}) async {
     if (state.topicsLoading[moduleId] ?? false) return;
@@ -380,7 +388,7 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     state = state.copyWith(topics: newTopics);
   }
 
-  // ── Download URLs ─────────────────────────────────────────────────────────
+  // ── Download URLs ───────────────────────────────────────────────────────────
 
   /// Fetches (or returns cached) a fresh signed download URL for a material.
   Future<String?> fetchDownloadUrl({
@@ -417,7 +425,7 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     }
   }
 
-  // ── Upload ────────────────────────────────────────────────────────────────
+  // ── Upload ──────────────────────────────────────────────────────────────
 
   Future<bool> uploadMaterial({
     required int moduleId,
@@ -470,7 +478,7 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     }
   }
 
-  // ── Question Bank (in-memory) ─────────────────────────────────────────────
+  // ── Question Bank (in-memory) ────────────────────────────────────────────
 
   void addQuestion(QuestionModel question) {
     state = state.copyWith(questions: [question, ...state.questions]);
@@ -482,7 +490,7 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
     );
   }
 
-  // ── Question Bank (backend sync) — NEW ────────────────────────────────────
+  // ── Question Bank (backend sync) ────────────────────────────────────────────────
 
   /// Syncs the in-memory MCQ questions to the backend for a specific material.
   ///

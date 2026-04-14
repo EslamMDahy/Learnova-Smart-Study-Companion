@@ -137,11 +137,6 @@ class _GlobalErrorToastListenerState
     BuildContext ctx,
     AppFailure f,
   ) async {
-    try {
-      TokenStorage.clear();
-      UserStorage.clear();
-    } catch (_) {}
-
     await showDialog<void>(
       context: ctx,
       barrierDismissible: false,
@@ -155,10 +150,8 @@ class _GlobalErrorToastListenerState
             Text(AppFailurePresenter.title(f)),
           ],
         ),
-        content: Text(
-          f.message.trim().isNotEmpty
-              ? f.message.trim()
-              : 'Your session has expired. Please log in again.',
+        content: const Text(
+          'Your session has expired. Please log in again.',
         ),
         actions: [
           TextButton(
@@ -168,6 +161,11 @@ class _GlobalErrorToastListenerState
         ],
       ),
     );
+
+    try {
+      TokenStorage.clear();
+      UserStorage.clear();
+    } catch (_) {}
 
     try {
       GoRouter.of(ctx).go(Routes.login);

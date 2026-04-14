@@ -1440,7 +1440,7 @@ class _IcBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(
     message: tip,
-    child: InkWell(
+    child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       onTap: onTap, borderRadius: BorderRadius.circular(6),
       child: Padding(padding: const EdgeInsets.all(6),
         child: Icon(icon, size: 17, color: col)),

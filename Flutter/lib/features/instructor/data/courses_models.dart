@@ -2,6 +2,38 @@ enum CourseType { individual, organization }
 
 enum CourseVisibilityLevel { private, public, unlisted }
 
+int? _asInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString());
+}
+
+bool _asBool(dynamic value, {bool fallback = false}) {
+  if (value == null) return fallback;
+  if (value is bool) return value;
+  final normalized = value.toString().trim().toLowerCase();
+  if (normalized == 'true' || normalized == '1') return true;
+  if (normalized == 'false' || normalized == '0') return false;
+  return fallback;
+}
+
+int? _countFromDynamicCollection(dynamic value) {
+  if (value is List) return value.length;
+  if (value is Map<String, dynamic>) {
+    final items = value['items'];
+    if (items is List) return items.length;
+    final modules = value['modules'];
+    if (modules is List) return modules.length;
+    final students = value['students'];
+    if (students is List) return students.length;
+    final enrollments = value['enrollments'];
+    if (enrollments is List) return enrollments.length;
+    return _asInt(value['count']) ?? _asInt(value['total']);
+  }
+  return null;
+}
+
 class MyCourseItem {
   final int id;
   final String title;
@@ -97,34 +129,41 @@ class MyCourseItem {
   factory MyCourseItem.fromJson(Map<String, dynamic> json) {
     String s(dynamic v) => (v ?? '').toString().trim();
 
+    final enrollmentCount =
+        _asInt(json['enrollment_count']) ??
+        _asInt(json['student_count']) ??
+        _asInt(json['students_count']) ??
+        _asInt(json['active_students']) ??
+        _countFromDynamicCollection(json['students']) ??
+        _countFromDynamicCollection(json['enrollments']);
+
+    final moduleCount =
+        _asInt(json['module_count']) ??
+        _asInt(json['modules_count']) ??
+        _countFromDynamicCollection(json['modules']);
+
     return MyCourseItem(
-      id: (json['id'] as num).toInt(),
+      id: _asInt(json['id']) ?? 0,
       title: s(json['title']),
       courseCode: s(json['course_code']).isEmpty ? null : s(json['course_code']),
       courseType: s(json['course_type']),
-      organizationId: json['organization_id'] == null
-          ? null
-          : (json['organization_id'] as num).toInt(),
-      isPublic: (json['is_public'] as bool?) ?? false,
+      organizationId: _asInt(json['organization_id']),
+      isPublic: _asBool(
+        json['is_open_for_enrollment'] ?? json['is_public'],
+      ),
       visibilityLevel: s(json['visibility_level']),
       status: s(json['status']),
       coverImageUrl: json['cover_image_url']?.toString(),
       bannerImageUrl: json['banner_image_url']?.toString(),
       category: json['category']?.toString(),
-      createdBy: (json['created_by'] as num?)?.toInt() ?? 0,
+      createdBy: _asInt(json['created_by']) ?? 0,
       createdAt: DateTime.tryParse((json['created_at'] ?? '').toString()) ??
           DateTime.fromMillisecondsSinceEpoch(0),
       updatedAt: DateTime.tryParse((json['updated_at'] ?? '').toString()) ??
           DateTime.fromMillisecondsSinceEpoch(0),
-      enrollmentCount: json['enrollment_count'] == null
-          ? null
-          : (json['enrollment_count'] as num).toInt(),
-      pendingInvites: json['pending_invites'] == null
-          ? null
-          : (json['pending_invites'] as num).toInt(),
-      moduleCount: json['module_count'] == null
-          ? null
-          : (json['module_count'] as num).toInt(),
+      enrollmentCount: enrollmentCount,
+      pendingInvites: _asInt(json['pending_invites']),
+      moduleCount: moduleCount,
     );
   }
 }
