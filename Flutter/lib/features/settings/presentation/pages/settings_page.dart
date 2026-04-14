@@ -1,14 +1,11 @@
 import 'dart:async';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-import 'dart:typed_data';
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/utils/before_unload_stub.dart'
     if (dart.library.html) '../../../../core/utils/before_unload_web.dart'
     as before_unload;
+import '../../../../core/utils/browser_file_picker.dart';
 
 import '../../../../core/ui/toast.dart';
 import '../../../../core/routing/routes.dart';
@@ -193,7 +190,7 @@ void _onNavSelect(int i) {
       'Sep',
       'Oct',
       'Nov',
-      'Dec'
+      'Dec',
     ];
     return '${months[d.month - 1]}, ${d.year}';
   }
@@ -243,20 +240,15 @@ void _onNavSelect(int i) {
   // Avatar Upload (Web via dart:html)
   // ──────────────────────────────────────
   Future<void> _pickAndUploadAvatar() async {
-    // Use dart:html file input for web
-    final input = html.FileUploadInputElement()
-      ..accept = 'image/png,image/jpeg,image/jpg'
-      ..multiple = false;
+    final files = await pickBrowserFiles(
+      accept: 'image/png,image/jpeg,image/jpg',
+    );
+    if (files.isEmpty) return;
 
-    input.click();
-
-    await input.onChange.first;
-
-    final file = input.files?.first;
-    if (file == null) return;
+    final file = files.first;
 
     // 5MB limit
-    if (file.size > 5 * 1024 * 1024) {
+    if (file.sizeBytes > 5 * 1024 * 1024) {
       if (mounted) {
         _toast(
           context,
@@ -268,12 +260,8 @@ void _onNavSelect(int i) {
       return;
     }
 
-    final reader = html.FileReader();
-    reader.readAsArrayBuffer(file);
-    await reader.onLoad.first;
-
-    final bytes = (reader.result as Uint8List).toList();
-    final contentType = file.type.isNotEmpty ? file.type : 'image/jpeg';
+    final bytes = file.bytes.toList();
+    final contentType = file.contentType.isNotEmpty ? file.contentType : 'image/jpeg';
 
     final ok = await ref.read(settingsControllerProvider.notifier).uploadAvatar(
       bytes: bytes,
@@ -443,12 +431,12 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
 
       if (err != null && err.trim().isNotEmpty) {
         _toast(context,
-            title: 'Error', message: err, icon: Icons.error_outline_rounded);
+            title: 'Error', message: err, icon: Icons.error_outline_rounded,);
       } else if (ok != null && ok.trim().isNotEmpty) {
         _toast(context,
             title: 'Done',
             message: ok,
-            icon: Icons.check_circle_outline_rounded);
+            icon: Icons.check_circle_outline_rounded,);
 
         
         WidgetsBinding.instance.addPostFrameCallback((_) {

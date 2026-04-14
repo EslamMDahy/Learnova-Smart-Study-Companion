@@ -1,9 +1,9 @@
 import 'dart:async';
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 // ignore: undefined_prefixed_name
 import 'dart:ui_web' as ui_web;
+
+import 'package:learnova/core/ui/pdf_iframe_view.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -277,7 +277,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
                 .loadModulesAndAllMaterials(force: true),
           ),
           Expanded(child: _buildPanel(st)),
-        ]),
+        ],),
       ),
       if (_sel != null && active != null)
         _FooterWidget(
@@ -292,7 +292,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
           ),
           onClose: () => setState(() { _sel = null; _stack.clear(); _persistUiState(); }),
         ),
-    ]);
+    ],);
   }
 
   bool _canGenerate(_Ctx ctx, CourseDetailsState st) {
@@ -483,7 +483,7 @@ Future<void> _showAddSubtopicDialog(
 
   if (topic != null) {
     AppToast.success(context,
-        title: 'Subtopic added', message: '"${topic.title}" created.');
+        title: 'Subtopic added', message: '"${topic.title}" created.',);
   }
 }
 
@@ -514,7 +514,7 @@ Future<void> _showCreateModuleDialog() async {
 
     if (m != null && mounted) {
       AppToast.success(context,
-          title: 'Module created', message: '"${m.title}" added.');
+          title: 'Module created', message: '"${m.title}" added.',);
     }
     return;
   }
@@ -548,7 +548,7 @@ Future<void> _showCreateModuleDialog() async {
 
     setState(() {
       _expanded.add(refreshedModule!.id);
-      _sel = _Ctx.module(refreshedModule!);
+      _sel = _Ctx.module(refreshedModule);
       _stack.clear();
       _persistUiState();
     });
@@ -575,19 +575,19 @@ Future<void> _showCreateModuleDialog() async {
   Future<void> _showUploadSheet(ModuleItem module) async {
     final results = await _showManagedDialog<List<UploadSheetResult>>(
         barrierColor: Colors.black.withOpacity(0.35),
-        builder: (_) => UploadMaterialSheet(moduleTitle: module.title));
+        builder: (_) => UploadMaterialSheet(moduleTitle: module.title),);
     if (results == null || results.isEmpty || !mounted) return;
     int ok = 0;
     for (final r in results) {
       if (!mounted) break;
       final success = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
           .uploadMaterial(moduleId: module.id, bytes: r.bytes,
-              filename: r.filename, contentType: r.contentType, title: r.title);
+              filename: r.filename, contentType: r.contentType, title: r.title,);
       if (success) ok++;
     }
     if (mounted && ok > 0) {
       AppToast.success(context, title: 'Uploaded',
-          message: ok == 1 ? '"${results.first.title}" is ready.' : '$ok files uploaded.');
+          message: ok == 1 ? '"${results.first.title}" is ready.' : '$ok files uploaded.',);
     }
   }
 
@@ -616,7 +616,7 @@ Future<void> _showCreateModuleDialog() async {
     } else {
       AppToast.error(context,
           title: 'Copy failed',
-          message: 'Could not copy module. Please try again.');
+          message: 'Could not copy module. Please try again.',);
     }
   }
 
@@ -734,7 +734,7 @@ Future<void> _showCreateModuleDialog() async {
         barrierColor: Colors.black.withOpacity(0.35),
         builder: (_) => _ConfirmDialogWidget(title: 'Delete Module',
             body: 'Delete "${m.title}"? This will also remove all its materials.',
-            confirm: 'Delete', confirmColor: const Color(0xFFEF4444)));
+            confirm: 'Delete', confirmColor: const Color(0xFFEF4444),),);
     if (ok != true || !mounted) return;
 
     final success = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
@@ -1381,7 +1381,7 @@ Future<void> _showCreateModuleDialog() async {
         initialModuleId: moduleId,
         initialMaterialId: materialId,
         initialTopicId: topicId,
-      ));
+      ),);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

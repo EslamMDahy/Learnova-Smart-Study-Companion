@@ -7,26 +7,26 @@ class _ModuleDialogWidget extends StatelessWidget {
   Widget build(BuildContext context) => AlertDialog(
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     title: const Row(children: [Icon(Icons.add_box_outlined, size: 18, color: AppColors.primary),
-        SizedBox(width: 8), Text('New Module', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800))]),
+        SizedBox(width: 8), Text('New Module', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),],),
     content: Column(mainAxisSize: MainAxisSize.min, children: [
       TextField(controller: titleCtrl, autofocus: true, decoration: InputDecoration(
           hintText: 'e.g. Lecture 1: Introduction', labelText: 'Title *',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),),),
       const SizedBox(height: 12),
       TextField(controller: descCtrl, maxLines: 2, decoration: InputDecoration(
           hintText: 'Optional description', labelText: 'Description',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
-    ]),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),),),
+    ],),
     actions: [
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
       ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white,
-              elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
+              elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),),
           onPressed: () { if (titleCtrl.text.trim().isEmpty) return; Navigator.pop(context, true); },
-          child: const Text('Create')),
-    ]);
+          child: const Text('Create'),),
+    ],);
 }
 
 class _AddTopicDialogWidget extends StatefulWidget {
@@ -34,7 +34,7 @@ class _AddTopicDialogWidget extends StatefulWidget {
   final TextEditingController titleCtrl, descCtrl;
   final ValueChanged<TopicDifficulty> onDifficultyChanged;
   const _AddTopicDialogWidget({required this.moduleTitle, required this.titleCtrl,
-      required this.descCtrl, required this.onDifficultyChanged});
+      required this.descCtrl, required this.onDifficultyChanged,});
   @override
   State<_AddTopicDialogWidget> createState() => _AddTopicDialogWidgetState();
 }
@@ -53,27 +53,27 @@ class _AddTopicDialogWidgetState extends State<_AddTopicDialogWidget> {
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Row(children: [Icon(Icons.tag_rounded, size: 17, color: AppColors.primary), SizedBox(width: 8),
-          Text('Add Topic', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800))]),
+          Text('Add Topic', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),],),
       const SizedBox(height: 4),
       Text('in "${widget.moduleTitle}"', style: const TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w400)),
-    ]),
+    ],),
     content: SizedBox(width: 440, child: Column(mainAxisSize: MainAxisSize.min, children: [
       Container(padding: const EdgeInsets.fromLTRB(12, 10, 12, 10), margin: const EdgeInsets.only(bottom: 14),
           decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Color(0x33137FEC))),
+              border: Border.all(color: const Color(0x33137FEC)),),
           child: const Row(children: [Icon(Icons.auto_awesome_rounded, size: 15, color: AppColors.primary),
               SizedBox(width: 8),
               Expanded(child: Text('Tip: Use AI to auto-generate topics from your PDF.',
-                  style: TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w500, height: 1.4)))])),
+                  style: TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w500, height: 1.4),),),],),),
       TextField(controller: widget.titleCtrl, autofocus: true, decoration: InputDecoration(
           hintText: 'e.g. Introduction to Cryptography', labelText: 'Topic Title *',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),),),
       const SizedBox(height: 12),
       TextField(controller: widget.descCtrl, maxLines: 2, decoration: InputDecoration(
           hintText: 'Optional description…', labelText: 'Description',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),),),
       const SizedBox(height: 14),
       Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         const Text('Difficulty', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
@@ -96,24 +96,24 @@ class _AddTopicDialogWidgetState extends State<_AddTopicDialogWidget> {
                 ),
                 child: Center(child: Text(d.label,
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-                        color: sel ? fg : AppColors.textMuted))),
+                        color: sel ? fg : AppColors.textMuted,),),),
               ),
             ),
-          ));
-        }).toList()),
-      ]),
-    ])),
+          ),);
+        }).toList(),),
+      ],),
+    ],),),
     actions: [
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
       ElevatedButton(
           style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white,
-              elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
+              elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),),
           onPressed: () {
             if (widget.titleCtrl.text.trim().isEmpty) return;
             Navigator.pop(context, {'difficulty': _diff});
           },
-          child: const Text('Add Topic')),
-    ]);
+          child: const Text('Add Topic'),),
+    ],);
 }
 
 class _SimpleDialog extends StatelessWidget {
@@ -250,7 +250,7 @@ class _ModuleActionsGrid extends StatelessWidget {
             .map((a) => SizedBox(width: cardW, child: _ActionCard(data: a)))
             .toList(),
       );
-    });
+    },);
   }
 }
 
@@ -362,14 +362,14 @@ class _CardWidget extends StatelessWidget {
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (header != null) ...[header!, const Divider(height: 1, color: _K.div)],
       child,
-    ]));
+    ],),);
 }
 
 class _HdrWidget extends StatelessWidget {
   final IconData icon; final Color iconColor; final String title;
   final String? badge; final Widget? trailing;
   const _HdrWidget({required this.icon, required this.iconColor, required this.title,
-      this.badge, this.trailing});
+      this.badge, this.trailing,});
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.fromLTRB(18, 15, 18, 15),
     child: Row(children: [
@@ -378,9 +378,9 @@ class _HdrWidget extends StatelessWidget {
       if (badge != null) ...[const SizedBox(width: 7),
         Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
             decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(10)),
-            child: Text(badge!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)))],
+            child: Text(badge!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)),),],
       const Spacer(), if (trailing != null) trailing!,
-    ]));
+    ],),);
 }
 
 class _SmBtn extends StatelessWidget {
@@ -394,7 +394,7 @@ class _SmBtn extends StatelessWidget {
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(icon, size: 14, color: AppColors.primary), const SizedBox(width: 5),
             Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.primary)),
-          ]))));
+          ],),),),);
 }
 
 class _Pill extends StatelessWidget {
@@ -403,14 +403,14 @@ class _Pill extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
     decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-    child: Text(l, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg, letterSpacing: 0.1)));
+    child: Text(l, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg, letterSpacing: 0.1)),);
 }
 
 class _PRow extends StatefulWidget {
   final IconData icon; final Color iconBg, iconFg;
   final String label, sub; final VoidCallback? onTap; final bool danger;
   const _PRow({required this.icon, required this.iconBg, required this.iconFg,
-      required this.label, required this.sub, this.onTap, this.danger = false});
+      required this.label, required this.sub, this.onTap, this.danger = false,});
   @override
   State<_PRow> createState() => _PRowState();
 }
@@ -457,11 +457,11 @@ class _PRowState extends State<_PRow> {
                   color: _hovered && !disabled && !widget.danger
                       ? AppColors.primary
                       : textColor,
-                )),
+                ),),
                 const SizedBox(height: 4),
                 Text(widget.sub, maxLines: 2, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 11.8, color: AppColors.textMuted, height: 1.45)),
-              ])),
+                    style: const TextStyle(fontSize: 11.8, color: AppColors.textMuted, height: 1.45),),
+              ],),),
               // Arrow only visible on hover
               AnimatedOpacity(
                 duration: const Duration(milliseconds: 120),
@@ -474,7 +474,7 @@ class _PRowState extends State<_PRow> {
                       : AppColors.primary,
                 ),
               ),
-            ]),
+            ],),
           ),
         ),
       ),
@@ -496,12 +496,12 @@ class _MRowW extends StatelessWidget {
     Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 10), child: Row(children: [
       Icon(icon, size: 14, color: AppColors.textHint), const SizedBox(width: 8),
       SizedBox(width: 110, child: Text(label, style: const TextStyle(
-          fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w500))),
+          fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w500,),),),
       Expanded(child: Text(value, style: const TextStyle(
-          fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textTitle))),
-    ])),
+          fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textTitle,),),),
+    ],),),
     if (!isLast) const Divider(height: 1, color: _K.div, indent: 16, endIndent: 16),
-  ]);
+  ],);
 }
 
 class _TIcon extends StatelessWidget {
@@ -517,7 +517,7 @@ class _TIcon extends StatelessWidget {
         (Icons.insert_drive_file_rounded, const Color(0xFFF1F5F9), AppColors.textMuted);
     return Container(width: size, height: size,
         decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(11)),
-        child: Icon(ico, size: size * 0.48, color: fg));
+        child: Icon(ico, size: size * 0.48, color: fg),);
   }
 }
 
@@ -534,7 +534,7 @@ class _Dot extends StatelessWidget {
       _             => AppColors.textHint,
     };
     return Container(width: 6, height: 6, margin: const EdgeInsets.only(left: 5),
-        decoration: BoxDecoration(color: c, shape: BoxShape.circle));
+        decoration: BoxDecoration(color: c, shape: BoxShape.circle),);
   }
 }
 
@@ -544,7 +544,7 @@ class _IBtn extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Tooltip(message: tooltip, child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), onTap: onTap,
       borderRadius: BorderRadius.circular(6), child: Padding(padding: const EdgeInsets.all(5),
-          child: Icon(icon, size: 14, color: AppColors.textHint))));
+          child: Icon(icon, size: 14, color: AppColors.textHint),),),);
 }
 
 class _Btn extends StatelessWidget {

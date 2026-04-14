@@ -1,11 +1,10 @@
 import 'dart:async';
 import 'dart:typed_data';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
+import '../../../core/network/browser_upload_client.dart';
 import '../../../core/network/endpoints.dart';
 import 'dto/user_profile.dart';
 import 'dto/user_preferences.dart';
@@ -73,32 +72,13 @@ class SettingsApi {
     required List<int> bytes,
     required String contentType,
     CancelToken? cancelToken,
-  }) async {
-    final bodyBytes = Uint8List.fromList(bytes);
-    final completer = Completer<void>();
-
-    final xhr = html.HttpRequest()
-      ..open('PUT', uploadUrl)
-      ..setRequestHeader('Content-Type', contentType)
-      ..setRequestHeader('x-upsert', 'true');
-
-    xhr.onLoad.listen((_) {
-      final status = xhr.status ?? 0;
-      if (status >= 200 && status < 400) {
-        completer.complete();
-      } else {
-        completer.completeError(
-          Exception('Supabase upload failed: HTTP $status - ${xhr.responseText}'),
-        );
-      }
-    });
-
-    xhr.onError.listen((_) {
-      completer.completeError(Exception('Supabase upload network error'));
-    });
-
-    xhr.send(bodyBytes.buffer);
-    return completer.future;
+  }) {
+    return uploadBinaryToSignedUrl(
+      uploadUrl: uploadUrl,
+      bodyBytes: Uint8List.fromList(bytes),
+      contentType: contentType,
+      headers: const <String, String>{'x-upsert': 'true'},
+    );
   }
 
   /// Step 3: Confirm the upload to the backend so it bumps updated_at

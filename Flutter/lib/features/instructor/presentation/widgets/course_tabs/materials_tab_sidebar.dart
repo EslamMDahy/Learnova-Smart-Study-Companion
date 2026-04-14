@@ -94,7 +94,6 @@ class _SidebarWidget extends StatelessWidget {
                                     scale: 1.0 + (0.02 * t),
                                     child: Material(
                                       color: Colors.transparent,
-                                      elevation: 0,
                                       child: DecoratedBox(
                                         decoration: BoxDecoration(
                                           borderRadius: BorderRadius.circular(12),
@@ -524,7 +523,7 @@ class _FooterWidget extends StatelessWidget {
   final _Ctx ctx; final bool uploading; final bool canGenerate;
   final VoidCallback onUpload, onGenerate, onClose;
   const _FooterWidget({required this.ctx, required this.uploading, required this.canGenerate,
-      required this.onUpload, required this.onGenerate, required this.onClose});
+      required this.onUpload, required this.onGenerate, required this.onClose,});
 
   String get _label => switch (ctx.type) {
     _CType.module   => ctx.module?.title ?? 'Module',
@@ -545,7 +544,7 @@ class _FooterWidget extends StatelessWidget {
       decoration: BoxDecoration(color: Colors.white,
           border: const Border(top: BorderSide(color: _K.div)),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05),
-              blurRadius: 16, offset: const Offset(0, -4))]),
+              blurRadius: 16, offset: const Offset(0, -4),),],),
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Row(children: [
         Container(
@@ -556,16 +555,16 @@ class _FooterWidget extends StatelessWidget {
             ConstrainedBox(constraints: const BoxConstraints(maxWidth: 200),
                 child: Text(_label, maxLines: 1, overflow: TextOverflow.ellipsis,
                     style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-                        color: AppColors.primary))),
-          ])),
+                        color: AppColors.primary,),),),
+          ],),),
         const Spacer(),
         _Btn(icon: Icons.auto_awesome_rounded, label: canGenerate ? 'Generate Questions' : 'No content yet',
-            primary: true, disabled: !canGenerate, onTap: canGenerate ? onGenerate : null),
+            primary: true, disabled: !canGenerate, onTap: canGenerate ? onGenerate : null,),
         const SizedBox(width: 8),
         InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), onTap: onClose, borderRadius: BorderRadius.circular(6),
             child: const Padding(padding: EdgeInsets.all(7),
-                child: Icon(Icons.close_rounded, size: 15, color: AppColors.textHint))),
-      ]),
+                child: Icon(Icons.close_rounded, size: 15, color: AppColors.textHint),),),
+      ],),
     );
   }
 }
@@ -605,7 +604,7 @@ class _EmptyStateWidget extends StatelessWidget {
                 ),
                 const SizedBox(height: 18),
                 const Text('Select a module or material', style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+                    fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textTitle,),),
                 const SizedBox(height: 8),
                 const Text(
                   'Use the structure panel to explore your modules, reorder them by dragging, or open a material to manage topics and content.',
@@ -635,7 +634,7 @@ class _EmptyStateWidget extends StatelessWidget {
                     style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary,
                         side: const BorderSide(color: AppColors.primary),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),),),
               ],
             ),
           ),
@@ -1075,7 +1074,7 @@ class _ModuleHeroWidget extends StatelessWidget {
                     _HPill(module.isPublished ? '● Live' : '● Draft', module.isPublished ? const Color(0xFF4ADE80) : const Color(0xFFFBBF24)),
                     const _HPill('MODULE', Colors.white70),
                     _HPill('$materialCount material${materialCount == 1 ? '' : 's'}', Colors.white70),
-                    if (module.isShared) _HPill('Shared', Colors.white70),
+                    if (module.isShared) const _HPill('Shared', Colors.white70),
                   ],
                 ),
                 const SizedBox(height: 18),
@@ -1129,7 +1128,7 @@ class _ModuleInsightsStrip extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final spacing = 14.0;
+        const spacing = 14.0;
         final itemWidth = constraints.maxWidth < 620
             ? constraints.maxWidth
             : (constraints.maxWidth < 1040
@@ -1173,7 +1172,7 @@ class _ModuleInsightsStrip extends StatelessWidget {
                 ],
               ),
             ),
-          )).toList(),
+          ),).toList(),
         );
       },
     );

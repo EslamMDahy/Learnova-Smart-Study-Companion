@@ -5,7 +5,7 @@ class _TopicsSidebarWidget extends StatelessWidget {
   final void Function(TopicItem) onTopicTap;
   final VoidCallback onAddManual, onGenerateAI;
   const _TopicsSidebarWidget({required this.topics, required this.loading,
-      required this.onTopicTap, required this.onAddManual, required this.onGenerateAI});
+      required this.onTopicTap, required this.onAddManual, required this.onGenerateAI,});
 
   @override
   Widget build(BuildContext context) {
@@ -15,9 +15,9 @@ class _TopicsSidebarWidget extends StatelessWidget {
           decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
           child: Row(children: [
             Container(width: 24, height: 24, decoration: BoxDecoration(
-                color: AppColors.primarySoft, borderRadius: BorderRadius.circular(7)),
+                color: AppColors.primarySoft, borderRadius: BorderRadius.circular(7),),
                 alignment: Alignment.center,
-                child: const Icon(Icons.tag_rounded, size: 13, color: AppColors.primary)),
+                child: const Icon(Icons.tag_rounded, size: 13, color: AppColors.primary),),
             const SizedBox(width: 8),
             const Text('Topics', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
             if (!loading && topics.isNotEmpty) ...[
@@ -25,12 +25,12 @@ class _TopicsSidebarWidget extends StatelessWidget {
               Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(10)),
                   child: Text('${topics.length}', style: const TextStyle(
-                      fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary))),
+                      fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary,),),),
             ],
             const Spacer(),
             if (loading) const SizedBox(width: 13, height: 13,
-                child: CircularProgressIndicator(strokeWidth: 1.5)),
-          ])),
+                child: CircularProgressIndicator(strokeWidth: 1.5),),
+          ],),),
 
       // add buttons
       Container(
@@ -38,26 +38,26 @@ class _TopicsSidebarWidget extends StatelessWidget {
         decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
         child: Row(children: [
           Expanded(child: _AddTopicBtnW(icon: Icons.edit_rounded, label: 'Manual',
-              onTap: onAddManual, color: AppColors.primary, bg: _K.blueSoft)),
+              onTap: onAddManual, color: AppColors.primary, bg: _K.blueSoft,),),
           const SizedBox(width: 6),
           Expanded(child: _AddTopicBtnW(icon: Icons.auto_awesome_rounded, label: 'AI',
-              onTap: onGenerateAI, color: AppColors.primary, bg: AppColors.primarySoft)),
-        ]),
+              onTap: onGenerateAI, color: AppColors.primary, bg: AppColors.primarySoft,),),
+        ],),
       ),
 
       // list
       Expanded(child: loading
           ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
               CircularProgressIndicator(strokeWidth: 2), SizedBox(height: 8),
-              Text('Loading topics…', style: TextStyle(fontSize: 13, color: AppColors.textMuted))]))
+              Text('Loading topics…', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),],),)
           : topics.isEmpty
               ? _TopicsEmptyW(onAddManual: onAddManual, onGenerateAI: onGenerateAI)
               : ListView.builder(
                   padding: const EdgeInsets.symmetric(vertical: 4),
                   itemCount: topics.length,
                   itemBuilder: (_, i) => _TopicItemW(
-                      topic: topics[i], index: i, onTap: () => onTopicTap(topics[i])))),
-    ]);
+                      topic: topics[i], index: i, onTap: () => onTopicTap(topics[i]),),),),
+    ],);
   }
 }
 
@@ -130,7 +130,7 @@ class _GhostActionButton extends StatelessWidget {
             Icon(icon, size: 14, color: fg),
             const SizedBox(width: 6),
             Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
-          ]),
+          ],),
         ),
       ),
     );
@@ -252,7 +252,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                              borderRadius: BorderRadius.circular(12),),
                           side: const BorderSide(color: _K.div),
                         ),
                         child: const Text('Cancel'),
@@ -273,11 +273,11 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12)),
+                              borderRadius: BorderRadius.circular(12),),
                         ),
                       ),
                     ),
-                  ]),
+                  ],),
                 ),
               ],
             ),
@@ -291,7 +291,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
       decoration: const BoxDecoration(
-          border: Border(bottom: BorderSide(color: _K.div))),
+          border: Border(bottom: BorderSide(color: _K.div)),),
       child: Row(children: [
         Container(
           width: 38, height: 38,
@@ -305,18 +305,18 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
         const Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Add Topic', style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+                fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle,),),
             SizedBox(height: 2),
             Text('Create a clear topic manually or let AI structure it for you.',
-                style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-          ]),
+                style: TextStyle(fontSize: 13, color: AppColors.textMuted),),
+          ],),
         ),
         IconButton(
           onPressed: () => Navigator.pop(context),
           icon: const Icon(Icons.close_rounded, size: 18),
           splashRadius: 20,
         ),
-      ]),
+      ],),
     );
   }
 
@@ -342,20 +342,20 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
         tabs: [
           Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(Icons.edit_rounded, size: 14,
-                color: _isManual ? AppColors.primary : AppColors.textHint),
+                color: _isManual ? AppColors.primary : AppColors.textHint,),
             const SizedBox(width: 6),
             Text('Manual', style: TextStyle(
                 fontSize: 12.5, fontWeight: FontWeight.w700,
-                color: _isManual ? AppColors.primary : AppColors.textMuted)),
-          ])),
+                color: _isManual ? AppColors.primary : AppColors.textMuted,),),
+          ],),),
           Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(Icons.auto_awesome_rounded, size: 14,
-                color: !_isManual ? AppColors.primary : AppColors.textHint),
+                color: !_isManual ? AppColors.primary : AppColors.textHint,),
             const SizedBox(width: 6),
             Text('AI Generate', style: TextStyle(
                 fontSize: 12.5, fontWeight: FontWeight.w700,
-                color: !_isManual ? AppColors.primary : AppColors.textMuted)),
-          ])),
+                color: !_isManual ? AppColors.primary : AppColors.textMuted,),),
+          ],),),
         ],
       ),
     );
@@ -369,7 +369,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text('Topic name', style: TextStyle(
-            fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+            fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted,),),
         const SizedBox(height: 8),
         TextField(
           controller: _titleCtrl,
@@ -383,13 +383,13 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
             fillColor: const Color(0xFFF8FAFC),
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: _K.div)),
+                borderSide: const BorderSide(color: _K.div),),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: _K.div)),
+                borderSide: const BorderSide(color: _K.div),),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
+                borderSide: const BorderSide(color: AppColors.primary, width: 1.4),),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           ),
         ),
@@ -397,11 +397,11 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
           const SizedBox(height: 18),
           Row(children: [
             const Text('Link to Learning Outcomes',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted),),
             const SizedBox(width: 6),
             Text('(optional)',
-                style: TextStyle(fontSize: 11, color: AppColors.textMuted.withOpacity(0.7))),
-          ]),
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted.withOpacity(0.7)),),
+          ],),
           const SizedBox(height: 8),
           Container(
             constraints: const BoxConstraints(maxHeight: 160),
@@ -469,7 +469,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(lo.code,
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg)),
+                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg),),
                         ),
                         const SizedBox(width: 8),
                         Expanded(child: Text(lo.title,
@@ -479,8 +479,8 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                               fontSize: 12.5,
                               color: selected ? AppColors.textTitle : AppColors.textMuted,
                               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                            ))),
-                      ]),
+                            ),),),
+                      ],),
                     ),
                   );
                 },
@@ -491,7 +491,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text('${_selectedOutcomeIds.length} outcome${_selectedOutcomeIds.length == 1 ? '' : 's'} linked',
-                  style: const TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w600),),
             ),
         ],
         const SizedBox(height: 14),
@@ -508,9 +508,9 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
             Expanded(child: Text(
               'Use clear topic names so question generation and analytics stay well organized.',
               style: TextStyle(fontSize: 13, height: 1.5,
-                  color: AppColors.primary, fontWeight: FontWeight.w500),
-            )),
-          ]),
+                  color: AppColors.primary, fontWeight: FontWeight.w500,),
+            ),),
+          ],),
         ),
       ],
     );
@@ -533,19 +533,19 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
             Container(
               width: 52, height: 52,
               decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(16)),
+                  color: Colors.white, borderRadius: BorderRadius.circular(16),),
               child: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 24),
             ),
             const SizedBox(height: 12),
             const Text('Generate Topics with AI', style: TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary)),
+                fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary,),),
             const SizedBox(height: 6),
             const Text(
               'AI will analyze the selected material and extract suggested topics automatically.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12.5, height: 1.6, color: AppColors.textMuted),
             ),
-          ]),
+          ],),
         ),
         const SizedBox(height: 12),
         Container(
@@ -562,8 +562,8 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
             Expanded(child: Text(
               'You can review and refine the generated topics later.',
               style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-            )),
-          ]),
+            ),),
+          ],),
         ),
       ],
     );
@@ -816,9 +816,9 @@ class _ShareModuleDialogState extends ConsumerState<_ShareModuleDialog> {
                   Text(widget.module.title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
                   if (widget.module.description != null && widget.module.description!.isNotEmpty)
                     Text(widget.module.description!, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
-                ]),
+                ],),
               ),
-            ]),
+            ],),
           ),
           const SizedBox(height: 16),
           coursesAsync.when(
@@ -881,8 +881,8 @@ class _ShareModuleDialogState extends ConsumerState<_ShareModuleDialog> {
               Expanded(child: Text(
                 'This creates an independent copy in the selected course using the current backend copy endpoint.',
                 style: TextStyle(fontSize: 13, height: 1.5, color: Color(0xFF92400E)),
-              )),
-            ]),
+              ),),
+            ],),
           ),
           const SizedBox(height: 20),
           _DialogActions(
@@ -992,7 +992,7 @@ class _AddTopicBtnW extends StatelessWidget {
   final IconData icon; final String label; final VoidCallback onTap;
   final Color color, bg;
   const _AddTopicBtnW({required this.icon, required this.label, required this.onTap,
-      required this.color, required this.bg});
+      required this.color, required this.bg,});
   @override
   Widget build(BuildContext context) => InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), onTap: onTap,
       borderRadius: BorderRadius.circular(7), child: Container(
@@ -1001,7 +1001,7 @@ class _AddTopicBtnW extends StatelessWidget {
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
           Icon(icon, size: 13, color: color), const SizedBox(width: 5),
           Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
-        ])));
+        ],),),);
 }
 
 class _TopicsEmptyW extends StatelessWidget {
@@ -1026,7 +1026,7 @@ class _TopicsEmptyW extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const Text('No topics yet',
-              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle),),
           const SizedBox(height: 6),
           const Text(
             'Use the "Add Topic" button above\nto create topics manually or with AI.',
@@ -1095,8 +1095,8 @@ class _TopicItemW extends StatelessWidget {
                     decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(999)),
                     child: Text('${topic.learningOutcomeIds.length} LO${topic.learningOutcomeIds.length == 1 ? '' : 's'}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
                   ),
-              ]),
-            ])),
+              ],),
+            ],),),
             const SizedBox(width: 8),
             Container(
               width: 30,
@@ -1104,7 +1104,7 @@ class _TopicItemW extends StatelessWidget {
               decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
               child: const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: AppColors.textHint),
             ),
-          ]),
+          ],),
         ),
       ),
     );
@@ -1755,7 +1755,7 @@ class _TopicInsightsGrid extends StatelessWidget {
               .map((card) => SizedBox(
                     width: itemWidth,
                     child: _TopicInsightCard(data: card),
-                  ))
+                  ),)
               .toList(),
         );
       },

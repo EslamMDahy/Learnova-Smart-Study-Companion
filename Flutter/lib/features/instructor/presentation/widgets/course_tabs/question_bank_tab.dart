@@ -170,7 +170,7 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
               ...filtered.map((q) => Padding(
                     padding: const EdgeInsets.only(bottom: 12),
                     child: _QuestionLibraryCard(question: q),
-                  )),
+                  ),),
           ],
         ),
       ),
@@ -316,10 +316,10 @@ class _QuestionLibraryHero extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Wrap(
+                const Wrap(
                   spacing: 8,
                   runSpacing: 8,
-                  children: const [
+                  children: [
                     _HeroPill('Library mode'),
                     _HeroPill('Browse only'),
                     _HeroPill('Database questions'),

@@ -12,7 +12,7 @@ class _MaterialPanelWidget extends StatelessWidget {
       required this.topics, required this.topicsLoading, required this.outcomes,
       required this.downloadUrl, required this.urlLoading,
       required this.onTopicTap, required this.onAddTopicManual,
-      required this.onGenerateTopicsAI, required this.onRefreshUrl, required this.previewInteractive});
+      required this.onGenerateTopicsAI, required this.onRefreshUrl, required this.previewInteractive,});
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +33,7 @@ class _MaterialPanelWidget extends StatelessWidget {
             _Pill(l: '${material.pageCount} pages', fg: AppColors.primary, bg: _K.blueSoft),
           const SizedBox(width: 8),
           if (downloadUrl != null && downloadUrl!.isNotEmpty) _OBtn(url: downloadUrl!),
-        ]),
+        ],),
       ),
       child: SizedBox(
         height: 640,
@@ -106,10 +106,10 @@ class _MaterialPanelWidget extends StatelessWidget {
                 Expanded(flex: 7, child: previewCard),
                 const SizedBox(width: 14),
                 SizedBox(width: 360, child: topicsCard),
-              ]);
+              ],);
             },
           ),
-        ]),
+        ],),
       ),
     );
   }
@@ -134,7 +134,7 @@ class _MaterialInsightsStrip extends StatelessWidget {
       _InsightPill(icon: Icons.tag_rounded, label: '$topicCount topic${topicCount == 1 ? '' : 's'}'),
       _InsightPill(icon: Icons.task_alt_rounded, label: '$readyCount ready'),
       _InsightPill(icon: Icons.flag_outlined, label: totalOutcomeCount == 0 ? 'No outcomes yet' : '$mappedOutcomeCount / $totalOutcomeCount LOs mapped'),
-    ]);
+    ],);
   }
 }
 
@@ -155,7 +155,7 @@ class _InsightPill extends StatelessWidget {
       Icon(icon, size: 13, color: AppColors.primary),
       const SizedBox(width: 6),
       Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-    ]),
+    ],),
   );
 }
 
@@ -179,20 +179,20 @@ class _MatHeaderWidget extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 12, 16, 12),
       decoration: const BoxDecoration(color: Colors.white,
-          border: Border(bottom: BorderSide(color: _K.div))),
+          border: Border(bottom: BorderSide(color: _K.div)),),
       child: Row(children: [
         _TIcon(type: material.type, size: 36), const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             _Pill(l: material.type.toUpperCase(), fg: tcol, bg: tbg), const SizedBox(width: 6),
             _Pill(l: sl, fg: scol, bg: sbg),
-          ]),
+          ],),
           const SizedBox(height: 4),
           Text(material.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textTitle),),
           Text('In "${module.title}"', style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-        ])),
-      ]),
+        ],),),
+      ],),
     );
   }
 }
@@ -252,7 +252,7 @@ class _MaterialHeroWidget extends StatelessWidget {
               _HPill(statusLabel, statusColor),
               _HPill(material.type.toUpperCase(), Colors.white70),
               _HPill('In "${module.title}"', Colors.white60),
-            ]),
+            ],),
             const SizedBox(height: 10),
             Text(
               material.displayTitle,
@@ -272,7 +272,7 @@ class _MaterialHeroWidget extends StatelessWidget {
                 style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.7)),
               ),
             ],
-          ]),
+          ],),
         ),
         const SizedBox(width: 12),
         // File size / pages info box
@@ -305,9 +305,9 @@ class _MaterialHeroWidget extends StatelessWidget {
                 color: Colors.white,
               ),
             ),
-          ]),
+          ],),
         ),
-      ]),
+      ],),
     );
   }
 }
@@ -323,7 +323,7 @@ class _FilePreviewWidget extends StatelessWidget {
   final bool loading; final VoidCallback onRefresh;
   final bool interactive;
   const _FilePreviewWidget({required this.material, required this.downloadUrl,
-      required this.loading, required this.onRefresh, required this.interactive});
+      required this.loading, required this.onRefresh, required this.interactive,});
 
   _PK get _kind {
     final t = material.type.toLowerCase(); final m = (material.mimeType ?? '').toLowerCase();
@@ -341,19 +341,19 @@ class _FilePreviewWidget extends StatelessWidget {
     if (material.isProcessing && material.status != 'uploaded') {
       return const _PlaceholderW(icon: Icons.hourglass_top_rounded,
         iconColor: _K.amber, iconBg: _K.amberSoft, title: 'Processing…',
-        sub: 'Your file is being processed. Preview will be available shortly.');
+        sub: 'Your file is being processed. Preview will be available shortly.',);
     }
     if (material.isError && material.status != 'uploaded') {
       return _PlaceholderW(icon: Icons.error_outline_rounded,
         iconColor: AppColors.dangerText, iconBg: _K.redSoft, title: 'Processing failed',
         sub: 'Something went wrong processing this file.',
-        actionLabel: 'Retry', onAction: onRefresh);
+        actionLabel: 'Retry', onAction: onRefresh,);
     }
     if (downloadUrl == null || downloadUrl!.isEmpty) {
       return _PlaceholderW(icon: Icons.link_off_rounded, iconColor: AppColors.textMuted,
           iconBg: _K.bg, title: 'Preview unavailable',
           sub: 'Could not load a URL for this file.',
-          actionLabel: 'Retry', onAction: onRefresh);
+          actionLabel: 'Retry', onAction: onRefresh,);
     }
 
     final url = downloadUrl!;
@@ -378,7 +378,7 @@ class _PdfPreviewWidget extends StatefulWidget {
 
 // Registry to avoid double-registering iframes
 final _registeredPdfViews = <String>{};
-final _registeredPdfIframes = <String, html.IFrameElement>{};
+final _registeredPdfIframes = <String, Object>{};
 
 class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
   late final String _viewId;
@@ -394,8 +394,7 @@ class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
   void _updatePointerEvents() {
     final iframe = _registeredPdfIframes[_viewId];
     if (iframe != null) {
-      iframe.style.pointerEvents = widget.interactive ? 'auto' : 'none';
-      iframe.style.overflow = 'auto';
+      updatePdfIframePointerEvents(iframe, interactive: widget.interactive);
     }
   }
 
@@ -415,15 +414,8 @@ class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
     ui_web.platformViewRegistry.registerViewFactory(_viewId, (int viewId) {
       // ignore: avoid_web_libraries_in_flutter
       final pdfUrl = '${widget.url}#toolbar=0&navpanes=0&scrollbar=1';
-      final iframe = html.IFrameElement()
-        ..src = pdfUrl
-        ..style.border = 'none'
-        ..style.width = '100%'
-        ..style.height = '100%'
-        ..style.overflow = 'auto'
-        ..style.backgroundColor = '#FFFFFF';
+      final iframe = createPdfIframeElement(url: pdfUrl, interactive: widget.interactive);
       _registeredPdfIframes[_viewId] = iframe;
-      iframe.style.pointerEvents = widget.interactive ? 'auto' : 'none';
       return iframe;
     });
   }
@@ -441,7 +433,7 @@ class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
         onAction: () async {
           final uri = Uri.tryParse(widget.url);
           if (uri != null) {
-            await launchUrl(uri, mode: LaunchMode.platformDefault);
+            await launchUrl(uri);
           }
         },
       );
@@ -458,15 +450,15 @@ class _ImagePreviewWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
     child: Container(decoration: BoxDecoration(color: Colors.white,
-        borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div)),
+        borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div),),
       child: ClipRRect(borderRadius: BorderRadius.circular(13), child: Stack(children: [
         Container(color: const Color(0xFFF8F9FB)),
         Center(child: Image.network(url, fit: BoxFit.contain,
             errorBuilder: (_, __, ___) => _FallbackWidget(url: url, material: null),
             loadingBuilder: (_, child, p) => p == null ? child :
-                const Center(child: CircularProgressIndicator(strokeWidth: 2)))),
+                const Center(child: CircularProgressIndicator(strokeWidth: 2)),),),
         Positioned(top: 12, right: 12, child: _OBtn(url: url)),
-      ]))));
+      ],),),),);
 }
 
 class _VideoPreviewWidget extends StatelessWidget {
@@ -482,23 +474,23 @@ class _VideoPreviewWidget extends StatelessWidget {
       _MetaStripW(material: material), const SizedBox(height: 14),
       Expanded(child: Container(
         decoration: BoxDecoration(color: const Color(0xFF0D1117),
-            borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div)),
+            borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div),),
         child: ClipRRect(borderRadius: BorderRadius.circular(13),
             child: Stack(alignment: Alignment.center, children: [
           Container(decoration: const BoxDecoration(gradient: RadialGradient(
-              colors: [Color(0xFF1A2332), Color(0xFF0D1117)]))),
+              colors: [Color(0xFF1A2332), Color(0xFF0D1117)],),),),
           Column(mainAxisSize: MainAxisSize.min, children: [
             Container(width: 80, height: 80,
                 decoration: BoxDecoration(color: Colors.white.withOpacity(0.1),
-                    shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.2))),
-                child: const Icon(Icons.play_arrow_rounded, size: 44, color: Colors.white)),
+                    shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.2)),),
+                child: const Icon(Icons.play_arrow_rounded, size: 44, color: Colors.white),),
             const SizedBox(height: 16),
             Text(material.displayTitle, style: const TextStyle(fontSize: 16,
-                fontWeight: FontWeight.w700, color: Colors.white)),
+                fontWeight: FontWeight.w700, color: Colors.white,),),
             if (material.durationSeconds != null) ...[
               const SizedBox(height: 4),
               Text(_fmt(material.durationSeconds!),
-                  style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.55))),
+                  style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.55)),),
             ],
             const SizedBox(height: 22),
             ElevatedButton.icon(onPressed: () {},
@@ -508,10 +500,10 @@ class _VideoPreviewWidget extends StatelessWidget {
                     backgroundColor: Colors.white.withOpacity(0.15),
                     foregroundColor: Colors.white, elevation: 0,
                     side: BorderSide(color: Colors.white.withOpacity(0.25)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)))),
-          ]),
-        ])))),
-    ]));
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),),),
+          ],),
+        ],),),),),
+    ],),);
 }
 
 class _AudioPreviewWidget extends StatelessWidget {
@@ -521,22 +513,22 @@ class _AudioPreviewWidget extends StatelessWidget {
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
     child: Container(padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _K.div)),
+          border: Border.all(color: _K.div),),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Container(width: 80, height: 80, decoration: BoxDecoration(
-            color: _K.greenSoft, borderRadius: BorderRadius.circular(22)),
-            child: const Icon(Icons.headphones_rounded, size: 40, color: _K.green)),
+            color: _K.greenSoft, borderRadius: BorderRadius.circular(22),),
+            child: const Icon(Icons.headphones_rounded, size: 40, color: _K.green),),
         const SizedBox(height: 18),
         Text(material.displayTitle, textAlign: TextAlign.center, style: const TextStyle(
-            fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+            fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle,),),
         if (material.durationSeconds != null) ...[
           const SizedBox(height: 6),
           Text('Duration: ${material.durationSeconds! ~/ 60}m ${material.durationSeconds! % 60}s',
-              style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
+              style: const TextStyle(fontSize: 13, color: AppColors.textMuted),),
         ],
         const SizedBox(height: 24),
         _OBtn(url: url, big: true),
-      ])));
+      ],),),);
 }
 
 class _LinkPreviewWidget extends StatelessWidget {
@@ -545,19 +537,19 @@ class _LinkPreviewWidget extends StatelessWidget {
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
     child: Container(padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _K.div)),
+          border: Border.all(color: _K.div),),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Container(width: 72, height: 72, decoration: BoxDecoration(
-            color: _K.blueSoft, borderRadius: BorderRadius.circular(18)),
-            child: const Icon(Icons.link_rounded, size: 34, color: AppColors.primary)),
+            color: _K.blueSoft, borderRadius: BorderRadius.circular(18),),
+            child: const Icon(Icons.link_rounded, size: 34, color: AppColors.primary),),
         const SizedBox(height: 16),
         const Text('External Link', style: TextStyle(fontSize: 17,
-            fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+            fontWeight: FontWeight.w800, color: AppColors.textTitle,),),
         const SizedBox(height: 8),
         Text(url, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
+            style: const TextStyle(fontSize: 13, color: AppColors.textMuted),),
         const SizedBox(height: 20), _OBtn(url: url, big: true),
-      ])));
+      ],),),);
 }
 
 class _FallbackWidget extends StatelessWidget {
@@ -567,7 +559,7 @@ class _FallbackWidget extends StatelessWidget {
   Widget build(BuildContext context) => _PlaceholderW(icon: Icons.insert_drive_file_rounded,
       iconColor: AppColors.textMuted, iconBg: _K.bg, title: 'Preview not available',
       sub: material != null ? 'This file type (${material!.type}) cannot be previewed inline.'
-          : 'Preview not available.', actionLabel: 'Open / Download', onAction: () {});
+          : 'Preview not available.', actionLabel: 'Open / Download', onAction: () {},);
 }
 
 class _LoaderW extends StatelessWidget {
@@ -575,31 +567,31 @@ class _LoaderW extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
     const CircularProgressIndicator(strokeWidth: 2), const SizedBox(height: 12),
-    Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textMuted))]));
+    Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),],),);
 }
 
 class _PlaceholderW extends StatelessWidget {
   final IconData icon; final Color iconColor, iconBg;
   final String title, sub; final String? actionLabel; final VoidCallback? onAction;
   const _PlaceholderW({required this.icon, required this.iconColor, required this.iconBg,
-      required this.title, required this.sub, this.actionLabel, this.onAction});
+      required this.title, required this.sub, this.actionLabel, this.onAction,});
   @override
   Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(32),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       Container(width: 70, height: 70,
           decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(18)),
-          child: Icon(icon, size: 32, color: iconColor)),
+          child: Icon(icon, size: 32, color: iconColor),),
       const SizedBox(height: 16),
       Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
       const SizedBox(height: 6),
       Text(sub, style: const TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
-          textAlign: TextAlign.center),
+          textAlign: TextAlign.center,),
       if (actionLabel != null && onAction != null) ...[
         const SizedBox(height: 20),
         ElevatedButton.icon(onPressed: onAction,
-            icon: const Icon(Icons.open_in_new_rounded, size: 14), label: Text(actionLabel!)),
+            icon: const Icon(Icons.open_in_new_rounded, size: 14), label: Text(actionLabel!),),
       ],
-    ])));
+    ],),),);
 }
 
 class _MetaStripW extends StatelessWidget {
@@ -623,7 +615,7 @@ class _MetaStripW extends StatelessWidget {
         Row(mainAxisSize: MainAxisSize.min, children: [
           Icon(it.$1, size: 12, color: AppColors.textHint), const SizedBox(width: 4),
           Text(it.$2, style: const TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
-        ])).toList());
+        ],),).toList(),);
   }
 }
 
@@ -644,7 +636,7 @@ class _OBtn extends StatelessWidget {
         icon: const Icon(Icons.open_in_new_rounded, size: 14), label: const Text('Open'),
         style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary,
             foregroundColor: Colors.white, elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))));
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),),);
     }
     return Material(color: AppColors.primary, borderRadius: BorderRadius.circular(7),
         child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), onTap: _open, borderRadius: BorderRadius.circular(7),
@@ -653,7 +645,7 @@ class _OBtn extends StatelessWidget {
                   Icon(Icons.open_in_new_rounded, size: 12, color: Colors.white),
                   SizedBox(width: 5),
                   Text('Open', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
-                ]))));
+                ],),),),);
   }
 }
 
