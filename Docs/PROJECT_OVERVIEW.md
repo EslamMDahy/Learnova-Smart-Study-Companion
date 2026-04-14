@@ -145,6 +145,19 @@ The platform is designed to support:
 5. AI sends structured JSON back to backend
 6. Backend validates and persists data
 
+### Backend-Controlled AI Integration Foundation
+To support AI workflows consistently across the platform, Learnova now includes a reusable backend-controlled integration foundation for communication with the AI service.
+
+This foundation is important because AI communication is not treated as ad-hoc feature logic. Instead, the backend manages a shared request structure, signed service-to-service communication, request tracking, and callback verification through a centralized integration layer.
+
+This gives the platform a more reliable base for:
+- AI-assisted content extraction
+- question generation workflows
+- future learner-support features
+- future AI-driven analysis and guidance flows
+
+As a result, Learnova is positioned to expand its AI capabilities without forcing each new feature to reimplement transport, security, or request-lifecycle handling from scratch.
+
 ---
 
 ## 7. Question Bank and Assessment Foundation

@@ -405,6 +405,99 @@ This keeps email sending logic reusable instead of scattering it across features
 The backend uses a shared Supabase client for storage-related operations.  
 Feature services use it indirectly through controlled business flows rather than exposing storage operations directly to clients.
 
+
+### 9.10 AI Service Integration Foundation
+
+The `core` package now includes a reusable AI service integration foundation that standardizes how backend features communicate with external AI services.
+
+This layer exists to prevent AI communication logic from being reimplemented separately inside feature services.  
+Instead of allowing each feature to handle transport, signing, request formatting, and lifecycle tracking independently, the backend centralizes these concerns in shared core infrastructure.
+
+This is architecturally important because AI communication is a cross-cutting system capability rather than a single-feature implementation detail.
+
+### 9.11 AI Request Protocol
+
+Backend-to-AI communication is structured around a unified request contract.
+
+The request shape is intentionally divided into:
+
+- **shared metadata at the root level**
+- **feature-specific payload inside `body`**
+
+This design allows the backend to keep transport-level and tracking-relevant fields consistently available across all AI workflows while still allowing each feature to provide its own domain-specific payload.
+
+A key example is `course_id`, which is treated as root-level metadata rather than being nested inside `body`.  
+This keeps important context available for tracking, authorization-aware orchestration, and future multi-feature reuse.
+
+### 9.12 AI Transport Client
+
+The core integration layer includes a dedicated outbound transport client responsible for communicating with the AI service.
+
+Its responsibility is to handle:
+
+- request envelope preparation
+- target path routing
+- request dispatch
+- timeout-aware outbound communication
+- consistent integration behavior across features
+
+This means feature services should not directly own low-level AI HTTP communication behavior.  
+They should prepare only the feature-specific request body and the intended AI endpoint path, while the shared transport layer handles the rest.
+
+### 9.13 AI Signing and Verification Utilities
+
+The AI integration foundation includes reusable signing and verification utilities built around HMAC-based request authentication.
+
+These utilities are responsible for:
+
+- deterministic request serialization inputs where needed
+- request-body hashing
+- signature generation for outbound backend requests
+- callback signature verification for inbound AI responses
+
+This logic belongs in shared infrastructure because request authenticity is an integration-level concern, not a feature-specific business rule.
+
+### 9.14 AI Request Tracking Support
+
+The backend also includes backend-specific request tracking support for AI operations.
+
+This tracking layer is responsible for recording request lifecycle metadata such as:
+
+- request identity
+- operation type
+- target endpoint
+- request payload
+- response payload
+- status transitions
+- timing information
+- error state
+
+This gives the backend operational visibility into asynchronous AI workflows and provides a consistent debugging and audit trail for future AI-enabled features.
+
+### 9.15 Shared vs Backend-Only AI Integration Responsibilities
+
+A deliberate architectural separation is maintained between:
+
+- **shareable AI integration logic**
+- **backend-only persistence and operational tracking logic**
+
+The shareable side includes concerns such as:
+
+- protocol shape
+- signing rules
+- verification behavior
+- request/response contract expectations
+
+The backend-only side includes concerns such as:
+
+- database persistence
+- request lifecycle logging
+- internal correlation with backend entities
+- operational observability
+
+This separation is important because some integration rules are part of the backend-to-AI agreement, while others are implementation details specific to Learnova's backend.
+
+
 ---
 
 ## 10. Request Lifecycle
@@ -950,22 +1043,157 @@ The backend is designed to integrate with AI workflows without giving the AI lay
 
 This separation is important because AI output should enhance backend workflows, not bypass backend rules.
 
+### Implemented Integration Boundary
+
+This separation is now reinforced by a reusable AI service integration layer in `core`.
+
+Feature services are not expected to manage transport, signing, callback verification, or request tracking as part of their local business logic.  
+Instead, they prepare the feature-specific request body and identify the target AI operation, while shared infrastructure handles:
+
+- request envelope construction
+- transport dispatch
+- request signing
+- callback verification
+- request lifecycle tracking
+
+This keeps feature services focused on domain rules while ensuring AI communication behavior remains consistent across the backend.
+
+### Boundary Between Shared Integration Logic and Backend-Specific State
+
+The AI integration design also preserves a clear boundary between:
+
+- integration rules that can be shared with the AI service team
+- backend-only concerns tied to Learnova's persistence and operational model
+
+For example:
+- request protocol structure and signature rules belong to the shared integration contract
+- request-log persistence, entity correlation, and operational status tracking remain backend-specific responsibilities
+
+This boundary is important because the AI service should be able to participate in a stable communication contract without gaining ownership of backend state management.
+
+
 ---
 
 ## 28. AI Communication Security
 
-The backend is designed to secure communication with AI services using HMAC-signed requests. This mechanism is part of the agreed architecture and is intended to be enforced as AI integrations are finalized.
+The backend secures communication with AI services using an HMAC-based request authentication model backed by a shared secret.
 
-- The backend signs outgoing requests before sending them to AI services.
-- AI services verify the signature before processing the request.
-- AI services sign callbacks or asynchronous responses before sending them back.
-- The backend verifies the callback signature before accepting or processing any returned payload.
+This mechanism is not limited to a generic "sign requests" rule.  
+It is part of a structured communication model that protects both outbound backend requests and inbound AI callbacks.
 
-This model helps ensure request integrity, prevents unauthorized service-to-service calls, and protects the AI integration boundary from tampering..
+### Outbound Request Security
+
+Before sending a request to the AI service, the backend prepares canonical signing inputs derived from:
+
+- HTTP method
+- target path
+- request ID
+- timestamp
+- body hash
+
+This keeps signature generation deterministic and ensures that the signature is tied to the actual request identity and payload rather than to loosely formatted raw JSON.
+
+### Deterministic Body Hashing
+
+To support stable signing behavior, the backend uses deterministic JSON serialization for the request body before hashing.
+
+This is important because equivalent payloads must produce the same body hash even when serialization details could otherwise vary.  
+Without canonical serialization behavior, signatures could become unreliable across services.
+
+### Callback Verification at the Request Boundary
+
+AI callbacks or asynchronous responses are verified before they are allowed to enter service-level business logic.
+
+This is a critical architectural rule because external payloads must not reach domain workflows until request authenticity has been validated.  
+As a result, callback verification is treated as a request-boundary concern rather than as feature-specific service logic.
+
+### Time-Based Validation Controls
+
+The communication layer also supports environment/config-driven controls such as:
+
+- AI service base URL
+- shared secret
+- outbound timeout
+- allowed timestamp drift
+
+These settings allow the backend to enforce consistent integration security behavior across environments while keeping deployment-specific values out of feature code.
+
+### Security Purpose
+
+This model helps ensure:
+
+- request integrity
+- callback authenticity
+- resistance to tampering
+- reduced risk of replay-style misuse within the allowed drift model
+- consistent enforcement of service-to-service trust boundaries
+
+The result is an AI communication model that is explicit, reusable, and aligned with the backend principle that external systems must be verified before they influence application behavior.
+
+
+## 29. AI Request Tracking and Lifecycle Logging
+
+The backend includes a dedicated request-tracking layer for AI communication so that outbound operations can be monitored across their full lifecycle.
+
+This tracking is implemented as a backend-specific operational concern rather than as part of the shareable protocol itself.
+
+### Purpose of Request Tracking
+
+AI workflows are often asynchronous and multi-step.  
+For that reason, the backend needs more than simple transport success/failure awareness.
+
+Request tracking supports:
+
+- correlating outbound requests with later callbacks or responses
+- monitoring status transitions over time
+- debugging failed or delayed AI operations
+- auditing what payload was sent and what payload was returned
+- linking AI operations back to relevant backend context such as course or entity scope
+
+### Tracked Request Data
+
+The request log model is designed to capture both communication metadata and operational state, including:
+
+- `request_id`
+- `course_id`
+- `operation_type`
+- `http_method`
+- `target_endpoint`
+- `request_payload`
+- `response_payload`
+- `status`
+- `error_message`
+- `primary_entity_type`
+- `primary_entity_id`
+- lifecycle timestamps such as creation, send, callback receipt, completion, update, and last error timing
+
+This gives the backend a durable record of AI communication activity instead of relying on temporary in-memory or console-only logging.
+
+### Lifecycle-Oriented Observability
+
+The request log is intentionally lifecycle-oriented rather than insert-only.
+
+This allows the backend to observe important milestones such as:
+
+- request created
+- request sent
+- callback received
+- request completed
+- request failed or last encountered an error
+
+That lifecycle visibility is especially valuable for future AI-assisted workflows that may involve delayed processing, retries, moderation steps, or post-processing decisions.
+
+### Separation from Shared Integration Rules
+
+Although request tracking is closely related to AI communication, it is not part of the shareable backend-to-AI contract itself.
+
+The AI service needs to follow the protocol and signature model, but it does not need to know how Learnova stores request logs, associates them with internal entities, or manages operational observability in the database.
+
+This distinction keeps the protocol portable while preserving backend ownership of its own monitoring and persistence behavior.
 
 ---
 
-## 29. Security Model Summary
+## 30. Security Model Summary
 
 The backend security model combines multiple layers:
 
@@ -984,7 +1212,7 @@ This layered approach is especially important in an educational system where lea
 
 ---
 
-## 30. Current Architectural Focus
+## 31. Current Architectural Focus
 
 The current backend is intentionally centered on the instructor-side foundation of the platform.
 
@@ -1002,7 +1230,7 @@ This sequencing makes sense because the learner experience depends on a strong i
 
 ---
 
-## 31. Future Architectural Direction
+## 32. Future Architectural Direction
 
 The current architecture is already positioned to support the next major phases of the platform, including:
 
@@ -1017,7 +1245,7 @@ Because the backend is modular, feature-oriented, and service-driven, these futu
 
 ---
 
-## 32. Summary
+## 33. Summary
 
 The Learnova backend follows a feature-oriented, service-driven architecture where the backend acts as the central authority for data integrity, authorization, storage access, and workflow orchestration.
 
@@ -1035,7 +1263,7 @@ This architecture provides a strong and realistic foundation for turning Learnov
 
 ---
 
-## 33. Anti-Patterns to Avoid
+## 34. Anti-Patterns to Avoid
 
 - Do not trust frontend-provided IDs without hierarchy validation
 - Do not expose storage keys directly
@@ -1044,7 +1272,7 @@ This architecture provides a strong and realistic foundation for turning Learnov
 
 ---
 
-## 34. Development Rules (Non-Negotiable)
+## 35. Development Rules (Non-Negotiable)
 
 - All database access MUST use sqlalchemy.text(...)
 - No ORM relationships inside services

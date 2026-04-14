@@ -1398,6 +1398,18 @@ Update an organization member’s status.
 
 ## 15. Final Notes
 
+
+### AI Integration Note
+
+Some AI-related backend capabilities are implemented as internal shared infrastructure rather than public API endpoints.
+
+This includes:
+- backend-to-AI transport layer
+- request signing and verification
+- request tracking and lifecycle handling
+
+These components are documented in the backend architecture documentation and are not directly exposed as part of the public API surface.
+
 This API reference reflects the current implemented backend routes and public request/response contracts visible in the codebase at the time of writing.
 
 As the platform continues to evolve, the areas most likely to expand are:
