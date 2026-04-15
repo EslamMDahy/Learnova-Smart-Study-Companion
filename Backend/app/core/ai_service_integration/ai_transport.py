@@ -25,7 +25,7 @@ from app.core.ai_service_integration.ai_signature import (
 )
 
 
-async def send_ai_request(
+def send_ai_request(
     db: Session,
     *,
     operation_type: str,
@@ -84,11 +84,11 @@ async def send_ai_request(
     )
 
     try:
-        async with httpx.AsyncClient(
+        with httpx.Client(
             base_url=settings.ai_service_base_url,
             timeout=settings.ai_request_timeout_seconds,
         ) as client:
-            response = await client.request(
+            response = client.request(
                 method=normalized_method,
                 url=normalized_endpoint_path,
                 content=serialized_envelope,
