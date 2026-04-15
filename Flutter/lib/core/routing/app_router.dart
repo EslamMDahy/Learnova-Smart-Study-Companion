@@ -1,7 +1,8 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:learnova/features/instructor/presentation/widgets/Quizzes/Quize_screen.dart';
+import 'package:learnova/features/instructor/presentation/widgets/Quizzes/quiz_details_screen.dart';
 import '../session/session_providers.dart';
 import '../session/session_snapshot.dart';
 import '../storage/token_storage.dart';
@@ -24,6 +25,7 @@ import '../../features/instructor/presentation/pages/instructor_shell.dart';
 import '../../features/instructor/presentation/pages/instructor_route_pages.dart';
 import '../../features/instructor/presentation/pages/course_details/course_details_page.dart';
 import '../../features/instructor/presentation/controllers/selected_course_provider.dart';
+import '../../features/instructor/presentation/widgets/question_bank/question_bank_screen.dart';
 import '../../features/instructor/data/courses_providers.dart';
 import '../../shared/pages/error_page.dart';
 import '../../shared/widgets/empty_state_page.dart';
@@ -149,7 +151,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: RouteNames.error,
         builder: (_, state) {
           final type = state.uri.queryParameters['type'] ?? 'server';
-          final msg  = state.uri.queryParameters['msg'];
+          final msg = state.uri.queryParameters['msg'];
           final errorId = state.uri.queryParameters['id'];
           return ErrorPage(errorType: type, message: msg, errorId: errorId);
         },
@@ -295,29 +297,25 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
 
           // ── Coming-soon routes: now show a proper empty state ─────────────
+          // ── تم التعديل لعرض صفحة الـ Question Bank الحقيقية ─────────────────────
           GoRoute(
             path: Routes.instructorQuestionBank,
             name: RouteNames.instructorQuestionBank,
             pageBuilder: (_, __) => const NoTransitionPage(
-              child: EmptyStatePage(
-                icon: Icons.quiz_outlined,
-                title: 'Question Bank',
-                description:
-                    'Build, organise and reuse questions across all your courses. Coming soon.',
-              ),
+              child: QuestionBankScreen(), // استدعاء الصفحة الجديدة هنا
             ),
           ),
           GoRoute(
-            path: Routes.instructorQuizzes,
-            name: RouteNames.instructorQuizzes,
-            pageBuilder: (_, __) => const NoTransitionPage(
-              child: EmptyStatePage(
-                icon: Icons.assignment_outlined,
-                title: 'Quizzes',
-                description:
-                    'Create timed quizzes and auto-grade student submissions. Coming soon.',
+            path: '/instructor/quizzes',
+            name: Routes.instructorQuizzes,
+            builder: (context, state) => const InstructorQuizzesScreen(),
+            routes: [
+              GoRoute(
+                path: 'details',
+                name: Routes.instructorQuizDetails,
+                builder: (context, state) => const QuizDetailsScreen(),
               ),
-            ),
+            ],
           ),
           GoRoute(
             path: Routes.instructorHelp,
@@ -350,7 +348,9 @@ String _initialLocationSafe(SessionSnapshot session) {
     }
     if (!session.hasAccessToken) return Routes.landing;
     if (session.hasMe && session.isOwner) return Routes.adminUsers;
-    if (session.hasMe && session.isInstructor) return Routes.instructorDashboard;
+    if (session.hasMe && session.isInstructor) {
+      return Routes.instructorDashboard;
+    }
     return Routes.home;
   } catch (_) {
     _clearSessionSafe();
@@ -386,37 +386,37 @@ void _clearSessionSafe() {
 
 class RouteNames {
   RouteNames._();
-  static const landing    = 'landing';
-  static const home       = 'home';
-  static const login      = 'login';
-  static const signup     = 'signup';
-  static const forgotPassword  = 'forgotPassword';
-  static const verifyEmail     = 'verifyEmail';
+  static const landing = 'landing';
+  static const home = 'home';
+  static const login = 'login';
+  static const signup = 'signup';
+  static const forgotPassword = 'forgotPassword';
+  static const verifyEmail = 'verifyEmail';
   static const verifyEmailSent = 'verifyEmailSent';
-  static const resetPassword   = 'resetPassword';
-  static const settings  = 'settings';
-  static const error     = 'error';
+  static const resetPassword = 'resetPassword';
+  static const settings = 'settings';
+  static const error = 'error';
 
-  static const instructorDashboard   = 'instructorDashboard';
-  static const instructorCourses     = 'instructorCourses';
+  static const instructorDashboard = 'instructorDashboard';
+  static const instructorCourses = 'instructorCourses';
   static const instructorCourseDetails = 'instructorCourseDetails';
-  static const instructorQuestionBank  = 'instructorQuestionBank';
-  static const instructorQuizzes       = 'instructorQuizzes';
-  static const instructorSettings      = 'instructorSettings';
-  static const instructorHelp          = 'instructorHelp';
+  static const instructorQuestionBank = 'instructorQuestionBank';
+  static const instructorQuizzes = 'instructorQuizzes';
+  static const instructorSettings = 'instructorSettings';
+  static const instructorHelp = 'instructorHelp';
   static const instructorNotifications = 'instructorNotifications';
 
-  static const adminUsers        = 'adminUsers';
+  static const adminUsers = 'adminUsers';
   static const adminJoinRequests = 'adminJoinRequests';
   static const adminUpgradePlans = 'adminUpgradePlans';
-  static const adminSettings     = 'adminSettings';
-  static const adminHelp         = 'adminHelp';
+  static const adminSettings = 'adminSettings';
+  static const adminHelp = 'adminHelp';
   static const adminNotifications = 'adminNotifications';
 
   // compat
-  static const instructorCourseMaterials    = 'instructorCourseMaterials';
-  static const instructorCourseStudents     = 'instructorCourseStudents';
-  static const instructorCourseAnalytics    = 'instructorCourseAnalytics';
+  static const instructorCourseMaterials = 'instructorCourseMaterials';
+  static const instructorCourseStudents = 'instructorCourseStudents';
+  static const instructorCourseAnalytics = 'instructorCourseAnalytics';
   static const instructorCourseQuestionBank = 'instructorCourseQuestionBank';
-  static const instructorCourseQuizzes      = 'instructorCourseQuizzes';
+  static const instructorCourseQuizzes = 'instructorCourseQuizzes';
 }
