@@ -7,6 +7,7 @@ import '../../data/courses_models.dart';
 import 'package:learnova/shared/widgets/app_ui_components.dart';
 import 'invite_students_dialog.dart';
 import '../controllers/selected_course_provider.dart';
+import '../course_route_identity.dart';
 
 class InstructorCourseContent extends StatefulWidget {
   final VoidCallback? onCreateNewCourse;
@@ -1131,22 +1132,12 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
   int _students(MyCourseItem c) => c.enrollmentCount ?? 0;
   int _modules(MyCourseItem c)  => 0;
 
-String _slug(MyCourseItem c) {
-    final code = c.safeCourseCode.trim();
-    if (code.isNotEmpty) {
-      return code
-          .toLowerCase()
-          .replaceAll(RegExp(r'\s+'), '-')
-          .replaceAll(RegExp(r'[^a-z0-9\-]'), '');
-    }
-    return c.id.toString();
-  }
     Future<void> _showCourseMenuFromKey(
   BuildContext context,
   MyCourseItem c,
   GlobalKey anchorKey,
 ) async {
-  final slug = _slug(c);
+  final slug = buildCourseRouteSlug(c);
 
   final selected = await showFigmaUmMenu<String>(
     context: context,
@@ -1245,7 +1236,7 @@ String _slug(MyCourseItem c) {
       child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
         borderRadius: BorderRadius.circular(12),
         onTap: () {
-          final slug = _slug(widget.course);
+          final slug = buildCourseRouteSlug(widget.course);
           SelectedCourseCache.set(widget.course);
           context.go(Routes.courseDetails(slug)); // ✅ navigate to course details
         },
