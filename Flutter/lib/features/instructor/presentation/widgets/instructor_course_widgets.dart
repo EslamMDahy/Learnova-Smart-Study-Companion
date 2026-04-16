@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learnova/core/routing/routes.dart';
 import '../../data/courses_models.dart';
+import '../../data/course_vocabulary.dart';
 import 'package:learnova/shared/widgets/app_ui_components.dart';
 import 'invite_students_dialog.dart';
 import '../controllers/selected_course_provider.dart';
@@ -1112,10 +1113,15 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
   }
 
   _CourseStatus _status(MyCourseItem c) {
-    final s = c.status.trim().toLowerCase();
-    if (s == 'draft')    return _CourseStatus.draft;
-    if (s == 'archived') return _CourseStatus.archived;
-    return _CourseStatus.active;
+    switch (c.lifecycleStatus) {
+      case CourseLifecycleStatus.draft:
+        return _CourseStatus.draft;
+      case CourseLifecycleStatus.archived:
+        return _CourseStatus.archived;
+      case CourseLifecycleStatus.published:
+      case CourseLifecycleStatus.active:
+        return _CourseStatus.active;
+    }
   }
 
   String _meta(MyCourseItem c) {
@@ -1124,7 +1130,7 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
       parts.add(c.category!.trim());
     }
     if (c.visibilityLevel.trim().isNotEmpty) {
-      parts.add(c.visibilityLevel.trim());
+      parts.add(c.visibility.label);
     }
     return parts.join(' • ');
   }
@@ -1152,7 +1158,7 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
         value: 'invite',
         label: 'Invite students',
         icon: Icons.person_add_alt_1_rounded,
-        enabled: c.visibilityLevel.trim().toLowerCase() == 'private',
+        enabled: c.visibility == CourseVisibility.private,
       ),
       const FigmaUmMenuEntry.divider(),
       const FigmaUmMenuEntry.item(
@@ -1188,13 +1194,12 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
   @override
     Widget build(BuildContext context) {
     // HTML-matched card layout (hero gradient + code badge + status pill + stats + footer)
-    final status = widget.course.status.trim().toLowerCase();
-    final isActive = status == 'active';
-    final isDraft = status == 'draft';
-    final isArchived = status == 'archived';
-    final statusLabel = widget.course.status.isEmpty
-        ? 'Draft'
-        : (widget.course.status[0].toUpperCase() + widget.course.status.substring(1));
+    final lifecycleStatus = widget.course.lifecycleStatus;
+    final isActive = lifecycleStatus == CourseLifecycleStatus.active ||
+        lifecycleStatus == CourseLifecycleStatus.published;
+    final isDraft = lifecycleStatus == CourseLifecycleStatus.draft;
+    final isArchived = lifecycleStatus == CourseLifecycleStatus.archived;
+    final statusLabel = lifecycleStatus.label;
     final statusBg = isActive
         ? const Color(0xE616A34A)
         : (isDraft
@@ -1209,7 +1214,7 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
     final modulesCount = widget.course.moduleCount ?? 0;
     final code = (widget.course.courseCode?.isNotEmpty ?? false) ? widget.course.courseCode! : '—';
     final metaLeft = widget.course.category ?? 'General';
-    final metaRight = widget.course.courseType;
+    final metaRight = widget.course.accessType.label;
     final meta = '$metaLeft • $metaRight';
   
   return MouseRegion(
