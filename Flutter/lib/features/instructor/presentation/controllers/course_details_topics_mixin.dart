@@ -16,7 +16,6 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
       ..[moduleId] = true;
     state = state.copyWith(topicsLoading: newLoading);
 
-    final useLocalFallback = ref.read(enableLocalAuthoringFallbackProvider);
     try {
       // Topics are nested under materials — ensure materials are loaded first.
       if ((state.materials[moduleId] ?? const <MaterialItem>[]).isEmpty) {
@@ -47,31 +46,15 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
       state = state.copyWith(topicsLoading: newLoad, topics: newTopics);
       return;
     } catch (e) {
-      if (!useLocalFallback) {
-        final failure = mapApiFailure(e);
-        AppErrorReporter.report(ref, failure);
-        final newTopics = Map<int, List<TopicItem>>.from(state.topics)
-          ..[moduleId] = const [];
-        final newLoad = Map<int, bool>.from(state.topicsLoading)
-          ..[moduleId] = false;
-        state = state.copyWith(topicsLoading: newLoad, topics: newTopics);
-        return;
-      }
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(ref, failure);
+      final newTopics = Map<int, List<TopicItem>>.from(state.topics)
+        ..[moduleId] = const [];
+      final newLoad = Map<int, bool>.from(state.topicsLoading)
+        ..[moduleId] = false;
+      state = state.copyWith(topicsLoading: newLoad, topics: newTopics);
+      return;
     }
-
-    final localTopics = await ref.read(topicMockServiceProvider).listTopics(moduleId);
-    final sortedTopics = [...localTopics]
-      ..sort((a, b) {
-        final materialCmp = a.materialId.compareTo(b.materialId);
-        if (materialCmp != 0) return materialCmp;
-        return a.orderIndex.compareTo(b.orderIndex);
-      });
-
-    final newTopics = Map<int, List<TopicItem>>.from(state.topics)
-      ..[moduleId] = sortedTopics;
-    final newLoad = Map<int, bool>.from(state.topicsLoading)
-      ..[moduleId] = false;
-    state = state.copyWith(topicsLoading: newLoad, topics: newTopics);
   }
 
   Future<TopicItem?> createTopic({
