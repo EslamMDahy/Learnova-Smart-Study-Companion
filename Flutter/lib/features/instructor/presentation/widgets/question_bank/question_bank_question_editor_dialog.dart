@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../data/materials_models.dart';
 import '../../../data/modules_materials_providers.dart';
+import 'package:learnova/features/instructor/data/question_vocabulary.dart';
 import '../../../data/modules_models.dart';
 import '../../../data/question_models.dart';
 import '../../../data/questions_api.dart';
@@ -878,36 +879,15 @@ class QuestionDraftItem {
   }
 
   CreateQuestionPayload toPayload() {
-    String difficultyValue;
-    switch (difficulty) {
-      case QuestionDifficulty.easy:
-        difficultyValue = 'easy';
-        break;
-      case QuestionDifficulty.medium:
-        difficultyValue = 'medium';
-        break;
-      case QuestionDifficulty.hard:
-        difficultyValue = 'hard';
-        break;
-    }
+    final difficultyValue = difficulty.backendValue;
 
-    String typeValue;
-    switch (type) {
-      case QuestionType.multipleChoice:
-        typeValue = 'multiple_choice';
-        break;
-      case QuestionType.trueFalse:
-        typeValue = 'true_false';
-        break;
-      case QuestionType.shortAnswer:
-        typeValue = 'short_answer';
-        break;
-      case QuestionType.essay:
-        typeValue = 'essay';
-        break;
-      default:
-        typeValue = 'short_answer';
-    }
+    final typeValue = switch (type) {
+      QuestionType.multipleChoice => QuestionType.multipleChoice.backendValue,
+      QuestionType.trueFalse => QuestionType.trueFalse.backendValue,
+      QuestionType.shortAnswer => QuestionType.shortAnswer.backendValue,
+      QuestionType.essay => QuestionType.essay.backendValue,
+      _ => QuestionType.shortAnswer.backendValue,
+    };
 
     final cleanedOptions = options
         .asMap()

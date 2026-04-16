@@ -12,6 +12,7 @@ import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/endpoints.dart';
 import 'question_models.dart';
+import 'question_vocabulary.dart';
 
 // ── Response models matching backend schema exactly ───────────────────────────
 
@@ -303,19 +304,7 @@ class QuestionsApi {
       }
     }
 
-    // Map difficulty enum → backend string
-    String? difficultyStr;
-    switch (q.difficulty) {
-      case QuestionDifficulty.easy:
-        difficultyStr = 'easy';
-        break;
-      case QuestionDifficulty.medium:
-        difficultyStr = 'medium';
-        break;
-      case QuestionDifficulty.hard:
-        difficultyStr = 'hard';
-        break;
-    }
+    final difficultyStr = q.difficulty.backendValue;
 
     return _QuestionMCQCreate(
       questionText: q.text,
