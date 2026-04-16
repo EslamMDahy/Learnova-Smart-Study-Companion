@@ -1,76 +1,65 @@
+// ignore_for_file: avoid_web_libraries_in_flutter
 import 'dart:async';
-import 'dart:typed_data';
-// ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+import 'dart:typed_data';
 
-import 'browser_file_picker.dart';
+class PickedBrowserFile {
+  final String name;
+  final String mimeType;
+  final int sizeBytes;
+  final Uint8List bytes;
 
-Future<List<PickedBrowserFile>> pickBrowserFilesImpl({
-  String? accept,
-  bool multiple = false,
+  const PickedBrowserFile({
+    required this.name,
+    required this.mimeType,
+    required this.sizeBytes,
+    required this.bytes,
+  });
+}
+
+Future<List<PickedBrowserFile>> pickBrowserFiles({
+  required List<String> acceptedExtensions,
+  bool multiple = true,
 }) async {
-  final input = html.FileUploadInputElement()
-    ..multiple = multiple;
-  if (accept != null && accept.trim().isNotEmpty) {
-    input.accept = accept;
-  }
-
   final completer = Completer<List<PickedBrowserFile>>();
+  final accepted = acceptedExtensions.join(',');
+  final input = html.FileUploadInputElement()
+    ..accept = accepted
+    ..multiple = multiple;
 
   input.onChange.listen((_) async {
-    try {
-      final files = input.files;
-      if (files == null || files.isEmpty) {
-        completer.complete(const <PickedBrowserFile>[]);
-        return;
-      }
-
-      final picked = <PickedBrowserFile>[];
-      for (int i = 0; i < files.length; i++) {
-        final file = files[i];
-        final bytes = await _readBytes(file);
-        picked.add(
-          PickedBrowserFile(
-            name: file.name,
-            sizeBytes: bytes.length,
-            bytes: bytes,
-            contentType: file.type,
-          ),
-        );
-      }
-      completer.complete(picked);
-    } catch (e, st) {
-      completer.completeError(e, st);
+    final selected = input.files;
+    if (selected == null || selected.isEmpty) {
+      completer.complete(const []);
+      return;
     }
+
+    final files = <PickedBrowserFile>[];
+    for (final file in selected) {
+      files.add(await _readFile(file));
+    }
+    completer.complete(files);
   });
 
   input.click();
   return completer.future;
 }
 
-Future<Uint8List> _readBytes(html.File file) {
-  final completer = Completer<Uint8List>();
+Future<PickedBrowserFile> _readFile(html.File file) async {
+  final completer = Completer<PickedBrowserFile>();
   final reader = html.FileReader();
 
   reader.onLoad.listen((_) {
     final result = reader.result;
-    if (result is Uint8List) {
-      completer.complete(result);
-      return;
-    }
-    if (result is ByteBuffer) {
-      completer.complete(Uint8List.view(result));
-      return;
-    }
-    completer.completeError(
-      StateError('Unsupported file reader result for ${file.name}.'),
-    );
-  });
-
-  reader.onError.listen((_) {
-    completer.completeError(
-      StateError('Failed to read ${file.name} from the browser picker.'),
-    );
+    final bytes = result is Uint8List
+        ? result
+        : Uint8List.view((result as ByteBuffer));
+    completer.complete(PickedBrowserFile(
+      name: file.name,
+      mimeType: file.type,
+      sizeBytes: bytes.length,
+      bytes: bytes,
+    ));
   });
 
   reader.readAsArrayBuffer(file);

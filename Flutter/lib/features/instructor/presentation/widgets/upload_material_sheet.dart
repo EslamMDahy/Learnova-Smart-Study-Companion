@@ -1,10 +1,8 @@
 import 'dart:typed_data';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/utils/browser_file_picker.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Result
@@ -89,52 +87,33 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
   }
 
   Future<void> _browse() async {
-    final c = Completer<void>();
-    final input = html.FileUploadInputElement()
-      ..accept = '.pdf'
-      ..multiple = true;
-    input.onChange.listen((_) async {
-      final files = input.files;
-      if (files != null) {
-        for (int i = 0; i < files.length; i++) {
-          final f = files[i];
-          await _read(f);
-        }
-      }
-      c.complete();
-    });
-    input.click();
-    await c.future;
+    final files = await pickBrowserFiles(
+      acceptedExtensions: const ['.pdf'],
+      multiple: true,
+    );
+    for (final file in files) {
+      _queuePickedFile(file);
+    }
   }
 
-  Future<void> _read(html.File file) async {
-    final c = Completer<void>();
-    final reader = html.FileReader();
-    reader.onLoad.listen((_) {
-      final bytes = reader.result as Uint8List;
-      final valid = bytes.length <= _maxBytes && _isSupportedPdf(file);
-      setState(() {
-        _queue.add(_QueuedFile(
-          name: file.name,
-          sizeBytes: bytes.length,
-          bytes: bytes,
-          status: valid ? _FileStatus.ready : _FileStatus.error,
-          errorMsg: valid ? null : 'Only PDF files are supported right now, up to 500 MB',
-        ));
-      });
-      c.complete();
+  void _queuePickedFile(PickedBrowserFile file) {
+    final valid = file.sizeBytes <= _maxBytes && _isSupportedPdf(file);
+    setState(() {
+      _queue.add(_QueuedFile(
+        name: file.name,
+        sizeBytes: file.sizeBytes,
+        bytes: file.bytes,
+        status: valid ? _FileStatus.ready : _FileStatus.error,
+        errorMsg: valid ? null : 'Only PDF files are supported right now, up to 500 MB',
+      ));
     });
-    reader.readAsArrayBuffer(file);
-    await c.future;
   }
-
-
 
   static final RegExp _pdfExtension = RegExp(r'\.pdf$', caseSensitive: false);
 
-  bool _isSupportedPdf(html.File file) {
+  bool _isSupportedPdf(PickedBrowserFile file) {
     final hasPdfExtension = _pdfExtension.hasMatch(file.name);
-    final mime = file.type.trim().toLowerCase();
+    final mime = file.mimeType.trim().toLowerCase();
     final mimeLooksPdf = mime.isEmpty || mime == 'application/pdf';
     return hasPdfExtension && mimeLooksPdf;
   }

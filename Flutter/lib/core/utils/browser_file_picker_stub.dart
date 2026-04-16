@@ -1,13 +1,22 @@
-import 'package:flutter/foundation.dart';
+import 'dart:typed_data';
 
-import 'browser_file_picker.dart';
+class PickedBrowserFile {
+  final String name;
+  final String mimeType;
+  final int sizeBytes;
+  final Uint8List bytes;
 
-Future<List<PickedBrowserFile>> pickBrowserFilesImpl({
-  String? accept,
-  bool multiple = false,
+  const PickedBrowserFile({
+    required this.name,
+    required this.mimeType,
+    required this.sizeBytes,
+    required this.bytes,
+  });
+}
+
+Future<List<PickedBrowserFile>> pickBrowserFiles({
+  required List<String> acceptedExtensions,
+  bool multiple = true,
 }) async {
-  if (kIsWeb) {
-    throw UnsupportedError('Browser file picker is unavailable on this platform.');
-  }
-  return const <PickedBrowserFile>[];
+  throw UnsupportedError('Browser file picker is only supported on web.');
 }
