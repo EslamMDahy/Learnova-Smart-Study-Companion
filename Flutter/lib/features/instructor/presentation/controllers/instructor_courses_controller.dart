@@ -28,8 +28,10 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
     state = state.copyWith(loading: true);
 
     try {
-      final res =
-          await _ref.read(coursesRepositoryProvider).myCourses(cancelToken: _cancel);
+      final res = await _ref.read(coursesRepositoryProvider).myCourses(
+        cancelToken: _cancel,
+        enrichMissingModuleCounts: false,
+      );
       state = state.copyWith(loading: false, items: res.items);
     } catch (e) {
       final failure = mapApiFailure(e);

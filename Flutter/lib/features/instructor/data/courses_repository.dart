@@ -12,8 +12,15 @@ class CoursesRepository {
 
   CoursesRepository(this._api, this._modulesApi);
 
-  Future<MyCoursesResponse> myCourses({CancelToken? cancelToken}) async {
+  Future<MyCoursesResponse> myCourses({
+    CancelToken? cancelToken,
+    bool enrichMissingModuleCounts = false,
+  }) async {
     final response = await _api.myCourses(cancelToken: cancelToken);
+
+    if (!enrichMissingModuleCounts) {
+      return response;
+    }
 
     final enrichedItems = await Future.wait(
       response.items.map((course) async {
