@@ -10,6 +10,7 @@ import '../../data/dto/user_profile.dart';
 import '../../data/settings_providers.dart';
 import '../../data/settings_repository.dart';
 import 'settings_state.dart';
+import 'settings_form_snapshot.dart';
 
 final settingsControllerProvider =
     StateNotifierProvider<SettingsController, SettingsState>(
@@ -143,6 +144,70 @@ Future<void> load() async {
   /// 1) Get signed upload URL from backend
   /// 2) PUT file bytes to Supabase
   /// 3) Confirm to backend → get new avatar_url
+
+  SettingsFormSnapshot buildFormSnapshot({
+    required String firstName,
+    required String lastName,
+    required String phone,
+    required String bio,
+    required String language,
+    required bool emailNotifications,
+    required bool assignmentAlerts,
+    required bool courseUpdates,
+    required bool announcementNotifications,
+    required bool gradingNotifications,
+    required bool deadlineReminders,
+    required String themeMode,
+    required String profileVisibility,
+    required bool showOnlineStatus,
+  }) {
+    return SettingsFormSnapshot(
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone: phone.trim(),
+      bio: bio.trim(),
+      language: language,
+      emailNotifications: emailNotifications,
+      assignmentAlerts: assignmentAlerts,
+      courseUpdates: courseUpdates,
+      announcementNotifications: announcementNotifications,
+      gradingNotifications: gradingNotifications,
+      deadlineReminders: deadlineReminders,
+      themeMode: themeMode,
+      profileVisibility: profileVisibility,
+      showOnlineStatus: showOnlineStatus,
+    );
+  }
+
+  bool hasFormChanges({
+    required SettingsFormSnapshot initial,
+    required SettingsFormSnapshot current,
+  }) {
+    return initial.firstName != current.firstName ||
+        initial.lastName != current.lastName ||
+        initial.phone != current.phone ||
+        initial.bio != current.bio ||
+        initial.language != current.language ||
+        initial.emailNotifications != current.emailNotifications ||
+        initial.assignmentAlerts != current.assignmentAlerts ||
+        initial.courseUpdates != current.courseUpdates ||
+        initial.announcementNotifications != current.announcementNotifications ||
+        initial.gradingNotifications != current.gradingNotifications ||
+        initial.deadlineReminders != current.deadlineReminders ||
+        initial.themeMode != current.themeMode ||
+        initial.profileVisibility != current.profileVisibility ||
+        initial.showOnlineStatus != current.showOnlineStatus;
+  }
+
+  bool shouldValidateProfileOnSave({
+    required SettingsFormSnapshot initial,
+    required SettingsFormSnapshot current,
+  }) {
+    return initial.firstName != current.firstName ||
+        initial.lastName != current.lastName ||
+        initial.phone != current.phone;
+  }
+
   Future<bool> uploadAvatar({
     required List<int> bytes,
     required String contentType,
