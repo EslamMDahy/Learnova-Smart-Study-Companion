@@ -345,7 +345,7 @@ class QuestionBankTable extends StatelessWidget {
     return InkWell(
       onTap: () {
         // الربط باستخدام GoRouter
-        context.pushNamed(Routes.instructorQuizDetails);
+        // context.pushNamed(Routes.instructorQuizDetails);
       },
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
