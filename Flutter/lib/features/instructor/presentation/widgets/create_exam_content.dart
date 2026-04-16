@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'create_exam_content2.dart';
-import 'create_exam_content3.dart';
+import 'exam_question_selection_step.dart';
+import 'exam_settings_step.dart';
 
 class CreateExamContent extends StatefulWidget {
   final int currentStep;
@@ -159,9 +159,9 @@ class _CreateExamContentState extends State<CreateExamContent> {
       case 1:
         return _buildStep1Fields(); 
       case 2:
-        return const CreateExamContent2(); 
+        return const ExamQuestionSelectionStep(); 
       case 3:
-        return const CreateExamContent3(); 
+        return const ExamSettingsStep(); 
       default:
         return const SizedBox.shrink();
     }
