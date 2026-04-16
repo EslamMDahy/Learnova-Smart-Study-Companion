@@ -376,10 +376,6 @@ class _PdfPreviewWidget extends StatefulWidget {
   State<_PdfPreviewWidget> createState() => _PdfPreviewWidgetState();
 }
 
-// Registry to avoid double-registering iframes
-final _registeredPdfViews = <String>{};
-final _registeredPdfIframes = <String, html.IFrameElement>{};
-
 class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
   late final String _viewId;
 
@@ -392,11 +388,7 @@ class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
   }
 
   void _updatePointerEvents() {
-    final iframe = _registeredPdfIframes[_viewId];
-    if (iframe != null) {
-      iframe.style.pointerEvents = widget.interactive ? 'auto' : 'none';
-      iframe.style.overflow = 'auto';
-    }
+    updatePdfPreviewInteractivity(viewType: _viewId, interactive: widget.interactive);
   }
 
   @override
@@ -408,24 +400,11 @@ class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
   }
 
   void _registerView() {
-    if (_registeredPdfViews.contains(_viewId)) return;
-    _registeredPdfViews.add(_viewId);
-    // Register the iframe as a platform view for Flutter Web
-    // ignore: undefined_prefixed_name
-    ui_web.platformViewRegistry.registerViewFactory(_viewId, (int viewId) {
-      // ignore: avoid_web_libraries_in_flutter
-      final pdfUrl = '${widget.url}#toolbar=0&navpanes=0&scrollbar=1';
-      final iframe = html.IFrameElement()
-        ..src = pdfUrl
-        ..style.border = 'none'
-        ..style.width = '100%'
-        ..style.height = '100%'
-        ..style.overflow = 'auto'
-        ..style.backgroundColor = '#FFFFFF';
-      _registeredPdfIframes[_viewId] = iframe;
-      iframe.style.pointerEvents = widget.interactive ? 'auto' : 'none';
-      return iframe;
-    });
+    registerPdfPreviewView(
+      viewType: _viewId,
+      url: widget.url,
+      interactive: widget.interactive,
+    );
   }
 
   @override

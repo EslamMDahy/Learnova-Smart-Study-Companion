@@ -1,14 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-// ignore: undefined_prefixed_name
-import 'dart:ui_web' as ui_web;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../../core/storage/key_value_store_factory.dart';
+import '../../../../../core/ui/pdf_preview_view.dart';
 import '../../../../../core/ui/toast.dart';
 import '../../../../../shared/widgets/app_ui_components.dart';
 import '../../../data/courses_models.dart';
