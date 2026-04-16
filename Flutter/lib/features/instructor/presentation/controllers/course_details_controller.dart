@@ -10,6 +10,7 @@ import '../../data/materials_models.dart';
 import '../../data/topics_models.dart';
 import '../../data/question_models.dart';
 import '../../data/mock_services.dart';
+import '../../data/authoring_mode.dart';
 import '../../data/modules_materials_providers.dart';
 
 import 'course_details_state.dart';
@@ -245,7 +246,7 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
       ..[moduleId] = true;
     state = state.copyWith(topicsLoading: newLoading);
 
-    List<TopicItem> backendTopics = const [];
+    final useLocalFallback = _ref.read(enableLocalAuthoringFallbackProvider);
     try {
       // Topics are nested under materials — ensure materials are loaded first.
       if ((state.materials[moduleId] ?? const <MaterialItem>[]).isEmpty) {
@@ -261,16 +262,35 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
             );
         allTopics.addAll(res.topics);
       }
-      backendTopics = allTopics;
-    } catch (_) {
-      // Non-fatal — topic authoring is currently handled via local fallback storage.
+
+      final sortedTopics = [...allTopics]
+        ..sort((a, b) {
+          final materialCmp = a.materialId.compareTo(b.materialId);
+          if (materialCmp != 0) return materialCmp;
+          return a.orderIndex.compareTo(b.orderIndex);
+        });
+
+      final newTopics = Map<int, List<TopicItem>>.from(state.topics)
+        ..[moduleId] = sortedTopics;
+      final newLoad = Map<int, bool>.from(state.topicsLoading)
+        ..[moduleId] = false;
+      state = state.copyWith(topicsLoading: newLoad, topics: newTopics);
+      return;
+    } catch (e) {
+      if (!useLocalFallback) {
+        final failure = mapApiFailure(e);
+        AppErrorReporter.report(_ref, failure);
+        final newTopics = Map<int, List<TopicItem>>.from(state.topics)
+          ..[moduleId] = const [];
+        final newLoad = Map<int, bool>.from(state.topicsLoading)
+          ..[moduleId] = false;
+        state = state.copyWith(topicsLoading: newLoad, topics: newTopics);
+        return;
+      }
     }
 
     final localTopics = await _ref.read(topicMockServiceProvider).listTopics(moduleId);
-    final merged = <int, TopicItem>{
-      for (final topic in backendTopics) topic.id: topic,
-      for (final topic in localTopics) topic.id: topic,
-    }.values.toList()
+    final sortedTopics = [...localTopics]
       ..sort((a, b) {
         final materialCmp = a.materialId.compareTo(b.materialId);
         if (materialCmp != 0) return materialCmp;
@@ -278,7 +298,7 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
       });
 
     final newTopics = Map<int, List<TopicItem>>.from(state.topics)
-      ..[moduleId] = merged;
+      ..[moduleId] = sortedTopics;
     final newLoad = Map<int, bool>.from(state.topicsLoading)
       ..[moduleId] = false;
     state = state.copyWith(topicsLoading: newLoad, topics: newTopics);
@@ -368,7 +388,7 @@ class CourseDetailsController extends StateNotifier<CourseDetailsState> {
                     title: '',
                     orderIndex: 0,
                     createdAt: DateTime(0),
-                    updatedAt: DateTime(0),),)
+                    updatedAt: DateTime(0)))
             .materialId;
     try {
       await _ref.read(topicsApiProvider).deleteTopic(

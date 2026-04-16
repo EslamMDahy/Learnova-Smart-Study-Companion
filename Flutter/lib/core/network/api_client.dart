@@ -118,6 +118,7 @@ class ApiClient implements ITokenRefreshScheduler {
                 DioException(
                   requestOptions: e.requestOptions,
                   response: e.response,
+                  type: DioExceptionType.unknown,
                   error: ApiException(
                     'Request could not be completed. Please try again.',
                     code: 'AUTH_RETRY_FAILED',

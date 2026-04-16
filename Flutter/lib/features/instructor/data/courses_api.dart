@@ -35,15 +35,15 @@ class CoursesApi {
     CancelToken? cancelToken,
   }) async {
     final res = await _client.get<Map<String, dynamic>>(
-      Endpoints.courseById(id),
+      '/courses/$id',
       cancelToken: cancelToken,
     );
     final data = res.data;
     if (data is Map<String, dynamic>) {
-      AppLogger.log('GET ${Endpoints.courseById(id)} -> $data', level: LogLevel.debug);
+      AppLogger.log('GET /courses/$id -> $data', level: LogLevel.debug);
       return MyCourseItem.fromJson(data);
     }
-    throw FormatException('Invalid response from GET ${Endpoints.courseById(id)}');
+    throw FormatException('Invalid response from GET /courses/$id');
   }
 
   /// POST /courses
@@ -91,7 +91,7 @@ class CoursesApi {
     });
 
     final res = await _client.post<Map<String, dynamic>>(
-      Endpoints.courseInvitationsUpload(courseId),
+      '/courses/$courseId/invitations/upload',
       data: form,
       options: Options(
         // Dio will set the correct boundary automatically
@@ -113,7 +113,7 @@ class CoursesApi {
     CancelToken? cancelToken,
   }) async {
     final res = await _client.post<Map<String, dynamic>>(
-      Endpoints.courseInvitationsSend(courseId),
+      '/courses/$courseId/invitations/send',
       data: {
         'include_expired': includeExpired,
         'force': force,

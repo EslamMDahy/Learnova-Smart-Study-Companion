@@ -1,7 +1,8 @@
 import 'dart:convert';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 
-import '../../../../../core/storage/key_value_store_factory.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/courses_models.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -24,9 +25,8 @@ final selectedCourseProvider = StateProvider<MyCourseItem?>((ref) => null);
 class SelectedCourseCache {
   SelectedCourseCache._();
 
-  static const _key = 'learnova_selected_course';
+  static const _key   = 'learnova_selected_course';
   static const _idKey = 'learnova_selected_course_id';
-  static final _session = createSessionStore();
   static MyCourseItem? _memory;
 
   // ── write ────────────────────────────────────────────────────────────────
@@ -54,10 +54,10 @@ class SelectedCourseCache {
         'enrollment_count': course.enrollmentCount,
         'pending_invites':  course.pendingInvites,
       };
-      _session.setString(_key, jsonEncode(full));
+      html.window.sessionStorage[_key]   = jsonEncode(full);
       // Also persist the bare id so the router can trigger an API re-fetch
       // when the full JSON is unavailable or corrupted.
-      _session.setString(_idKey, course.id.toString());
+      html.window.sessionStorage[_idKey] = course.id.toString();
     } catch (_) {
       // Storage write failure is non-fatal — memory still works within the tab.
     }
@@ -71,7 +71,7 @@ class SelectedCourseCache {
     if (_memory != null) return _memory;
 
     try {
-      final raw = _session.getString(_key);
+      final raw = html.window.sessionStorage[_key];
       if (raw != null && raw.isNotEmpty) {
         final json = (jsonDecode(raw) as Map).cast<String, dynamic>();
         _memory = MyCourseItem.fromJson(json);
@@ -90,7 +90,7 @@ class SelectedCourseCache {
     // Check memory first
     if (_memory != null) return _memory!.id;
     try {
-      final raw = _session.getString(_idKey);
+      final raw = html.window.sessionStorage[_idKey];
       if (raw != null && raw.isNotEmpty) return int.tryParse(raw);
     } catch (_) {}
     return null;
@@ -106,8 +106,8 @@ class SelectedCourseCache {
 
   static void _clearStorage() {
     try {
-      _session.remove(_key);
-      _session.remove(_idKey);
+      html.window.sessionStorage.remove(_key);
+      html.window.sessionStorage.remove(_idKey);
     } catch (_) {}
   }
 }

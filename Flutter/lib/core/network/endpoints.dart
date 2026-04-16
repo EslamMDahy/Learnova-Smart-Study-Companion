@@ -3,9 +3,8 @@ class Endpoints {
 
   static const _auth     = '/auth';
   static const _orgs     = '/organizations';
-  static const _settings  = '/settings';
-  static const _courses   = '/courses';
-  static const _materials = '/materials';
+  static const _settings = '/settings';
+  static const _courses  = '/courses';
 
   // ─── AUTH ────────────────────────────────────────────────────────────────
   static const login               = '$_auth/login';
@@ -29,8 +28,6 @@ class Endpoints {
   // ─── COURSES ─────────────────────────────────────────────────────────────
   static const createCourse = _courses;
   static const myCourses    = '$_courses/my';
-  static String courseById(int courseId) =>
-      '$_courses/$courseId';
   static String courseInvitationsUpload(String courseId) =>
       '$_courses/$courseId/invitations/upload';
   static String courseInvitationsSend(String courseId) =>
@@ -59,13 +56,13 @@ class Endpoints {
   static String initMaterialUpload(int courseId, int moduleId) =>
       '$_courses/$courseId/modules/$moduleId/materials/init-upload';
   static String confirmMaterialUpload(int materialId) =>
-      '$_materials/materials/$materialId/confirm-upload';
+      '/materials/$materialId/confirm-upload';
   static String materialDownloadUrl(int courseId, int moduleId, int materialId) =>
       '$_courses/$courseId/modules/$moduleId/materials/$materialId/download-url';
   static String deleteMaterial(int courseId, int moduleId, int materialId) =>
-      '$_materials/courses/$courseId/modules/$moduleId/materials/$materialId';
-  static String reassignMaterial(int materialId) =>
-      '$_materials/$materialId/reassign';
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId';
+  static String reassignMaterial(int courseId, int moduleId, int materialId) =>
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId/reassign';
 
   // ─── TOPICS ──────────────────────────────────────────────────────────────
   static String materialTopics(int courseId, int moduleId, int materialId) =>

@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:learnova/features/instructor/presentation/widgets/create_course_dialog.dart';
 import 'package:learnova/features/instructor/presentation/widgets/invite_students_dialog.dart';
 import 'package:learnova/features/instructor/data/mock_services.dart';
+import 'package:learnova/features/instructor/data/authoring_mode.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_course_widgets.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_dashboard_content.dart';
 
@@ -42,7 +43,7 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
     // Load my courses once when entering the page
     Future.microtask(() => ref
         .read(instructorCoursesControllerProvider.notifier)
-        .load(force: true),);
+        .load(force: true));
   }
 
   Future<void> _openCreateCourse() async {
@@ -69,7 +70,8 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
     }
 
     // 2) Seed locally-managed learning outcomes for the dedicated Outcomes tab.
-    if (result.learningOutcomes.isNotEmpty) {
+    if (result.learningOutcomes.isNotEmpty &&
+        ref.read(enableLocalAuthoringFallbackProvider)) {
       await ref
           .read(learningOutcomeMockServiceProvider)
           .seedOutcomes(courseId, result.learningOutcomes);
