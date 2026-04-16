@@ -2,6 +2,8 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/error/app_error_bus.dart';
+import '../../../../core/error/app_failure.dart';
+import '../../../../core/log/app_logger.dart';
 import '../../../../core/network/error_mapper.dart';
 import '../../../../core/storage/token_storage.dart';
 import '../../../../core/storage/user_storage.dart';
@@ -47,6 +49,26 @@ class SettingsController extends StateNotifier<SettingsState> {
     _saveCancel = CancelToken();
   }
 
+  void _reportSoftWarning(
+    String message, {
+    Object? error,
+    StackTrace? stackTrace,
+  }) {
+    AppLogger.log(
+      message,
+      level: LogLevel.warn,
+      error: error,
+      stackTrace: stackTrace,
+    );
+    AppErrorReporter.report(
+      ref,
+      AppFailure(
+        type: AppFailureType.warning,
+        message: message,
+      ),
+    );
+  }
+
   void _handleError(Object e, {bool stopLoading = true}) {
     final failure = mapApiFailure(e);
 
@@ -73,8 +95,13 @@ class SettingsController extends StateNotifier<SettingsState> {
     try {
       final profile = UserProfile.fromJson(cachedUser);
       state = state.copyWith(profile: profile);
-    } catch (_) {
-      // ignore
+    } catch (e, st) {
+      AppLogger.log(
+        'Failed to hydrate settings profile from cached storage.',
+        level: LogLevel.warn,
+        error: e,
+        stackTrace: st,
+      );
     }
   }
 
@@ -122,8 +149,13 @@ Future<void> load() async {
     UserPreferences prefs;
     try {
       prefs = await _repo.getPreferences(cancelToken: _loadCancel);
-    } catch (_) {
+    } catch (e, st) {
       prefs = state.preferences ?? UserPreferences.defaults();
+      _reportSoftWarning(
+        'Preferences could not be loaded. Showing defaults for now.',
+        error: e,
+        stackTrace: st,
+      );
     }
 
     state = state.copyWith(
@@ -131,9 +163,14 @@ Future<void> load() async {
       profile: mergedProfile,
       preferences: prefs,
     );
-  } catch (e) {
+  } catch (e, st) {
     if (state.profile != null) {
       state = state.copyWith(loading: false);
+      _reportSoftWarning(
+        'Unable to refresh settings right now. Showing cached profile data.',
+        error: e,
+        stackTrace: st,
+      );
     } else {
       _handleError(e);
     }
@@ -377,15 +414,22 @@ Future<void> load() async {
       );
 
       UserPreferences savedPrefs = nextPrefs;
-      
+      var preferencesSyncFailed = false;
+
       try {
         state = state.copyWith(savingPreferences: true);
         savedPrefs = await _repo.updatePreferences(
           nextPrefs,
           cancelToken: _saveCancel,
         );
-      } catch (_) {
+      } catch (e, st) {
         savedPrefs = nextPrefs;
+        preferencesSyncFailed = true;
+        _reportSoftWarning(
+          'Profile was saved, but preference changes could not be synced.',
+          error: e,
+          stackTrace: st,
+        );
       } finally {
         state = state.copyWith(savingPreferences: false);
       }
@@ -394,7 +438,9 @@ Future<void> load() async {
         savingProfile: false,
         profile: mergedProfile,
         preferences: savedPrefs,
-        success: 'Saved',
+        success: preferencesSyncFailed
+            ? 'Profile saved. Preferences will need to be retried.'
+            : 'Saved',
       );
 
       return true;

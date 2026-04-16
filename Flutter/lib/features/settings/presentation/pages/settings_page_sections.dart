@@ -2,6 +2,57 @@ part of 'settings_page.dart';
 
 extension _SettingsPageSections on _SettingsPageState {
 
+  Widget _buildReadOnlyProfileValue({
+    required String label,
+    required String value,
+    required String fallback,
+    required IconData icon,
+    required String helperText,
+  }) {
+    final resolved = value.trim().isNotEmpty ? value.trim() : fallback;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: AppText.label),
+        AppSpacing.gap6,
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: const Color(0xFFE5E7EB)),
+          ),
+          child: Row(
+            children: [
+              Icon(icon, color: AppColors.muted, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  resolved,
+                  style: const TextStyle(
+                    color: AppColors.title,
+                    fontSize: 15,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Icon(Icons.lock_outline, color: AppColors.muted, size: 18),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          helperText,
+          style: AppText.mutedSmall,
+        ),
+      ],
+    );
+  }
+
+
   // =========================
   // Sections
   // =========================
@@ -60,29 +111,24 @@ extension _SettingsPageSections on _SettingsPageState {
                   children: [
                     row,
                     const SizedBox(height: 16),
-                    AbsorbPointer(
-                      child: AppLabeledIconField(
-                        label: 'University Email',
-                        controller: universityEmailCtrl,
-                        hint: 'University email',
-                        icon: Icons.email_outlined,
-                        keyboardType: TextInputType.emailAddress,
-                        onChanged: (_) {},
-                      ),
+                    _buildReadOnlyProfileValue(
+                      label: 'University Email',
+                      value: universityEmailCtrl.text,
+                      fallback: 'Not available',
+                      icon: Icons.email_outlined,
+                      helperText: 'Managed by your account identity and not editable from settings yet.',
                     ),
                     const SizedBox(height: 16),
                     LayoutBuilder(
                       builder: (context, c2) {
                         final wide2 = c2.maxWidth >= 780;
 
-                        final id = AbsorbPointer(
-                          child: AppLabeledIconField(
-                            label: 'Student ID',
-                            controller: studentIdCtrl,
-                            hint: 'Student ID',
-                            icon: Icons.badge_outlined,
-                            onChanged: (_) {},
-                          ),
+                        final id = _buildReadOnlyProfileValue(
+                          label: 'Student ID',
+                          value: studentIdCtrl.text,
+                          fallback: 'Not set',
+                          icon: Icons.badge_outlined,
+                          helperText: 'This field is currently read-only until backend profile support is finalized.',
                         );
 
                         final phone = AppLabeledIconField(
@@ -97,6 +143,7 @@ extension _SettingsPageSections on _SettingsPageState {
 
                         return wide2
                             ? Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(child: id),
                                   const SizedBox(width: 24),
