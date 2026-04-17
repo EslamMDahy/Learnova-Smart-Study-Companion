@@ -408,7 +408,7 @@ def confirm_material_upload(*, material_id: int, db: Session, current_user: dict
             try:
                 send_ai_request(
                     db,
-                    operation_type="material_extraction",
+                    operation_type="content_structure_generation",
                     endpoint_path="/content-structure/extract", # !!!!!!UPDATE THIS AFTER GETING THE REAL ENDPOINT!!!!!!
                     course_id=int(mat["course_id"]),
                     primary_entity_type="material",

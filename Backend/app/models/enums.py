@@ -251,7 +251,7 @@ class AIRequestStatus(str, Enum):
     INVALID_CALLBACK = "invalid_callback"
 
 class AIOperationType(str, Enum):
-    MATERIAL_EXTRACTION = "material_extraction"
+    MATERIAL_EXTRACTION = "content_structure_generation"
     QUESTION_GENERATION = "question_generation"
 
 class AIChatContextType(str, Enum):
