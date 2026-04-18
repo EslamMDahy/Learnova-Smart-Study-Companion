@@ -84,6 +84,7 @@ def handle_ai_callback(*, verified_callback: VerifiedAICallbackRequest, db: Sess
         request_id=request_id,
         response_payload=payload,
     )
+    db.flush()
 
     try:
         result = handler(

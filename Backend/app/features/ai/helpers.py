@@ -127,7 +127,6 @@ def mark_material_ai_processing_completed(
             text("""
                 UPDATE materials
                 SET
-                    status = CAST(:status AS material_status_enum),
                     is_ai_processed = TRUE,
                     ai_processed_at = NOW(),
                     updated_at = NOW()
@@ -136,7 +135,6 @@ def mark_material_ai_processing_completed(
             """),
             {
                 "material_id": material_id,
-                "status": "ready",
             },
         ).mappings().first()
 
