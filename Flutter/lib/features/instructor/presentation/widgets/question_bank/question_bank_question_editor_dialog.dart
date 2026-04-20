@@ -759,11 +759,13 @@ class QuestionAuthoringTopicTarget {
   final ModuleItem module;
   final MaterialItem material;
   final TopicItem topic;
+  final String? parentTopicTitle;
 
   const QuestionAuthoringTopicTarget({
     required this.module,
     required this.material,
     required this.topic,
+    this.parentTopicTitle,
   });
 }
 

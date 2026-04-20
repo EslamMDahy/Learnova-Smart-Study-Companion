@@ -10,59 +10,68 @@ class _TopicsSidebarWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // header
-      Container(padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
-          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
-          child: Row(children: [
-            Container(width: 24, height: 24, decoration: BoxDecoration(
-                color: AppColors.primarySoft, borderRadius: BorderRadius.circular(7)),
-                alignment: Alignment.center,
-                child: const Icon(Icons.tag_rounded, size: 13, color: AppColors.primary)),
-            const SizedBox(width: 8),
-            const Text('Topics', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-            if (!loading && topics.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(10)),
-                  child: Text('${topics.length}', style: const TextStyle(
-                      fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary))),
-            ],
-            const Spacer(),
-            if (loading) const SizedBox(width: 13, height: 13,
-                child: CircularProgressIndicator(strokeWidth: 1.5)),
-          ])),
-
-      // add buttons
+      Container(
+        padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
+        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
+        child: Row(children: [
+          Container(
+            width: 24,
+            height: 24,
+            decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(7)),
+            alignment: Alignment.center,
+            child: const Icon(Icons.tag_rounded, size: 13, color: AppColors.primary),
+          ),
+          const SizedBox(width: 8),
+          const Text('Topics', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+          if (!loading && topics.isNotEmpty) ...[
+            const SizedBox(width: 6),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(10)),
+              child: Text('${topics.length}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
+            ),
+          ],
+          const Spacer(),
+          if (loading) const SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 1.5)),
+        ]),
+      ),
       Container(
         padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
         decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
-        child: Row(children: [
-          Expanded(child: _AddTopicBtnW(icon: Icons.edit_rounded, label: 'Manual',
-              onTap: onAddManual, color: AppColors.primary, bg: _K.blueSoft)),
-          const SizedBox(width: 6),
-          Expanded(child: _AddTopicBtnW(icon: Icons.auto_awesome_rounded, label: 'AI',
-              onTap: onGenerateAI, color: AppColors.primary, bg: AppColors.primarySoft)),
-        ]),
+        child: SizedBox(
+          width: double.infinity,
+          child: _AddTopicBtnW(
+            icon: Icons.edit_rounded,
+            label: 'Add Topic',
+            onTap: onAddManual,
+            color: AppColors.primary,
+            bg: _K.blueSoft,
+          ),
+        ),
       ),
-
-      // list
-      Expanded(child: loading
-          ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              CircularProgressIndicator(strokeWidth: 2), SizedBox(height: 8),
-              Text('Loading topics…', style: TextStyle(fontSize: 13, color: AppColors.textMuted))]))
-          : topics.isEmpty
-              ? _TopicsEmptyW(onAddManual: onAddManual, onGenerateAI: onGenerateAI)
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: topics.length,
-                  itemBuilder: (_, i) => _TopicItemW(
-                      topic: topics[i], index: i, onTap: () => onTopicTap(topics[i])))),
+      Expanded(
+        child: loading
+            ? const Center(
+                child: Column(mainAxisSize: MainAxisSize.min, children: [
+                  CircularProgressIndicator(strokeWidth: 2),
+                  SizedBox(height: 8),
+                  Text('Loading topics…', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
+                ]),
+              )
+            : topics.isEmpty
+                ? _TopicsEmptyW(onAddManual: onAddManual)
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    itemCount: topics.length,
+                    itemBuilder: (_, i) => _TopicItemW(topic: topics[i], index: i, onTap: () => onTopicTap(topics[i])),
+                  ),
+      ),
     ]);
   }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Unified "Add Topic" button — opens a tabbed dialog (Manual | AI)
+//  Unified "Add Topic" button
 // ─────────────────────────────────────────────────────────────────────────────
 class _AddTopicUnifiedBtn extends StatelessWidget {
   final VoidCallback onTap;
@@ -162,13 +171,10 @@ class _AddTopicDialogV2 extends StatefulWidget {
 }
 
 class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
-    with SingleTickerProviderStateMixin {
-  late final TabController _tabController;
+    {
   final TextEditingController _titleCtrl = TextEditingController();
   bool _submitted = false;
   final Set<int> _selectedOutcomeIds = {};
-
-  bool get _isManual => _tabController.index == 0;
 
   String? get _titleError {
     if (!_submitted) return null;
@@ -179,28 +185,19 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
-    _tabController.addListener(() {
-      if (mounted) setState(() {});
-    });
   }
 
   @override
   void dispose() {
-    _tabController.dispose();
     _titleCtrl.dispose();
     super.dispose();
   }
 
   void _submit() {
-    if (_isManual) {
-      setState(() => _submitted = true);
-      final title = _titleCtrl.text.trim();
-      if (title.isEmpty) return;
-      Navigator.pop(context, _TopicDialogResult.manual(title, learningOutcomeIds: _selectedOutcomeIds.toList()));
-      return;
-    }
-    Navigator.pop(context, const _TopicDialogResult.ai());
+    setState(() => _submitted = true);
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) return;
+    Navigator.pop(context, _TopicDialogResult.manual(title, learningOutcomeIds: _selectedOutcomeIds.toList()));
   }
 
   @override
@@ -230,15 +227,8 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
               children: [
                 _dialogHeader(),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                  child: _dialogTabs(),
-                ),
-                Padding(
                   padding: const EdgeInsets.all(20),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 180),
-                    child: _isManual ? _manualBody() : _aiBody(),
-                  ),
+                  child: _manualBody(),
                 ),
                 Container(
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
@@ -262,14 +252,11 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _submit,
-                        icon: Icon(
-                          _isManual ? Icons.add_rounded : Icons.auto_awesome_rounded,
-                          size: 16,
-                        ),
-                        label: Text(_isManual ? 'Create Topic' : 'Generate with AI'),
+                        icon: const Icon(Icons.add_rounded, size: 16),
+                        label: const Text('Create Topic'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 13),
-                          backgroundColor: _isManual ? AppColors.primary : AppColors.primary,
+                          backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           elevation: 0,
                           shape: RoundedRectangleBorder(
@@ -307,7 +294,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
             Text('Add Topic', style: TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
             SizedBox(height: 2),
-            Text('Create a clear topic manually or let AI structure it for you.',
+            Text('Create a clear topic and attach it to the right learning outcomes.',
                 style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
           ]),
         ),
@@ -317,47 +304,6 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
           splashRadius: 20,
         ),
       ]),
-    );
-  }
-
-  Widget _dialogTabs() {
-    return Container(
-      height: 42,
-      decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
-        borderRadius: BorderRadius.circular(12),
-      ),
-      padding: const EdgeInsets.all(4),
-      child: TabBar(
-        controller: _tabController,
-        dividerColor: Colors.transparent,
-        indicator: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          boxShadow: const [
-            BoxShadow(color: Color(0x12000000), blurRadius: 4, offset: Offset(0, 1)),
-          ],
-        ),
-        labelPadding: EdgeInsets.zero,
-        tabs: [
-          Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.edit_rounded, size: 14,
-                color: _isManual ? AppColors.primary : AppColors.textHint),
-            const SizedBox(width: 6),
-            Text('Manual', style: TextStyle(
-                fontSize: 12.5, fontWeight: FontWeight.w700,
-                color: _isManual ? AppColors.primary : AppColors.textMuted)),
-          ])),
-          Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.auto_awesome_rounded, size: 14,
-                color: !_isManual ? AppColors.primary : AppColors.textHint),
-            const SizedBox(width: 6),
-            Text('AI Generate', style: TextStyle(
-                fontSize: 12.5, fontWeight: FontWeight.w700,
-                color: !_isManual ? AppColors.primary : AppColors.textMuted)),
-          ])),
-        ],
-      ),
     );
   }
 
@@ -516,58 +462,6 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
     );
   }
 
-  Widget _aiBody() {
-    return Column(
-      key: const ValueKey('ai'),
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF8FBFF),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0x33137FEC)),
-          ),
-          child: Column(children: [
-            Container(
-              width: 52, height: 52,
-              decoration: BoxDecoration(
-                  color: Colors.white, borderRadius: BorderRadius.circular(16)),
-              child: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary, size: 24),
-            ),
-            const SizedBox(height: 12),
-            const Text('Generate Topics with AI', style: TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.primary)),
-            const SizedBox(height: 6),
-            const Text(
-              'AI will analyze the selected material and extract suggested topics automatically.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12.5, height: 1.6, color: AppColors.textMuted),
-            ),
-          ]),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: const Color(0xFFFAFAFA),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: _K.div),
-          ),
-          child: const Row(children: [
-            Icon(Icons.bolt_rounded, size: 15, color: AppColors.primary),
-            SizedBox(width: 8),
-            Expanded(child: Text(
-              'You can review and refine the generated topics later.',
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-            )),
-          ]),
-        ),
-      ],
-    );
-  }
 }
 
 
@@ -754,7 +648,9 @@ class _DialogActions extends StatelessWidget {
 //  _ShareModuleDialog — lets the instructor choose the target course
 // ─────────────────────────────────────────────────────────────────────────────
 final _shareTargetCoursesProvider = FutureProvider.family<List<MyCourseItem>, int>((ref, currentCourseId) async {
-  final res = await ref.read(coursesApiProvider).myCourses();
+  final res = await ref.read(coursesRepositoryProvider).myCourses(
+    enrichMissingModuleCounts: false,
+  );
   final items = [...res.items]
     ..removeWhere((course) => course.id == currentCourseId)
     ..sort((a, b) => a.safeTitle.toLowerCase().compareTo(b.safeTitle.toLowerCase()));
@@ -1005,8 +901,8 @@ class _AddTopicBtnW extends StatelessWidget {
 }
 
 class _TopicsEmptyW extends StatelessWidget {
-  final VoidCallback onAddManual, onGenerateAI;
-  const _TopicsEmptyW({required this.onAddManual, required this.onGenerateAI});
+  final VoidCallback onAddManual;
+  const _TopicsEmptyW({required this.onAddManual});
   @override
   Widget build(BuildContext context) => SizedBox(
     width: double.infinity,
@@ -1029,7 +925,7 @@ class _TopicsEmptyW extends StatelessWidget {
               style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
           const SizedBox(height: 6),
           const Text(
-            'Use the "Add Topic" button above\nto create topics manually or with AI.',
+            'Use the "Add Topic" button above to add the first topic for this material.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.6),
           ),
@@ -1148,6 +1044,13 @@ class _TopicPanelWidget extends StatelessWidget {
     final readinessMeta = _topicReadinessMeta(topic.readiness);
     final difficultyMeta = _topicDifficultyMeta(topic.difficulty);
 
+    final isSubtopic = topic.parentTopicId != null;
+    final parentTopic = isSubtopic
+        ? allMaterialTopics.cast<TopicItem?>().firstWhere(
+            (t) => t?.id == topic.parentTopicId,
+            orElse: () => null,
+          )
+        : null;
     final subtopics = allMaterialTopics
         .where((t) => t.parentTopicId == topic.id)
         .toList()
@@ -1156,24 +1059,28 @@ class _TopicPanelWidget extends StatelessWidget {
 
     final actionCards = [
       _TopicActionData(
-        icon: Icons.auto_awesome_rounded,
-        title: 'Generate questions',
-        subtitle: 'Open scoped AI generation with this topic as the anchor.',
+        icon: isSubtopic ? Icons.topic_outlined : Icons.auto_awesome_rounded,
+        title: isSubtopic ? 'Build questions from subtopic' : 'Generate questions',
+        subtitle: isSubtopic
+            ? 'Use this subtopic as a focused anchor for question authoring.'
+            : 'Open scoped AI generation with this topic as the anchor.',
         accent: AppColors.primary,
         softColor: AppColors.primarySoft,
         onTap: onGenerate,
       ),
       _TopicActionData(
         icon: Icons.edit_note_rounded,
-        title: 'Draft manual question',
-        subtitle: 'Create a hand-authored question tied directly to this topic.',
+        title: isSubtopic ? 'Draft subtopic question' : 'Draft manual question',
+        subtitle: isSubtopic
+            ? 'Create a question tied to this subtopic only.'
+            : 'Create a hand-authored question tied directly to this topic.',
         accent: _K.blue,
         softColor: _K.blueSoft,
         onTap: onAddManualQuestion,
       ),
       _TopicActionData(
         icon: Icons.tune_rounded,
-        title: 'Refine topic setup',
+        title: isSubtopic ? 'Refine subtopic setup' : 'Refine topic setup',
         subtitle: 'Update title, mappings, notes, and delivery status.',
         accent: _K.green,
         softColor: _K.greenSoft,
@@ -1182,10 +1089,10 @@ class _TopicPanelWidget extends StatelessWidget {
     ];
 
     final timeline = [
-      const _TimelineEntry(
+      _TimelineEntry(
         icon: Icons.add_task_rounded,
-        title: 'Topic created',
-        subtitle: 'Structured under this material and ready for instructor refinement.',
+        title: isSubtopic ? 'Subtopic created' : 'Topic created',
+        subtitle: isSubtopic ? 'Structured under its parent topic and ready for refinement.' : 'Structured under this material and ready for instructor refinement.',
       ),
       _TimelineEntry(
         icon: Icons.flag_outlined,
@@ -1278,6 +1185,8 @@ class _TopicPanelWidget extends StatelessWidget {
                     module: module,
                     material: material,
                     topic: topic,
+                    parentTopicTitle: parentTopic?.title,
+                    isSubtopic: isSubtopic,
                     mappedOutcomesCount: mappedOutcomes.length,
                     readinessMeta: readinessMeta,
                     difficultyMeta: difficultyMeta,
@@ -1286,6 +1195,8 @@ class _TopicPanelWidget extends StatelessWidget {
                   const SizedBox(height: 18),
                   _TopicInsightsGrid(
                     topic: topic,
+                    parentTopicTitle: parentTopic?.title,
+                    isSubtopic: isSubtopic,
                     mappedOutcomesCount: mappedOutcomes.length,
                     readinessMeta: readinessMeta,
                     difficultyMeta: difficultyMeta,
@@ -1371,13 +1282,31 @@ class _TopicPanelWidget extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  _TopicSubtopicsCard(
-                    topic: topic,
-                    subtopics: subtopics,
-                    onAddSubtopic: onAddSubtopic,
-                    onOpenSubtopic: onOpenSubtopic,
-                  ),
-                  const SizedBox(height: 16),
+                  if (!isSubtopic) ...[
+                    _TopicSubtopicsCard(
+                      topic: topic,
+                      subtopics: subtopics,
+                      onAddSubtopic: onAddSubtopic,
+                      onOpenSubtopic: onOpenSubtopic,
+                    ),
+                    const SizedBox(height: 16),
+                  ] else ...[
+                    _CardWidget(
+                      header: const _HdrWidget(
+                        icon: Icons.account_tree_outlined,
+                        iconColor: AppColors.primary,
+                        title: 'Parent topic',
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+                        child: Text(
+                          parentTopic?.title ?? 'Parent topic',
+                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                  ],
                   _TopicTimelineCard(entries: timeline),
                 ],
               ),
@@ -1539,6 +1468,8 @@ class _TopicHeroCard extends StatelessWidget {
   final MaterialItem material;
   final TopicItem topic;
   final int mappedOutcomesCount;
+  final bool isSubtopic;
+  final String? parentTopicTitle;
   final _TopicMeta readinessMeta;
   final _TopicMeta difficultyMeta;
   final VoidCallback onManage;
@@ -1548,6 +1479,8 @@ class _TopicHeroCard extends StatelessWidget {
     required this.material,
     required this.topic,
     required this.mappedOutcomesCount,
+    required this.isSubtopic,
+    this.parentTopicTitle,
     required this.readinessMeta,
     required this.difficultyMeta,
     required this.onManage,
@@ -1557,9 +1490,19 @@ class _TopicHeroCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final created = '${topic.createdAt.day}/${topic.createdAt.month}/${topic.createdAt.year}';
     final statusChips = [
-      const _TopicStatusChip(icon: Icons.sell_outlined, label: 'Topic', fg: AppColors.primary, bg: AppColors.primarySoft),
+      _TopicStatusChip(
+        icon: isSubtopic ? Icons.subdirectory_arrow_right_rounded : Icons.sell_outlined,
+        label: isSubtopic ? 'Subtopic' : 'Topic',
+        fg: AppColors.primary,
+        bg: AppColors.primarySoft,
+      ),
       if (topic.isRequired)
-        const _TopicStatusChip(icon: Icons.check_circle_outline_rounded, label: 'Required', fg: _K.blue, bg: _K.blueSoft),
+        const _TopicStatusChip(
+          icon: Icons.check_circle_outline_rounded,
+          label: 'Required',
+          fg: _K.blue,
+          bg: _K.blueSoft,
+        ),
       _TopicStatusChip(icon: readinessMeta.icon, label: readinessMeta.label, fg: readinessMeta.fg, bg: readinessMeta.bg),
       _TopicStatusChip(icon: difficultyMeta.icon, label: difficultyMeta.label, fg: difficultyMeta.fg, bg: difficultyMeta.bg),
     ];
@@ -1599,7 +1542,11 @@ class _TopicHeroCard extends StatelessWidget {
                     borderRadius: BorderRadius.circular(18),
                     border: Border.all(color: Colors.white.withOpacity(0.14)),
                   ),
-                  child: const Icon(Icons.auto_stories_rounded, color: Colors.white, size: 28),
+                  child: Icon(
+                    isSubtopic ? Icons.subdirectory_arrow_right_rounded : Icons.auto_stories_rounded,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                 ),
                 const SizedBox(width: 16),
                 Expanded(
@@ -1623,6 +1570,8 @@ class _TopicHeroCard extends StatelessWidget {
                         children: [
                           _TopicBreadcrumb(icon: Icons.folder_outlined, text: module.title),
                           _TopicBreadcrumb(icon: Icons.article_outlined, text: material.displayTitle),
+                          if (isSubtopic && parentTopicTitle != null)
+                            _TopicBreadcrumb(icon: Icons.account_tree_outlined, text: parentTopicTitle!),
                           _TopicBreadcrumb(icon: Icons.calendar_today_outlined, text: 'Created $created'),
                         ],
                       ),
@@ -1658,15 +1607,15 @@ class _TopicHeroCard extends StatelessWidget {
                   child: _HeroStat(
                     label: 'Question workflow',
                     value: topic.readiness == TopicReadiness.ready ? 'Generation-ready' : 'Preparation mode',
-                    helper: topic.readiness == TopicReadiness.ready ? 'Safe to build assessment coverage' : 'Refine topic first',
+                    helper: topic.readiness == TopicReadiness.ready ? 'Safe to build assessment coverage' : 'Refine content first',
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: _HeroStat(
-                    label: 'Topic type',
-                    value: topic.source == TopicSource.ai ? 'AI-assisted' : 'Instructor-led',
-                    helper: topic.source == TopicSource.ai ? 'Generated from material context' : 'Created manually',
+                    label: isSubtopic ? 'Hierarchy' : 'Topic type',
+                    value: isSubtopic ? 'Nested under topic' : (topic.source == TopicSource.ai ? 'AI-assisted' : 'Instructor-led'),
+                    helper: isSubtopic ? 'Final content level inside this material' : (topic.source == TopicSource.ai ? 'Generated from material context' : 'Created manually'),
                   ),
                 ),
               ],
@@ -1681,12 +1630,16 @@ class _TopicHeroCard extends StatelessWidget {
 class _TopicInsightsGrid extends StatelessWidget {
   final TopicItem topic;
   final int mappedOutcomesCount;
+  final bool isSubtopic;
+  final String? parentTopicTitle;
   final _TopicMeta readinessMeta;
   final _TopicMeta difficultyMeta;
 
   const _TopicInsightsGrid({
     required this.topic,
     required this.mappedOutcomesCount,
+    required this.isSubtopic,
+    this.parentTopicTitle,
     required this.readinessMeta,
     required this.difficultyMeta,
   });
@@ -1729,12 +1682,16 @@ class _TopicInsightsGrid extends StatelessWidget {
         softColor: _K.blueSoft,
       ),
       _TopicInsightData(
-        title: 'Instructor notes',
-        value: (topic.instructorNotes?.trim().isNotEmpty ?? false) ? 'Available' : 'Missing',
-        caption: (topic.instructorNotes?.trim().isNotEmpty ?? false)
-            ? 'Delivery guidance has been added'
-            : 'Add notes for examples and pacing',
-        icon: Icons.sticky_note_2_outlined,
+        title: isSubtopic ? 'Parent topic' : 'Instructor notes',
+        value: isSubtopic
+            ? (parentTopicTitle ?? 'Parent topic')
+            : ((topic.instructorNotes?.trim().isNotEmpty ?? false) ? 'Available' : 'Missing'),
+        caption: isSubtopic
+            ? 'This subtopic is the final hierarchy level and cannot contain children.'
+            : ((topic.instructorNotes?.trim().isNotEmpty ?? false)
+                ? 'Delivery guidance has been added'
+                : 'Add notes for examples and pacing'),
+        icon: isSubtopic ? Icons.account_tree_outlined : Icons.sticky_note_2_outlined,
         accent: AppColors.primary,
         softColor: AppColors.primarySoft,
       ),
@@ -1761,315 +1718,6 @@ class _TopicInsightsGrid extends StatelessWidget {
       },
     );
   }
-}
-
-class _TopicInsightCard extends StatelessWidget {
-  final _TopicInsightData data;
-
-  const _TopicInsightCard({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return _CardWidget(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: data.softColor,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(data.icon, color: data.accent, size: 20),
-            ),
-            const SizedBox(height: 14),
-            Text(
-              data.title,
-              style: const TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w700),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              data.value,
-              style: const TextStyle(fontSize: 16, color: AppColors.textTitle, fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              data.caption,
-              style: const TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TopicSmartActionsCard extends StatelessWidget {
-  final List<_TopicActionData> actions;
-
-  const _TopicSmartActionsCard({required this.actions});
-
-  @override
-  Widget build(BuildContext context) {
-    return _CardWidget(
-      header: const _HdrWidget(
-        icon: Icons.bolt_rounded,
-        iconColor: AppColors.primary,
-        title: 'Smart Actions',
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-        child: Column(
-          children: actions
-              .map(
-                (action) => Padding(
-                  padding: EdgeInsets.only(bottom: action == actions.last ? 0 : 12),
-                  child: _TopicActionTile(data: action),
-                ),
-              )
-              .toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _TopicActionTile extends StatelessWidget {
-  final _TopicActionData data;
-
-  const _TopicActionTile({required this.data});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
-      onTap: data.onTap,
-      borderRadius: BorderRadius.circular(18),
-      child: Ink(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE5E7EB)),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: data.softColor,
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: Icon(data.icon, color: data.accent, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    data.title,
-                    style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textTitle),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    data.subtitle,
-                    style: const TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.45),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            const Icon(Icons.arrow_outward_rounded, size: 18, color: AppColors.textMuted),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _TopicTimelineCard extends StatelessWidget {
-  final List<_TimelineEntry> entries;
-
-  const _TopicTimelineCard({required this.entries});
-
-  @override
-  Widget build(BuildContext context) {
-    return _CardWidget(
-      header: const _HdrWidget(
-        icon: Icons.timeline_rounded,
-        iconColor: AppColors.primary,
-        title: 'Delivery Timeline',
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 12, 18, 16),
-        child: Column(
-          children: List.generate(entries.length, (index) {
-            final entry = entries[index];
-            final isLast = index == entries.length - 1;
-            return Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                SizedBox(
-                  width: 28,
-                  child: Column(
-                    children: [
-                      Container(
-                        width: 28,
-                        height: 28,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFEFF6FF),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Icon(entry.icon, color: AppColors.primary, size: 16),
-                      ),
-                      if (!isLast)
-                        Container(
-                          width: 2,
-                          height: 42,
-                          margin: const EdgeInsets.symmetric(vertical: 6),
-                          color: const Color(0xFFE2E8F0),
-                        ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Padding(
-                    padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          entry.title,
-                          style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textTitle),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          entry.subtitle,
-                          style: const TextStyle(fontSize: 12.3, color: AppColors.textMuted, height: 1.5),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            );
-          }),
-        ),
-      ),
-    );
-  }
-}
-
-class _TopicStatusChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color fg;
-  final Color bg;
-
-  const _TopicStatusChip({
-    required this.icon,
-    required this.label,
-    required this.fg,
-    required this.bg,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(bg == Colors.white ? 1 : 0)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: fg),
-          const SizedBox(width: 6),
-          Text(
-            label.toUpperCase(),
-            style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: fg, letterSpacing: .2),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TopicBreadcrumb extends StatelessWidget {
-  final IconData icon;
-  final String text;
-
-  const _TopicBreadcrumb({required this.icon, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 13, color: Colors.white70),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: const TextStyle(fontSize: 12.5, color: Colors.white70, fontWeight: FontWeight.w600),
-        ),
-      ],
-    );
-  }
-}
-
-class _HeroStat extends StatelessWidget {
-  final String label;
-  final String value;
-  final String helper;
-
-  const _HeroStat({
-    required this.label,
-    required this.value,
-    required this.helper,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: const TextStyle(fontSize: 11.5, color: Colors.white70, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 6),
-          Text(value, style: const TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text(helper, style: const TextStyle(fontSize: 11.5, color: Colors.white70, height: 1.4)),
-        ],
-      ),
-    );
-  }
-}
-
-class _TopicMeta {
-  final String label;
-  final IconData icon;
-  final Color fg;
-  final Color bg;
-
-  const _TopicMeta({
-    required this.label,
-    required this.icon,
-    required this.fg,
-    required this.bg,
-  });
 }
 
 class _TopicInsightData {
@@ -2118,6 +1766,314 @@ class _TimelineEntry {
     required this.title,
     required this.subtitle,
   });
+}
+
+class _TopicMeta {
+  final String label;
+  final IconData icon;
+  final Color fg;
+  final Color bg;
+
+  const _TopicMeta({
+    required this.label,
+    required this.icon,
+    required this.fg,
+    required this.bg,
+  });
+}
+
+class _TopicStatusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color fg;
+  final Color bg;
+
+  const _TopicStatusChip({
+    required this.icon,
+    required this.label,
+    required this.fg,
+    required this.bg,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: fg.withOpacity(0.14)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: fg),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: fg,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopicBreadcrumb extends StatelessWidget {
+  final IconData icon;
+  final String text;
+
+  const _TopicBreadcrumb({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, size: 14, color: Colors.white.withOpacity(0.78)),
+        const SizedBox(width: 5),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 12.5,
+            fontWeight: FontWeight.w600,
+            color: Colors.white.withOpacity(0.84),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _HeroStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final String helper;
+
+  const _HeroStat({
+    required this.label,
+    required this.value,
+    required this.helper,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.10)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Colors.white.withOpacity(0.78),
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            style: const TextStyle(
+              fontSize: 15.5,
+              fontWeight: FontWeight.w800,
+              color: Colors.white,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            helper,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.45,
+              color: Colors.white.withOpacity(0.72),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopicInsightCard extends StatelessWidget {
+  final _TopicInsightData data;
+
+  const _TopicInsightCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFE9EEF5)),
+      ),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: data.softColor,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(data.icon, color: data.accent, size: 20),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            data.title,
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            data.value,
+            style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: AppColors.textTitle),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            data.caption,
+            style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopicSmartActionsCard extends StatelessWidget {
+  final List<_TopicActionData> actions;
+
+  const _TopicSmartActionsCard({required this.actions});
+
+  @override
+  Widget build(BuildContext context) {
+    return _CardWidget(
+      header: const _HdrWidget(
+        icon: Icons.flash_on_rounded,
+        iconColor: AppColors.primary,
+        title: 'Smart Actions',
+      ),
+      child: Column(
+        children: [
+          for (var i = 0; i < actions.length; i++) ...[
+            _TopicActionTile(data: actions[i]),
+            if (i != actions.length - 1) const Divider(height: 1, color: Color(0xFFEEF2F6)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _TopicActionTile extends StatelessWidget {
+  final _TopicActionData data;
+
+  const _TopicActionTile({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: data.onTap,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: data.softColor,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(data.icon, color: data.accent, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(data.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                    const SizedBox(height: 4),
+                    Text(data.subtitle, style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.4)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Icon(Icons.arrow_outward_rounded, size: 18, color: AppColors.textMuted),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _TopicTimelineCard extends StatelessWidget {
+  final List<_TimelineEntry> entries;
+
+  const _TopicTimelineCard({required this.entries});
+
+  @override
+  Widget build(BuildContext context) {
+    return _CardWidget(
+      header: const _HdrWidget(
+        icon: Icons.schedule_rounded,
+        iconColor: AppColors.primary,
+        title: 'Topic timeline',
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+        child: Column(
+          children: [
+            for (var i = 0; i < entries.length; i++) ...[
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: AppColors.primarySoft,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(entries[i].icon, size: 16, color: AppColors.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(entries[i].title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                        const SizedBox(height: 4),
+                        Text(entries[i].subtitle, style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.45)),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+              if (i != entries.length - 1) const Padding(
+                padding: EdgeInsets.only(left: 15, top: 8, bottom: 8),
+                child: Divider(height: 1, color: Color(0xFFEEF2F6)),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 _TopicMeta _topicReadinessMeta(TopicReadiness readiness) {

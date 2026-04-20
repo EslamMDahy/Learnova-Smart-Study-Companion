@@ -93,6 +93,7 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
             payload:    TopicUpdateRequest(
               title:              topic.title,
               description:        topic.description,
+              parentTopicId:      topic.parentTopicId,
               learningOutcomeIds: topic.learningOutcomeIds.isNotEmpty
                   ? topic.learningOutcomeIds
                   : topic.linkedOutcomeIds
@@ -109,6 +110,7 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
         linkedOutcomeId: topic.linkedOutcomeId,
         linkedOutcomeIds: topic.linkedOutcomeIds,
         learningOutcomeIds: topic.learningOutcomeIds,
+        parentTopicId: topic.parentTopicId,
         instructorNotes: topic.instructorNotes,
         estimatedDurationMinutes: topic.estimatedDurationMinutes,
         isRequired: topic.isRequired,

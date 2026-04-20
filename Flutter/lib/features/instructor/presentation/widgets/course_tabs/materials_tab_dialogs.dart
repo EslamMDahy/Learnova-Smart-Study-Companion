@@ -58,13 +58,6 @@ class _AddTopicDialogWidgetState extends State<_AddTopicDialogWidget> {
       Text('in "${widget.moduleTitle}"', style: const TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w400)),
     ]),
     content: SizedBox(width: 440, child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Container(padding: const EdgeInsets.fromLTRB(12, 10, 12, 10), margin: const EdgeInsets.only(bottom: 14),
-          decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Color(0x33137FEC))),
-          child: const Row(children: [Icon(Icons.auto_awesome_rounded, size: 15, color: AppColors.primary),
-              SizedBox(width: 8),
-              Expanded(child: Text('Tip: Use AI to auto-generate topics from your PDF.',
-                  style: TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w500, height: 1.4)))])),
       TextField(controller: widget.titleCtrl, autofocus: true, decoration: InputDecoration(
           hintText: 'e.g. Introduction to Cryptography', labelText: 'Topic Title *',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),

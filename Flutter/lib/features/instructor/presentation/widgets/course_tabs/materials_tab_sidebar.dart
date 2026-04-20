@@ -14,6 +14,17 @@ class _SidebarWidget extends StatelessWidget {
   final void Function(int? moduleId) onDragChanged;
   final VoidCallback onAddModule;
   final VoidCallback onRefresh;
+  final bool selectionMode;
+  final _TreeSelectionState treeSelection;
+  final VoidCallback onToggleSelectionMode;
+  final VoidCallback onClearSelection;
+  final void Function(ModuleItem module, bool checked) onModuleCheckChanged;
+  final void Function(ModuleItem module, MaterialItem material, bool checked) onMaterialCheckChanged;
+  final void Function(ModuleItem module, MaterialItem material, TopicItem topic, bool checked) onTopicCheckChanged;
+  final Set<int> expandedMaterialIds;
+  final Set<int> expandedTopicIds;
+  final void Function(MaterialItem material) onToggleMaterialExpanded;
+  final void Function(TopicItem topic) onToggleTopicExpanded;
 
   const _SidebarWidget({
     required this.state,
@@ -29,6 +40,17 @@ class _SidebarWidget extends StatelessWidget {
     required this.onDragChanged,
     required this.onAddModule,
     required this.onRefresh,
+    required this.selectionMode,
+    required this.treeSelection,
+    required this.onToggleSelectionMode,
+    required this.onClearSelection,
+    required this.onModuleCheckChanged,
+    required this.onMaterialCheckChanged,
+    required this.onTopicCheckChanged,
+    required this.expandedMaterialIds,
+    required this.expandedTopicIds,
+    required this.onToggleMaterialExpanded,
+    required this.onToggleTopicExpanded,
   });
 
   @override
@@ -63,6 +85,70 @@ class _SidebarWidget extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (selectionMode && !treeSelection.isEmpty) ...[
+                  InkWell(
+                    hoverColor: Colors.transparent,
+                    splashColor: Colors.transparent,
+                    highlightColor: Colors.transparent,
+                    overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                    onTap: onClearSelection,
+                    borderRadius: BorderRadius.circular(999),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: _K.blueSoft,
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        '${treeSelection.totalCount}',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 4),
+                ],
+                InkWell(
+                  hoverColor: Colors.transparent,
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                  onTap: onToggleSelectionMode,
+                  borderRadius: BorderRadius.circular(999),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: selectionMode ? _K.blueSoft : const Color(0xFFF8FAFC),
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(
+                        color: selectionMode ? AppColors.primary.withOpacity(0.18) : _K.div,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          selectionMode ? Icons.check_box_rounded : Icons.check_box_outline_blank_rounded,
+                          size: 12,
+                          color: selectionMode ? AppColors.primary : AppColors.textHint,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Select',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: selectionMode ? AppColors.primary : AppColors.textHint,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 4),
                 if (state.modulesLoading)
                   const SizedBox(
                     width: 12,
@@ -136,6 +222,15 @@ class _SidebarWidget extends StatelessWidget {
                                   onMaterialTap: (mat) => onMaterialTap(m, mat),
                                   onTopicTap: (mat, t) => onTopicTap(m, mat, t),
                                   onAddMaterial: () => onAddMaterial(m),
+                                  selectionMode: selectionMode,
+                                  treeSelection: treeSelection,
+                                  onModuleCheckChanged: (checked) => onModuleCheckChanged(m, checked),
+                                  onMaterialCheckChanged: (material, checked) => onMaterialCheckChanged(m, material, checked),
+                                  onTopicCheckChanged: (material, topic, checked) => onTopicCheckChanged(m, material, topic, checked),
+                                  expandedMaterialIds: expandedMaterialIds,
+                                  expandedTopicIds: expandedTopicIds,
+                                  onToggleMaterialExpanded: onToggleMaterialExpanded,
+                                  onToggleTopicExpanded: onToggleTopicExpanded,
                                   dragHandle: ReorderableDragStartListener(
                                     index: i,
                                     child: Tooltip(
@@ -190,6 +285,20 @@ class _SidebarWidget extends StatelessWidget {
   }
 }
 
+
+
+List<TopicItem> _rootTopicsForMaterial(List<TopicItem> topics) {
+  final roots = topics.where((t) => t.parentTopicId == null).toList()
+    ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+  return roots;
+}
+
+List<TopicItem> _childTopicsForParent(List<TopicItem> topics, int parentTopicId) {
+  final children = topics.where((t) => t.parentTopicId == parentTopicId).toList()
+    ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+  return children;
+}
+
 class _SidebarEmpty extends StatelessWidget {
   final VoidCallback onAdd;
   const _SidebarEmpty({required this.onAdd});
@@ -217,7 +326,7 @@ class _SidebarEmpty extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, height: 1.45),
               ),
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: onAdd,
                 icon: const Icon(Icons.add_rounded, size: 16),
@@ -236,18 +345,27 @@ class _SidebarEmpty extends StatelessWidget {
 
 // ─── Module row ──────────────────────────────────────────────────────────────
 class _ModuleRowWidget extends StatelessWidget {
-  final ModuleItem    module;
-  final bool          isExpanded;
+  final ModuleItem module;
+  final bool isExpanded;
   final List<MaterialItem> materials;
-  final bool          loading;
+  final bool loading;
   final List<TopicItem> moduleTopics;
-  final _Ctx?         active;
-  final bool          isDragging;
-  final Widget?       dragHandle;
-  final VoidCallback  onModuleTap;
+  final _Ctx? active;
+  final bool isDragging;
+  final Widget? dragHandle;
+  final VoidCallback onModuleTap;
   final void Function(MaterialItem) onMaterialTap;
   final void Function(MaterialItem, TopicItem) onTopicTap;
-  final VoidCallback  onAddMaterial;
+  final VoidCallback onAddMaterial;
+  final bool selectionMode;
+  final _TreeSelectionState treeSelection;
+  final ValueChanged<bool> onModuleCheckChanged;
+  final void Function(MaterialItem material, bool checked) onMaterialCheckChanged;
+  final void Function(MaterialItem material, TopicItem topic, bool checked) onTopicCheckChanged;
+  final Set<int> expandedMaterialIds;
+  final Set<int> expandedTopicIds;
+  final void Function(MaterialItem material) onToggleMaterialExpanded;
+  final void Function(TopicItem topic) onToggleTopicExpanded;
 
   const _ModuleRowWidget({
     required this.module,
@@ -262,13 +380,35 @@ class _ModuleRowWidget extends StatelessWidget {
     required this.onMaterialTap,
     required this.onTopicTap,
     required this.onAddMaterial,
+    required this.selectionMode,
+    required this.treeSelection,
+    required this.onModuleCheckChanged,
+    required this.onMaterialCheckChanged,
+    required this.onTopicCheckChanged,
+    required this.expandedMaterialIds,
+    required this.expandedTopicIds,
+    required this.onToggleMaterialExpanded,
+    required this.onToggleTopicExpanded,
   });
 
   bool get _isSel => active?.type == _CType.module && active?.module?.id == module.id;
 
+  bool? _moduleCheckValue() {
+    if (materials.isEmpty) {
+      return treeSelection.moduleIds.contains(module.id);
+    }
+    final allMaterialIds = materials.map((m) => m.id).toSet();
+    final selectedCount = allMaterialIds.where(treeSelection.materialIds.contains).length;
+    if (selectedCount == 0) {
+      return treeSelection.moduleIds.contains(module.id) ? true : false;
+    }
+    if (selectedCount == allMaterialIds.length) return true;
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
-    final highlight = _isSel || isDragging;
+    final selected = _isSel || isDragging;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -281,29 +421,46 @@ class _ModuleRowWidget extends StatelessWidget {
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             curve: Curves.easeOutCubic,
-            padding: const EdgeInsets.fromLTRB(8, 9, 8, 9),
+            margin: const EdgeInsets.fromLTRB(6, 0, 6, 2),
+            padding: const EdgeInsets.fromLTRB(6, 7, 6, 7),
             decoration: BoxDecoration(
-              color: highlight ? _K.blueSoft : Colors.white,
-              borderRadius: BorderRadius.circular(10),
+              color: selected ? const Color(0xFFF7FAFF) : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: highlight ? AppColors.primary.withOpacity(0.18) : _K.div,
+                color: selected ? const Color(0xFFD5E5FF) : Colors.transparent,
               ),
             ),
             child: Row(
               children: [
-                dragHandle ?? const SizedBox(width: 22, height: 22),
+                dragHandle ?? const SizedBox(width: 18, height: 18),
+                if (selectionMode)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Transform.scale(
+                      scale: .88,
+                      child: Checkbox(
+                        value: _moduleCheckValue(),
+                        tristate: true,
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.1),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        onChanged: (value) => onModuleCheckChanged(value == true),
+                      ),
+                    ),
+                  ),
                 Icon(
                   isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded,
-                  size: 15,
-                  color: highlight ? AppColors.primary : AppColors.textHint,
+                  size: 14,
+                  color: const Color(0xFF94A3B8),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 4),
                 Icon(
                   Icons.folder_rounded,
-                  size: 16,
-                  color: highlight ? AppColors.primary : const Color(0xFFEA580C),
+                  size: 14,
+                  color: selected ? AppColors.primary : const Color(0xFFEAB308),
                 ),
-                const SizedBox(width: 8),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -313,46 +470,41 @@ class _ModuleRowWidget extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          fontSize: 12.5,
+                          fontSize: 12.2,
+                          height: 1.1,
                           fontWeight: FontWeight.w700,
-                          color: highlight ? AppColors.primary : AppColors.textTitle,
+                          color: selected ? AppColors.primary : const Color(0xFF0F172A),
                         ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${materials.length} material${materials.length == 1 ? '' : 's'}',
-                        style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted),
+                        style: const TextStyle(fontSize: 10.2, color: Color(0xFF94A3B8), height: 1.1),
                       ),
                     ],
                   ),
                 ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: module.isPublished ? _K.greenSoft : _K.amberSoft,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    module.isPublished ? 'Live' : 'Draft',
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      fontWeight: FontWeight.w700,
-                      color: module.isPublished ? _K.green : _K.amber,
+                if (module.isPublished)
+                  Container(
+                    width: 7,
+                    height: 7,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF22C55E),
+                      shape: BoxShape.circle,
                     ),
                   ),
-                ),
                 if (isExpanded) ...[
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 6),
                   InkWell(
                     hoverColor: Colors.transparent,
                     splashColor: Colors.transparent,
                     highlightColor: Colors.transparent,
                     overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                     onTap: onAddMaterial,
-                    borderRadius: BorderRadius.circular(9),
+                    borderRadius: BorderRadius.circular(8),
                     child: const Padding(
-                      padding: EdgeInsets.all(3),
-                      child: Icon(Icons.add_rounded, size: 14, color: AppColors.textHint),
+                      padding: EdgeInsets.all(2),
+                      child: Icon(Icons.add_rounded, size: 14, color: Color(0xFF94A3B8)),
                     ),
                   ),
                 ],
@@ -381,7 +533,7 @@ class _ModuleRowWidget extends StatelessWidget {
     }
     if (materials.isEmpty) {
       return Container(
-        margin: const EdgeInsets.fromLTRB(34, 8, 6, 4),
+        margin: const EdgeInsets.fromLTRB(34, 6, 6, 4),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
           color: Colors.white,
@@ -402,20 +554,31 @@ class _ModuleRowWidget extends StatelessWidget {
         ),
       );
     }
-    return Column(
-      children: materials.map((mat) {
-        final matSel = active?.material?.id == mat.id &&
-            (active?.type == _CType.material || active?.type == _CType.topic);
-        final scopedTopics = moduleTopics.where((t) => t.materialId == mat.id).toList();
-        return _MatRowWidget(
-          material: mat,
-          topics: scopedTopics,
-          isSelected: matSel,
-          active: active,
-          onTap: () => onMaterialTap(mat),
-          onTopicTap: (t) => onTopicTap(mat, t),
-        );
-      }).toList(),
+    return Padding(
+      padding: const EdgeInsets.only(left: 26),
+      child: Column(
+        children: materials.map((mat) {
+          final matSel = active?.material?.id == mat.id &&
+              (active?.type == _CType.material || active?.type == _CType.topic);
+          final scopedTopics = moduleTopics.where((t) => t.materialId == mat.id).toList();
+          return _MatRowWidget(
+            material: mat,
+            topics: scopedTopics,
+            isSelected: matSel,
+            active: active,
+            onTap: () => onMaterialTap(mat),
+            onTopicTap: (t) => onTopicTap(mat, t),
+            selectionMode: selectionMode,
+            treeSelection: treeSelection,
+            onCheckChanged: (checked) => onMaterialCheckChanged(mat, checked),
+            onTopicCheckChanged: (topic, checked) => onTopicCheckChanged(mat, topic, checked),
+            isExpanded: expandedMaterialIds.contains(mat.id),
+            expandedTopicIds: expandedTopicIds,
+            onToggleExpanded: () => onToggleMaterialExpanded(mat),
+            onToggleTopicExpanded: onToggleTopicExpanded,
+          );
+        }).toList(),
+      ),
     );
   }
 }
@@ -427,16 +590,53 @@ class _MatRowWidget extends StatelessWidget {
   final _Ctx? active;
   final VoidCallback onTap;
   final void Function(TopicItem) onTopicTap;
-  const _MatRowWidget({required this.material, required this.topics, required this.isSelected, required this.active, required this.onTap, required this.onTopicTap});
+  final bool selectionMode;
+  final _TreeSelectionState treeSelection;
+  final ValueChanged<bool> onCheckChanged;
+  final void Function(TopicItem topic, bool checked) onTopicCheckChanged;
+  final bool isExpanded;
+  final Set<int> expandedTopicIds;
+  final VoidCallback onToggleExpanded;
+  final void Function(TopicItem topic) onToggleTopicExpanded;
+
+  const _MatRowWidget({
+    required this.material,
+    required this.topics,
+    required this.isSelected,
+    required this.active,
+    required this.onTap,
+    required this.onTopicTap,
+    required this.selectionMode,
+    required this.treeSelection,
+    required this.onCheckChanged,
+    required this.onTopicCheckChanged,
+    required this.isExpanded,
+    required this.expandedTopicIds,
+    required this.onToggleExpanded,
+    required this.onToggleTopicExpanded,
+  });
+
+  bool? _materialCheckValue() {
+    if (topics.isEmpty) {
+      return treeSelection.materialIds.contains(material.id);
+    }
+    final topicIds = topics.map((t) => t.id).toSet();
+    final selectedCount = topicIds.where(treeSelection.topicIds.contains).length;
+    if (selectedCount == 0) return treeSelection.materialIds.contains(material.id) ? true : false;
+    if (selectedCount == topicIds.length) return true;
+    return null;
+  }
 
   @override
   Widget build(BuildContext context) {
     const iconMap = {
       'video': (Icons.play_circle_outline_rounded, Color(0xFF2563EB)),
-      'pdf'  : (Icons.picture_as_pdf_outlined,    Color(0xFFDC2626)),
-      'quiz' : (Icons.quiz_outlined,               Color(0xFF7C3AED)),
+      'pdf': (Icons.picture_as_pdf_outlined, Color(0xFFEF4444)),
+      'quiz': (Icons.quiz_outlined, Color(0xFF7C3AED)),
     };
     final (ico, col) = iconMap[material.type] ?? (Icons.article_outlined, AppColors.textMuted);
+    final roots = _rootTopicsForMaterial(topics);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -447,27 +647,82 @@ class _MatRowWidget extends StatelessWidget {
           overlayColor: const WidgetStatePropertyAll(Colors.transparent),
           onTap: onTap,
           child: Container(
-            margin: const EdgeInsets.fromLTRB(28, 1, 6, 1),
-            padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
+            margin: const EdgeInsets.fromLTRB(0, 1, 4, 1),
+            padding: const EdgeInsets.fromLTRB(8, 7, 6, 7),
             decoration: BoxDecoration(
-              color: isSelected ? _K.blueSoft : Colors.transparent,
-              borderRadius: BorderRadius.circular(9),
+              color: isSelected ? const Color(0xFFF7FAFF) : Colors.transparent,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: isSelected ? const Color(0xFFD5E5FF) : Colors.transparent,
+              ),
             ),
             child: Row(
               children: [
-                Container(width: 1, height: 14, color: _K.div, margin: const EdgeInsets.only(right: 8)),
-                Icon(ico, size: 13, color: isSelected ? AppColors.primary : col),
+                if (selectionMode)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 4),
+                    child: Transform.scale(
+                      scale: .86,
+                      child: Checkbox(
+                        value: _materialCheckValue(),
+                        tristate: true,
+                        visualDensity: VisualDensity.compact,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.1),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                        onChanged: (value) => onCheckChanged(value == true),
+                      ),
+                    ),
+                  ),
+                InkWell(
+                  hoverColor: Colors.transparent,
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                  onTap: roots.isNotEmpty ? onToggleExpanded : null,
+                  child: Icon(
+                    roots.isEmpty
+                        ? Icons.remove_rounded
+                        : (isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded),
+                    size: 13,
+                    color: const Color(0xFF94A3B8),
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Container(
+                  width: 16,
+                  height: 16,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: col.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: Icon(ico, size: 10, color: col),
+                ),
                 const SizedBox(width: 7),
                 Expanded(
-                  child: Text(
-                    material.displayTitle,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 12.5,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                      color: isSelected ? AppColors.primary : const Color(0xFF334155),
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        material.displayTitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 12,
+                          height: 1.1,
+                          fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
+                          color: isSelected ? AppColors.primary : const Color(0xFF334155),
+                        ),
+                      ),
+                      if (topics.isNotEmpty) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          '${roots.length} topic${roots.length == 1 ? '' : 's'}',
+                          style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), height: 1.1),
+                        ),
+                      ],
+                    ],
                   ),
                 ),
                 _Dot(status: material.status),
@@ -475,43 +730,203 @@ class _MatRowWidget extends StatelessWidget {
             ),
           ),
         ),
-        ...topics.map((t) {
-          final tSel = active?.type == _CType.topic && active?.topic?.id == t.id;
-          return InkWell(
-            hoverColor: Colors.transparent,
-            splashColor: Colors.transparent,
-            highlightColor: Colors.transparent,
-            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-            onTap: () => onTopicTap(t),
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(42, 0, 6, 0),
-              padding: const EdgeInsets.fromLTRB(12, 4, 8, 4),
-              decoration: BoxDecoration(
-                color: tSel ? AppColors.primarySoft : Colors.transparent,
-                borderRadius: BorderRadius.circular(5),
+        if (roots.isNotEmpty && isExpanded)
+          Padding(
+            padding: const EdgeInsets.only(left: 22),
+            child: Column(
+              children: roots
+                  .map(
+                    (topic) => _SidebarTopicNode(
+                      topic: topic,
+                      allTopics: topics,
+                      active: active,
+                      depth: 0,
+                      onTap: onTopicTap,
+                      selectionMode: selectionMode,
+                      treeSelection: treeSelection,
+                      onTopicCheckChanged: onTopicCheckChanged,
+                      isExpanded: expandedTopicIds.contains(topic.id),
+                      onToggleExpanded: () => onToggleTopicExpanded(topic),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _SidebarTopicNode extends StatelessWidget {
+  final TopicItem topic;
+  final List<TopicItem> allTopics;
+  final _Ctx? active;
+  final int depth;
+  final ValueChanged<TopicItem> onTap;
+  final bool selectionMode;
+  final _TreeSelectionState treeSelection;
+  final void Function(TopicItem topic, bool checked) onTopicCheckChanged;
+  final bool isExpanded;
+  final VoidCallback onToggleExpanded;
+
+  const _SidebarTopicNode({
+    required this.topic,
+    required this.allTopics,
+    required this.active,
+    required this.depth,
+    required this.onTap,
+    required this.selectionMode,
+    required this.treeSelection,
+    required this.onTopicCheckChanged,
+    required this.isExpanded,
+    required this.onToggleExpanded,
+  });
+
+  bool? _topicCheckValue(List<TopicItem> children) {
+    if (children.isEmpty) {
+      return treeSelection.topicIds.contains(topic.id);
+    }
+    final childIds = children.map((t) => t.id).toSet();
+    final selectedChildren = childIds.where(treeSelection.topicIds.contains).length;
+    if (selectedChildren == 0) return treeSelection.topicIds.contains(topic.id) ? true : false;
+    if (selectedChildren == childIds.length) return true;
+    return null;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = active?.type == _CType.topic && active?.topic?.id == topic.id;
+    final children = depth == 0 ? _childTopicsForParent(allTopics, topic.id) : const <TopicItem>[];
+    final isRootTopic = depth == 0;
+    final baseIndent = isRootTopic ? 10.0 : 34.0;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: EdgeInsets.fromLTRB(baseIndent, 0, 4, 0),
+          child: Stack(
+            children: [
+              if (isRootTopic)
+                Positioned(
+                  left: 6,
+                  top: 0,
+                  bottom: children.isNotEmpty && isExpanded ? -2 : 14,
+                  child: Container(width: 1, color: const Color(0xFFE2E8F0)),
+                )
+              else
+                Positioned(
+                  left: 6,
+                  top: 0,
+                  bottom: 14,
+                  child: Container(width: 1, color: const Color(0xFFE2E8F0)),
+                ),
+              Positioned(
+                left: 6,
+                top: 14,
+                child: Container(width: 10, height: 1, color: const Color(0xFFE2E8F0)),
               ),
-              child: Row(
-                children: [
-                  Container(width: 1, height: 11, color: _K.div, margin: const EdgeInsets.only(right: 7)),
-                  Icon(Icons.tag_rounded, size: 10, color: tSel ? AppColors.primary : AppColors.textHint),
-                  const SizedBox(width: 5),
-                  Expanded(
-                    child: Text(
-                      t.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: tSel ? FontWeight.w600 : FontWeight.w400,
-                        color: tSel ? AppColors.primary : AppColors.textMuted,
-                      ),
+              InkWell(
+                hoverColor: Colors.transparent,
+                splashColor: Colors.transparent,
+                highlightColor: Colors.transparent,
+                overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                onTap: () => onTap(topic),
+                child: Container(
+                  margin: const EdgeInsets.only(left: 16),
+                  padding: const EdgeInsets.fromLTRB(6, 5, 6, 5),
+                  decoration: BoxDecoration(
+                    color: selected ? const Color(0xFFEFF6FF) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(7),
+                    border: Border.all(
+                      color: selected ? const Color(0xFFD5E5FF) : Colors.transparent,
                     ),
                   ),
-                ],
+                  child: Row(
+                    children: [
+                      if (selectionMode)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 4),
+                          child: Transform.scale(
+                            scale: .84,
+                            child: Checkbox(
+                              value: _topicCheckValue(children),
+                              tristate: true,
+                              visualDensity: VisualDensity.compact,
+                              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                              side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.1),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
+                              onChanged: (value) => onTopicCheckChanged(topic, value == true),
+                            ),
+                          ),
+                        ),
+                      if (isRootTopic)
+                        InkWell(
+                          hoverColor: Colors.transparent,
+                          splashColor: Colors.transparent,
+                          highlightColor: Colors.transparent,
+                          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                          onTap: children.isNotEmpty ? onToggleExpanded : null,
+                          child: Icon(
+                            children.isEmpty
+                                ? Icons.remove_rounded
+                                : (isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded),
+                            size: 12,
+                            color: const Color(0xFF94A3B8),
+                          ),
+                        )
+                      else
+                        const SizedBox(width: 12, height: 12),
+                      const SizedBox(width: 4),
+                      Icon(
+                        isRootTopic ? Icons.topic_outlined : Icons.subdirectory_arrow_right_rounded,
+                        size: isRootTopic ? 12 : 11,
+                        color: selected ? AppColors.primary : const Color(0xFF94A3B8),
+                      ),
+                      const SizedBox(width: 5),
+                      Expanded(
+                        child: Text(
+                          topic.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: isRootTopic ? 11.2 : 10.7,
+                            height: 1.15,
+                            fontWeight: selected ? FontWeight.w700 : (isRootTopic ? FontWeight.w600 : FontWeight.w500),
+                            color: selected ? AppColors.primary : (isRootTopic ? const Color(0xFF334155) : const Color(0xFF64748B)),
+                          ),
+                        ),
+                      ),
+                      if (isRootTopic && children.isNotEmpty)
+                        Text(
+                          '${children.length}',
+                          style: const TextStyle(
+                            fontSize: 9.5,
+                            fontWeight: FontWeight.w700,
+                            color: Color(0xFF94A3B8),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
               ),
+            ],
+          ),
+        ),
+        if (isRootTopic && isExpanded)
+          for (final child in children)
+            _SidebarTopicNode(
+              topic: child,
+              allTopics: allTopics,
+              active: active,
+              depth: depth + 1,
+              onTap: onTap,
+              selectionMode: selectionMode,
+              treeSelection: treeSelection,
+              onTopicCheckChanged: onTopicCheckChanged,
+              isExpanded: false,
+              onToggleExpanded: () {},
             ),
-          );
-        }),
       ],
     );
   }
@@ -522,21 +937,28 @@ class _MatRowWidget extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 class _FooterWidget extends StatelessWidget {
   final _Ctx ctx; final bool uploading; final bool canGenerate;
+  final int? selectionCount;
   final VoidCallback onUpload, onGenerate, onClose;
   const _FooterWidget({required this.ctx, required this.uploading, required this.canGenerate,
+      this.selectionCount,
       required this.onUpload, required this.onGenerate, required this.onClose});
 
-  String get _label => switch (ctx.type) {
-    _CType.module   => ctx.module?.title ?? 'Module',
-    _CType.material => ctx.material?.displayTitle ?? 'Material',
-    _CType.topic    => ctx.topic?.title ?? 'Topic',
-  };
-  IconData get _icon => switch (ctx.type) {
-    _CType.module   => Icons.folder_rounded,
-    _CType.material => ctx.material?.type == 'video'
-        ? Icons.play_circle_filled_rounded : Icons.picture_as_pdf_rounded,
-    _CType.topic    => Icons.tag_rounded,
-  };
+  bool get _showSelectionLabel => (selectionCount ?? 0) > 0;
+  String get _label => _showSelectionLabel
+      ? '${selectionCount!} selected'
+      : switch (ctx.type) {
+          _CType.module   => ctx.module?.title ?? 'Module',
+          _CType.material => ctx.material?.displayTitle ?? 'Material',
+          _CType.topic    => ctx.topic?.title ?? 'Topic',
+        };
+  IconData get _icon => _showSelectionLabel
+      ? Icons.checklist_rounded
+      : switch (ctx.type) {
+          _CType.module   => Icons.folder_rounded,
+          _CType.material => ctx.material?.type == 'video'
+              ? Icons.play_circle_filled_rounded : Icons.picture_as_pdf_rounded,
+          _CType.topic    => Icons.tag_rounded,
+        };
 
   @override
   Widget build(BuildContext context) {
@@ -678,249 +1100,786 @@ class _ModulePanelWidget extends StatelessWidget {
     final processingMaterials = materials.where((m) => m.status != 'ready').length;
 
     return Container(
-      color: _K.bg,
+      color: const Color(0xFFF8FAFC),
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(28, 28, 28, 112),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _ModuleHeroWidget(module: module, materialCount: materials.length),
-            const SizedBox(height: 20),
-            _ModuleInsightsStrip(
-              materialCount: materials.length,
-              readyMaterials: readyMaterials,
-              processingMaterials: processingMaterials,
-              sharedCount: module.sharedWithCourseIds.length,
-            ),
-            const SizedBox(height: 20),
-            if (uploading) ...[
-              _UploadProgressWidget(progress: uploadProgress),
-              const SizedBox(height: 18),
-            ],
-            LayoutBuilder(
-              builder: (context, constraints) {
-                final isWide = constraints.maxWidth >= 1160;
-                final infoCard = _CardWidget(
-                  header: const _HdrWidget(
-                    icon: Icons.dashboard_customize_rounded,
-                    iconColor: AppColors.primary,
-                    title: 'Module overview',
-                  ),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 112),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final wide = constraints.maxWidth >= 1080;
+
+            final mainColumn = Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _ModuleCanvasHeader(
+                  module: module,
+                  materialCount: materials.length,
+                  onUpload: uploading ? null : onUpload,
+                ),
+                const SizedBox(height: 18),
+                if (uploading) ...[
+                  _UploadProgressWidget(progress: uploadProgress),
+                  const SizedBox(height: 18),
+                ],
+                _CanvasSection(
+                  title: 'Overview',
+                  icon: Icons.grid_view_rounded,
                   child: Column(
                     children: [
                       LayoutBuilder(
-                        builder: (context, cardConstraints) {
-                          final stacked = cardConstraints.maxWidth < 560;
-                          final positionTile = _MiniInfoTile(
-                            icon: Icons.layers_rounded,
-                            iconBg: _K.blueSoft,
-                            iconFg: AppColors.primary,
-                            label: 'Position',
-                            value: '#${module.orderIndex + 1}',
-                            caption: 'Current order in this course',
-                          );
-                          final visibilityTile = _MiniInfoTile(
-                            icon: module.isPublished ? Icons.visibility_rounded : Icons.visibility_off_rounded,
-                            iconBg: module.isPublished ? _K.greenSoft : _K.amberSoft,
-                            iconFg: module.isPublished ? _K.green : _K.amber,
-                            label: 'Visibility',
-                            value: module.isPublished ? 'Live' : 'Draft',
-                            caption: module.isPublished ? 'Visible to students' : 'Hidden from students',
-                          );
+                        builder: (context, sectionConstraints) {
+                          final compact = sectionConstraints.maxWidth < 760;
+                          final children = [
+                            _SoftStatTile(
+                              icon: Icons.layers_rounded,
+                              iconBg: const Color(0xFFEAF2FF),
+                              iconFg: AppColors.primary,
+                              label: 'Position',
+                              value: '#${module.orderIndex + 1}',
+                              description: 'Current order inside this course.',
+                            ),
+                            _SoftStatTile(
+                              icon: module.isPublished ? Icons.visibility_rounded : Icons.visibility_off_rounded,
+                              iconBg: module.isPublished ? const Color(0xFFEAFBF0) : const Color(0xFFFFF4E5),
+                              iconFg: module.isPublished ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                              label: 'Visibility',
+                              value: module.isPublished ? 'Published' : 'Draft',
+                              description: module.isPublished ? 'Students can access this module.' : 'Hidden from students right now.',
+                            ),
+                            _SoftStatTile(
+                              icon: Icons.folder_open_rounded,
+                              iconBg: const Color(0xFFF1F5F9),
+                              iconFg: const Color(0xFF64748B),
+                              label: 'Materials',
+                              value: '${materials.length}',
+                              description: '$readyMaterials ready and $processingMaterials processing.',
+                            ),
+                          ];
 
-                          if (stacked) {
+                          if (compact) {
                             return Column(
                               children: [
-                                positionTile,
-                                const SizedBox(height: 14),
-                                visibilityTile,
+                                for (var i = 0; i < children.length; i++) ...[
+                                  children[i],
+                                  if (i != children.length - 1) const SizedBox(height: 12),
+                                ],
                               ],
                             );
                           }
 
                           return Row(
                             children: [
-                              Expanded(child: positionTile),
-                              const SizedBox(width: 14),
-                              Expanded(child: visibilityTile),
+                              for (var i = 0; i < children.length; i++) ...[
+                                Expanded(child: children[i]),
+                                if (i != children.length - 1) const SizedBox(width: 14),
+                              ],
                             ],
                           );
                         },
                       ),
                       const SizedBox(height: 14),
-                      _MiniInfoTile(
-                        icon: Icons.notes_rounded,
-                        iconBg: const Color(0xFFF8FAFC),
-                        iconFg: AppColors.textMuted,
-                        label: 'Description',
-                        value: hasDescription ? description : 'No description added yet',
-                        caption: hasDescription
-                            ? 'Used to describe this module for instructors and learners.'
-                            : 'Add a short summary to make this module easier to understand.',
-                        multiline: true,
+                      _DescriptionBlock(
+                        hasDescription: hasDescription,
+                        description: description,
                       ),
                     ],
                   ),
-                );
-
-                final actionsCard = Column(
-                  children: [
-                    _CardWidget(
-                      header: const _HdrWidget(
-                        icon: Icons.auto_fix_high_rounded,
-                        iconColor: AppColors.primary,
-                        title: 'Manage module',
-                      ),
-                      child: Column(
-                        children: [
-                          _PRow(
-                            icon: Icons.drive_file_rename_outline_rounded,
-                            iconBg: _K.blueSoft,
-                            iconFg: AppColors.primary,
-                            label: 'Rename module',
-                            sub: 'Update the module title shown across the course.',
-                            onTap: onRename,
-                          ),
-                          _DivW(),
-                          _PRow(
-                            icon: Icons.notes_rounded,
-                            iconBg: _K.blueSoft,
-                            iconFg: AppColors.primary,
-                            label: 'Edit description',
-                            sub: hasDescription ? 'Refine the current summary and teaching context.' : 'Add a short summary for this module.',
-                            onTap: onEditDescription,
-                          ),
-                          _DivW(),
-                          _PRow(
-                            icon: Icons.upload_file_rounded,
-                            iconBg: AppColors.primarySoft,
-                            iconFg: AppColors.primary,
-                            label: 'Upload material',
-                            sub: uploading ? 'Upload in progress…' : 'Add a PDF, video, or document to this module.',
-                            onTap: uploading ? null : onUpload,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _CardWidget(
-                      header: const _HdrWidget(
-                        icon: Icons.settings_suggest_rounded,
-                        iconColor: AppColors.primary,
-                        title: 'Distribution & status',
-                      ),
-                      child: Column(
-                        children: [
-                          _PRow(
-                            icon: module.isPublished ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                            iconBg: module.isPublished ? _K.amberSoft : _K.greenSoft,
-                            iconFg: module.isPublished ? _K.amber : _K.green,
-                            label: module.isPublished ? 'Unpublish module' : 'Publish module',
-                            sub: module.isPublished ? 'Hide this module from students.' : 'Make this module visible to students.',
-                            onTap: onTogglePublish,
-                          ),
-                          _DivW(),
-                          _PRow(
-                            icon: Icons.swap_vert_rounded,
-                            iconBg: _K.greenSoft,
-                            iconFg: _K.green,
-                            label: 'Change position',
-                            sub: 'Currently #${module.orderIndex + 1} in the course structure.',
-                            onTap: onChangePosition,
-                          ),
-                          _DivW(),
-                          _PRow(
-                            icon: Icons.share_rounded,
-                            iconBg: const Color(0xFFF0FDF4),
-                            iconFg: const Color(0xFF16A34A),
-                            label: 'Share with another course',
-                            sub: module.sharedWithCourseIds.isEmpty
-                                ? 'Not shared with any other course.'
-                                : 'Shared with ${module.sharedWithCourseIds.length} course${module.sharedWithCourseIds.length == 1 ? '' : 's'}.',
-                            onTap: onShare,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _CardWidget(
-                      header: const _HdrWidget(
-                        icon: Icons.delete_outline_rounded,
-                        iconColor: Color(0xFFEF4444),
-                        title: 'Danger zone',
-                      ),
-                      child: _SectionNoteWidget(
-                        tone: _SectionTone.danger,
-                        title: 'Delete this module',
-                        description: 'This permanently removes the module from the course. Only do this when you are sure the content is no longer needed.',
-                        actionLabel: 'Delete module',
-                        onTap: onDelete,
-                      ),
-                    ),
-                  ],
-                );
-
-                if (isWide) {
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Expanded(flex: 7, child: infoCard),
-                      const SizedBox(width: 20),
-                      Expanded(flex: 5, child: actionsCard),
-                    ],
-                  );
-                }
-
-                return Column(
-                  children: [
-                    infoCard,
-                    const SizedBox(height: 18),
-                    actionsCard,
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 20),
-            _CardWidget(
-              header: _HdrWidget(
-                icon: Icons.folder_open_rounded,
-                iconColor: AppColors.primary,
-                title: 'Materials',
-                badge: '${materials.length}',
-                trailing: _SmBtn(
-                  icon: Icons.upload_rounded,
-                  label: 'Upload',
-                  disabled: uploading,
-                  onTap: onUpload,
                 ),
-              ),
-              child: Column(
+                const SizedBox(height: 18),
+                _CanvasSection(
+                  title: 'Materials',
+                  icon: Icons.folder_copy_rounded,
+                  trailing: _SmBtn(
+                    icon: Icons.upload_rounded,
+                    label: 'Upload',
+                    disabled: uploading,
+                    onTap: onUpload,
+                  ),
+                  child: materials.isEmpty
+                      ? _MatEmptyWidget(onUpload: onUpload)
+                      : Column(
+                          children: materials.asMap().entries.map(
+                            (e) => Padding(
+                              padding: EdgeInsets.only(bottom: e.key == materials.length - 1 ? 0 : 12),
+                              child: _ModuleMaterialCard(
+                                material: e.value,
+                                onTap: () => onMaterialTap(e.value),
+                              ),
+                            ),
+                          ).toList(),
+                        ),
+                ),
+              ],
+            );
+
+            final sideColumn = Column(
+              children: [
+                _CanvasSection(
+                  title: 'Quick actions',
+                  icon: Icons.auto_fix_high_rounded,
+                  compactHeader: true,
+                  child: Column(
+                    children: [
+                      _ActionTile(
+                        icon: Icons.drive_file_rename_outline_rounded,
+                        iconBg: const Color(0xFFEAF2FF),
+                        iconFg: AppColors.primary,
+                        title: 'Rename module',
+                        subtitle: 'Update the module title shown across the course.',
+                        onTap: onRename,
+                      ),
+                      const SizedBox(height: 10),
+                      _ActionTile(
+                        icon: Icons.notes_rounded,
+                        iconBg: const Color(0xFFF1F5F9),
+                        iconFg: const Color(0xFF64748B),
+                        title: 'Edit description',
+                        subtitle: hasDescription ? 'Refine the current summary and teaching context.' : 'Add a short summary for this module.',
+                        onTap: onEditDescription,
+                      ),
+                      const SizedBox(height: 10),
+                      _ActionTile(
+                        icon: Icons.upload_file_rounded,
+                        iconBg: const Color(0xFFEAF2FF),
+                        iconFg: AppColors.primary,
+                        title: 'Upload material',
+                        subtitle: uploading ? 'Upload in progress…' : 'Add a PDF, video, or document to this module.',
+                        onTap: uploading ? null : onUpload,
+                        emphasis: true,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _CanvasSection(
+                  title: 'Module status',
+                  icon: Icons.tune_rounded,
+                  compactHeader: true,
+                  child: Column(
+                    children: [
+                      _ActionTile(
+                        icon: module.isPublished ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                        iconBg: module.isPublished ? const Color(0xFFFFF4E5) : const Color(0xFFEAFBF0),
+                        iconFg: module.isPublished ? const Color(0xFFD97706) : const Color(0xFF16A34A),
+                        title: module.isPublished ? 'Unpublish module' : 'Publish module',
+                        subtitle: module.isPublished ? 'Hide this module from students.' : 'Make this module visible to students.',
+                        onTap: onTogglePublish,
+                      ),
+                      const SizedBox(height: 10),
+                      _ActionTile(
+                        icon: Icons.swap_vert_rounded,
+                        iconBg: const Color(0xFFF1F5F9),
+                        iconFg: const Color(0xFF64748B),
+                        title: 'Change position',
+                        subtitle: 'Currently #${module.orderIndex + 1} in the course structure.',
+                        onTap: onChangePosition,
+                      ),
+                      const SizedBox(height: 10),
+                      _ActionTile(
+                        icon: Icons.share_rounded,
+                        iconBg: const Color(0xFFEAFBF0),
+                        iconFg: const Color(0xFF16A34A),
+                        title: 'Share with another course',
+                        subtitle: module.sharedWithCourseIds.isEmpty
+                            ? 'Not shared with any other course.'
+                            : 'Shared with ${module.sharedWithCourseIds.length} course${module.sharedWithCourseIds.length == 1 ? '' : 's'}.',
+                        onTap: onShare,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _CanvasDangerSection(onDelete: onDelete),
+              ],
+            );
+
+            if (wide) {
+              return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text(
-                    'All files and learning assets attached to this module appear here.',
-                    style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, height: 1.45),
+                  Expanded(flex: 8, child: mainColumn),
+                  const SizedBox(width: 20),
+                  SizedBox(width: 320, child: sideColumn),
+                ],
+              );
+            }
+
+            return Column(
+              children: [
+                mainColumn,
+                const SizedBox(height: 18),
+                sideColumn,
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ModuleCanvasHeader extends StatelessWidget {
+  final ModuleItem module;
+  final int materialCount;
+  final VoidCallback? onUpload;
+
+  const _ModuleCanvasHeader({
+    required this.module,
+    required this.materialCount,
+    required this.onUpload,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final description = (module.description ?? '').trim();
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x080F172A),
+            blurRadius: 18,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 760;
+          final titleBlock = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _HeaderChip(
+                    label: module.isPublished ? 'Published' : 'Draft',
+                    bg: module.isPublished ? const Color(0xFFEAFBF0) : const Color(0xFFFFF4E5),
+                    fg: module.isPublished ? const Color(0xFF16A34A) : const Color(0xFFD97706),
                   ),
-                  const SizedBox(height: 14),
-                  if (materials.isEmpty)
-                    _MatEmptyWidget(onUpload: onUpload)
-                  else
-                    Column(
-                      children: materials.asMap().entries.map(
-                        (e) => Padding(
-                          padding: EdgeInsets.only(bottom: e.key == materials.length - 1 ? 0 : 10),
-                          child: _ModuleMaterialCard(
-                            material: e.value,
-                            onTap: () => onMaterialTap(e.value),
-                          ),
-                        ),
-                      ).toList(),
-                    ),
+                  _HeaderChip(
+                    label: '$materialCount material${materialCount == 1 ? '' : 's'}',
+                    bg: const Color(0xFFF1F5F9),
+                    fg: const Color(0xFF475569),
+                  ),
                 ],
               ),
+              const SizedBox(height: 14),
+              Text(
+                module.title,
+                style: const TextStyle(
+                  fontSize: 30,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textTitle,
+                  height: 1.05,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                description.isNotEmpty
+                    ? description
+                    : 'Organize files, manage visibility, and keep this module ready for students.',
+                style: const TextStyle(
+                  fontSize: 13.5,
+                  color: AppColors.textMuted,
+                  height: 1.6,
+                ),
+              ),
+            ],
+          );
+
+          final side = Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(14),
             ),
-          ],
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text(
+                  'Module order',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '#${module.orderIndex + 1}',
+                  style: const TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textTitle,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  'Updated ${_relativeDate(module.updatedAt)}',
+                  style: const TextStyle(
+                    fontSize: 11.8,
+                    color: AppColors.textMuted,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: onUpload,
+                    icon: const Icon(Icons.upload_rounded, size: 16),
+                    label: const Text('Upload material'),
+                    style: ElevatedButton.styleFrom(
+                      elevation: 0,
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [titleBlock, const SizedBox(height: 18), side],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: titleBlock),
+              const SizedBox(width: 18),
+              SizedBox(width: 240, child: side),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _HeaderChip extends StatelessWidget {
+  final String label;
+  final Color bg;
+  final Color fg;
+
+  const _HeaderChip({
+    required this.label,
+    required this.bg,
+    required this.fg,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 11.5,
+          fontWeight: FontWeight.w700,
+          color: fg,
         ),
+      ),
+    );
+  }
+}
+
+class _CanvasSection extends StatelessWidget {
+  final String title;
+  final IconData icon;
+  final Widget child;
+  final Widget? trailing;
+  final bool compactHeader;
+
+  const _CanvasSection({
+    required this.title,
+    required this.icon,
+    required this.child,
+    this.trailing,
+    this.compactHeader = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.all(compactHeader ? 18 : 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x080F172A),
+            blurRadius: 20,
+            offset: Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFEAF2FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(icon, size: 18, color: AppColors.primary),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textTitle,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing!,
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _SoftStatTile extends StatelessWidget {
+  final IconData icon;
+  final Color iconBg;
+  final Color iconFg;
+  final String label;
+  final String value;
+  final String description;
+
+  const _SoftStatTile({
+    required this.icon,
+    required this.iconBg,
+    required this.iconFg,
+    required this.label,
+    required this.value,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: iconBg,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, size: 20, color: iconFg),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textTitle,
+                    height: 1.2,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textMuted,
+                    height: 1.45,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DescriptionBlock extends StatelessWidget {
+  final bool hasDescription;
+  final String description;
+
+  const _DescriptionBlock({
+    required this.hasDescription,
+    required this.description,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF8FAFC),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 42,
+            height: 42,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF1F5F9),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.notes_rounded, size: 18, color: Color(0xFF64748B)),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Description',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textMuted,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  hasDescription ? description : 'No description added yet',
+                  style: const TextStyle(
+                    fontSize: 14.5,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textTitle,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  hasDescription
+                      ? 'This text helps instructors and students understand the purpose of the module.'
+                      : 'Add a short summary to make this module clearer for instructors and students.',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textMuted,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ActionTile extends StatefulWidget {
+  final IconData icon;
+  final Color iconBg;
+  final Color iconFg;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+  final bool emphasis;
+
+  const _ActionTile({
+    required this.icon,
+    required this.iconBg,
+    required this.iconFg,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.emphasis = false,
+  });
+
+  @override
+  State<_ActionTile> createState() => _ActionTileState();
+}
+
+class _ActionTileState extends State<_ActionTile> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final disabled = widget.onTap == null;
+    return MouseRegion(
+      cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) {
+        if (!disabled) setState(() => _hovered = true);
+      },
+      onExit: (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 140),
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: widget.emphasis
+                ? const Color(0xFFEFF6FF)
+                : (_hovered && !disabled ? const Color(0xFFF8FAFC) : const Color(0xFFFDFDFD)),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Opacity(
+            opacity: disabled ? 0.45 : 1,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: widget.iconBg,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: Icon(widget.icon, size: 18, color: widget.iconFg),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        widget.title,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: _hovered && !disabled ? AppColors.primary : AppColors.textTitle,
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        widget.subtitle,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textMuted,
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 16,
+                  color: disabled ? AppColors.textHint : AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CanvasDangerSection extends StatelessWidget {
+  final VoidCallback? onDelete;
+
+  const _CanvasDangerSection({required this.onDelete});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF5F5),
+        borderRadius: BorderRadius.circular(24),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: const [
+              Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFDC2626)),
+              SizedBox(width: 10),
+              Text(
+                'Danger zone',
+                style: TextStyle(
+                  fontSize: 14.5,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF991B1B),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          const Text(
+            'Delete this module only when you are sure its content is no longer needed in the course.',
+            style: TextStyle(
+              fontSize: 12,
+              color: Color(0xFF7F1D1D),
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: onDelete,
+              icon: const Icon(Icons.delete_outline_rounded, size: 16),
+              label: const Text('Delete module'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFFDC2626),
+                side: const BorderSide(color: Color(0xFFFCA5A5)),
+                padding: const EdgeInsets.symmetric(vertical: 13),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1023,19 +1982,19 @@ class _ModuleHeroWidget extends StatelessWidget {
   Widget build(BuildContext context) {
     final description = (module.description ?? '').trim();
     return Container(
-      padding: const EdgeInsets.fromLTRB(28, 26, 28, 26),
+      padding: const EdgeInsets.fromLTRB(26, 24, 26, 24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [Color(0xFF145CCB), Color(0xFF137FEC), Color(0xFF4CB5FF)],
         ),
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withOpacity(0.16),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -1044,10 +2003,10 @@ class _ModuleHeroWidget extends StatelessWidget {
           final compact = constraints.maxWidth < 980;
           final rightCard = Container(
             constraints: const BoxConstraints(minWidth: 180),
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(16),
+              color: Colors.white.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.white.withOpacity(0.16)),
             ),
             child: Column(
@@ -1058,7 +2017,7 @@ class _ModuleHeroWidget extends StatelessWidget {
                 const SizedBox(height: 8),
                 Text('#${module.orderIndex + 1}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white, height: 1.0)),
                 const SizedBox(height: 14),
-                Text('Updated ${_relativeDate(module.updatedAt)}', style: TextStyle(fontSize: 11.8, height: 1.45, color: Colors.white.withOpacity(0.8))),
+                Text('Updated ${_relativeDate(module.updatedAt)}', style: TextStyle(fontSize: 11.8, height: 1.45, color: Colors.white.withOpacity(0.86))),
               ],
             ),
           );
@@ -1102,7 +2061,7 @@ class _ModuleHeroWidget extends StatelessWidget {
           }
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: body), const SizedBox(width: 24), rightCard],
+            children: [Expanded(child: body), const SizedBox(width: 20), rightCard],
           );
         },
       ),

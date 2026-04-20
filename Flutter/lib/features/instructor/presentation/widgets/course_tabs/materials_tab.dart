@@ -21,6 +21,7 @@ import '../course_outcomes_panel.dart';
 import '../upload_material_sheet.dart';
 
 import '../generate_questions_dialog.dart';
+import '../question_bank/question_bank_authoring_flow.dart';
 import '../module_selector_sheet.dart';
 
 part 'materials_tab_sidebar.dart';
@@ -69,6 +70,39 @@ class _Ctx {
 // ─────────────────────────────────────────────────────────────────────────────
 //  CourseMaterialsTab
 // ─────────────────────────────────────────────────────────────────────────────
+
+
+class _TreeSelectionState {
+  final Set<int> moduleIds;
+  final Set<int> materialIds;
+  final Set<int> topicIds;
+
+  const _TreeSelectionState({
+    this.moduleIds = const <int>{},
+    this.materialIds = const <int>{},
+    this.topicIds = const <int>{},
+  });
+
+  static const empty = _TreeSelectionState();
+
+  bool get isEmpty => moduleIds.isEmpty && materialIds.isEmpty && topicIds.isEmpty;
+  int get totalCount => moduleIds.length + materialIds.length + topicIds.length;
+
+  _TreeSelectionState copyWith({
+    Set<int>? moduleIds,
+    Set<int>? materialIds,
+    Set<int>? topicIds,
+  }) {
+    return _TreeSelectionState(
+      moduleIds: moduleIds ?? this.moduleIds,
+      materialIds: materialIds ?? this.materialIds,
+      topicIds: topicIds ?? this.topicIds,
+    );
+  }
+
+  _TreeSelectionState clear() => empty;
+}
+
 class CourseMaterialsTab extends ConsumerStatefulWidget {
   final MyCourseItem course;
   const CourseMaterialsTab({super.key, required this.course});
@@ -79,6 +113,8 @@ class CourseMaterialsTab extends ConsumerStatefulWidget {
 class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
     with AutomaticKeepAliveClientMixin {
   final Set<int>    _expanded = {};
+  final Set<int>    _expandedMaterialIds = {};
+  final Set<int>    _expandedTopicIds = {};
   _Ctx?             _sel;
   final List<_Ctx>  _stack   = [];
   final ScrollController _scroll = ScrollController();
@@ -86,6 +122,13 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
   bool _restored = false;
   bool _dialogOpen = false;
   int? _draggingModuleId;
+  bool _selectionMode = false;
+  _TreeSelectionState _treeSelection = _TreeSelectionState.empty;
+  bool _hideFooterForActive = false;
+  bool _showQuestionAuthoring = false;
+  Set<int> _authoringModuleIds = const <int>{};
+  Set<int> _authoringMaterialIds = const <int>{};
+  Set<int> _authoringTopicIds = const <int>{};
 
   @override
   bool get wantKeepAlive => true;
@@ -127,6 +170,8 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
     final active = _active;
     final payload = <String, dynamic>{
       'expanded': _expanded.toList(),
+      'expandedMaterials': _expandedMaterialIds.toList(),
+      'expandedTopics': _expandedTopicIds.toList(),
       'scrollOffset': _scroll.hasClients ? _scroll.offset : 0.0,
       'selectedType': sel?.type.name,
       'selectedModuleId': sel?.module?.id,
@@ -147,6 +192,12 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
     try {
       final map = jsonDecode(raw) as Map<String, dynamic>;
       final expanded = ((map['expanded'] as List?) ?? const [])
+          .map((e) => (e as num).toInt())
+          .toSet();
+      final expandedMaterials = ((map['expandedMaterials'] as List?) ?? const [])
+          .map((e) => (e as num).toInt())
+          .toSet();
+      final expandedTopics = ((map['expandedTopics'] as List?) ?? const [])
           .map((e) => (e as num).toInt())
           .toSet();
       final selectedType = map['selectedType']?.toString();
@@ -190,6 +241,12 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
       _expanded
         ..clear()
         ..addAll(expanded.where((id) => st.modules.any((m) => m.id == id)));
+      _expandedMaterialIds
+        ..clear()
+        ..addAll(expandedMaterials);
+      _expandedTopicIds
+        ..clear()
+        ..addAll(expandedTopics);
 
       if (module != null && !st.materials.containsKey(module.id)) {
         ref.read(courseDetailsControllerProvider(widget.course.id).notifier).loadMaterials(module.id);
@@ -249,7 +306,22 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
     super.build(context);
     final st = ref.watch(courseDetailsControllerProvider(widget.course.id));
     _maybeRestoreUiState(st);
+
+    if (_showQuestionAuthoring) {
+      return QuestionBankAuthoringFlow(
+        course: widget.course,
+        initialModuleIds: _authoringModuleIds,
+        initialMaterialIds: _authoringMaterialIds,
+        initialTopicIds: _authoringTopicIds,
+        embedded: true,
+        onClose: _closeQuestionAuthoring,
+      );
+    }
+
     final active = _active ?? _sel;
+    final hasTreeSelection = _selectionMode && !_treeSelection.isEmpty;
+    final footerCtx = hasTreeSelection ? (_footerCtxFromSelection(st) ?? active) : active;
+    final showFooter = hasTreeSelection ? footerCtx != null : (footerCtx != null && !_hideFooterForActive);
     return Column(children: [
       Expanded(
         child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -272,24 +344,80 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
             onRefresh: () => ref
                 .read(courseDetailsControllerProvider(widget.course.id).notifier)
                 .loadModulesAndAllMaterials(force: true),
+            selectionMode: _selectionMode,
+            treeSelection: _treeSelection,
+            onToggleSelectionMode: _toggleSelectionMode,
+            onClearSelection: _clearTreeSelection,
+            onModuleCheckChanged: (module, value) => _setModuleChecked(module, st, value),
+            onMaterialCheckChanged: (module, material, value) => _setMaterialChecked(module, material, st, value),
+            onTopicCheckChanged: (module, material, topic, value) =>
+                _setTopicChecked(module, material, topic, st, value),
+            expandedMaterialIds: _expandedMaterialIds,
+            expandedTopicIds: _expandedTopicIds,
+            onToggleMaterialExpanded: _toggleMaterialExpanded,
+            onToggleTopicExpanded: _toggleTopicExpanded,
           ),
           Expanded(child: _buildPanel(st)),
         ]),
       ),
-      if (_sel != null && active != null)
+      if (showFooter && footerCtx != null)
         _FooterWidget(
-          ctx: active,
+          ctx: footerCtx,
           uploading: st.uploading,
-          canGenerate: _canGenerate(active, st),
-          onUpload: () { final m = _sel?.module; if (m != null) _showUploadSheet(m); },
-          onGenerate: () => _openGenerateDialog(
-            moduleId: active.module?.id,
-            materialId: active.material?.id,
-            topicId: active.topic?.id,
-          ),
-          onClose: () => setState(() { _sel = null; _stack.clear(); _persistUiState(); }),
+          canGenerate: _canGenerate(footerCtx, st),
+          selectionCount: hasTreeSelection ? _treeSelection.totalCount : null,
+          onUpload: () { final m = footerCtx.module; if (m != null) _showUploadSheet(m); },
+          onGenerate: () => _openQuestionAuthoringFromSelection(footerCtx),
+          onClose: () => setState(() {
+            if (_selectionMode && !_treeSelection.isEmpty) {
+              _treeSelection = _treeSelection.clear();
+              _hideFooterForActive = false;
+            } else {
+              _hideFooterForActive = true;
+            }
+            _persistUiState();
+          }),
         ),
     ]);
+  }
+
+  _Ctx? _footerCtxFromSelection(CourseDetailsState st) {
+    if (_treeSelection.topicIds.isNotEmpty) {
+      for (final module in st.modules) {
+        final topics = st.topics[module.id] ?? const <TopicItem>[];
+        for (final topic in topics) {
+          if (_treeSelection.topicIds.contains(topic.id)) {
+            final materials = st.materials[module.id] ?? const <MaterialItem>[];
+            for (final material in materials) {
+              if (material.id == topic.materialId) {
+                return _Ctx.topic(module, material, topic);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    if (_treeSelection.materialIds.isNotEmpty) {
+      for (final module in st.modules) {
+        final materials = st.materials[module.id] ?? const <MaterialItem>[];
+        for (final material in materials) {
+          if (_treeSelection.materialIds.contains(material.id)) {
+            return _Ctx.material(module, material);
+          }
+        }
+      }
+    }
+
+    if (_treeSelection.moduleIds.isNotEmpty) {
+      for (final module in st.modules) {
+        if (_treeSelection.moduleIds.contains(module.id)) {
+          return _Ctx.module(module);
+        }
+      }
+    }
+
+    return null;
   }
 
   bool _canGenerate(_Ctx ctx, CourseDetailsState st) {
@@ -304,15 +432,208 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
     }
   }
 
+
+  void _toggleSelectionMode() {
+    setState(() {
+      _selectionMode = !_selectionMode;
+      _hideFooterForActive = false;
+      if (!_selectionMode) {
+        _treeSelection = _treeSelection.clear();
+      }
+    });
+  }
+
+  void _clearTreeSelection() {
+    if (_treeSelection.isEmpty) return;
+    setState(() {
+      _treeSelection = _treeSelection.clear();
+      _selectionMode = false;
+      _hideFooterForActive = false;
+    });
+  }
+
+  List<MaterialItem> _materialsForModule(CourseDetailsState st, int moduleId) {
+    return st.materials[moduleId] ?? const <MaterialItem>[];
+  }
+
+  List<TopicItem> _topicsForMaterial(CourseDetailsState st, int moduleId, int materialId) {
+    final items = st.topics[moduleId] ?? const <TopicItem>[];
+    return items.where((t) => t.materialId == materialId).toList();
+  }
+
+  List<TopicItem> _childTopics(List<TopicItem> topics, int parentTopicId) {
+    final items = topics.where((t) => t.parentTopicId == parentTopicId).toList()
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    return items;
+  }
+
+
+  _TreeSelectionState _normalizeTreeSelection(
+    CourseDetailsState st, {
+    required Set<int> moduleIds,
+    required Set<int> materialIds,
+    required Set<int> topicIds,
+  }) {
+    final nextModules = <int>{...moduleIds};
+    final nextMaterials = <int>{...materialIds};
+    final nextTopics = <int>{...topicIds};
+
+    for (final module in st.modules) {
+      final materials = _materialsForModule(st, module.id);
+      if (materials.isEmpty) {
+        if (!nextModules.contains(module.id)) nextModules.remove(module.id);
+        continue;
+      }
+
+      var allMaterialsSelected = true;
+      for (final material in materials) {
+        final topics = _topicsForMaterial(st, module.id, material.id);
+        final isMaterialFullySelected = topics.isEmpty
+            ? nextMaterials.contains(material.id)
+            : topics.every((t) => nextTopics.contains(t.id));
+
+        if (isMaterialFullySelected) {
+          nextMaterials.add(material.id);
+        } else {
+          nextMaterials.remove(material.id);
+          allMaterialsSelected = false;
+        }
+      }
+
+      if (allMaterialsSelected) {
+        nextModules.add(module.id);
+      } else {
+        nextModules.remove(module.id);
+      }
+    }
+
+    return _TreeSelectionState(
+      moduleIds: nextModules,
+      materialIds: nextMaterials,
+      topicIds: nextTopics,
+    );
+  }
+
+  void _toggleMaterialExpanded(MaterialItem material) {
+    setState(() {
+      if (!_expandedMaterialIds.add(material.id)) {
+        _expandedMaterialIds.remove(material.id);
+      }
+      _persistUiState();
+    });
+  }
+
+  void _toggleTopicExpanded(TopicItem topic) {
+    setState(() {
+      if (!_expandedTopicIds.add(topic.id)) {
+        _expandedTopicIds.remove(topic.id);
+      }
+      _persistUiState();
+    });
+  }
+
+  void _setModuleChecked(ModuleItem module, CourseDetailsState st, bool checked) {
+    final materials = _materialsForModule(st, module.id);
+    final materialIds = materials.map((m) => m.id).toSet();
+    final topicIds = <int>{};
+    for (final material in materials) {
+      topicIds.addAll(_topicsForMaterial(st, module.id, material.id).map((t) => t.id));
+    }
+
+    setState(() {
+      final nextModules = {..._treeSelection.moduleIds};
+      final nextMaterials = {..._treeSelection.materialIds};
+      final nextTopics = {..._treeSelection.topicIds};
+
+      if (checked) {
+        nextModules.add(module.id);
+        nextMaterials.addAll(materialIds);
+        nextTopics.addAll(topicIds);
+      } else {
+        nextModules.remove(module.id);
+        nextMaterials.removeAll(materialIds);
+        nextTopics.removeAll(topicIds);
+      }
+
+      _treeSelection = _normalizeTreeSelection(
+        st,
+        moduleIds: nextModules,
+        materialIds: nextMaterials,
+        topicIds: nextTopics,
+      );
+    });
+  }
+
+  void _setMaterialChecked(ModuleItem module, MaterialItem material, CourseDetailsState st, bool checked) {
+    final topics = _topicsForMaterial(st, module.id, material.id);
+    final topicIds = topics.map((t) => t.id).toSet();
+
+    setState(() {
+      final nextModules = {..._treeSelection.moduleIds}..remove(module.id);
+      final nextMaterials = {..._treeSelection.materialIds};
+      final nextTopics = {..._treeSelection.topicIds};
+
+      if (checked) {
+        nextMaterials.add(material.id);
+        nextTopics.addAll(topicIds);
+      } else {
+        nextMaterials.remove(material.id);
+        nextTopics.removeAll(topicIds);
+      }
+
+      _treeSelection = _normalizeTreeSelection(
+        st,
+        moduleIds: nextModules,
+        materialIds: nextMaterials,
+        topicIds: nextTopics,
+      );
+    });
+  }
+
+  void _setTopicChecked(
+    ModuleItem module,
+    MaterialItem material,
+    TopicItem topic,
+    CourseDetailsState st,
+    bool checked,
+  ) {
+    final allTopics = _topicsForMaterial(st, module.id, material.id);
+    final descendantIds = <int>{topic.id};
+    if (topic.parentTopicId == null) {
+      descendantIds.addAll(_childTopics(allTopics, topic.id).map((t) => t.id));
+    }
+
+    setState(() {
+      final nextModules = {..._treeSelection.moduleIds}..remove(module.id);
+      final nextMaterials = {..._treeSelection.materialIds}..remove(material.id);
+      final nextTopics = {..._treeSelection.topicIds};
+
+      if (checked) {
+        nextTopics.addAll(descendantIds);
+      } else {
+        nextTopics.removeAll(descendantIds);
+      }
+
+      _treeSelection = _normalizeTreeSelection(
+        st,
+        moduleIds: nextModules,
+        materialIds: nextMaterials,
+        topicIds: nextTopics,
+      );
+    });
+  }
+
   // ── Tap handlers ────────────────────────────────────────────────────────
   void _tapModule(ModuleItem m, CourseDetailsState st) {
     setState(() {
       final alreadySel = _active?.type == _CType.module && _active?.module?.id == m.id;
       if (_expanded.contains(m.id) && alreadySel) {
         _expanded.remove(m.id); _sel = null; _stack.clear();
+        _hideFooterForActive = false;
         _persistUiState();
       } else {
         _expanded.add(m.id); _sel = _Ctx.module(m); _stack.clear();
+        _hideFooterForActive = false;
         if (!st.materials.containsKey(m.id)) {
           ref.read(courseDetailsControllerProvider(widget.course.id).notifier).loadMaterials(m.id);
         }
@@ -322,7 +643,13 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
   }
 
   void _tapMaterial(ModuleItem m, MaterialItem mat) {
-    setState(() { _sel = _Ctx.material(m, mat); _stack.clear(); });
+    setState(() {
+      _expanded.add(m.id);
+      _expandedMaterialIds.add(mat.id);
+      _sel = _Ctx.material(m, mat);
+      _stack.clear();
+      _hideFooterForActive = false;
+    });
     _persistUiState();
     final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
     notifier.loadTopics(m.id);
@@ -330,7 +657,16 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
   }
 
   void _tapTopic(ModuleItem m, MaterialItem mat, TopicItem t) {
-    setState(() { _sel = _Ctx.material(m, mat); _stack..clear()..add(_Ctx.topic(m, mat, t)); });
+    setState(() {
+      _expanded.add(m.id);
+      _expandedMaterialIds.add(mat.id);
+      if (t.parentTopicId == null) {
+        _expandedTopicIds.add(t.id);
+      }
+      _sel = _Ctx.material(m, mat);
+      _stack..clear()..add(_Ctx.topic(m, mat, t));
+      _hideFooterForActive = false;
+    });
     _persistUiState();
   }
 
@@ -369,11 +705,14 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
 
   void _drillTopic(TopicItem t) {
     final c = _sel; if (c?.module == null || c?.material == null) return;
-    setState(() { _stack.add(_Ctx.topic(c!.module!, c.material!, t)); });
+    setState(() {
+      _stack.add(_Ctx.topic(c!.module!, c.material!, t));
+      _hideFooterForActive = false;
+    });
     _persistUiState();
   }
 
-  void _pop() => setState(() { if (_stack.isNotEmpty) _stack.removeLast(); _persistUiState(); });
+  void _pop() => setState(() { if (_stack.isNotEmpty) _stack.removeLast(); _hideFooterForActive = false; _persistUiState(); });
 
   // ── Right panel routing ──────────────────────────────────────────────────
   Widget _buildPanel(CourseDetailsState st) {
@@ -797,6 +1136,7 @@ Future<void> _showCreateModuleDialog() async {
       );
     }
   }
+
   Future<void> _showEditTopicDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
     final outcomes = ref.read(courseLOProvider(widget.course.id));
     final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
@@ -807,6 +1147,57 @@ Future<void> _showCreateModuleDialog() async {
     TopicDifficulty difficulty = topic.difficulty;
     TopicReadiness readiness = topic.readiness;
     final selectedOutcomeIds = <int>{...topic.learningOutcomeIds};
+    int? selectedParentTopicId = topic.parentTopicId;
+    final parentTopicOptions = ref
+        .read(courseDetailsControllerProvider(widget.course.id))
+        .topics[m.id]
+        ?.where((t) => t.materialId == mat.id && t.parentTopicId == null && t.id != topic.id)
+        .toList() ??
+        <TopicItem>[];
+
+    Color difficultyColor(TopicDifficulty value) {
+      switch (value) {
+        case TopicDifficulty.advanced:
+          return const Color(0xFFDC2626);
+        case TopicDifficulty.intermediate:
+          return _K.amber;
+        case TopicDifficulty.beginner:
+          return _K.blue;
+      }
+    }
+
+    Color difficultyBg(TopicDifficulty value) {
+      switch (value) {
+        case TopicDifficulty.advanced:
+          return const Color(0xFFFFF1F2);
+        case TopicDifficulty.intermediate:
+          return const Color(0xFFFFFBEB);
+        case TopicDifficulty.beginner:
+          return const Color(0xFFEFF6FF);
+      }
+    }
+
+    Color readinessFg(TopicReadiness value) {
+      switch (value) {
+        case TopicReadiness.ready:
+          return _K.green;
+        case TopicReadiness.review:
+          return _K.amber;
+        case TopicReadiness.draft:
+          return AppColors.textMuted;
+      }
+    }
+
+    Color readinessBg(TopicReadiness value) {
+      switch (value) {
+        case TopicReadiness.ready:
+          return _K.greenSoft;
+        case TopicReadiness.review:
+          return _K.amberSoft;
+        case TopicReadiness.draft:
+          return const Color(0xFFF1F5F9);
+      }
+    }
 
     Future<bool> confirmDelete(BuildContext context) async {
       final ok = await _showManagedDialog<bool>(
@@ -830,515 +1221,493 @@ Future<void> _showCreateModuleDialog() async {
               .where((lo) => selectedOutcomeIds.contains(lo.id))
               .toList();
 
-          Color readinessFg(TopicReadiness value) {
-            switch (value) {
-              case TopicReadiness.ready:
-                return _K.green;
-              case TopicReadiness.review:
-                return _K.amber;
-              case TopicReadiness.draft:
-                return AppColors.textMuted;
-            }
-          }
-
-          Color readinessBg(TopicReadiness value) {
-            switch (value) {
-              case TopicReadiness.ready:
-                return _K.greenSoft;
-              case TopicReadiness.review:
-                return _K.amberSoft;
-              case TopicReadiness.draft:
-                return const Color(0xFFF1F5F9);
-            }
-          }
-
-          Color difficultyColor(TopicDifficulty value) {
-            switch (value) {
-              case TopicDifficulty.advanced:
-                return const Color(0xFFDC2626);
-              case TopicDifficulty.intermediate:
-                return _K.amber;
-              case TopicDifficulty.beginner:
-                return _K.blue;
-            }
-          }
-
-          Color difficultyBg(TopicDifficulty value) {
-            switch (value) {
-              case TopicDifficulty.advanced:
-                return const Color(0xFFFEF2F2);
-              case TopicDifficulty.intermediate:
-                return const Color(0xFFFFFBEB);
-              case TopicDifficulty.beginner:
-                return const Color(0xFFEFF6FF);
-            }
-          }
-
-          return Dialog(
-            backgroundColor: Colors.transparent,
-            insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-            child: Container(
-              constraints: const BoxConstraints(maxWidth: 760, maxHeight: 760),
+          return _PreferencesDialogShell(
+            title: 'Manage Topic',
+            subtitle: 'Update topic details, delivery state, and linked learning outcomes without leaving the material workspace.',
+            maxWidth: 760,
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
+            leading: Container(
+              width: 44,
+              height: 44,
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: const Color(0xFFE5E7EB)),
-                boxShadow: const [
-                  BoxShadow(
-                    color: Color(0x1A0F172A),
-                    blurRadius: 36,
-                    offset: Offset(0, 18),
-                  ),
-                ],
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(14),
               ),
-              child: Column(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xFFF8FAFF), Color(0xFFFFFFFF)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
+              child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 720),
+              child: SingleChildScrollView(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFFF8FAFF), Color(0xFFFFFFFF)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: const Color(0xFFE8EEF8)),
                       ),
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          _TopicStatusChip(
+                            icon: topic.parentTopicId != null
+                                ? Icons.subdirectory_arrow_right_rounded
+                                : (topic.source == TopicSource.ai
+                                    ? Icons.auto_awesome_rounded
+                                    : Icons.edit_note_rounded),
+                            label: topic.parentTopicId != null
+                                ? 'Subtopic'
+                                : (topic.source == TopicSource.ai ? 'AI-assisted' : 'Manual topic'),
+                            fg: AppColors.primary,
+                            bg: AppColors.primarySoft,
+                          ),
+                          _TopicStatusChip(
+                            icon: Icons.signal_cellular_alt_rounded,
+                            label: difficulty.label,
+                            fg: difficultyColor(difficulty),
+                            bg: difficultyBg(difficulty),
+                          ),
+                          _TopicStatusChip(
+                            icon: Icons.track_changes_rounded,
+                            label: readiness.label,
+                            fg: readinessFg(readiness),
+                            bg: readinessBg(readiness),
+                          ),
+                          _TopicStatusChip(
+                            icon: Icons.flag_outlined,
+                            label: selectedOutcomeIds.isEmpty
+                                ? 'No outcomes linked'
+                                : '${selectedOutcomeIds.length} outcome(s) linked',
+                            fg: _K.blue,
+                            bg: _K.blueSoft,
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Column(
+                    const SizedBox(height: 16),
+                    _CardWidget(
+                      header: const _HdrWidget(
+                        icon: Icons.edit_note_rounded,
+                        iconColor: AppColors.primary,
+                        title: 'Core details',
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Topic title',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                            ),
+                            const SizedBox(height: 8),
+                            _DialogTextField(
+                              controller: titleCtrl,
+                              hintText: 'Write a concise, teachable topic name',
+                              autofocus: true,
+                            ),
+                            const SizedBox(height: 14),
+                            const Text(
+                              'Description',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                            ),
+                            const SizedBox(height: 8),
+                            _DialogTextField(
+                              controller: descriptionCtrl,
+                              hintText: 'Add a short summary, scope, or teaching angle for this topic',
+                              multiline: true,
+                            ),
+                            const SizedBox(height: 14),
+                            const Text(
+                              'Hierarchy',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                            ),
+                            const SizedBox(height: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFF8FAFC),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: _K.div),
+                              ),
+                              child: DropdownButtonHideUnderline(
+                                child: DropdownButton<int?>(
+                                  value: selectedParentTopicId,
+                                  isExpanded: true,
+                                  dropdownColor: Colors.white,
+                                  borderRadius: BorderRadius.circular(14),
+                                  items: [
+                                    const DropdownMenuItem<int?>(
+                                      value: null,
+                                      child: Text('Top-level topic'),
+                                    ),
+                                    ...parentTopicOptions.map(
+                                      (parent) => DropdownMenuItem<int?>(
+                                        value: parent.id,
+                                        child: Text('Subtopic under ${parent.title}'),
+                                      ),
+                                    ),
+                                  ],
+                                  onChanged: (value) => setDialogState(() => selectedParentTopicId = value),
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              selectedParentTopicId == null
+                                  ? 'This item appears as a top-level topic inside the material.'
+                                  : 'This item becomes a subtopic. Subtopics are final-level items and cannot contain children.',
+                              style: const TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.45),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Container(
-                              width: 52,
-                              height: 52,
-                              decoration: BoxDecoration(
-                                gradient: const LinearGradient(
-                                  colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(16),
-                              ),
-                              child: const Icon(Icons.tune_rounded, color: Colors.white, size: 24),
+                        Expanded(
+                          child: _CardWidget(
+                            header: const _HdrWidget(
+                              icon: Icons.settings_suggest_rounded,
+                              iconColor: AppColors.primary,
+                              title: 'Delivery setup',
                             ),
-                            const SizedBox(width: 14),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Difficulty',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: TopicDifficulty.values.map((value) {
+                                      final selected = difficulty == value;
+                                      return ChoiceChip(
+                                        label: Text(value.label),
+                                        selected: selected,
+                                        onSelected: (_) => setDialogState(() => difficulty = value),
+                                        labelStyle: TextStyle(
+                                          color: selected ? Colors.white : AppColors.textTitle,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        selectedColor: difficultyColor(value),
+                                        backgroundColor: difficultyBg(value),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                                        side: BorderSide(
+                                          color: selected ? difficultyColor(value) : const Color(0xFFE5E7EB),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'Readiness',
+                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 8,
+                                    runSpacing: 8,
+                                    children: TopicReadiness.values.map((value) {
+                                      final selected = readiness == value;
+                                      return ChoiceChip(
+                                        label: Text(value.label),
+                                        selected: selected,
+                                        onSelected: (_) => setDialogState(() => readiness = value),
+                                        labelStyle: TextStyle(
+                                          color: selected ? Colors.white : AppColors.textTitle,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                        selectedColor: readinessFg(value),
+                                        backgroundColor: readinessBg(value),
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+                                        side: BorderSide(
+                                          color: selected ? readinessFg(value) : const Color(0xFFE5E7EB),
+                                        ),
+                                      );
+                                    }).toList(),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: _CardWidget(
+                            header: const _HdrWidget(
+                              icon: Icons.sticky_note_2_outlined,
+                              iconColor: AppColors.primary,
+                              title: 'Instructor notes',
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    'Use notes for examples, misconceptions, teaching cues, or assessment reminders.',
+                                    style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
+                                  ),
+                                  const SizedBox(height: 10),
+                                  _DialogTextField(
+                                    controller: notesCtrl,
+                                    hintText: 'Add delivery notes for this topic',
+                                    multiline: true,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _CardWidget(
+                      header: const _HdrWidget(
+                        icon: Icons.flag_outlined,
+                        iconColor: AppColors.primary,
+                        title: 'Learning outcome alignment',
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Select the course outcomes this topic supports.',
+                              style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
+                            ),
+                            const SizedBox(height: 12),
+                            if (outcomes.isEmpty)
+                              Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.all(14),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                ),
+                                child: const Text(
+                                  'No course outcomes yet. Add them in the Outcomes tab first.',
+                                  style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
+                                ),
+                              )
+                            else ...[
+                              if (selectedOutcomes.isNotEmpty) ...[
+                                Wrap(
+                                  spacing: 8,
+                                  runSpacing: 8,
+                                  children: selectedOutcomes
+                                      .map(
+                                        (lo) => Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                                          decoration: BoxDecoration(
+                                            color: _K.blueSoft,
+                                            borderRadius: BorderRadius.circular(999),
+                                            border: Border.all(color: _K.blueMid),
+                                          ),
+                                          child: Text(
+                                            '${lo.code} • ${lo.title}',
+                                            style: const TextStyle(
+                                              fontSize: 12.5,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.primary,
+                                            ),
+                                          ),
+                                        ),
+                                      )
+                                      .toList(),
+                                ),
+                                const SizedBox(height: 12),
+                              ],
+                              Container(
+                                constraints: const BoxConstraints(maxHeight: 220),
+                                decoration: BoxDecoration(
+                                  color: const Color(0xFFF8FAFC),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(color: _K.div),
+                                ),
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(14),
+                                  child: ListView.separated(
+                                    shrinkWrap: true,
+                                    itemCount: outcomes.length,
+                                    separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFEAECEF)),
+                                    itemBuilder: (_, i) {
+                                      final lo = outcomes[i];
+                                      final selected = selectedOutcomeIds.contains(lo.id);
+                                      return InkWell(
+                                        hoverColor: Colors.transparent,
+                                        splashColor: Colors.transparent,
+                                        highlightColor: Colors.transparent,
+                                        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                                        onTap: () => setDialogState(() {
+                                          if (selected) {
+                                            selectedOutcomeIds.remove(lo.id);
+                                          } else {
+                                            selectedOutcomeIds.add(lo.id);
+                                          }
+                                        }),
+                                        child: Padding(
+                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+                                          child: Row(
+                                            children: [
+                                              Container(
+                                                width: 18,
+                                                height: 18,
+                                                decoration: BoxDecoration(
+                                                  color: selected ? AppColors.primary : Colors.white,
+                                                  borderRadius: BorderRadius.circular(5),
+                                                  border: Border.all(
+                                                    color: selected ? AppColors.primary : const Color(0xFFCBD5E1),
+                                                    width: 1.4,
+                                                  ),
+                                                ),
+                                                child: selected
+                                                    ? const Icon(Icons.check, size: 12, color: Colors.white)
+                                                    : null,
+                                              ),
+                                              const SizedBox(width: 10),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.badgeBlueBg,
+                                                  borderRadius: BorderRadius.circular(6),
+                                                ),
+                                                child: Text(
+                                                  lo.code,
+                                                  style: const TextStyle(
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w800,
+                                                    color: AppColors.badgeBlueFg,
+                                                  ),
+                                                ),
+                                              ),
+                                              const SizedBox(width: 8),
+                                              Expanded(
+                                                child: Text(
+                                                  lo.title,
+                                                  style: TextStyle(
+                                                    fontSize: 12.5,
+                                                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+                                                    color: selected ? AppColors.textTitle : AppColors.textMuted,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    _CardWidget(
+                      header: const _HdrWidget(
+                        icon: Icons.warning_amber_rounded,
+                        iconColor: Color(0xFFDC2626),
+                        title: 'Danger zone',
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+                        child: Row(
+                          children: [
                             const Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
-                                    'Manage Topic',
-                                    style: TextStyle(
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.textTitle,
-                                    ),
+                                    'Delete this topic',
+                                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle),
                                   ),
                                   SizedBox(height: 4),
                                   Text(
-                                    'Edit topic details, map outcomes, and prepare this topic for delivery.',
+                                    'This removes the topic and its direct links from the material structure.',
                                     style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
                                   ),
                                 ],
                               ),
                             ),
-                            IconButton(
-                              tooltip: 'Close',
-                              onPressed: () => Navigator.pop(dialogContext, false),
-                              icon: const Icon(Icons.close_rounded),
+                            const SizedBox(width: 12),
+                            AppButton(
+                              label: 'Delete topic',
+                              onTap: () async {
+                                final ok = await confirmDelete(dialogContext);
+                                if (!ok) return;
+                                await notifier.deleteTopic(
+                                  moduleId: m.id,
+                                  topicId: topic.id,
+                                  materialId: mat.id,
+                                );
+                                if (mounted) Navigator.pop(dialogContext, true);
+                              },
+                              variant: AppButtonVariant.danger,
+                              height: 40,
                             ),
                           ],
                         ),
-                        const SizedBox(height: 18),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: [
-                            _TopicStatusChip(
-                              icon: Icons.auto_awesome_rounded,
-                              label: topic.source == TopicSource.ai ? 'AI-generated topic' : 'Manual topic',
-                              fg: AppColors.primary,
-                              bg: AppColors.primarySoft,
-                            ),
-                            _TopicStatusChip(
-                              icon: Icons.signal_cellular_alt_rounded,
-                              label: difficulty.label,
-                              fg: difficultyColor(difficulty),
-                              bg: difficultyBg(difficulty),
-                            ),
-                            _TopicStatusChip(
-                              icon: Icons.track_changes_rounded,
-                              label: readiness.label,
-                              fg: readinessFg(readiness),
-                              bg: readinessBg(readiness),
-                            ),
-                            _TopicStatusChip(
-                              icon: Icons.flag_outlined,
-                              label: selectedOutcomeIds.isEmpty
-                                  ? 'No outcomes linked'
-                                  : '${selectedOutcomeIds.length} outcome(s) linked',
-                              fg: _K.blue,
-                              bg: _K.blueSoft,
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: SingleChildScrollView(
-                      padding: const EdgeInsets.fromLTRB(24, 10, 24, 24),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _CardWidget(
-                            child: Padding(
-                              padding: const EdgeInsets.all(18),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Core details',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.textTitle,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  TextField(
-                                    controller: titleCtrl,
-                                    decoration: InputDecoration(
-                                      labelText: 'Topic title',
-                                      hintText: 'Write a concise, teachable topic name',
-                                      prefixIcon: const Icon(Icons.title_rounded),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  TextField(
-                                    controller: descriptionCtrl,
-                                    maxLines: 3,
-                                    decoration: InputDecoration(
-                                      labelText: 'Description',
-                                      hintText: 'Add a short summary, scope, or teaching angle for this topic',
-                                      alignLabelWithHint: true,
-                                      prefixIcon: const Padding(
-                                        padding: EdgeInsets.only(bottom: 52),
-                                        child: Icon(Icons.notes_rounded),
-                                      ),
-                                      border: OutlineInputBorder(
-                                        borderRadius: BorderRadius.circular(14),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 16),
-                          Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Expanded(
-                                child: _CardWidget(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(18),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Delivery setup',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppColors.textTitle,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 14),
-                                        const Text(
-                                          'Difficulty',
-                                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Wrap(
-                                          spacing: 8,
-                                          runSpacing: 8,
-                                          children: TopicDifficulty.values.map((value) {
-                                            final selected = difficulty == value;
-                                            return ChoiceChip(
-                                              label: Text(value.label),
-                                              selected: selected,
-                                              onSelected: (_) => setDialogState(() => difficulty = value),
-                                              avatar: Icon(
-                                                value == TopicDifficulty.beginner
-                                                    ? Icons.wb_sunny_outlined
-                                                    : value == TopicDifficulty.intermediate
-                                                        ? Icons.stacked_bar_chart_rounded
-                                                        : Icons.local_fire_department_outlined,
-                                                size: 16,
-                                                color: selected ? Colors.white : difficultyColor(value),
-                                              ),
-                                              labelStyle: TextStyle(
-                                                color: selected ? Colors.white : AppColors.textTitle,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                              selectedColor: difficultyColor(value),
-                                              backgroundColor: difficultyBg(value),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                                            );
-                                          }).toList(),
-                                        ),
-                                        const SizedBox(height: 16),
-                                        const Text(
-                                          'Readiness',
-                                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Wrap(
-                                          spacing: 8,
-                                          runSpacing: 8,
-                                          children: TopicReadiness.values.map((value) {
-                                            final selected = readiness == value;
-                                            return ChoiceChip(
-                                              label: Text(value.label),
-                                              selected: selected,
-                                              onSelected: (_) => setDialogState(() => readiness = value),
-                                              avatar: Icon(Icons.circle, size: 10, color: selected ? Colors.white : readinessFg(value)),
-                                              labelStyle: TextStyle(
-                                                color: selected ? Colors.white : AppColors.textTitle,
-                                                fontWeight: FontWeight.w700,
-                                              ),
-                                              selectedColor: readinessFg(value),
-                                              backgroundColor: readinessBg(value),
-                                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                                            );
-                                          }).toList(),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: _CardWidget(
-                                  child: Padding(
-                                    padding: const EdgeInsets.all(18),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Instructor notes',
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            fontWeight: FontWeight.w800,
-                                            color: AppColors.textTitle,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        const Text(
-                                          'Capture explanations, examples, pacing cues, or common misconceptions.',
-                                          style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
-                                        ),
-                                        const SizedBox(height: 12),
-                                        TextField(
-                                          controller: notesCtrl,
-                                          maxLines: 8,
-                                          decoration: InputDecoration(
-                                            hintText: 'Example: Start with a concrete scenario, then introduce the abstract rule.',
-                                            alignLabelWithHint: true,
-                                            border: OutlineInputBorder(
-                                              borderRadius: BorderRadius.circular(14),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
-                          _CardWidget(
-                            child: Padding(
-                              padding: const EdgeInsets.all(18),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Learning outcome alignment',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.textTitle,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  const Text(
-                                    'Select the outcomes this topic supports. These mappings are available in the backend update flow.',
-                                    style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
-                                  ),
-                                  const SizedBox(height: 14),
-                                  if (outcomes.isEmpty)
-                                    Container(
-                                      width: double.infinity,
-                                      padding: const EdgeInsets.all(14),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFFF8FAFC),
-                                        borderRadius: BorderRadius.circular(14),
-                                        border: Border.all(color: const Color(0xFFE2E8F0)),
-                                      ),
-                                      child: const Text(
-                                        'No course outcomes yet. Add them in the Outcomes tab first.',
-                                        style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
-                                      ),
-                                    )
-                                  else ...[
-                                    if (selectedOutcomes.isNotEmpty) ...[
-                                      Wrap(
-                                        spacing: 8,
-                                        runSpacing: 8,
-                                        children: selectedOutcomes
-                                            .map(
-                                              (lo) => Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                                decoration: BoxDecoration(
-                                                  color: _K.blueSoft,
-                                                  borderRadius: BorderRadius.circular(999),
-                                                  border: Border.all(color: _K.blueMid),
-                                                ),
-                                                child: Text(
-                                                  '${lo.code} • ${lo.title}',
-                                                  style: const TextStyle(
-                                                    fontSize: 13,
-                                                    fontWeight: FontWeight.w700,
-                                                    color: AppColors.primary,
-                                                  ),
-                                                ),
-                                              ),
-                                            )
-                                            .toList(),
-                                      ),
-                                      const SizedBox(height: 14),
-                                    ],
-                                    Wrap(
-                                      spacing: 10,
-                                      runSpacing: 10,
-                                      children: outcomes.map((lo) {
-                                        final selected = selectedOutcomeIds.contains(lo.id);
-                                        return FilterChip(
-                                          selected: selected,
-                                          onSelected: (value) => setDialogState(() {
-                                            if (value) {
-                                              selectedOutcomeIds.add(lo.id);
-                                            } else {
-                                              selectedOutcomeIds.remove(lo.id);
-                                            }
-                                          }),
-                                          label: Text('${lo.code} • ${lo.title}'),
-                                          labelStyle: TextStyle(
-                                            color: selected ? AppColors.primary : AppColors.textTitle,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                          selectedColor: const Color(0xFFE0ECFF),
-                                          backgroundColor: Colors.white,
-                                          side: BorderSide(
-                                            color: selected ? _K.blue : const Color(0xFFE5E7EB),
-                                          ),
-                                          avatar: Icon(
-                                            selected ? Icons.check_circle_rounded : Icons.flag_outlined,
-                                            size: 16,
-                                            color: selected ? _K.blue : AppColors.textMuted,
-                                          ),
-                                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                                        );
-                                      }).toList(),
-                                    ),
-                                  ],
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
                       ),
                     ),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.fromLTRB(24, 18, 24, 22),
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFCFCFD),
-                      border: Border(top: BorderSide(color: Color(0xFFE5E7EB))),
-                      borderRadius: BorderRadius.vertical(bottom: Radius.circular(28)),
-                    ),
-                    child: Row(
-                      children: [
-                        TextButton.icon(
-                          onPressed: () async {
-                            final ok = await confirmDelete(dialogContext);
-                            if (!ok) return;
-                            await notifier.deleteTopic(
-                              moduleId: m.id,
-                              topicId: topic.id,
-                              materialId: mat.id,
-                            );
-                            if (mounted) Navigator.pop(dialogContext, true);
-                          },
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          label: const Text('Delete topic'),
-                          style: TextButton.styleFrom(
-                            foregroundColor: const Color(0xFFDC2626),
+                    const SizedBox(height: 18),
+                    _DialogActions(
+                      confirmLabel: 'Save changes',
+                      onCancel: () => Navigator.pop(dialogContext, false),
+                      onConfirm: () async {
+                        final title = titleCtrl.text.trim();
+                        if (title.isEmpty) {
+                          AppToast.error(
+                            context,
+                            title: 'Topic title required',
+                            message: 'Please enter a title before saving.',
+                          );
+                          return;
+                        }
+                        await notifier.updateTopic(
+                          topic.copyWith(
+                            moduleId: m.id,
+                            materialId: mat.id,
+                            title: title,
+                            description: descriptionCtrl.text.trim().isEmpty ? null : descriptionCtrl.text.trim(),
+                            learningOutcomeIds: selectedOutcomeIds.toList(),
+                            linkedOutcomeId: selectedOutcomeIds.isEmpty ? null : selectedOutcomeIds.first.toString(),
+                            linkedOutcomeIds: selectedOutcomeIds.map((id) => id.toString()).toList(),
+                            instructorNotes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
+                            difficulty: difficulty,
+                            readiness: readiness,
+                            parentTopicId: selectedParentTopicId,
                           ),
-                        ),
-                        const Spacer(),
-                        TextButton(
-                          onPressed: () => Navigator.pop(dialogContext, false),
-                          child: const Text('Cancel'),
-                        ),
-                        const SizedBox(width: 10),
-                        ElevatedButton.icon(
-                          onPressed: () async {
-                            final title = titleCtrl.text.trim();
-                            if (title.isEmpty) {
-                              AppToast.error(
-                                context,
-                                title: 'Topic title required',
-                                message: 'Please enter a title before saving.',
-                              );
-                              return;
-                            }
-                            await notifier.updateTopic(
-                              topic.copyWith(
-                                moduleId: m.id,
-                                materialId: mat.id,
-                                title: title,
-                                description: descriptionCtrl.text.trim().isEmpty ? null : descriptionCtrl.text.trim(),
-                                learningOutcomeIds: selectedOutcomeIds.toList(),
-                                linkedOutcomeId: selectedOutcomeIds.isEmpty ? null : selectedOutcomeIds.first.toString(),
-                                linkedOutcomeIds: selectedOutcomeIds.map((id) => id.toString()).toList(),
-                                instructorNotes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-                                difficulty: difficulty,
-                                readiness: readiness,
-                              ),
-                            );
-                            if (mounted) Navigator.pop(dialogContext, true);
-                          },
-                          icon: const Icon(Icons.save_outlined, size: 18),
-                          label: const Text('Save changes'),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppColors.primary,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
-                      ],
+                        );
+                        if (mounted) Navigator.pop(dialogContext, true);
+                      },
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           );
@@ -1370,6 +1739,46 @@ Future<void> _showCreateModuleDialog() async {
     } finally {
       if (mounted) setState(() => _dialogOpen = false);
     }
+  }
+
+  void _openQuestionAuthoringFromSelection(_Ctx active) {
+    final hasTreeSelection = _selectionMode && !_treeSelection.isEmpty;
+
+    final moduleIds = hasTreeSelection
+        ? _treeSelection.moduleIds
+        : (active.type == _CType.module ? <int>{if (active.module != null) active.module!.id} : const <int>{});
+
+    final materialIds = hasTreeSelection
+        ? _treeSelection.materialIds
+        : (active.type == _CType.material ? <int>{if (active.material != null) active.material!.id} : const <int>{});
+
+    final topicIds = hasTreeSelection
+        ? _treeSelection.topicIds
+        : (active.type == _CType.topic ? <int>{if (active.topic != null) active.topic!.id} : const <int>{});
+
+    if (moduleIds.isEmpty && materialIds.isEmpty && topicIds.isEmpty) {
+      _openGenerateDialog(
+        moduleId: active.module?.id,
+        materialId: active.material?.id,
+        topicId: active.topic?.id,
+      );
+      return;
+    }
+
+    setState(() {
+      _authoringModuleIds = {...moduleIds};
+      _authoringMaterialIds = {...materialIds};
+      _authoringTopicIds = {...topicIds};
+      _showQuestionAuthoring = true;
+      _hideFooterForActive = true;
+    });
+  }
+
+  void _closeQuestionAuthoring() {
+    if (!mounted) return;
+    setState(() {
+      _showQuestionAuthoring = false;
+    });
   }
 
   void _openGenerateDialog({int? moduleId, int? materialId, int? topicId}) => _showManagedDialog(

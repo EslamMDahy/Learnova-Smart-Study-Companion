@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 
 class ExamQuestionSelectionStep extends StatefulWidget {
-  const ExamQuestionSelectionStep({super.key});
+  final String scopeLabel;
+  final List<dynamic> topicTargets;
+  final VoidCallback? onAddQuestion;
+
+  const ExamQuestionSelectionStep({
+    super.key,
+    this.scopeLabel = 'Selected content',
+    this.topicTargets = const [],
+    this.onAddQuestion,
+  });
 
   @override
   State<ExamQuestionSelectionStep> createState() => _ExamQuestionSelectionStepState();
 }
 
 class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
-  
   final List<String> _selectedQuestions = [
     'Explain the difference between SQL and NoSQL databases, providing examples for each.',
     'Describe the CAP theorem and its implications for distributed system design.',
@@ -16,11 +24,9 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
 
   @override
   Widget build(BuildContext context) {
-    
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        
         Expanded(
           flex: 2,
           child: Column(
@@ -47,13 +53,11 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
           ),
         ),
         const SizedBox(width: 32),
-        
         Expanded(child: _buildQuizSummaryCard()),
       ],
     );
   }
 
-  
   Widget _buildAIQuestionGenerator() {
     return Container(
       padding: const EdgeInsets.all(20),
@@ -70,18 +74,14 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
               color: Colors.white,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
-              Icons.auto_awesome,
-              color: Color(0xFF3B82F6),
-              size: 20,
-            ),
+            child: const Icon(Icons.auto_awesome, color: Color(0xFF3B82F6), size: 20),
           ),
           const SizedBox(width: 16),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'AI Question Generator',
                   style: TextStyle(
                     fontWeight: FontWeight.bold,
@@ -90,8 +90,8 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
                   ),
                 ),
                 Text(
-                  'Let our AI analyze the course material and suggest relevant questions for this quiz.',
-                  style: TextStyle(
+                  'Current scope: ${widget.scopeLabel}',
+                  style: const TextStyle(
                     color: Color(0xFF617589),
                     fontSize: 13,
                   ),
@@ -105,16 +105,11 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
               backgroundColor: Colors.white,
               side: const BorderSide(color: Color(0xFFE2E8F0)),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
             child: const Text(
               'Generate Questions',
-              style: TextStyle(
-                color: Color(0xFF3B82F6),
-                fontWeight: FontWeight.bold,
-              ),
+              style: TextStyle(color: Color(0xFF3B82F6), fontWeight: FontWeight.bold),
             ),
           ),
         ],
@@ -122,19 +117,14 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
     );
   }
 
-  
   Widget _buildFiltersBar() {
     return Row(
       children: [
         Expanded(
           child: TextField(
             decoration: InputDecoration(
-              hintText: 'Search questions by keyword or',
-              prefixIcon: const Icon(
-                Icons.search,
-                size: 20,
-                color: Colors.grey,
-              ),
+              hintText: 'Search questions by keyword',
+              prefixIcon: const Icon(Icons.search, size: 20, color: Colors.grey),
               filled: true,
               fillColor: Colors.white,
               contentPadding: const EdgeInsets.symmetric(),
@@ -169,69 +159,29 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
       ),
       child: Row(
         children: [
-          Text(
-            label,
-            style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B)),
-          ),
+          Text(label, style: const TextStyle(fontSize: 13, color: Color(0xFF1E293B))),
           const Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey),
         ],
       ),
     );
   }
 
-  
   Widget _buildQuestionsList() {
     return Column(
       children: [
-        _buildQuestionCard(
-          'What is the time complexity of a binary search algorithm in the worst case?',
-          'Algorithms',
-          'Multiple Choice',
-          'Used 3 times',
-          'Easy',
-          Colors.green,
-        ),
+        _buildQuestionCard('What is the time complexity of a binary search algorithm in the worst case?', 'Algorithms', 'Multiple Choice', 'Used 3 times', 'Easy', Colors.green),
         const SizedBox(height: 16),
-        _buildQuestionCard(
-          'Explain the difference between SQL and NoSQL databases, providing examples for each.',
-          'Databases',
-          'Essay',
-          'Used 1 time',
-          'Medium',
-          Colors.orange,
-        ),
+        _buildQuestionCard('Explain the difference between SQL and NoSQL databases, providing examples for each.', 'Databases', 'Essay', 'Used 1 time', 'Medium', Colors.orange),
         const SizedBox(height: 16),
-        _buildQuestionCard(
-          'In Python, which of the following is NOT a mutable data type?',
-          'Programming',
-          'Multiple Choice',
-          'New',
-          'Easy',
-          Colors.green,
-        ),
+        _buildQuestionCard('In Python, which of the following is NOT a mutable data type?', 'Programming', 'Multiple Choice', 'New', 'Easy', Colors.green),
         const SizedBox(height: 16),
-        _buildQuestionCard(
-          'Describe the CAP theorem and its implications for distributed system design.',
-          'System Design',
-          'Essay',
-          'Used 5 times',
-          'Hard',
-          Colors.red,
-        ),
+        _buildQuestionCard('Describe the CAP theorem and its implications for distributed system design.', 'System Design', 'Essay', 'Used 5 times', 'Hard', Colors.red),
       ],
     );
   }
 
-  Widget _buildQuestionCard(
-    String title,
-    String tag,
-    String type,
-    String usage,
-    String diff,
-    Color diffColor,
-  ) {
+  Widget _buildQuestionCard(String title, String tag, String type, String usage, String diff, Color diffColor) {
     final bool selected = _selectedQuestions.contains(title);
-
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -259,10 +209,6 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
                   }
                 });
               },
-              activeColor: const Color(0xFF3B82F6),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(4),
-              ),
             ),
           ),
           const SizedBox(width: 16),
@@ -270,51 +216,73 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 15,
-                    color: Color(0xFF1E293B),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
+                Text(title, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1E293B))),
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
                   children: [
-                    _metaItem(Icons.folder_outlined, tag),
-                    const SizedBox(width: 16),
-                    _metaItem(Icons.list_alt, type),
-                    const SizedBox(width: 16),
-                    _metaItem(Icons.history, usage),
+                    _metaPill(tag),
+                    _metaPill(type),
+                    _metaPill(usage),
                   ],
                 ),
               ],
             ),
           ),
+          const SizedBox(width: 16),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: diffColor.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(6),
+              color: diffColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(999),
             ),
-            child: Text(
-              diff,
-              style: TextStyle(
-                color: diffColor,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            child: Text(diff, style: TextStyle(color: diffColor, fontWeight: FontWeight.w700, fontSize: 12)),
           ),
         ],
       ),
     );
   }
 
-  
+  Widget _metaPill(String label) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8FAFC),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+        ),
+        child: Text(label, style: const TextStyle(fontSize: 11, color: Color(0xFF617589))),
+      );
+
+  Widget _buildPagination() => Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: List.generate(
+          5,
+          (index) => Container(
+            width: 32,
+            height: 32,
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            decoration: BoxDecoration(
+              color: index == 0 ? const Color(0xFF137FEC) : Colors.white,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Center(
+              child: Text(
+                '${index + 1}',
+                style: TextStyle(
+                  color: index == 0 ? Colors.white : const Color(0xFF0F172A),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+
   Widget _buildQuizSummaryCard() {
     return Container(
-      padding: const EdgeInsets.all(24),
+      padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
@@ -323,160 +291,37 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
-            'Quiz Summary',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              fontSize: 18,
-              color: Color(0xFF1E293B),
-            ),
-          ),
-          const SizedBox(height: 24),
-          _summaryRow('Total Questions', '15'),
-          const Divider(height: 32, color: Color(0xFFF1F5F9)),
-          _summaryRow('Total Points', '100'),
-          const Divider(height: 32, color: Color(0xFFF1F5F9)),
-          _summaryRow('Difficulty', 'Medium', color: Colors.orange),
-          const SizedBox(height: 24),
-          _buildInfoBox(),
-          const SizedBox(height: 24),
-          _summaryButton(
-            Icons.visibility_outlined,
-            'Preview as Student',
-            Colors.black,
-            Colors.white,
-          ),
+          const Text('Quiz Summary', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 18),
+          _summaryRow('Total Questions', '${_selectedQuestions.length}'),
+          _summaryRow('Selected Targets', '${widget.topicTargets.length}'),
+          _summaryRow('Difficulty', 'Medium'),
           const SizedBox(height: 16),
-          _summaryButton(
-            Icons.add,
-            'Add New Question',
-            const Color(0xFF3B82F6),
-            Colors.white,
-            isPrimary: true,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoBox() {
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF0F9FF),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(Icons.info_outline, size: 18, color: Color(0xFF0EA5E9)),
-          SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              'This quiz is currently saved as a draft. Publishing will make it visible to enrolled students immediately or on the scheduled date.',
-              style: TextStyle(
-                fontSize: 12,
-                color: Color(0xFF617589),
-                height: 1.4,
+          if (widget.onAddQuestion != null)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: widget.onAddQuestion,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF137FEC),
+                  foregroundColor: Colors.white,
+                ),
+                child: const Text('Add New Question'),
               ),
             ),
-          ),
         ],
       ),
     );
   }
 
-  // --- Helpers ---
-  Widget _metaItem(IconData icon, String label) {
-    return Row(
-      children: [
-        Icon(icon, size: 14, color: const Color(0xFF94A3B8)),
-        const SizedBox(width: 4),
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFF64748B), fontSize: 12),
+  Widget _summaryRow(String label, String value) => Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(label, style: const TextStyle(color: Color(0xFF617589))),
+            Text(value, style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+          ],
         ),
-      ],
-    );
-  }
-
-  Widget _summaryRow(String label, String value, {Color? color}) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(color: Color(0xFF64748B), fontSize: 14),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-            color: color ?? const Color(0xFF1E293B),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _summaryButton(
-    IconData icon,
-    String label,
-    Color bg,
-    Color text, {
-    bool isPrimary = false,
-  }) {
-    return SizedBox(
-      width: double.infinity,
-      child: ElevatedButton.icon(
-        onPressed: () {},
-        icon: Icon(icon, size: 18),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bg,
-          foregroundColor: text,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 18),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPagination() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        const Icon(Icons.chevron_left, color: Color(0xFF94A3B8)),
-        const SizedBox(width: 8),
-        _pageNode('1', true),
-        _pageNode('2', false),
-        _pageNode('3', false),
-        const SizedBox(width: 8),
-        const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
-      ],
-    );
-  }
-
-  Widget _pageNode(String n, bool active) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      width: 32,
-      height: 32,
-      decoration: BoxDecoration(
-        color: active ? const Color(0xFF3B82F6) : Colors.transparent,
-        borderRadius: BorderRadius.circular(4),
-      ),
-      child: Center(
-        child: Text(
-          n,
-          style: TextStyle(
-            color: active ? Colors.white : const Color(0xFF64748B),
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-    );
-  }
+      );
 }
