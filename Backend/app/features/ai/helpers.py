@@ -86,6 +86,7 @@ def insert_topic_learning_outcome_relations(
                         :learning_outcome_id,
                         NOW()
                     )
+                    ON CONFLICT (topic_id, learning_outcome_id) DO NOTHING
                 """),
                 {
                     "topic_id": topic_id,

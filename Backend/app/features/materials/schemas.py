@@ -49,6 +49,7 @@ class MaterialConfirmUploadResponse(BaseModel):
     course_id: int
 
     status: str
+    ai_processing_started: bool
     updated_at: datetime
 
     download_url: Optional[str] = None

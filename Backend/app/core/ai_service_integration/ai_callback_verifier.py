@@ -13,6 +13,7 @@ from app.core.ai_service_integration.ai_protocol import (
 from app.core.ai_service_integration.ai_signature import (
     is_timestamp_valid,
     verify_signature_from_bytes,
+    # create_signature_from_bytes,
 )
 
 
@@ -58,10 +59,12 @@ async def _read_request_body_bytes(request: Request) -> bytes:
 
 
 def _validate_callback_timestamp(timestamp: str) -> None:
+    # print("Checking timestamp:", timestamp)
     if not is_timestamp_valid(
         timestamp=timestamp,
         allowed_drift_seconds=settings.ai_allowed_timestamp_drift_seconds,
     ):
+        # print("❌ Timestamp invalid or expired:", timestamp)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired callback timestamp",
@@ -76,6 +79,26 @@ def _validate_callback_signature(
     signature: str,
     body: bytes,
 ) -> None:
+    # print("=== SIGNATURE DEBUG ===")
+    # print("Method:", request.method)
+    # print("Path:", request.url.path)
+    # print("Request ID:", request_id)
+    # print("Timestamp:", timestamp)
+    # print("Raw body bytes:", body)
+    # print("Provided signature:", signature)
+
+    # expected_signature = create_signature_from_bytes(
+    #     secret=settings.ai_shared_secret,
+    #     method=request.method,
+    #     path=request.url.path,
+    #     request_id=request_id,
+    #     timestamp=timestamp,
+    #     body=body,
+    # )
+
+    # print("Expected signature:", expected_signature)
+    # print("=======================")
+
     is_valid = verify_signature_from_bytes(
         secret=settings.ai_shared_secret,
         method=request.method,
@@ -87,6 +110,7 @@ def _validate_callback_signature(
     )
 
     if not is_valid:
+        # print("❌ Signature mismatch")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid callback signature",
@@ -116,6 +140,13 @@ async def verify_ai_callback_request(
 ) -> VerifiedAICallbackRequest:
     request_id, timestamp, signature = _extract_ai_callback_headers(request)
     raw_body = await _read_request_body_bytes(request)
+    # print("=== AI CALLBACK RECEIVED ===")
+    # print("Headers:")
+    # print("Request-Id:", request.headers.get("Learnova-Request-Id"))
+    # print("Timestamp:", request.headers.get("Learnova-Timestamp"))
+    # print("Signature:", request.headers.get("Learnova-Signature"))
+    # print("Path:", request.url.path)
+    # print("============================")
 
     _validate_callback_timestamp(timestamp)
     _validate_callback_signature(

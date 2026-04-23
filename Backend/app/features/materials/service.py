@@ -409,7 +409,7 @@ def confirm_material_upload(*, material_id: int, db: Session, current_user: dict
                 send_ai_request(
                     db,
                     operation_type="content_structure_generation",
-                    endpoint_path="/content-structure/extract", # !!!!!!UPDATE THIS AFTER GETING THE REAL ENDPOINT!!!!!!
+                    endpoint_path="/api/v1/courses/documents/ingest", # !!!!!!UPDATE THIS AFTER GETING THE REAL ENDPOINT!!!!!!
                     course_id=int(mat["course_id"]),
                     primary_entity_type="material",
                     primary_entity_id=int(mat["material_id"]),
@@ -420,11 +420,10 @@ def confirm_material_upload(*, material_id: int, db: Session, current_user: dict
                     text("""
                         UPDATE materials
                         SET
-                            status = CAST(:new_status AS material_status_enum),
                             updated_at = NOW()
                         WHERE id = :mid
                     """),
-                    {"mid": material_id, "new_status": "processing"},
+                    {"mid": material_id},
                 )
                 db.commit()
 
