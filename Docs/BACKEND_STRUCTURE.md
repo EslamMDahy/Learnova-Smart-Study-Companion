@@ -9,9 +9,12 @@ Backend/
 |
 ├─ app/
 │  ├─ core/
-|  |  ├─ ai_callback_verifier.py
-|  |  ├─ ai_request_tracking.py
-|  |  ├─ ai_signature.py
+|  |  ├─ ai_service_integration/
+|  |  |  ├─ ai_callback_verifier.py
+|  |  |  ├─ ai_protocol.py
+|  |  |  ├─ ai_request_tracking.py
+|  |  |  ├─ ai_signature.py
+|  |  |  └─ ai_transport.py
 |  |  ├─ config.py
 |  |  ├─ deps.py
 |  |  ├─ emailer.py
@@ -27,6 +30,12 @@ Backend/
 │  │  └─ session.py
 |  | 
 │  ├─ features/
+|  |  ├─ ai/
+|  |  |  ├─ handlers.py
+|  |  |  ├─ helpers.py
+|  |  |  ├─ router.py
+|  |  |  └─ service.py
+|  |  |
 |  |  ├─ auth/
 |  |  |  ├─ router.py
 |  |  |  ├─ schemas.py
@@ -38,6 +47,7 @@ Backend/
 |  |  |  └─ service.py
 |  |  |
 |  |  ├─ learningOutcomes/
+|  |  |  ├─ helpers.py
 |  |  |  ├─ router.py
 |  |  |  ├─ schemas.py
 |  |  |  └─ service.py
@@ -69,6 +79,7 @@ Backend/
 |  |  |  └─ service.py
 |  |  |
 |  |  └─ topics/
+|  |     ├─ helpers.py
 |  |     ├─ router.py
 |  |     ├─ schemas.py
 |  |     └─ service.py
