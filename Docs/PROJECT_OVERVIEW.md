@@ -140,10 +140,30 @@ The platform is designed to support:
 ### AI Processing Flow (High-Level)
 1. Instructor uploads material
 2. Backend decides if AI processing is requested
-3. Backend sends signed download URL to AI service
+3. Backend sends a signed AI request for the selected operation
 4. AI processes content asynchronously
-5. AI sends structured JSON back to backend
-6. Backend validates and persists data
+5. AI sends a callback to the backend when processing is complete
+6. Backend verifies the callback request before business logic
+7. Backend dispatches the callback by operation type
+8. Backend validates and persists the returned structured data
+
+### Asynchronous AI Processing and Callback Handling
+Learnova now includes implemented backend support for asynchronous AI processing and callback handling rather than relying only on one-way outbound AI requests.
+
+For supported AI-assisted workflows, the backend can:
+- send the AI request after the relevant backend workflow reaches the correct stage
+- receive the AI result through a dedicated callback endpoint
+- verify callback authenticity before entering business logic
+- dispatch processing based on the AI operation type
+- persist the returned structured data under backend-controlled rules
+
+The currently supported callback-driven operation is **`content_structure_generation`**, which is used in the material AI-processing flow. Through this flow, the backend can receive and store:
+- topics
+- learning outcomes
+- topic-learning outcome relations
+
+This keeps AI-assisted workflows consistent with Learnova's broader design principle that the backend remains the authority over validation, persistence, and accepted application state even when AI participates in content generation.
+
 
 ### Backend-Controlled AI Integration Foundation
 To support AI workflows consistently across the platform, Learnova now includes a reusable backend-controlled integration foundation for communication with the AI service.

@@ -1318,7 +1318,33 @@ Update an organization member’s status.
 
 ---
 
-## 14. Endpoint Summary by Feature
+## 14. AI Integration (Internal / Callback)
+
+### `POST /ai/callback`
+Receive an asynchronous callback from the AI service after backend-initiated AI processing completes.
+
+**Request**
+- signed JSON callback request using the shared AI integration protocol
+- includes operation metadata and operation-specific `body`
+
+**Response**
+- callback handling result
+- may include basic acknowledgment or operation summary according to current service behavior
+
+**Authorization**
+- Internal service-to-service endpoint  
+- Uses signed request verification rather than JWT-based user authentication
+
+**Notes**
+- Callback authenticity is verified before the request enters business logic.
+- Callback handling is dispatched based on `operation_type`.
+- The currently supported callback-driven operation is:
+  - `content_structure_generation`
+- This endpoint is part of the backend's internal AI integration flow rather than the normal frontend-facing API surface.
+
+---
+
+## 15. Endpoint Summary by Feature
 
 ### Authentication
 - `POST /auth/register`
@@ -1396,19 +1422,21 @@ Update an organization member’s status.
 
 ---
 
-## 15. Final Notes
+## 16. Final Notes
 
 
 ### AI Integration Note
 
-Some AI-related backend capabilities are implemented as internal shared infrastructure rather than public API endpoints.
+Learnova now includes implemented internal AI integration support for both outbound backend-to-AI requests and inbound callback handling.
 
 This includes:
 - backend-to-AI transport layer
 - request signing and verification
+- asynchronous callback reception through `POST /ai/callback`
 - request tracking and lifecycle handling
+- callback dispatch by `operation_type`
 
-These components are documented in the backend architecture documentation and are not directly exposed as part of the public API surface.
+These components are documented in the backend architecture documentation. Only the callback endpoint appears here because it is part of the implemented backend API surface, while the rest remains internal integration infrastructure rather than normal frontend-facing API functionality.
 
 This API reference reflects the current implemented backend routes and public request/response contracts visible in the codebase at the time of writing.
 

@@ -86,6 +86,7 @@ The backend currently registers routers for:
 - questions
 - organizations
 - settings
+- ai
 
 This confirms that the backend is assembled as a composition of domain routers rather than as one large monolithic route file.
 
@@ -154,12 +155,20 @@ A typical feature package contains:
 - `schemas.py`
 - `service.py`
 
-Some features also include helper modules where needed.
+These three files form the default backbone of a feature package.
+
+Additional internal modules are used only when the feature flow requires them:
+
+- `helpers.py` is used when reusable logic is needed across multiple endpoints or internal flows within the same feature.
+- `handlers.py` is used when the feature is handler-driven by nature, or when one endpoint/service flow must dispatch between multiple entity variants, payload shapes, or operation types.
+
+This keeps the default feature structure simple while still allowing justified internal expansion when the feature complexity actually demands it.
 
 ### Feature Packages
 
 ```text
 features/
+├── ai/
 ├── auth/
 ├── courses/
 ├── learningOutcomes/
@@ -202,6 +211,10 @@ Contains:
 #### `helpers.py` (where applicable)
 Used for reusable logic that does not belong directly in routing or core shared infrastructure.  
 The questions feature uses helpers to support type-specific validation and extensibility.
+
+#### `handlers.py` (where applicable)
+Used when a feature needs operation-specific or variant-specific business handlers behind a shared orchestration flow.  
+This is especially useful when one entrypoint must dispatch between multiple supported payload types or operation types while keeping the main service layer generic.
 
 ---
 
@@ -787,6 +800,18 @@ Material access is backend-controlled:
 
 This reinforces the principle that storage access must remain subordinate to application rules.
 
+### AI Processing Integration
+
+Materials can optionally participate in an AI processing workflow after upload confirmation.
+
+When `use_ai_processing = true`, the backend uses the confirm-upload flow to trigger an outbound AI request through the shared integration layer.  
+The current operation used for this flow is `content_structure_generation`.
+
+That outbound request remains transport- and security-controlled by shared infrastructure rather than by material-specific service code.  
+The AI service then processes the material asynchronously and returns results through the generic callback endpoint.
+
+After callback verification and dispatch, the backend persists the returned structured content and updates the material's AI-processing fields without conflating AI processing state with the material's general upload/status lifecycle.
+
 ---
 
 ## 18. Topic Architecture
@@ -1045,7 +1070,7 @@ This separation is important because AI output should enhance backend workflows,
 
 ### Implemented Integration Boundary
 
-This separation is now reinforced by a reusable AI service integration layer in `core`.
+This separation is now reinforced by a reusable AI service integration layer in `core` together with a dedicated AI callback feature for inbound orchestration.
 
 Feature services are not expected to manage transport, signing, callback verification, or request tracking as part of their local business logic.  
 Instead, they prepare the feature-specific request body and identify the target AI operation, while shared infrastructure handles:
@@ -1055,6 +1080,9 @@ Instead, they prepare the feature-specific request body and identify the target 
 - request signing
 - callback verification
 - request lifecycle tracking
+
+On the inbound side, the backend now exposes a generic callback endpoint that dispatches by `operation_type` after request-boundary verification succeeds.  
+This keeps callback transport/authenticity handling separate from operation-specific persistence logic.
 
 This keeps feature services focused on domain rules while ensuring AI communication behavior remains consistent across the backend.
 
@@ -1071,6 +1099,8 @@ For example:
 
 This boundary is important because the AI service should be able to participate in a stable communication contract without gaining ownership of backend state management.
 
+At the current stage, the implemented callback-driven operation for material structure processing is `content_structure_generation`.  
+The earlier temporary name `material_extraction` should be treated as deprecated.
 
 ---
 
@@ -1100,12 +1130,32 @@ To support stable signing behavior, the backend uses deterministic JSON serializ
 This is important because equivalent payloads must produce the same body hash even when serialization details could otherwise vary.  
 Without canonical serialization behavior, signatures could become unreliable across services.
 
+### Standard Integration Headers
+
+The protocol uses a standard header set for service-to-service communication:
+
+- `Learnova-Request-Id`
+- `Learnova-Timestamp`
+- `Learnova-Signature`
+
+These headers are part of the callback verification and signing model rather than optional transport metadata.
+
 ### Callback Verification at the Request Boundary
 
 AI callbacks or asynchronous responses are verified before they are allowed to enter service-level business logic.
 
 This is a critical architectural rule because external payloads must not reach domain workflows until request authenticity has been validated.  
 As a result, callback verification is treated as a request-boundary concern rather than as feature-specific service logic.
+
+The verifier returns a normalized `VerifiedAICallbackRequest` object containing:
+
+- `request_id`
+- `timestamp`
+- `signature`
+- `payload`
+- `raw_body`
+
+That normalized object is what gets passed downstream into callback-handling service logic after authenticity checks succeed.
 
 ### Time-Based Validation Controls
 
@@ -1193,7 +1243,235 @@ This distinction keeps the protocol portable while preserving backend ownership 
 
 ---
 
-## 30. Security Model Summary
+
+## 30. AI Callback Handling Architecture
+
+The backend now includes implemented callback support for asynchronous AI workflows.
+
+This is not just a protocol capability in `core`.  
+It is a full feature-level architecture that receives verified AI callbacks, correlates them with tracked requests, dispatches them by operation type, and persists accepted results through backend-controlled business logic.
+
+### 30.1 Callback Entry Point
+
+The implemented callback endpoint is:
+
+- `POST /ai/callback`
+
+This endpoint is exposed through a dedicated AI router under `app/features/ai/` and is registered in `main.py` as part of the application router composition.
+
+### 30.2 Thin Router Design
+
+The AI callback router remains intentionally thin.
+
+Its responsibility is limited to:
+
+- receiving the raw `Request`
+- accessing the database session
+- calling `verify_ai_callback_request(...)`
+- passing the verified result into `service.handle_ai_callback(...)`
+
+It does not contain operation-specific business logic, persistence rules, or transaction orchestration.
+
+### 30.3 Request-Boundary Verification
+
+Callback authenticity is verified before the request enters business logic.
+
+That verification includes:
+
+- required header presence
+- timestamp validation
+- signature validation
+- JSON body parsing
+
+Only after this succeeds does the backend pass a `VerifiedAICallbackRequest` object into the feature service.  
+This preserves the architectural rule that external payloads must be authenticated before they influence application behavior.
+
+### 30.4 AI Feature Package Structure
+
+The callback feature is implemented under:
+
+- `app/features/ai/`
+
+Its internal structure follows the same architectural discipline as the rest of the backend while allowing a justified handler-driven extension:
+
+- `router.py`
+- `service.py`
+- `handlers.py`
+- `helpers.py` when needed
+
+This is an intentional design choice rather than an accidental deviation from the standard feature pattern.  
+The callback feature is handler-driven by nature because one verified entrypoint may dispatch to multiple AI operation handlers over time.
+
+### 30.5 Generic Service Responsibilities
+
+The AI feature service is designed to stay as generic as possible.
+
+Its responsibilities include:
+
+- accepting `VerifiedAICallbackRequest`
+- extracting `operation_type`
+- looking up the tracked AI request by `request_id`
+- validating that the request exists
+- validating that the operation type matches
+- rejecting expired requests
+- rejecting already-processed callbacks
+- marking callback receipt in the request lifecycle
+- dispatching to the correct operation handler
+- marking the AI request as completed after success
+- marking the AI request as failed after unexpected failure
+- owning the transaction boundary
+
+This service deliberately does not contain operation-specific content insertion logic.
+
+### 30.6 Registry-Based Operation Dispatch
+
+Callback dispatch is registry-based rather than hardcoded as one growing conditional flow.
+
+This allows the backend to support additional AI operations later by:
+
+- adding a new handler
+- registering it in the dispatch registry
+
+without redesigning the generic callback service.
+
+### 30.7 Current Implemented Operation
+
+The currently implemented callback-handled operation is:
+
+- `content_structure_generation`
+
+This is the finalized operation name used across request dispatch, callback payloads, operation-type definitions, and backend documentation.  
+The earlier temporary name `material_extraction` should be treated as deprecated.
+
+### 30.8 Operation-Specific Handler Responsibilities
+
+The current handler is responsible only for `content_structure_generation` business logic.
+
+Its responsibilities include:
+
+- reading `payload["body"]`
+- extracting `course_id`, `module_id`, `material_id`, `topics`, `learning_outcomes`, and `topic_learning_outcome_relations`
+- performing basic callback structure validation
+- validating important identity fields such as `course_id` and `material_id` against the tracked AI request
+- invoking the relevant persistence helpers
+- updating material AI-processing state after successful persistence
+- returning a small summary result
+
+The handler does not perform callback verification, request-log lookup, lifecycle orchestration, or transaction commits/rollbacks.
+
+### 30.9 Persistence Helpers and Responsibility Split
+
+Persistence is intentionally divided across feature-scoped helpers.
+
+#### Topics Helper
+
+The topics feature provides:
+
+- `bulk_insert_ai_topics(...)`
+
+This helper inserts AI-generated topics using a two-pass strategy:
+
+- pass 1 inserts topic rows without `parent_topic_id`
+- pass 2 resolves `parent_temp_id` and updates `parent_topic_id`
+
+It returns an in-memory mapping from:
+
+- `topic_temp_id -> topic_db_id`
+
+#### Learning Outcomes Helper
+
+The learning outcomes feature provides:
+
+- `bulk_insert_ai_learning_outcomes(...)`
+
+This helper inserts AI-generated learning outcomes and returns an in-memory mapping from:
+
+- `learning_outcome_temp_id -> learning_outcome_db_id`
+
+#### AI Feature Helpers
+
+The AI feature helpers provide operations such as:
+
+- `insert_topic_learning_outcome_relations(...)`
+- `mark_material_ai_processing_completed(...)`
+
+The relation helper uses the in-memory mappings produced by topic and learning-outcome insertion helpers to populate the relation table.  
+The material helper updates:
+
+- `is_ai_processed = TRUE`
+- `ai_processed_at = NOW()`
+- `updated_at = NOW()`
+
+### 30.10 Temporary ID Mapping Strategy
+
+The backend does not persist AI temporary identifiers as long-term database reference keys.
+
+Instead, temp IDs exist only during the processing of the current callback, where they are used to build in-memory mappings such as:
+
+- `topic_temp_id -> topic_id`
+- `learning_outcome_temp_id -> learning_outcome_id`
+
+After persistence completes, these temp IDs are not retained as durable application identifiers.  
+Accordingly, `ai_ref_key` is not part of the intended long-term linkage strategy for this flow.
+
+### 30.11 Idempotent Relation Insertion
+
+Topic-to-learning-outcome relation insertion is intentionally idempotent.
+
+To tolerate duplicate callbacks, retries, or repeated network delivery, relation insertion uses conflict-safe behavior equivalent to:
+
+- `ON CONFLICT (topic_id, learning_outcome_id) DO NOTHING`
+
+This prevents avoidable crashes and unnecessary rollbacks when a duplicate relation arrives during callback replay scenarios.
+
+### 30.12 Material AI Processing State
+
+Successful callback processing does not repurpose the material's general status field as AI completion state.
+
+Instead, AI completion is tracked separately through dedicated material fields such as:
+
+- `is_ai_processed`
+- `ai_processed_at`
+- `updated_at`
+
+This preserves a clean separation between the material's upload/status lifecycle and its AI-processing lifecycle.
+
+### 30.13 Transaction Strategy
+
+Transaction ownership remains centralized in the generic AI callback service.
+
+The adopted strategy is:
+
+- helpers do not commit
+- helpers do not rollback
+- handlers do not commit
+- handlers do not rollback
+- the generic service performs one commit after the full operation succeeds
+- the generic service performs rollback on failure
+
+This keeps the callback flow atomic and avoids fragmented transaction control across layers.
+
+### 30.14 Flush Usage Within the Callback Flow
+
+The service performs `db.flush()` after marking callback receipt.
+
+This keeps the callback-received update inside the same transaction without introducing a partial commit.  
+If a later handler step fails, the entire operation can still be rolled back atomically.
+
+### 30.15 AI-Generated Content State
+
+Rows created from AI callback output are inserted as AI-generated but not yet reviewed.
+
+For the current content-structure flow, this means:
+
+- topics are stored with `is_ai_generated = TRUE` and `is_reviewed = FALSE`
+- learning outcomes are stored with `is_ai_generated = TRUE` and `is_reviewed = FALSE`
+
+This keeps AI-produced instructional content distinguishable from manually authored or explicitly reviewed content.
+
+---
+
+## 31. Security Model Summary
 
 The backend security model combines multiple layers:
 
@@ -1212,7 +1490,7 @@ This layered approach is especially important in an educational system where lea
 
 ---
 
-## 31. Current Architectural Focus
+## 32. Current Architectural Focus
 
 The current backend is intentionally centered on the instructor-side foundation of the platform.
 
@@ -1230,7 +1508,7 @@ This sequencing makes sense because the learner experience depends on a strong i
 
 ---
 
-## 32. Future Architectural Direction
+## 33. Future Architectural Direction
 
 The current architecture is already positioned to support the next major phases of the platform, including:
 
@@ -1245,7 +1523,7 @@ Because the backend is modular, feature-oriented, and service-driven, these futu
 
 ---
 
-## 33. Summary
+## 34. Summary
 
 The Learnova backend follows a feature-oriented, service-driven architecture where the backend acts as the central authority for data integrity, authorization, storage access, and workflow orchestration.
 
@@ -1263,7 +1541,7 @@ This architecture provides a strong and realistic foundation for turning Learnov
 
 ---
 
-## 34. Anti-Patterns to Avoid
+## 35. Anti-Patterns to Avoid
 
 - Do not trust frontend-provided IDs without hierarchy validation
 - Do not expose storage keys directly
@@ -1272,7 +1550,7 @@ This architecture provides a strong and realistic foundation for turning Learnov
 
 ---
 
-## 35. Development Rules (Non-Negotiable)
+## 36. Development Rules (Non-Negotiable)
 
 - All database access MUST use sqlalchemy.text(...)
 - No ORM relationships inside services
