@@ -386,52 +386,52 @@ def confirm_material_upload(*, material_id: int, db: Session, current_user: dict
     # =========================
     ai_processing_started = False
 
-    if use_ai_processing:
-        if download_url:
-            ai_request_body = {
-                "module_id": int(mat["module_id"]),
-                "material_id": int(mat["material_id"]),
-                "material": {
-                    "title": mat["title"],
-                    "type": str(mat["type"]),
-                    "file_name": mat["file_name"],
-                    "mime_type": mat["mime_type"],
-                    "signed_download_url": download_url,
-                },
-                "extraction_config": {
-                    "extract_topics": True,
-                    "extract_learning_outcomes": True,
-                    "allow_subtopics": True,
-                },
-            }
+    # if use_ai_processing:
+    if download_url:
+        ai_request_body = {
+            "module_id": int(mat["module_id"]),
+            "material_id": int(mat["material_id"]),
+            "material": {
+                "title": mat["title"],
+                "type": str(mat["type"]),
+                "file_name": mat["file_name"],
+                "mime_type": mat["mime_type"],
+                "signed_download_url": download_url,
+            },
+            "extraction_config": {
+                "extract_topics": True,
+                "extract_learning_outcomes": True,
+                "allow_subtopics": True,
+            },
+        }
 
-            try:
-                send_ai_request(
-                    db,
-                    operation_type="content_structure_generation",
-                    endpoint_path="/api/v1/courses/documents/ingest", # !!!!!!UPDATE THIS AFTER GETING THE REAL ENDPOINT!!!!!!
-                    course_id=int(mat["course_id"]),
-                    primary_entity_type="material",
-                    primary_entity_id=int(mat["material_id"]),
-                    body=ai_request_body,
-                )
+        try:
+            send_ai_request(
+                db,
+                operation_type="content_structure_generation",
+                endpoint_path="/api/v1/courses/documents/ingest", # !!!!!!UPDATE THIS AFTER GETING THE REAL ENDPOINT!!!!!!
+                course_id=int(mat["course_id"]),
+                primary_entity_type="material",
+                primary_entity_id=int(mat["material_id"]),
+                body=ai_request_body,
+            )
 
-                db.execute(
-                    text("""
-                        UPDATE materials
-                        SET
-                            updated_at = NOW()
-                        WHERE id = :mid
-                    """),
-                    {"mid": material_id},
-                )
-                db.commit()
+            db.execute(
+                text("""
+                    UPDATE materials
+                    SET
+                        updated_at = NOW()
+                    WHERE id = :mid
+                """),
+                {"mid": material_id},
+            )
+            db.commit()
 
-                ai_processing_started = True
+            ai_processing_started = True
 
-            except Exception:
-                db.rollback()
-                ai_processing_started = False
+        except Exception:
+            db.rollback()
+            ai_processing_started = False
 
     # =========================
     # 8) Final response
