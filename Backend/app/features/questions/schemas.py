@@ -137,3 +137,15 @@ class QuestionGetResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class QuestionUpdateRequest(BaseModel):
+    topic_id: Optional[int] = Field(None, gt=0)
+    question_text: Optional[str] = None
+    difficulty: Optional[str] = None
+
+    explanation: Optional[str] = None
+    options: Optional[List[QuestionOptionItem]] = None
+    expected_answer: Optional[List[str] | str] = None
+    grading_rubric: Optional[dict] = None
+    tags: Optional[list] = None
+
+    model_config = ConfigDict(extra="forbid")
