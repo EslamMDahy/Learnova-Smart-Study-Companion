@@ -47,9 +47,19 @@ class Settings:
         # ─────────────────────────────────────────────────────────────────────────
         is_production = os.getenv("ENV", "development").lower() == "production"
 
-        self.cookie_secure: bool   = is_production
-        self.cookie_samesite: str  = "none" if is_production else "lax"
-        self.cookie_path: str      = os.getenv("COOKIE_PATH", "/")
+        self.cookie_secure: bool = (
+            os.getenv("COOKIE_SECURE", "true" if is_production else "false")
+            .strip()
+            .lower()
+            == "true"
+        )
+
+        self.cookie_samesite: str = os.getenv(
+            "COOKIE_SAMESITE",
+            "none" if is_production else "lax",
+        ).strip().lower()
+
+        self.cookie_path: str = os.getenv("COOKIE_PATH", "/")
 
         # Supabase Storage
         self.supabase_url: str = os.getenv("SUPABASE_URL", "")
