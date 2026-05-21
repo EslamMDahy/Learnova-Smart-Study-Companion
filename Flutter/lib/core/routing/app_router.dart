@@ -23,6 +23,7 @@ import '../../features/admin/presentation/pages/admin_route_pages.dart';
 import '../../features/instructor/presentation/pages/instructor_shell.dart';
 import '../../features/instructor/presentation/pages/instructor_route_pages.dart';
 import '../../features/instructor/presentation/pages/course_details/course_details_page.dart';
+import '../../features/instructor/presentation/widgets/Quizzes/quiz_screen.dart';
 import '../../features/instructor/presentation/controllers/selected_course_provider.dart';
 import '../../features/instructor/presentation/course_route_identity.dart';
 import '../../features/instructor/data/courses_providers.dart';
@@ -43,6 +44,39 @@ final _routerRefreshListenableProvider = Provider<ValueNotifier<int>>((ref) {
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refresh = ref.watch(_routerRefreshListenableProvider);
   final initialSession = SessionSnapshot.fromStorage();
+
+  Page<void> courseDetailsPage(
+    GoRouterState state,
+    CourseDetailsTab tab,
+  ) {
+    final slug = state.pathParameters['courseSlug']!;
+    final routeCourseId = parseCourseIdFromSlug(slug);
+
+    // Prefer the URL as the source of truth on refresh/deep links.
+    final cached = SelectedCourseCache.value;
+    if (cached != null && slugMatchesCourse(slug, cached)) {
+      return NoTransitionPage(
+        child: CourseDetailsPage(
+          courseSlug: slug,
+          cachedCourse: cached,
+          cachedCourseId: routeCourseId ?? cached.id,
+          initialTab: tab,
+        ),
+      );
+    }
+
+    // Fall back to persisted selection only when the URL itself
+    // does not carry a parseable course id.
+    final courseId = routeCourseId ?? SelectedCourseCache.cachedCourseId;
+    return NoTransitionPage(
+      child: CourseDetailsPage(
+        courseSlug: slug,
+        cachedCourse: null,
+        cachedCourseId: courseId,
+        initialTab: tab,
+      ),
+    );
+  }
 
   final router = GoRouter(
     navigatorKey: rootNavigatorKey,
@@ -255,33 +289,32 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           GoRoute(
             path: Routes.instructorCourseDetails,
             name: RouteNames.instructorCourseDetails,
-            pageBuilder: (context, state) {
-              final slug = state.pathParameters['courseSlug']!;
-              final routeCourseId = parseCourseIdFromSlug(slug);
-
-              // Prefer the URL as the source of truth on refresh/deep links.
-              final cached = SelectedCourseCache.value;
-              if (cached != null && slugMatchesCourse(slug, cached)) {
-                return NoTransitionPage(
-                  child: CourseDetailsPage(
-                    courseSlug: slug,
-                    cachedCourse: cached,
-                    cachedCourseId: routeCourseId ?? cached.id,
-                  ),
-                );
-              }
-
-              // Fall back to persisted selection only when the URL itself
-              // does not carry a parseable course id.
-              final courseId = routeCourseId ?? SelectedCourseCache.cachedCourseId;
-              return NoTransitionPage(
-                child: CourseDetailsPage(
-                  courseSlug: slug,
-                  cachedCourse: null,
-                  cachedCourseId: courseId,
-                ),
-              );
-            },
+            pageBuilder: (_, state) =>
+                courseDetailsPage(state, CourseDetailsTab.overview),
+          ),
+          GoRoute(
+            path: Routes.instructorCourseMaterials,
+            name: RouteNames.instructorCourseMaterials,
+            pageBuilder: (_, state) =>
+                courseDetailsPage(state, CourseDetailsTab.materials),
+          ),
+          GoRoute(
+            path: Routes.instructorCourseOutcomes,
+            name: RouteNames.instructorCourseOutcomes,
+            pageBuilder: (_, state) =>
+                courseDetailsPage(state, CourseDetailsTab.outcomes),
+          ),
+          GoRoute(
+            path: Routes.instructorCourseQuestionBank,
+            name: RouteNames.instructorCourseQuestionBank,
+            pageBuilder: (_, state) =>
+                courseDetailsPage(state, CourseDetailsTab.questionBank),
+          ),
+          GoRoute(
+            path: Routes.instructorCourseStudents,
+            name: RouteNames.instructorCourseStudents,
+            pageBuilder: (_, state) =>
+                courseDetailsPage(state, CourseDetailsTab.students),
           ),
           GoRoute(
             path: Routes.instructorNotifications,
@@ -313,12 +346,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             path: Routes.instructorQuizzes,
             name: RouteNames.instructorQuizzes,
             pageBuilder: (_, __) => const NoTransitionPage(
-              child: EmptyStatePage(
-                icon: Icons.assignment_outlined,
-                title: 'Quizzes',
-                description:
-                    'Create timed quizzes and auto-grade student submissions. Coming soon.',
-              ),
+              child: InstructorQuizzesScreen(),
             ),
           ),
           GoRoute(
@@ -417,6 +445,7 @@ class RouteNames {
 
   // compat
   static const instructorCourseMaterials    = 'instructorCourseMaterials';
+  static const instructorCourseOutcomes     = 'instructorCourseOutcomes';
   static const instructorCourseStudents     = 'instructorCourseStudents';
   static const instructorCourseAnalytics    = 'instructorCourseAnalytics';
   static const instructorCourseQuestionBank = 'instructorCourseQuestionBank';

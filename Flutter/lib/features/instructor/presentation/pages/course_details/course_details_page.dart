@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../../core/theme/app_theme.dart';
-import '../../../../../core/storage/key_value_store_factory.dart';
 import '../../../../../core/network/error_mapper.dart';
+import '../../../../../core/routing/routes.dart';
 import '../../../data/courses_models.dart';
 import '../../../data/courses_providers.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../widgets/course_tabs/overview_tab.dart';
 import '../../widgets/course_tabs/materials_tab.dart';
 import '../../widgets/course_tabs/outcomes_tab.dart';
-import '../../widgets/course_outcomes_panel.dart';
 import '../../widgets/course_tabs/question_bank_tab.dart';
 import '../../widgets/course_tabs/students_tab.dart';
+import '../../controllers/selected_course_provider.dart';
+import '../../course_route_identity.dart';
+
+enum CourseDetailsTab { overview, materials, outcomes, questionBank, students }
 
 class CourseDetailsPage extends ConsumerStatefulWidget {
   final String courseSlug;
@@ -25,40 +29,54 @@ class CourseDetailsPage extends ConsumerStatefulWidget {
   /// [cachedCourse] is null (e.g. after a browser refresh).
   final int? cachedCourseId;
 
+  /// Route-backed active tab. Each tab has its own URL and lazy load boundary.
+  final CourseDetailsTab initialTab;
+
   const CourseDetailsPage({
     super.key,
     required this.courseSlug,
     this.cachedCourse,
     this.cachedCourseId,
+    this.initialTab = CourseDetailsTab.overview,
   });
 
   @override
   ConsumerState<CourseDetailsPage> createState() => _CourseDetailsPageState();
 }
 
-class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
-    with SingleTickerProviderStateMixin {
-  late TabController _tabController;
-  late final List<Widget>? _pages;
-  late final _session = createSessionStore();
+class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
   int _currentIndex = 0;
+  final Set<String> _loadedTabKeys = <String>{};
 
-  List<Widget> _buildPages(MyCourseItem course) => [
-        CourseOverviewTab(
-            key: const PageStorageKey('course-overview-tab'), course: course),
-        CourseMaterialsTab(
-            key: const PageStorageKey('course-materials-tab'), course: course),
-        CourseOutcomesTab(
-            key: const PageStorageKey('course-outcomes-tab'), course: course),
-        CourseQuestionBankTab(
-            key: const PageStorageKey('course-question-bank-tab'),
-            course: course),
-        CourseStudentsTab(
-            key: const PageStorageKey('course-students-tab'), course: course),
-      ];
-
-  String get _tabKey =>
-      'course:${widget.cachedCourse?.id ?? widget.cachedCourseId ?? widget.courseSlug}:active_tab';
+  Widget _buildActivePage(MyCourseItem course) {
+    switch (widget.initialTab) {
+      case CourseDetailsTab.overview:
+        return CourseOverviewTab(
+          key: const PageStorageKey('course-overview-tab'),
+          course: course,
+        );
+      case CourseDetailsTab.materials:
+        return CourseMaterialsTab(
+          key: const PageStorageKey('course-materials-tab'),
+          course: course,
+        );
+      case CourseDetailsTab.outcomes:
+        return CourseOutcomesTab(
+          key: const PageStorageKey('course-outcomes-tab'),
+          course: course,
+        );
+      case CourseDetailsTab.questionBank:
+        return CourseQuestionBankTab(
+          key: const PageStorageKey('course-question-bank-tab'),
+          course: course,
+        );
+      case CourseDetailsTab.students:
+        return CourseStudentsTab(
+          key: const PageStorageKey('course-students-tab'),
+          course: course,
+        );
+    }
+  }
 
   static const _tabs = [
     _TabDef(icon: Icons.dashboard_outlined, label: 'Overview'),
@@ -71,41 +89,70 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
   @override
   void initState() {
     super.initState();
-    final storedIndex = int.tryParse(_session.getString(_tabKey) ?? '');
-    _currentIndex = storedIndex != null &&
-            storedIndex >= 0 &&
-            storedIndex < _tabs.length
-        ? storedIndex
-        : 0;
-    _tabController = TabController(
-        length: _tabs.length, vsync: this, initialIndex: _currentIndex);
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        setState(() => _currentIndex = _tabController.index);
-        _session.setString(_tabKey, _currentIndex.toString());
-      }
-    });
-
-    if (widget.cachedCourse != null) {
-      _loadCourseData(widget.cachedCourse!);
-    }
-  }
-
-  void _loadCourseData(MyCourseItem course) {
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      if (!mounted) return;
-      await ref
-          .read(courseDetailsControllerProvider(course.id).notifier)
-          .loadModulesAndAllMaterials();
-      if (!mounted) return;
-      await ensureCourseLearningOutcomesLoaded(ref, course.id);
-    });
+    _currentIndex = widget.initialTab.index;
+    final course = widget.cachedCourse;
+    if (course != null) _loadActiveTabData(course);
   }
 
   @override
-  void dispose() {
-    _tabController.dispose();
-    super.dispose();
+  void didUpdateWidget(covariant CourseDetailsPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialTab != widget.initialTab) {
+      _currentIndex = widget.initialTab.index;
+    }
+
+    final course = widget.cachedCourse;
+    if (course != null &&
+        (oldWidget.initialTab != widget.initialTab ||
+            oldWidget.cachedCourse?.id != course.id)) {
+      _loadActiveTabData(course);
+    }
+  }
+
+  void _loadActiveTabData(MyCourseItem course) {
+    final tab = widget.initialTab;
+    final key = '${course.id}:${tab.name}';
+    if (!_loadedTabKeys.add(key)) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+      final notifier = ref.read(courseDetailsControllerProvider(course.id).notifier);
+
+      switch (tab) {
+        case CourseDetailsTab.overview:
+          // Overview only needs the course structure. Do not preload materials,
+          // topics, questions, outcomes, or invitations from here.
+          await notifier.loadModules();
+          break;
+        case CourseDetailsTab.materials:
+          // Materials tab starts with modules; each module/material branch loads
+          // its own materials/topics only when opened by the user.
+          await notifier.loadModules();
+          break;
+        case CourseDetailsTab.outcomes:
+        case CourseDetailsTab.questionBank:
+        case CourseDetailsTab.students:
+          // These tabs own their loading in their own widgets.
+          break;
+      }
+    });
+  }
+
+  String _routeForTab(MyCourseItem course, int index) {
+    final slug = buildCourseRouteSlug(course);
+    final tab = CourseDetailsTab.values[index];
+    switch (tab) {
+      case CourseDetailsTab.overview:
+        return Routes.courseDetails(slug);
+      case CourseDetailsTab.materials:
+        return Routes.courseMaterials(slug);
+      case CourseDetailsTab.outcomes:
+        return Routes.courseOutcomes(slug);
+      case CourseDetailsTab.questionBank:
+        return Routes.courseQuestionBank(slug);
+      case CourseDetailsTab.students:
+        return Routes.courseStudents(slug);
+    }
   }
 
   @override
@@ -120,12 +167,7 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
       return asyncCourse.when(
         loading: () => _buildLoadingShell(),
         error: (e, _) => _buildErrorShell(mapApiFailure(e).message),
-        data: (course) {
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (mounted) _loadCourseData(course);
-          });
-          return _buildContent(course);
-        },
+        data: (course) => _buildContent(course),
       );
     }
 
@@ -210,7 +252,7 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
   // ── Main content ────────────────────────────────────────────────────────────
 
   Widget _buildContent(MyCourseItem course) {
-    final pages = _buildPages(course);
+    _loadActiveTabData(course);
     return Column(children: [
       // ── Tab header — centered, does NOT stretch to full width ─────────────
       Container(
@@ -224,17 +266,17 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage>
             tabs: _tabs,
             currentIndex: _currentIndex,
             onTap: (i) {
-              setState(() => _currentIndex = i);
-              _session.setString(_tabKey, i.toString());
-              _tabController.animateTo(i);
+              if (i == _currentIndex) return;
+              SelectedCourseCache.set(course);
+              context.go(_routeForTab(course, i));
             },
           ),
         ),
       ),
       Expanded(
-        child: IndexedStack(
-          index: _currentIndex,
-          children: pages,
+        child: KeyedSubtree(
+          key: ValueKey('course-${course.id}-${widget.initialTab.name}'),
+          child: _buildActivePage(course),
         ),
       ),
     ]);

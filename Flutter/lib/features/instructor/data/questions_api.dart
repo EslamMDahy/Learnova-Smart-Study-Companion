@@ -112,7 +112,7 @@ class CreateQuestionPayload {
   final String? explanation;
   final List<CreateQuestionOption>? options;
   final Object? expectedAnswer;
-  final String? gradingRubric;
+  final Object? gradingRubric;
 
   const CreateQuestionPayload({
     required this.topicId,
@@ -141,8 +141,8 @@ class CreateQuestionPayload {
     if (expectedAnswer != null) {
       data['expected_answer'] = expectedAnswer;
     }
-    if (gradingRubric != null && gradingRubric!.trim().isNotEmpty) {
-      data['grading_rubric'] = gradingRubric!.trim();
+    if (gradingRubric != null) {
+      data['grading_rubric'] = gradingRubric;
     }
     return data;
   }
@@ -219,6 +219,24 @@ class QuestionsApi {
   }
 
 
+
+  Future<QuestionModel> getQuestion({
+    required int courseId,
+    required int questionId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.courseQuestion(courseId, questionId),
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return QuestionModel.fromJson(data);
+    }
+    throw const FormatException('Invalid response from GET /courses/{id}/questions/{questionId}');
+  }
+
   Future<QuestionModel> createQuestion({
     required int courseId,
     required CreateQuestionPayload payload,
@@ -237,12 +255,33 @@ class QuestionsApi {
     throw const FormatException('Invalid response from POST /courses/{id}/questions');
   }
 
-  /// POST /courses/{courseId}/modules/{moduleId}/materials/{materialId}/questions
+  /// Compatibility helper for controller/UI flows that still pass a QuestionModel.
+  Future<QuestionModel> createQuestionFromModel({
+    required int courseId,
+    required QuestionModel question,
+    CancelToken? cancelToken,
+  }) async {
+    final payload = buildCreatePayloadFromQuestion(question);
+    if (payload == null) {
+      throw ArgumentError(
+        'Question is not compatible with the backend create-question contract. '
+        'Make sure it has a topicId and valid type-specific answer data.',
+      );
+    }
+
+    return createQuestion(
+      courseId: courseId,
+      payload: payload,
+      cancelToken: cancelToken,
+    );
+  }
+
+  /// Creates questions using the currently implemented backend contract:
+  /// `POST /courses/{courseId}/questions`.
   ///
-  /// Converts the app's [QuestionModel] list into the backend MCQ batch schema.
-  /// Only [QuestionType.multipleChoice] questions are supported by this endpoint.
-  /// Other question types are silently skipped (they can be submitted manually
-  /// once the backend adds more question-type support).
+  /// The older material-scoped batch endpoint is not implemented in the backend,
+  /// so this method now submits the compatible questions one by one and returns
+  /// a batch-shaped response for the existing Flutter flow.
   Future<BatchCreateQuestionsResponse> batchCreateQuestions({
     required int courseId,
     required int moduleId,
@@ -250,34 +289,113 @@ class QuestionsApi {
     required List<QuestionModel> questions,
     CancelToken? cancelToken,
   }) async {
-    final mcqList = questions
-        .where((q) => q.type == QuestionType.multipleChoice)
-        .map((q) => _buildMCQPayload(q))
-        .whereType<_QuestionMCQCreate>()
+    final compatibleQuestions = questions
+        .where((q) => q.topicId != null)
+        .where((q) => {
+              QuestionType.multipleChoice,
+              QuestionType.multiSelect,
+              QuestionType.trueFalse,
+              QuestionType.shortAnswer,
+              QuestionType.essay,
+            }.contains(q.type))
         .toList();
 
-    if (mcqList.isEmpty) {
+    if (compatibleQuestions.isEmpty) {
       throw ArgumentError(
-          'No valid MCQ questions to submit. Backend currently supports MCQ only.');
+        'No valid backend-supported questions with topicId to submit to the backend.',
+      );
     }
 
-    final res = await _client.post<Map<String, dynamic>>(
-      Endpoints.batchCreateQuestions(courseId, moduleId, materialId),
-      data: {
-        'questions': mcqList.map((q) => q.toJson()).toList(),
-      },
-      cancelToken: cancelToken,
+    final createdItems = <QuestionCreatedItem>[];
+
+    for (final question in compatibleQuestions) {
+      final payload = _buildCreatePayload(question);
+      if (payload == null) continue;
+
+      final created = await createQuestion(
+        courseId: courseId,
+        payload: payload,
+        cancelToken: cancelToken,
+      );
+
+      createdItems.add(
+        QuestionCreatedItem(
+          id: created.remoteId ?? int.tryParse(created.id) ?? 0,
+          questionText: created.text,
+          createdAt: created.createdAt.toIso8601String(),
+        ),
+      );
+    }
+
+    return BatchCreateQuestionsResponse(
+      courseId: courseId,
+      moduleId: moduleId,
+      materialId: materialId,
+      createdCount: createdItems.length,
+      questions: createdItems,
     );
-
-    final data = res.data;
-    if (data is Map<String, dynamic>) {
-      return BatchCreateQuestionsResponse.fromJson(data);
-    }
-    throw const FormatException(
-        'Invalid response from POST .../questions');
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
+
+  CreateQuestionPayload? buildCreatePayloadFromQuestion(QuestionModel q) {
+    final topicId = q.topicId;
+    if (topicId == null) return null;
+
+    if (q.type == QuestionType.multipleChoice || q.type == QuestionType.multiSelect) {
+      if (q.options.length < 2) return null;
+      final ids = List.generate(q.options.length, (i) => String.fromCharCode('A'.codeUnitAt(0) + i));
+      final options = List.generate(q.options.length, (i) {
+        return CreateQuestionOption(id: ids[i], text: q.options[i].text);
+      });
+      final correctIds = <String>[];
+      for (var i = 0; i < q.options.length; i++) {
+        final option = q.options[i];
+        if (option.isCorrect || option.id == q.correctOptionId) {
+          correctIds.add(ids[i]);
+        }
+      }
+      if (correctIds.isEmpty) correctIds.add(ids.first);
+
+      return CreateQuestionPayload(
+        topicId: topicId,
+        questionText: q.text,
+        type: q.type.backendValue,
+        difficulty: q.difficulty.backendValue,
+        explanation: q.explanation,
+        options: options,
+        expectedAnswer: q.type == QuestionType.multiSelect ? correctIds : correctIds.first,
+      );
+    }
+
+    if (q.type == QuestionType.trueFalse) {
+      return CreateQuestionPayload(
+        topicId: topicId,
+        questionText: q.text,
+        type: q.type.backendValue,
+        difficulty: q.difficulty.backendValue,
+        explanation: q.explanation,
+        expectedAnswer: (q.correctBool ?? false).toString(),
+      );
+    }
+
+    if (q.type == QuestionType.shortAnswer || q.type == QuestionType.essay) {
+      final answer = q.sampleAnswer ?? q.expectedAnswer;
+      return CreateQuestionPayload(
+        topicId: topicId,
+        questionText: q.text,
+        type: q.type.backendValue,
+        difficulty: q.difficulty.backendValue,
+        explanation: q.explanation,
+        expectedAnswer: answer,
+      );
+    }
+
+    return null;
+  }
+
+  CreateQuestionPayload? _buildCreatePayload(QuestionModel q) =>
+      buildCreatePayloadFromQuestion(q);
 
   _QuestionMCQCreate? _buildMCQPayload(QuestionModel q) {
     if (q.options.isEmpty) return null;

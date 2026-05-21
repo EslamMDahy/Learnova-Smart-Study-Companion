@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'upload_materials_dialog.dart';
-import 'package:learnova/features/instructor/presentation/widgets/create_exam_content.dart';
 import 'package:learnova/features/instructor/data/courses_models.dart';
 import 'package:learnova/features/instructor/presentation/controllers/course_details_controller.dart';
 import 'package:learnova/features/instructor/data/topics_models.dart';
@@ -159,7 +158,6 @@ class _MaterialsExplorerPageState extends ConsumerState<MaterialsExplorerPage>
   bool _loadingTree      = true;
   bool _generatingTopics = false;
   DateTime _lastSaved    = DateTime.now().subtract(const Duration(minutes: 2));
-  int _examStep = 1;
 
   // ── lifecycle ────────────────────────────────────────────────────────────
   @override
@@ -360,21 +358,12 @@ class _MaterialsExplorerPageState extends ConsumerState<MaterialsExplorerPage>
 
   void _showUpload() => showDialog(context: context, builder: (_) => const UploadMaterialsDialog());
 
-  void _openExam() {
-    _examStep = 1;
-    showGeneralDialog(
-      context: context, barrierDismissible: true, barrierLabel: '',
-      pageBuilder: (_, __, ___) => Material(color: Colors.white, child: SafeArea(
-        child: StatefulBuilder(builder: (ctx, ss) => CreateExamContent(
-          currentStep: _examStep,
-          courseTitle: widget.course.title,
-          scopeLabel: _selected == null ? null : _selected!.title,
-          topicTargets: const [],
-          onAddQuestion: () {},
-          onBack: () { if (_examStep > 1) { ss(() => _examStep--); } else { Navigator.pop(ctx); } },
-          onNext: () { if (_examStep < 3) { ss(() => _examStep++); } else { Navigator.pop(ctx); } },
-        )),
-      )),
+  void _showQuestionGenerationUnavailable() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Question generation and quiz creation are not available in the current instructor flow yet.'),
+      ),
     );
   }
 
@@ -653,8 +642,8 @@ class _MaterialsExplorerPageState extends ConsumerState<MaterialsExplorerPage>
         const SizedBox(width: 6),
         Text(txt, style: const TextStyle(fontSize: 12, color: _K.muted, fontWeight: FontWeight.w600)),
         const Spacer(),
-        _BtnGenerate(label: 'Generate Question', icon: Icons.auto_awesome_rounded,
-          onTap: _openExam),
+        _BtnOutline(label: 'Question Generation Unavailable', icon: Icons.info_outline_rounded,
+          onTap: _showQuestionGenerationUnavailable),
       ]),
     );
   }

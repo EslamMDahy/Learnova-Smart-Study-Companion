@@ -196,6 +196,29 @@ class MyCoursesResponse {
   }
 }
 
+
+class CourseCreatedResponse {
+  final int id;
+  final String title;
+  final String? courseCode;
+
+  const CourseCreatedResponse({
+    required this.id,
+    required this.title,
+    required this.courseCode,
+  });
+
+  factory CourseCreatedResponse.fromJson(Map<String, dynamic> json) {
+    String s(dynamic v) => (v ?? '').toString().trim();
+
+    return CourseCreatedResponse(
+      id: _asInt(json['id']) ?? 0,
+      title: s(json['title']),
+      courseCode: s(json['course_code']).isEmpty ? null : s(json['course_code']),
+    );
+  }
+}
+
 class CourseCreateRequest {
   final String courseType; // "individual" | "organization"
   final int? organizationId;

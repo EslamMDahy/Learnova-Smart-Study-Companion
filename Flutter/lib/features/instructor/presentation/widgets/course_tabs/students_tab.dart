@@ -51,11 +51,13 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
         _loading = false;
       });
     } catch (e) {
-      // 404 / 403 on public courses with no invitations — treat as empty
+      // 404 / 403 / 409 on courses with no invitation collection — treat as empty.
+      // Some backends return 409 for public courses where invitations are not applicable.
       final failure = mapApiFailure(e);
       final msg = failure.message;
       final isEmptyOk = failure.statusCode == 404 ||
           failure.statusCode == 403 ||
+          failure.statusCode == 409 ||
           msg.toLowerCase().contains('not found');
       setState(() {
         _loading = false;

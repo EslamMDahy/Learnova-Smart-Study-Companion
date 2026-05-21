@@ -60,7 +60,7 @@ class CoursesRepository {
   }) =>
       _api.getCourseById(id, cancelToken: cancelToken);
 
-  Future<Map<String, dynamic>> createCourse({
+  Future<CourseCreatedResponse> createCourse({
     required CourseCreateRequest payload,
     CancelToken? cancelToken,
   }) =>

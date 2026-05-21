@@ -1180,7 +1180,7 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
 
   if (selected == 'materials') {
     SelectedCourseCache.set(c);
-    context.go(Routes.courseDetails(slug)); // ✅ navigate to course details
+    context.go(Routes.courseMaterials(slug)); // ✅ navigate directly to Materials tab
     return;
   }
 

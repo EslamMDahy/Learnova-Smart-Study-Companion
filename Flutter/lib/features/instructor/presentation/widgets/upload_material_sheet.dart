@@ -68,7 +68,7 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
   bool _hovering = false;
   late final AnimationController _pulseCtrl;
   late final Animation<double> _pulse;
-  static const int _maxBytes = 500 * 1024 * 1024;
+  static const int _maxBytes = 50 * 1024 * 1024;
 
   @override
   void initState() {
@@ -88,7 +88,7 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
 
   Future<void> _browse() async {
     final files = await pickBrowserFiles(
-      acceptedExtensions: const ['.pdf'],
+      acceptedExtensions: const ['pdf'],
       multiple: true,
     );
     for (final file in files) {
@@ -104,7 +104,7 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
         sizeBytes: file.sizeBytes,
         bytes: file.bytes,
         status: valid ? _FileStatus.ready : _FileStatus.error,
-        errorMsg: valid ? null : 'Only PDF files are supported right now, up to 500 MB',
+        errorMsg: valid ? null : 'Only PDF files are supported right now, up to 50 MB',
       ));
     });
   }
@@ -304,7 +304,7 @@ class _LeftPanel extends StatelessWidget {
 
               // Big headline
               const Text(
-                'Drop your\nPDF files here.',
+                'Drop your\nPDFs here.',
                 style: TextStyle(
                   fontSize: 38,
                   fontWeight: FontWeight.w800,
@@ -315,7 +315,7 @@ class _LeftPanel extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               Text(
-                'PDF only  ·  Max 500 MB',
+                'PDF only  ·  Max 50 MB',
                 style: TextStyle(
                     fontSize: 13,
                     color: Colors.white.withOpacity(0.45)),
@@ -384,8 +384,8 @@ class _LeftPanel extends StatelessWidget {
                             const SizedBox(height: 20),
                             Text(
                               hovering
-                                  ? 'Release to add files'
-                                  : 'Drag & drop files',
+                                  ? 'Release to add PDFs'
+                                  : 'Drag & drop PDFs',
                               style: TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
@@ -451,7 +451,7 @@ class _LeftPanel extends StatelessWidget {
                 const SizedBox(width: 16),
                 const Icon(Icons.layers_outlined, size: 13, color: Color(0xFF60AFFE)),
                 const SizedBox(width: 6),
-                Text('Multi-file upload', style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.45))),
+                Text('Multi-PDF upload', style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.45))),
                 const SizedBox(width: 16),
                 const Icon(Icons.text_snippet_outlined, size: 13, color: Color(0xFF60AFFE)),
                 const SizedBox(width: 6),

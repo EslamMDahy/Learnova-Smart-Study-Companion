@@ -132,25 +132,21 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
     }
   }
 
-  Future<void> deleteTopic({required int moduleId, required int topicId, int? materialId}) async {
-    // materialId is required for the backend URL — find it from state if not provided
-    final matId = materialId ??
-        (state.topics[moduleId] ?? const [])
-            .firstWhere((t) => t.id == topicId,
-                orElse: () => TopicItem(
-                    id: 0,
-                    materialId: 0,
-                    title: '',
-                    orderIndex: 0,
-                    createdAt: DateTime(0),
-                    updatedAt: DateTime(0)))
-            .materialId;
+  Future<void> deleteTopic({
+    required int moduleId,
+    required int topicId,
+    required int materialId,
+  }) async {
+    if (materialId <= 0) {
+      throw ArgumentError.value(materialId, 'materialId', 'materialId is required for deleting a topic');
+    }
+
     try {
       await ref.read(topicsApiProvider).deleteTopic(
-            courseId:   courseId,
-            moduleId:   moduleId,
-            materialId: matId,
-            topicId:    topicId,
+            courseId: courseId,
+            moduleId: moduleId,
+            materialId: materialId,
+            topicId: topicId,
           );
     } catch (e) {
       final failure = mapApiFailure(e);

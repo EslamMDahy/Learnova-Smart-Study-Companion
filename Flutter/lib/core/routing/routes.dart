@@ -27,6 +27,7 @@ class Routes {
   static const instructorCourses    = '/instructor/courses';
   static const instructorCourseDetails  = '/instructor/courses/:courseSlug';
   static const instructorCourseMaterials    = '/instructor/courses/:courseSlug/materials';
+  static const instructorCourseOutcomes     = '/instructor/courses/:courseSlug/outcomes';
   static const instructorCourseStudents     = '/instructor/courses/:courseSlug/students';
   static const instructorCourseAnalytics    = '/instructor/courses/:courseSlug/analytics';
   static const instructorCourseQuestionBank = '/instructor/courses/:courseSlug/question-bank';
@@ -39,6 +40,7 @@ class Routes {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
   static const courseMaterialsSegment    = 'materials';
+  static const courseOutcomesSegment     = 'outcomes';
   static const courseStudentsSegment     = 'students';
   static const courseAnalyticsSegment    = 'analytics';
   static const courseQuestionBankSegment = 'question-bank';
@@ -46,6 +48,7 @@ class Routes {
 
   static String courseDetails(String slug)      => '/instructor/courses/$slug';
   static String courseMaterials(String slug)    => '/instructor/courses/$slug/materials';
+  static String courseOutcomes(String slug)     => '/instructor/courses/$slug/outcomes';
   static String courseStudents(String slug)     => '/instructor/courses/$slug/students';
   static String courseAnalytics(String slug)    => '/instructor/courses/$slug/analytics';
   static String courseQuestionBank(String slug) => '/instructor/courses/$slug/question-bank';
