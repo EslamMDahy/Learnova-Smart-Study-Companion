@@ -494,10 +494,9 @@ return PopScope(
   },
   child: AbsorbPointer(
     absorbing: isBusy,
-    child: Container(
-      color: AppColors.pageBg,
-      width: double.infinity,
-      height: double.infinity,
+    child: Scaffold(
+      backgroundColor: AppColors.pageBg,
+      body: SizedBox.expand(
       child: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 1200),
@@ -682,6 +681,7 @@ return PopScope(
       ),
     ),
   ),
+)
 );
   }
 

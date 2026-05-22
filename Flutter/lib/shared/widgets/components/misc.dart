@@ -153,7 +153,7 @@ class AppSidebarItem {
   const AppSidebarItem({
     required this.icon,
     required this.title,
-    required this.index,
+    required this.index ,
   });
 }
 

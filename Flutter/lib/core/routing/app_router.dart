@@ -1,12 +1,12 @@
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:learnova/features/student/presentation/pages/courses/student_courses_page.dart';
 
 import '../session/session_providers.dart';
 import '../session/session_snapshot.dart';
 import '../storage/token_storage.dart';
 import '../storage/user_storage.dart';
-import '../theme/app_theme.dart';
 
 import '../../features/auth/presentation/pages/forget_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -26,9 +26,18 @@ import '../../features/instructor/presentation/pages/course_details/course_detai
 import '../../features/instructor/presentation/widgets/Quizzes/quiz_screen.dart';
 import '../../features/instructor/presentation/controllers/selected_course_provider.dart';
 import '../../features/instructor/presentation/course_route_identity.dart';
-import '../../features/instructor/data/courses_providers.dart';
 import '../../shared/pages/error_page.dart';
 import '../../shared/widgets/empty_state_page.dart';
+//student
+import '../../features/student/presentation/pages/student_shell.dart';
+import '../../features/student/presentation/pages/dashboard/student_dashboard_page.dart';
+import '../../features/student/presentation/pages/courses/student_course_details_page.dart';
+import '../../features/student/presentation/pages/question_bank/student_question_bank_page.dart';
+
+import '../../features/student/presentation/pages/quiz_history/student_quiz_history_page.dart';
+
+import '../../features/student/presentation/pages/recommendations/student_recommendations_page.dart';
+import '../../features/student/presentation/pages/quiz/student_quiz_result_page.dart';
 
 import 'routes.dart';
 
@@ -107,10 +116,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         // ── Landing / root ───────────────────────────────────────────────────
         if (path == Routes.landing) {
           if (!isAuthed) return null;
+
           if (!s.hasMe) return Routes.home;
-          if (s.isOwner) return Routes.adminUsers;
-          if (s.isInstructor) return Routes.instructorDashboard;
-          return Routes.home;
+
+          if (s.isOwner) {
+            return Routes.adminUsers;
+          }
+
+          if (s.isInstructor) {
+            return Routes.instructorDashboard;
+          }
+
+          /// student
+          return Routes.studentDashboard;
         }
 
         // ── Unauthenticated → protected route ───────────────────────────────
@@ -123,10 +141,19 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           if (path == Routes.verifyEmail || path == Routes.verifyEmailSent) {
             return null;
           }
+
           if (!s.hasMe) return Routes.home;
-          if (s.isOwner) return Routes.adminUsers;
-          if (s.isInstructor) return Routes.instructorDashboard;
-          return Routes.home;
+
+          if (s.isOwner) {
+            return Routes.adminUsers;
+          }
+
+          if (s.isInstructor) {
+            return Routes.instructorDashboard;
+          }
+
+          /// student
+          return Routes.studentDashboard;
         }
 
         // ── /settings → role-based settings ────────────────────────────────
@@ -145,6 +172,21 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         }
 
         if (path.startsWith(Routes.instructor)) {
+          if (path.startsWith(Routes.student)) {
+            if (!s.hasMe) return null;
+
+            if (s.isInstructor) {
+              return Routes.instructorDashboard;
+            }
+
+            if (s.isOwner) {
+              return Routes.adminUsers;
+            }
+
+            if (path == Routes.student) {
+              return Routes.studentDashboard;
+            }
+          }
           if (!s.hasMe) return null;
           if (!s.isInstructor) {
             return s.isOwner ? Routes.adminUsers : Routes.home;
@@ -184,7 +226,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         name: RouteNames.error,
         builder: (_, state) {
           final type = state.uri.queryParameters['type'] ?? 'server';
-          final msg  = state.uri.queryParameters['msg'];
+          final msg = state.uri.queryParameters['msg'];
           final errorId = state.uri.queryParameters['id'];
           return ErrorPage(errorType: type, message: msg, errorId: errorId);
         },
@@ -363,6 +405,85 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
         ],
       ),
+
+      /// ── Student shell ─────────────────────────────────────────────
+      ShellRoute(
+        builder: (_, __, child) => StudentShell(
+          child: child,
+        ),
+        routes: [
+          GoRoute(
+            path: Routes.studentDashboard,
+            name: RouteNames.studentDashboard,
+            pageBuilder: (_, __) => const NoTransitionPage(
+              child: StudentDashboardPage(),
+            ),
+          ),
+          GoRoute(
+            path: Routes.studentCourses,
+            name: RouteNames.studentCourses,
+            pageBuilder: (_, __) => const NoTransitionPage(
+              child: Scaffold(
+                body: Center(
+                  child: StudentCoursesPage(),
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: Routes.studentQuestionBank,
+            name: RouteNames.studentQuestionBank,
+            pageBuilder: (_, __) => const NoTransitionPage(
+              child: Scaffold(
+                body: Center(
+                  child: Text("Question Bank"),
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: Routes.studentQuizHistory,
+            name: RouteNames.studentQuizHistory,
+            pageBuilder: (_, __) => NoTransitionPage(
+              child: StudentQuizHistoryPage(),
+            ),
+          ),
+          GoRoute(
+            path: Routes.studentRecommendations,
+            name: RouteNames.studentRecommendations,
+            pageBuilder: (_, __) => const NoTransitionPage(
+              child: Scaffold(
+                body: Center(
+                  child: Text("Recommendations"),
+                ),
+              ),
+            ),
+          ),
+          GoRoute(
+            path: Routes.studentCourseDetails,
+            builder: (context, state) => const StudentCourseDetailsPage(),
+          ),
+          GoRoute(
+            path: Routes.questionBank,
+            builder: (context, state) => const StudentQuestionBankPage(),
+          ),
+          GoRoute(
+            path: Routes.quizHistory,
+            builder: (context, state) => const StudentQuizHistoryPage(),
+          ),
+          GoRoute(
+            path: Routes.recommendations,
+            builder: (context, state) => const StudentRecommendationsPage(),
+          ),
+
+          GoRoute(
+  path: Routes.studentQuizResult,
+  builder: (context, state) =>
+      const StudentQuizResultPage(),
+),
+          
+        ],
+      ),
     ],
   );
 
@@ -380,7 +501,15 @@ String _initialLocationSafe(SessionSnapshot session) {
     }
     if (!session.hasAccessToken) return Routes.landing;
     if (session.hasMe && session.isOwner) return Routes.adminUsers;
-    if (session.hasMe && session.isInstructor) return Routes.instructorDashboard;
+    if (session.hasMe && session.isInstructor) {
+      return Routes.instructorDashboard;
+    }
+
+    /// student
+    if (session.hasMe) {
+      return Routes.studentDashboard;
+    }
+
     return Routes.home;
   } catch (_) {
     _clearSessionSafe();
@@ -416,38 +545,56 @@ void _clearSessionSafe() {
 
 class RouteNames {
   RouteNames._();
-  static const landing    = 'landing';
-  static const home       = 'home';
-  static const login      = 'login';
-  static const signup     = 'signup';
-  static const forgotPassword  = 'forgotPassword';
-  static const verifyEmail     = 'verifyEmail';
+  static const landing = 'landing';
+  static const home = 'home';
+  static const login = 'login';
+  static const signup = 'signup';
+  static const forgotPassword = 'forgotPassword';
+  static const verifyEmail = 'verifyEmail';
   static const verifyEmailSent = 'verifyEmailSent';
-  static const resetPassword   = 'resetPassword';
-  static const settings  = 'settings';
-  static const error     = 'error';
+  static const resetPassword = 'resetPassword';
+  static const settings = 'settings';
+  static const error = 'error';
 
-  static const instructorDashboard   = 'instructorDashboard';
-  static const instructorCourses     = 'instructorCourses';
+  static const instructorDashboard = 'instructorDashboard';
+  static const instructorCourses = 'instructorCourses';
   static const instructorCourseDetails = 'instructorCourseDetails';
-  static const instructorQuestionBank  = 'instructorQuestionBank';
-  static const instructorQuizzes       = 'instructorQuizzes';
-  static const instructorSettings      = 'instructorSettings';
-  static const instructorHelp          = 'instructorHelp';
+  static const instructorQuestionBank = 'instructorQuestionBank';
+  static const instructorQuizzes = 'instructorQuizzes';
+  static const instructorSettings = 'instructorSettings';
+  static const instructorHelp = 'instructorHelp';
   static const instructorNotifications = 'instructorNotifications';
 
-  static const adminUsers        = 'adminUsers';
+  static const adminUsers = 'adminUsers';
   static const adminJoinRequests = 'adminJoinRequests';
   static const adminUpgradePlans = 'adminUpgradePlans';
-  static const adminSettings     = 'adminSettings';
-  static const adminHelp         = 'adminHelp';
+  static const adminSettings = 'adminSettings';
+  static const adminHelp = 'adminHelp';
   static const adminNotifications = 'adminNotifications';
 
   // compat
-  static const instructorCourseMaterials    = 'instructorCourseMaterials';
-  static const instructorCourseOutcomes     = 'instructorCourseOutcomes';
-  static const instructorCourseStudents     = 'instructorCourseStudents';
-  static const instructorCourseAnalytics    = 'instructorCourseAnalytics';
+  static const instructorCourseMaterials = 'instructorCourseMaterials';
+  static const instructorCourseOutcomes = 'instructorCourseOutcomes';
+  static const instructorCourseStudents = 'instructorCourseStudents';
+  static const instructorCourseAnalytics = 'instructorCourseAnalytics';
   static const instructorCourseQuestionBank = 'instructorCourseQuestionBank';
-  static const instructorCourseQuizzes      = 'instructorCourseQuizzes';
+  static const instructorCourseQuizzes = 'instructorCourseQuizzes';
+
+  /// ── Student ─────────────────────────────────────────────
+
+  static const studentDashboard = 'studentDashboard';
+
+  static const studentCourses = 'studentCourses';
+
+  static const studentQuestionBank = 'studentQuestionBank';
+
+  static const studentQuizHistory = 'studentQuizHistory';
+
+  static const studentRecommendations = 'studentRecommendations';
+
+  static const studentSettings = 'studentSettings';
+
+  static const studentHelp = 'studentHelp';
+
+  static const studentNotifications = 'studentNotifications';
 }
