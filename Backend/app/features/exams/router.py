@@ -12,7 +12,8 @@ from .schemas import (ExamCreateRequest,
                       ExamAddQuestionsRequest,
                       ExamAddQuestionsResponse,
                       ExamListResponse,
-                      ExamDetailsResponse,)
+                      ExamDetailsResponse,
+                      ExamPublishResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}/exams", tags=["Exams"],)
@@ -61,6 +62,18 @@ def get_exam_endpoint(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):
     return service.get_exam(
+        course_id=course_id,
+        exam_id=exam_id,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/{exam_id}/publish", response_model=ExamPublishResponse,)
+def publish_exam_endpoint(
+    course_id: int,
+    exam_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.publish_exam(
         course_id=course_id,
         exam_id=exam_id,
         db=db,

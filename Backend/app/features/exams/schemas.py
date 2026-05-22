@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExamCreateRequest(BaseModel):
@@ -155,3 +155,14 @@ class ExamDetailsResponse(BaseModel):
     created_at: datetime
     updated_at: datetime
     questions: List[ExamQuestionDetailResponse]
+
+
+class ExamPublishResponse(BaseModel):
+    exam_id: int
+    course_id: int
+    is_published: bool
+    total_questions: int
+    total_score: float
+    message: str
+
+    model_config = ConfigDict(extra="forbid")
