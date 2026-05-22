@@ -661,45 +661,82 @@ def get_exam(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
                 detail="You can only view your own exam",
             )
 
+        is_published = bool(exam_row["is_published"])
+
         # =========================
         # 4) Fetch exam questions
         # =========================
-        question_rows = db.execute(
-            text("""
-                SELECT
-                    eq.id AS exam_question_id,
-                    eq.question_id,
-                    eq.section_id,
-                    eq.order_index,
-                    eq.points,
-                    eq.custom_points,
-                    eq.custom_instructions,
+        if is_published:
+            question_rows = db.execute(
+                text("""
+                    SELECT
+                        eq.id AS exam_question_id,
+                        eq.question_id,
+                        eq.section_id,
+                        eq.order_index,
+                        eq.points,
+                        eq.custom_points,
+                        eq.custom_instructions,
 
-                    q.topic_id,
-                    q.question_text,
-                    q.explanation,
-                    q.options,
-                    q.type,
-                    q.difficulty,
-                    q.source,
-                    q.approval_status,
-                    q.expected_answer,
-                    q.grading_rubric,
-                    q.max_score,
-                    q.auto_gradable,
-                    q.tags
-                FROM exam_questions eq
-                JOIN questions q
-                  ON q.id = eq.question_id
-                WHERE eq.exam_id = :exam_id
-                  AND q.course_id = :course_id
-                ORDER BY eq.order_index ASC, eq.id ASC
-            """),
-            {
-                "exam_id": exam_id,
-                "course_id": course_id,
-            },
-        ).mappings().all()
+                        eq.snapshot_topic_id AS topic_id,
+                        eq.snapshot_question_text AS question_text,
+                        eq.snapshot_explanation AS explanation,
+                        eq.snapshot_options AS options,
+                        eq.snapshot_type AS type,
+                        eq.snapshot_difficulty AS difficulty,
+                        q.source,
+                        q.approval_status,
+                        eq.snapshot_expected_answer AS expected_answer,
+                        eq.snapshot_grading_rubric AS grading_rubric,
+                        eq.snapshot_max_score AS max_score,
+                        eq.snapshot_auto_gradable AS auto_gradable,
+                        eq.snapshot_tags AS tags
+                    FROM exam_questions eq
+                    LEFT JOIN questions q
+                      ON q.id = eq.question_id
+                    WHERE eq.exam_id = :exam_id
+                    ORDER BY eq.order_index ASC, eq.id ASC
+                """),
+                {"exam_id": exam_id},
+            ).mappings().all()
+
+        else:
+            question_rows = db.execute(
+                text("""
+                    SELECT
+                        eq.id AS exam_question_id,
+                        eq.question_id,
+                        eq.section_id,
+                        eq.order_index,
+                        eq.points,
+                        eq.custom_points,
+                        eq.custom_instructions,
+
+                        q.topic_id,
+                        q.question_text,
+                        q.explanation,
+                        q.options,
+                        q.type,
+                        q.difficulty,
+                        q.source,
+                        q.approval_status,
+                        q.expected_answer,
+                        q.grading_rubric,
+                        q.max_score,
+                        q.auto_gradable,
+                        q.tags
+                    FROM exam_questions eq
+                    JOIN questions q
+                      ON q.id = eq.question_id
+                    WHERE eq.exam_id = :exam_id
+                      AND q.course_id = :course_id
+                    ORDER BY eq.order_index ASC, eq.id ASC
+                """),
+                {
+                    "exam_id": exam_id,
+                    "course_id": course_id,
+                },
+            ).mappings().all()
 
         exam_data = dict(exam_row)
         exam_data["questions"] = [dict(row) for row in question_rows]
@@ -710,8 +747,7 @@ def get_exam(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
         raise
 
     except SQLAlchemyError as e:
-        raise HTTPException(status_code=500, detail="Database error") from e  
-
+        raise HTTPException(status_code=500, detail="Database error") from e
 
 
  

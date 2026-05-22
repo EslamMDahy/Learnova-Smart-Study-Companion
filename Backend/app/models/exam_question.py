@@ -1,11 +1,16 @@
+from datetime import datetime
+
 from sqlalchemy import (
     Integer,
     Float,
     Text,
+    Boolean,
+    DateTime,
     ForeignKey,
     Index
 )
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.db.base import Base
 
@@ -52,6 +57,71 @@ class ExamQuestion(Base):
 
     custom_instructions: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True
+    )
+
+    snapshot_topic_id: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True
+    )
+
+    snapshot_question_text: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
+    snapshot_explanation: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
+    snapshot_options: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True
+    )
+
+    snapshot_type: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
+    snapshot_difficulty: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
+    snapshot_expected_answer: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True
+    )
+
+    snapshot_grading_rubric: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True
+    )
+
+    snapshot_max_score: Mapped[float | None] = mapped_column(
+        Float,
+        nullable=True
+    )
+
+    snapshot_auto_gradable: Mapped[bool | None] = mapped_column(
+        Boolean,
+        nullable=True
+    )
+
+    snapshot_tags: Mapped[dict | None] = mapped_column(
+        JSONB,
+        nullable=True
+    )
+
+    snapshot_source_question_updated_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True
+    )
+
+    snapshot_created_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
         nullable=True
     )
 

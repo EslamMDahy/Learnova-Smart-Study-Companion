@@ -1230,3 +1230,6 @@ def generate_questions_for_topics(*, course_id: int, payload: QuestionGeneration
             status_code=503,
             detail="Failed to send AI question generation request"
         ) from e
+    
+
+    

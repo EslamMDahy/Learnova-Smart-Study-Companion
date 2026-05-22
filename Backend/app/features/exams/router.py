@@ -15,10 +15,7 @@ from .schemas import (ExamCreateRequest,
                       ExamDetailsResponse,)
 
 
-router = APIRouter(
-    prefix="/courses/{course_id}/exams",
-    tags=["Exams"],
-)
+router = APIRouter(prefix="/courses/{course_id}/exams", tags=["Exams"],)
 
 
 @router.post("", response_model=ExamResponse, status_code=status.HTTP_201_CREATED,)
