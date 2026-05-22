@@ -261,7 +261,7 @@ def add_questions_to_exam(*, course_id: int, exam_id: int, payload: ExamAddQuest
         # =========================
         exam_row = db.execute(
             text("""
-                SELECT id, course_id, created_by
+                SELECT id, course_id, created_by, is_published
                 FROM exams
                 WHERE id = :exam_id
                   AND course_id = :course_id
@@ -281,6 +281,9 @@ def add_questions_to_exam(*, course_id: int, exam_id: int, payload: ExamAddQuest
                 status_code=403,
                 detail="You can only add questions to your own exam",
             )
+                
+        if exam_row["is_published"]:
+            raise HTTPException(status_code=403, detail="Cannot add questions to a published exam")
 
         # =========================
         # 4) Validate all questions belong to same course
