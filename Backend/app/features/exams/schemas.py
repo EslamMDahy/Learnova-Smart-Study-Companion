@@ -72,6 +72,15 @@ class ExamAddQuestionsResponse(BaseModel):
     questions: List[ExamQuestionItemResponse]
 
 
+class ExamRemoveQuestionResponse(BaseModel):
+    exam_id: int
+    course_id: int
+    removed_exam_question_id: int
+    total_questions: int
+    total_score: float
+    message: str
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ExamListItemResponse(BaseModel):

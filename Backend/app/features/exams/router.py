@@ -11,6 +11,7 @@ from .schemas import (ExamCreateRequest,
                       ExamResponse,
                       ExamAddQuestionsRequest,
                       ExamAddQuestionsResponse,
+                      ExamRemoveQuestionResponse,
                       ExamListResponse,
                       ExamDetailsResponse,
                       ExamPublishResponse)
@@ -42,6 +43,20 @@ def add_questions_to_exam_endpoint(
         course_id=course_id,
         exam_id=exam_id,
         payload=payload,
+        db=db,
+        current_user=current_user,)
+
+@router.delete("/{exam_id}/questions/{exam_question_id}", response_model=ExamRemoveQuestionResponse, status_code=status.HTTP_200_OK)
+def remove_question_from_exam_endpoint(
+    course_id: int,
+    exam_id: int,
+    exam_question_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.remove_question_from_exam(
+        course_id=course_id,
+        exam_id=exam_id,
+        exam_question_id=exam_question_id,
         db=db,
         current_user=current_user,)
 

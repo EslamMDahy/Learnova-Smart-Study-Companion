@@ -481,7 +481,175 @@ def add_questions_to_exam(*, course_id: int, exam_id: int, payload: ExamAddQuest
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
-    
+
+
+
+def remove_question_from_exam(*, course_id: int, exam_id: int, exam_question_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can remove questions from exams")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not exam_id or exam_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    if not exam_question_id or exam_question_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_question_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only manage exams for your own course",
+            )
+
+        # =========================
+        # 3) Validate exam belongs to course
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT id, course_id, created_by, is_published
+                FROM exams
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {
+                "exam_id": exam_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=404, detail="Exam not found")
+
+        if int(exam_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only modify your own exam",
+            )
+
+        if exam_row["is_published"]:
+            raise HTTPException(status_code=403, detail="Cannot remove questions from a published exam")
+
+        # =========================
+        # 4) Validate exam_question exists in this exam
+        # =========================
+        exam_question_row = db.execute(
+            text("""
+                SELECT id
+                FROM exam_questions
+                WHERE id = :exam_question_id
+                  AND exam_id = :exam_id
+            """),
+            {
+                "exam_question_id": exam_question_id,
+                "exam_id": exam_id,
+            },
+        ).mappings().first()
+
+        if not exam_question_row:
+            raise HTTPException(status_code=404, detail="Exam question not found in this exam")
+
+        # =========================
+        # 5) Delete exam_question
+        # =========================
+        db.execute(
+            text("""
+                DELETE FROM exam_questions
+                WHERE id = :exam_question_id
+                    AND exam_id = :exam_id
+            """),
+            {"exam_question_id": exam_question_id},
+        )
+
+        # =========================
+        # 6) Recalculate exam totals
+        # =========================
+        totals_row = db.execute(
+            text("""
+                SELECT
+                    COUNT(*) AS total_questions,
+                    COALESCE(SUM(points), 0) AS total_score
+                FROM exam_questions
+                WHERE exam_id = :exam_id
+            """),
+            {"exam_id": exam_id},
+        ).mappings().first()
+
+        if not totals_row:
+            total_questions = 0
+            total_score = 0.0
+        else:
+            total_questions = int(totals_row.get("total_questions", 0))
+            total_score = float(totals_row.get("total_score", 0))
+
+        db.execute(
+            text("""
+                UPDATE exams
+                SET
+                    total_questions = :total_questions,
+                    total_score = :total_score,
+                    updated_at = NOW()
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+            """),
+            {
+                "exam_id": exam_id,
+                "course_id": course_id,
+                "total_questions": total_questions,
+                "total_score": total_score,
+            },
+        )
+
+        db.commit()
+
+        return {
+            "exam_id": exam_id,
+            "course_id": course_id,
+            "removed_exam_question_id": exam_question_id,
+            "total_questions": total_questions,
+            "total_score": total_score,
+            "message": "Question removed from exam successfully",
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while removing exam question") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
 
 
 def list_exams(*, course_id: int, db: Session, current_user: dict,):
