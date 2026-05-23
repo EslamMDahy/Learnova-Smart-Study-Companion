@@ -11,12 +11,13 @@ class CourseOutcomesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       color: AppColors.pageBg,
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.border),
         ),

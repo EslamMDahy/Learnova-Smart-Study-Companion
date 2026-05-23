@@ -55,7 +55,7 @@ class CourseOutcomesManager extends ConsumerWidget {
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.cardBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ConstrainedBox(
         constraints: BoxConstraints(
@@ -112,7 +112,7 @@ class _CourseOutcomesContentState
     final result = await showDialog<LearningOutcome>(
       context: context,
       barrierColor: Colors.black.withOpacity(0.4),
-      builder: (_) => const _AddOutcomeDialog(),
+      builder: (_) => _AddOutcomeDialog(),
     );
     if (result == null || !mounted) return;
     await _addOutcome(result);
@@ -181,6 +181,7 @@ class _CourseOutcomesContentState
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final outcomes = ref.watch(courseLOProvider(widget.courseId));
     final loading = ref.watch(courseLOLoadingProvider(widget.courseId));
     final beginnerCount = outcomes.where((o) => o.difficulty == OutcomeDifficulty.beginner).length;
@@ -188,13 +189,13 @@ class _CourseOutcomesContentState
     final advancedCount = outcomes.where((o) => o.difficulty == OutcomeDifficulty.advanced).length;
 
     return Container(
-      color: const Color(0xFFF8FAFC),
+      color: AppColors.surfaceBg,
       child: Column(
         children: [
           Container(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
               border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
             child: Column(
@@ -203,17 +204,17 @@ class _CourseOutcomesContentState
                   width: double.infinity,
                   padding: const EdgeInsets.all(18),
                   decoration: BoxDecoration(
-                    gradient: const LinearGradient(
+                    gradient: LinearGradient(
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
-                      colors: [Color(0xFF145CCB), Color(0xFF3FA9FF)],
+                      colors: [Color(0xFF145CCB), AppColors.infoText],
                     ),
                     borderRadius: BorderRadius.circular(18),
                     boxShadow: [
                       BoxShadow(
                         color: AppColors.primary.withOpacity(0.12),
                         blurRadius: 18,
-                        offset: const Offset(0, 8),
+                        offset: Offset(0, 8),
                       ),
                     ],
                   ),
@@ -233,18 +234,18 @@ class _CourseOutcomesContentState
                                     color: Colors.white.withOpacity(0.16),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
-                                  child: const Icon(Icons.flag_rounded, color: Colors.white, size: 20),
+                                  child: Icon(Icons.flag_rounded, color: Colors.white, size: 20),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: 12),
                                 Expanded(
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Text(
+                                      Text(
                                         'Learning Outcomes',
                                         style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white),
                                       ),
-                                      const SizedBox(height: 4),
+                                      SizedBox(height: 4),
                                       Text(
                                         'Define what students should achieve by the end of this course and keep outcomes structured, measurable, and easy to manage.',
                                         style: TextStyle(fontSize: 12.5, height: 1.45, color: Colors.white.withOpacity(0.82)),
@@ -254,7 +255,7 @@ class _CourseOutcomesContentState
                                 ),
                               ],
                             ),
-                            const SizedBox(height: 14),
+                            SizedBox(height: 14),
                             Wrap(
                               spacing: 8,
                               runSpacing: 8,
@@ -271,12 +272,12 @@ class _CourseOutcomesContentState
 
                       final action = FilledButton.icon(
                         onPressed: _openAddDialog,
-                        icon: const Icon(Icons.add, size: 16),
-                        label: const Text('Add Outcome'),
+                        icon: Icon(Icons.add, size: 16),
+                        label: Text('Add Outcome'),
                         style: FilledButton.styleFrom(
-                          backgroundColor: Colors.white,
+                          backgroundColor: AppColors.cardBg,
                           foregroundColor: AppColors.primary,
-                          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+                          textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
                           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
@@ -285,26 +286,26 @@ class _CourseOutcomesContentState
                       if (compact) {
                         return Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [textBlock, const SizedBox(height: 14), action],
+                          children: [textBlock, SizedBox(height: 14), action],
                         );
                       }
                       return Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [textBlock, const SizedBox(width: 14), action],
+                        children: [textBlock, SizedBox(width: 14), action],
                       );
                     },
                   ),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 Row(
                   children: [
                     Expanded(child: _OutcomeStatCard(icon: Icons.flag_outlined, title: 'Total Outcomes', value: '${outcomes.length}', color: AppColors.primary, bg: AppColors.badgeBlueBg)),
-                    const SizedBox(width: 12),
-                    Expanded(child: _OutcomeStatCard(icon: Icons.trending_up_rounded, title: 'Beginner', value: '$beginnerCount', color: const Color(0xFF16A34A), bg: const Color(0xFFDCFCE7))),
-                    const SizedBox(width: 12),
-                    Expanded(child: _OutcomeStatCard(icon: Icons.adjust_rounded, title: 'Intermediate', value: '$intermediateCount', color: const Color(0xFFD97706), bg: const Color(0xFFFFEDD5))),
-                    const SizedBox(width: 12),
-                    Expanded(child: _OutcomeStatCard(icon: Icons.stars_rounded, title: 'Advanced', value: '$advancedCount', color: const Color(0xFFDC2626), bg: const Color(0xFFFEE2E2))),
+                    SizedBox(width: 12),
+                    Expanded(child: _OutcomeStatCard(icon: Icons.trending_up_rounded, title: 'Beginner', value: '$beginnerCount', color: AppColors.successText, bg: AppColors.successBg)),
+                    SizedBox(width: 12),
+                    Expanded(child: _OutcomeStatCard(icon: Icons.adjust_rounded, title: 'Intermediate', value: '$intermediateCount', color: AppColors.warningText, bg: AppColors.warningBg)),
+                    SizedBox(width: 12),
+                    Expanded(child: _OutcomeStatCard(icon: Icons.stars_rounded, title: 'Advanced', value: '$advancedCount', color: AppColors.dangerText, bg: AppColors.dangerBorder)),
                   ],
                 ),
               ],
@@ -312,7 +313,7 @@ class _CourseOutcomesContentState
           ),
           Expanded(
             child: loading
-                ? const Center(child: CircularProgressIndicator())
+                ? Center(child: CircularProgressIndicator())
                 : _LOBody(
                     outcomes: outcomes,
                     onEdit: (lo) async {
@@ -372,20 +373,21 @@ class _AddOutcomeDialogState extends State<_AddOutcomeDialog> {
 
   static Color _diffColor(OutcomeDifficulty d) {
     switch (d) {
-      case OutcomeDifficulty.beginner:     return const Color(0xFF16A34A);
-      case OutcomeDifficulty.intermediate: return const Color(0xFFD97706);
-      case OutcomeDifficulty.advanced:     return const Color(0xFFDC2626);
+      case OutcomeDifficulty.beginner:     return AppColors.successText;
+      case OutcomeDifficulty.intermediate: return AppColors.warningText;
+      case OutcomeDifficulty.advanced:     return AppColors.dangerText;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.cardBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460),
+        constraints: BoxConstraints(maxWidth: 460),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -401,10 +403,10 @@ class _AddOutcomeDialogState extends State<_AddOutcomeDialog> {
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: AppColors.badgeBlueBorder),
                   ),
-                  child: const Icon(Icons.flag_outlined, size: 18, color: AppColors.primary),
+                  child: Icon(Icons.flag_outlined, size: 18, color: AppColors.primary),
                 ),
-                const SizedBox(width: 12),
-                const Expanded(
+                SizedBox(width: 12),
+                Expanded(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Text('Add Learning Outcome',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
@@ -413,18 +415,18 @@ class _AddOutcomeDialogState extends State<_AddOutcomeDialog> {
                   ]),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, size: 18),
+                  icon: Icon(Icons.close, size: 18),
                   color: AppColors.textMuted,
                   onPressed: () => Navigator.pop(context),
                   visualDensity: VisualDensity.compact,
                 ),
               ]),
-              const SizedBox(height: 22),
+              SizedBox(height: 22),
 
               // Outcome description
-              const Text('Description',
+              Text('Description',
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               TextField(
                 controller: _titleCtrl,
                 autofocus: true,
@@ -436,27 +438,27 @@ class _AddOutcomeDialogState extends State<_AddOutcomeDialog> {
                 onSubmitted: (_) => _submit(),
                 decoration: InputDecoration(
                   hintText: 'e.g. Students will be able to explain the key concepts of...',
-                  hintStyle: const TextStyle(fontSize: 13, color: AppColors.textHint, height: 1.5),
+                  hintStyle: TextStyle(fontSize: 13, color: AppColors.textHint, height: 1.5),
                   errorText: _titleError,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
                   enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppColors.border)),
+                      borderSide: BorderSide(color: AppColors.border)),
                   focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                      borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
                   errorBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(10),
-                      borderSide: const BorderSide(color: Color(0xFFEF4444))),
+                      borderSide: BorderSide(color: AppColors.errorDot)),
                 ),
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
 
               // Difficulty
-              const Text('Difficulty Level',
+              Text('Difficulty Level',
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Row(children: OutcomeDifficulty.values.map((d) {
                 final sel = _diff == d;
                 final color = _diffColor(d);
@@ -465,10 +467,10 @@ class _AddOutcomeDialogState extends State<_AddOutcomeDialog> {
                   child: GestureDetector(
                     onTap: () => setState(() => _diff = d),
                     child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
+                      duration: Duration(milliseconds: 120),
                       padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: sel ? color.withOpacity(0.09) : const Color(0xFFF8FAFC),
+                        color: sel ? color.withOpacity(0.09) : AppColors.surfaceBg,
                         borderRadius: BorderRadius.circular(9),
                         border: Border.all(color: sel ? color : AppColors.border, width: sel ? 1.5 : 1),
                       ),
@@ -478,7 +480,7 @@ class _AddOutcomeDialogState extends State<_AddOutcomeDialog> {
                           width: 8, height: 8,
                           decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                         ),
-                        const SizedBox(width: 6),
+                        SizedBox(width: 6),
                         Text(d.label,
                             style: TextStyle(
                               fontSize: 12,
@@ -490,7 +492,7 @@ class _AddOutcomeDialogState extends State<_AddOutcomeDialog> {
                   ),
                 ));
               }).toList()),
-              const SizedBox(height: 24),
+              SizedBox(height: 24),
 
               // Actions
               Row(children: [
@@ -499,19 +501,19 @@ class _AddOutcomeDialogState extends State<_AddOutcomeDialog> {
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: AppColors.textTitle,
-                      side: const BorderSide(color: AppColors.border),
+                      side: BorderSide(color: AppColors.border),
                       padding: const EdgeInsets.symmetric(vertical: 13),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
                     ),
-                    child: const Text('Cancel'),
+                    child: Text('Cancel'),
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Expanded(
                   child: FilledButton.icon(
                     onPressed: _submit,
-                    icon: const Icon(Icons.add, size: 16),
-                    label: const Text('Add Outcome'),
+                    icon: Icon(Icons.add, size: 16),
+                    label: Text('Add Outcome'),
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       padding: const EdgeInsets.symmetric(vertical: 13),
@@ -546,12 +548,13 @@ class _LOBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     if (outcomes.isEmpty) return _EmptyLO(onAdd: onAddFirst);
 
     return ListView.separated(
       padding: const EdgeInsets.all(20),
       itemCount: outcomes.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 14),
+      separatorBuilder: (_, __) => SizedBox(height: 14),
       itemBuilder: (_, i) => _LOTile(
         outcome: outcomes[i],
         index: i,
@@ -572,11 +575,11 @@ class _HeroChip extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.16),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withOpacity(0.18)),
+          border: Border.all(color: AppColors.cardBg.withOpacity(0.18)),
         ),
         child: Text(
           label,
-          style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
+          style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: Colors.white),
         ),
       );
 }
@@ -594,7 +597,7 @@ class _OutcomeStatCard extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.border),
         ),
@@ -606,14 +609,14 @@ class _OutcomeStatCard extends StatelessWidget {
               decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(11)),
               child: Icon(icon, size: 18, color: color),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(title, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-                  const SizedBox(height: 2),
-                  Text(value, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+                  Text(title, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                  SizedBox(height: 2),
+                  Text(value, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
                 ],
               ),
             )
@@ -653,19 +656,19 @@ class _EditLODialogState extends State<_EditLODialog> {
 
   static Color _diffColor(OutcomeDifficulty d) {
     switch (d) {
-      case OutcomeDifficulty.beginner:     return const Color(0xFF16A34A);
-      case OutcomeDifficulty.intermediate: return const Color(0xFFD97706);
-      case OutcomeDifficulty.advanced:     return const Color(0xFFDC2626);
+      case OutcomeDifficulty.beginner:     return AppColors.successText;
+      case OutcomeDifficulty.intermediate: return AppColors.warningText;
+      case OutcomeDifficulty.advanced:     return AppColors.dangerText;
     }
   }
 
   @override
   Widget build(BuildContext context) => Dialog(
     insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-    backgroundColor: Colors.white,
+    backgroundColor: AppColors.cardBg,
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
     child: ConstrainedBox(
-      constraints: const BoxConstraints(maxWidth: 460),
+      constraints: BoxConstraints(maxWidth: 460),
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -674,31 +677,31 @@ class _EditLODialogState extends State<_EditLODialog> {
             Container(
               width: 38, height: 38,
               decoration: BoxDecoration(
-                color: const Color(0xFFF5F3FF),
+                color: AppColors.purpleBg,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF7C3AED)),
+              child: Icon(Icons.edit_outlined, size: 18, color: AppColors.purpleText),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Edit ${widget.outcome.code}',
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-              const Text('Update this learning outcome',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+              Text('Update this learning outcome',
                   style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
             ])),
             IconButton(
-              icon: const Icon(Icons.close, size: 18),
+              icon: Icon(Icons.close, size: 18),
               color: AppColors.textMuted,
               onPressed: () => Navigator.pop(context),
               visualDensity: VisualDensity.compact,
             ),
           ]),
-          const SizedBox(height: 22),
+          SizedBox(height: 22),
 
           // Description
-          const Text('Description',
+          Text('Description',
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           TextField(
             controller: _ctrl,
             maxLines: 3,
@@ -713,18 +716,18 @@ class _EditLODialogState extends State<_EditLODialog> {
               border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
               enabledBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.border)),
+                  borderSide: BorderSide(color: AppColors.border)),
               focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(10),
-                  borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
+                  borderSide: BorderSide(color: AppColors.primary, width: 1.5)),
             ),
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
 
           // Difficulty
-          const Text('Difficulty Level',
+          Text('Difficulty Level',
               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Row(children: OutcomeDifficulty.values.map((d) {
             final sel = _diff == d;
             final color = _diffColor(d);
@@ -733,10 +736,10 @@ class _EditLODialogState extends State<_EditLODialog> {
               child: GestureDetector(
                 onTap: () => setState(() => _diff = d),
                 child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 120),
+                  duration: Duration(milliseconds: 120),
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   decoration: BoxDecoration(
-                    color: sel ? color.withOpacity(0.09) : const Color(0xFFF8FAFC),
+                    color: sel ? color.withOpacity(0.09) : AppColors.surfaceBg,
                     borderRadius: BorderRadius.circular(9),
                     border: Border.all(color: sel ? color : AppColors.border, width: sel ? 1.5 : 1),
                   ),
@@ -746,7 +749,7 @@ class _EditLODialogState extends State<_EditLODialog> {
                       width: 8, height: 8,
                       decoration: BoxDecoration(color: color, shape: BoxShape.circle),
                     ),
-                    const SizedBox(width: 6),
+                    SizedBox(width: 6),
                     Text(d.label,
                         style: TextStyle(
                           fontSize: 12,
@@ -758,7 +761,7 @@ class _EditLODialogState extends State<_EditLODialog> {
               ),
             ));
           }).toList()),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
 
           // Actions
           Row(mainAxisAlignment: MainAxisAlignment.end, children: [
@@ -766,12 +769,12 @@ class _EditLODialogState extends State<_EditLODialog> {
               onPressed: () => Navigator.pop(context),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.textTitle,
-                side: const BorderSide(color: AppColors.border),
+                side: BorderSide(color: AppColors.border),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
               ),
-              child: const Text('Cancel'),
+              child: Text('Cancel'),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             FilledButton.icon(
               onPressed: () {
                 final t = _ctrl.text.trim();
@@ -781,8 +784,8 @@ class _EditLODialogState extends State<_EditLODialog> {
                 }
                 Navigator.pop(context, widget.outcome.copyWith(title: t, difficulty: _diff));
               },
-              icon: const Icon(Icons.check, size: 16),
-              label: const Text('Save Changes'),
+              icon: Icon(Icons.check, size: 16),
+              label: Text('Save Changes'),
               style: FilledButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
@@ -806,17 +809,17 @@ class _LOTile extends StatelessWidget {
 
   Color get _diffColor {
     switch (outcome.difficulty) {
-      case OutcomeDifficulty.beginner:     return const Color(0xFF16A34A);
-      case OutcomeDifficulty.intermediate: return const Color(0xFFD97706);
-      case OutcomeDifficulty.advanced:     return const Color(0xFFDC2626);
+      case OutcomeDifficulty.beginner:     return AppColors.successText;
+      case OutcomeDifficulty.intermediate: return AppColors.warningText;
+      case OutcomeDifficulty.advanced:     return AppColors.dangerText;
     }
   }
 
   Color get _diffBg {
     switch (outcome.difficulty) {
-      case OutcomeDifficulty.beginner:     return const Color(0xFFDCFCE7);
-      case OutcomeDifficulty.intermediate: return const Color(0xFFFFEDD5);
-      case OutcomeDifficulty.advanced:     return const Color(0xFFFEE2E2);
+      case OutcomeDifficulty.beginner:     return AppColors.successBg;
+      case OutcomeDifficulty.intermediate: return AppColors.warningBg;
+      case OutcomeDifficulty.advanced:     return AppColors.dangerBorder;
     }
   }
 
@@ -824,10 +827,10 @@ class _LOTile extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.all(18),
     decoration: BoxDecoration(
-      color: Colors.white,
+      color: AppColors.cardBg,
       borderRadius: BorderRadius.circular(18),
       border: Border.all(color: AppColors.border),
-      boxShadow: const [
+      boxShadow: [
         BoxShadow(color: Color(0x06000000), blurRadius: 10, offset: Offset(0, 3)),
       ],
     ),
@@ -848,10 +851,10 @@ class _LOTile extends StatelessWidget {
               alignment: Alignment.center,
               child: Text(
                 outcome.code,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg),
               ),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -863,32 +866,32 @@ class _LOTile extends StatelessWidget {
                         decoration: BoxDecoration(color: _diffBg, borderRadius: BorderRadius.circular(999)),
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
                           Container(width: 7, height: 7, decoration: BoxDecoration(color: _diffColor, shape: BoxShape.circle)),
-                          const SizedBox(width: 5),
+                          SizedBox(width: 5),
                           Text(outcome.difficulty.label, style: TextStyle(fontSize: 10.8, fontWeight: FontWeight.w700, color: _diffColor)),
                         ]),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(999)),
-                        child: Text('Outcome ${index + 1}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                        decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(999)),
+                        child: Text('Outcome ${index + 1}', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   Text(
                     outcome.title,
-                    style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textTitle, height: 1.45),
+                    style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textTitle, height: 1.45),
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Row(
               children: [
                 _ActionIconButton(icon: Icons.edit_outlined, color: AppColors.primary, bg: AppColors.badgeBlueBg, onTap: onEdit),
-                const SizedBox(width: 8),
-                _ActionIconButton(icon: Icons.delete_outline_rounded, color: AppColors.dangerText, bg: const Color(0xFFFEE2E2), onTap: onDelete),
+                SizedBox(width: 8),
+                _ActionIconButton(icon: Icons.delete_outline_rounded, color: AppColors.dangerText, bg: AppColors.dangerBorder, onTap: onDelete),
               ],
             ),
           ],
@@ -927,13 +930,13 @@ class _EmptyLO extends StatelessWidget {
     child: Padding(
       padding: const EdgeInsets.all(32),
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 460),
+        constraints: BoxConstraints(maxWidth: 460),
         padding: const EdgeInsets.all(26),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: AppColors.border),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(color: Color(0x08000000), blurRadius: 18, offset: Offset(0, 8)),
           ],
         ),
@@ -941,25 +944,25 @@ class _EmptyLO extends StatelessWidget {
           Container(
             width: 64, height: 64,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(colors: [Color(0xFF145CCB), Color(0xFF3FA9FF)]),
+              gradient: LinearGradient(colors: [Color(0xFF145CCB), AppColors.infoText]),
               borderRadius: BorderRadius.circular(18),
             ),
-            child: const Icon(Icons.flag_rounded, size: 30, color: Colors.white),
+            child: Icon(Icons.flag_rounded, size: 30, color: Colors.white),
           ),
-          const SizedBox(height: 16),
-          const Text('No learning outcomes yet',
+          SizedBox(height: 16),
+          Text('No learning outcomes yet',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
             'Create structured learning goals so instructors and learners can clearly understand what this course is expected to achieve.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.55),
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
           FilledButton.icon(
             onPressed: onAdd,
-            icon: const Icon(Icons.add, size: 16),
-            label: const Text('Add First Outcome'),
+            icon: Icon(Icons.add, size: 16),
+            label: Text('Add First Outcome'),
             style: FilledButton.styleFrom(
               backgroundColor: AppColors.primary,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),

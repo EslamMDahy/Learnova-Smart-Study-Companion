@@ -60,6 +60,32 @@ class CoursesRepository {
   }) =>
       _api.getCourseById(id, cancelToken: cancelToken);
 
+
+
+  Future<MyCourseItem?> updateCourse({
+    required int courseId,
+    required CourseUpdateRequest payload,
+    CancelToken? cancelToken,
+  }) =>
+      _api.updateCourse(
+        courseId: courseId,
+        payload: payload,
+        cancelToken: cancelToken,
+      );
+
+  Future<MyCourseItem?> archiveCourse({
+    required int courseId,
+    CancelToken? cancelToken,
+  }) =>
+      _api.archiveCourse(courseId: courseId, cancelToken: cancelToken);
+
+  Future<void> deleteCourse({
+    required int courseId,
+    CancelToken? cancelToken,
+  }) =>
+      _api.deleteCourse(courseId: courseId, cancelToken: cancelToken);
+
+
   Future<CourseCreatedResponse> createCourse({
     required CourseCreateRequest payload,
     CancelToken? cancelToken,

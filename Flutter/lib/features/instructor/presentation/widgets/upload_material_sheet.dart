@@ -75,7 +75,7 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
     super.initState();
     _pulseCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 2),
+      duration: Duration(seconds: 2),
     )..repeat(reverse: true);
     _pulse = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
   }
@@ -88,7 +88,7 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
 
   Future<void> _browse() async {
     final files = await pickBrowserFiles(
-      acceptedExtensions: const ['pdf'],
+      acceptedExtensions: ['pdf'],
       multiple: true,
     );
     for (final file in files) {
@@ -144,6 +144,7 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final readyCount = _queue.where((f) => f.status == _FileStatus.ready).length;
 
     return Dialog(
@@ -154,18 +155,18 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
           width: constraints.maxWidth.clamp(0.0, 900.0),
           height: constraints.maxHeight.clamp(0.0, 580.0),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.cardBg,
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF137FEC).withOpacity(0.12),
+                color: AppColors.primary.withOpacity(0.12),
                 blurRadius: 80,
-                offset: const Offset(0, 24),
+                offset: Offset(0, 24),
               ),
               BoxShadow(
                 color: Colors.black.withOpacity(0.18),
                 blurRadius: 40,
-                offset: const Offset(0, 8),
+                offset: Offset(0, 8),
               ),
             ],
           ),
@@ -230,8 +231,9 @@ class _LeftPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -256,7 +258,7 @@ class _LeftPanel extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF137FEC).withOpacity(0.18 + pulse.value * 0.06),
+                    AppColors.primary.withOpacity(0.18 + pulse.value * 0.06),
                     Colors.transparent,
                   ],
                 ),
@@ -277,21 +279,21 @@ class _LeftPanel extends StatelessWidget {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF137FEC).withOpacity(0.2),
+                    color: AppColors.primary.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                        color: const Color(0xFF137FEC).withOpacity(0.4)),
+                        color: AppColors.primary.withOpacity(0.4)),
                   ),
-                  child: const Icon(Icons.upload_file_rounded,
-                      size: 20, color: Color(0xFF60AFFE)),
+                  child: Icon(Icons.upload_file_rounded,
+                      size: 20, color: AppColors.infoText),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Upload Materials',
+                  Text('Upload Materials',
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
-                          color: Color(0xFF60AFFE),
+                          color: AppColors.infoText,
                           letterSpacing: 0.5)),
                   Text('→ $moduleTitle',
                       style: TextStyle(
@@ -300,10 +302,10 @@ class _LeftPanel extends StatelessWidget {
                 ]),
               ]),
 
-              const SizedBox(height: 36),
+              SizedBox(height: 36),
 
               // Big headline
-              const Text(
+              Text(
                 'Drop your\nPDFs here.',
                 style: TextStyle(
                   fontSize: 38,
@@ -313,7 +315,7 @@ class _LeftPanel extends StatelessWidget {
                   letterSpacing: -1.0,
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Text(
                 'PDF only  ·  Max 50 MB',
                 style: TextStyle(
@@ -321,7 +323,7 @@ class _LeftPanel extends StatelessWidget {
                     color: Colors.white.withOpacity(0.45)),
               ),
 
-              const SizedBox(height: 40),
+              SizedBox(height: 40),
 
               // Drop zone box
               Expanded(
@@ -333,16 +335,16 @@ class _LeftPanel extends StatelessWidget {
                     child: AnimatedBuilder(
                       animation: pulse,
                       builder: (_, __) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
+                        duration: Duration(milliseconds: 200),
                         width: double.infinity,
                         decoration: BoxDecoration(
                           color: hovering
-                              ? const Color(0xFF137FEC).withOpacity(0.12)
+                              ? AppColors.primary.withOpacity(0.12)
                               : Colors.white.withOpacity(0.04 + pulse.value * 0.02),
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
                             color: hovering
-                                ? const Color(0xFF137FEC)
+                                ? AppColors.primary
                                 : Colors.white.withOpacity(0.12 + pulse.value * 0.06),
                             width: hovering ? 2.0 : 1.5,
                           ),
@@ -361,11 +363,11 @@ class _LeftPanel extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: hovering
-                                        ? const Color(0xFF137FEC).withOpacity(0.25)
+                                        ? AppColors.primary.withOpacity(0.25)
                                         : Colors.white.withOpacity(0.07),
                                     border: Border.all(
                                       color: hovering
-                                          ? const Color(0xFF60AFFE).withOpacity(0.6)
+                                          ? AppColors.infoText.withOpacity(0.6)
                                           : Colors.white.withOpacity(0.15),
                                     ),
                                   ),
@@ -375,13 +377,13 @@ class _LeftPanel extends StatelessWidget {
                                         : Icons.cloud_upload_outlined,
                                     size: 36,
                                     color: hovering
-                                        ? const Color(0xFF60AFFE)
+                                        ? AppColors.infoText
                                         : Colors.white.withOpacity(0.6),
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            SizedBox(height: 20),
                             Text(
                               hovering
                                   ? 'Release to add PDFs'
@@ -390,12 +392,12 @@ class _LeftPanel extends StatelessWidget {
                                 fontSize: 18,
                                 fontWeight: FontWeight.w700,
                                 color: hovering
-                                    ? const Color(0xFF60AFFE)
+                                    ? AppColors.infoText
                                     : Colors.white.withOpacity(0.85),
                                 letterSpacing: -0.3,
                               ),
                             ),
-                            const SizedBox(height: 6),
+                            SizedBox(height: 6),
                             Text(
                               'or click anywhere here to browse',
                               style: TextStyle(
@@ -403,7 +405,7 @@ class _LeftPanel extends StatelessWidget {
                                 color: Colors.white.withOpacity(0.4),
                               ),
                             ),
-                            const SizedBox(height: 28),
+                            SizedBox(height: 28),
                             // Browse button
                             GestureDetector(
                               onTap: onBrowse,
@@ -411,18 +413,18 @@ class _LeftPanel extends StatelessWidget {
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 32, vertical: 13),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF137FEC),
+                                  color: AppColors.primary,
                                   borderRadius: BorderRadius.circular(10),
                                   boxShadow: [
                                     BoxShadow(
-                                      color: const Color(0xFF137FEC)
+                                      color: AppColors.primary
                                           .withOpacity(0.4),
                                       blurRadius: 20,
-                                      offset: const Offset(0, 6),
+                                      offset: Offset(0, 6),
                                     ),
                                   ],
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'Browse Files',
                                   style: TextStyle(
                                     fontSize: 14,
@@ -441,20 +443,20 @@ class _LeftPanel extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
 
               // Tips — compact inline
               Row(children: [
-                const Icon(Icons.auto_awesome_rounded, size: 13, color: Color(0xFF60AFFE)),
-                const SizedBox(width: 6),
+                Icon(Icons.auto_awesome_rounded, size: 13, color: AppColors.infoText),
+                SizedBox(width: 6),
                 Text('AI auto-analysis', style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.45))),
-                const SizedBox(width: 16),
-                const Icon(Icons.layers_outlined, size: 13, color: Color(0xFF60AFFE)),
-                const SizedBox(width: 6),
+                SizedBox(width: 16),
+                Icon(Icons.layers_outlined, size: 13, color: AppColors.infoText),
+                SizedBox(width: 6),
                 Text('Multi-PDF upload', style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.45))),
-                const SizedBox(width: 16),
-                const Icon(Icons.text_snippet_outlined, size: 13, color: Color(0xFF60AFFE)),
-                const SizedBox(width: 6),
+                SizedBox(width: 16),
+                Icon(Icons.text_snippet_outlined, size: 13, color: AppColors.infoText),
+                SizedBox(width: 6),
                 Text('OCR supported', style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.45))),
               ]),
             ],
@@ -509,30 +511,31 @@ class _RightPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
-      color: Colors.white,
+      color: AppColors.cardBg,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         // Queue header
         Padding(
           padding: const EdgeInsets.fromLTRB(28, 32, 28, 0),
           child: Row(children: [
-            const Text('Upload Queue',
+            Text('Upload Queue',
                 style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.textTitle,
                     letterSpacing: -0.4)),
-            const Spacer(),
+            Spacer(),
             if (queue.isNotEmpty)
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text('${queue.length} Files',
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
                         color: AppColors.primary)),
@@ -540,19 +543,19 @@ class _RightPanel extends StatelessWidget {
           ]),
         ),
 
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Text(
             queue.isEmpty
                 ? 'Files you add will appear here'
                 : '$readyCount of ${queue.length} ready to save',
-            style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+            style: TextStyle(fontSize: 13, color: AppColors.textHint),
           ),
         ),
 
-        const SizedBox(height: 20),
-        const Divider(height: 1, color: Color(0xFFF1F5F9)),
+        SizedBox(height: 20),
+        Divider(height: 1, color: AppColors.headerBg),
 
         // File list
         Expanded(
@@ -563,25 +566,25 @@ class _RightPanel extends StatelessWidget {
                       width: 72,
                       height: 72,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
+                        color: AppColors.surfaceBg,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: AppColors.border),
                       ),
-                      child: const Icon(Icons.inbox_outlined,
-                          size: 32, color: Color(0xFFCBD5E1)),
+                      child: Icon(Icons.inbox_outlined,
+                          size: 32, color: AppColors.borderSoft),
                     ),
-                    const SizedBox(height: 16),
-                    const Text('Nothing here yet',
+                    SizedBox(height: 16),
+                    Text('Nothing here yet',
                         style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF94A3B8))),
-                    const SizedBox(height: 6),
-                    const Text('Drop files on the left\nto add them to the queue',
+                            color: AppColors.textHint)),
+                    SizedBox(height: 6),
+                    Text('Drop files on the left\nto add them to the queue',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                             fontSize: 13,
-                            color: Color(0xFFCBD5E1),
+                            color: AppColors.borderSoft,
                             height: 1.5)),
                   ]),
                 )
@@ -589,7 +592,7 @@ class _RightPanel extends StatelessWidget {
                   padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
                   itemCount: queue.length,
                   separatorBuilder: (_, __) =>
-                      const Divider(height: 1, color: Color(0xFFF8FAFC)),
+                      Divider(height: 1, color: AppColors.surfaceBg),
                   itemBuilder: (_, i) => _QueueTile(
                     file: queue[i],
                     onRemove: () => onRemove(i),
@@ -599,7 +602,7 @@ class _RightPanel extends StatelessWidget {
 
         // Queue actions
         if (queue.isNotEmpty) ...[
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          Divider(height: 1, color: AppColors.headerBg),
           Padding(
             padding: const EdgeInsets.fromLTRB(28, 12, 28, 8),
             child: SizedBox(
@@ -608,12 +611,12 @@ class _RightPanel extends StatelessWidget {
               child: OutlinedButton(
                 onPressed: readyCount > 0 ? onClear : null,
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
+                  side: BorderSide(color: AppColors.border),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(9)),
-                  foregroundColor: const Color(0xFF64748B),
+                  foregroundColor: AppColors.textMuted,
                 ),
-                child: const Text('Clear Completed',
+                child: Text('Clear Completed',
                     style:
                         TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
               ),
@@ -624,8 +627,8 @@ class _RightPanel extends StatelessWidget {
         // Footer buttons
         Container(
           padding: const EdgeInsets.fromLTRB(28, 16, 28, 28),
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+          decoration: BoxDecoration(
+            border: Border(top: BorderSide(color: AppColors.headerBg)),
           ),
           child: Column(children: [
             // Save
@@ -634,19 +637,19 @@ class _RightPanel extends StatelessWidget {
               height: 48,
               child: ElevatedButton.icon(
                 onPressed: onSave,
-                icon: const Icon(Icons.save_alt_rounded, size: 18),
+                icon: Icon(Icons.save_alt_rounded, size: 18),
                 label: Text(
                   readyCount > 1
                       ? 'Save to Course ($readyCount)'
                       : 'Save to Course',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 14, fontWeight: FontWeight.w700),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF137FEC),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFFE2E8F0),
-                  disabledForegroundColor: const Color(0xFF94A3B8),
+                  disabledBackgroundColor: AppColors.border,
+                  disabledForegroundColor: AppColors.textHint,
                   elevation: 0,
                   shadowColor: Colors.transparent,
                   shape: RoundedRectangleBorder(
@@ -654,7 +657,7 @@ class _RightPanel extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: 10),
             // Cancel
             SizedBox(
               width: double.infinity,
@@ -662,11 +665,11 @@ class _RightPanel extends StatelessWidget {
               child: TextButton(
                 onPressed: onCancel,
                 style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF94A3B8),
+                  foregroundColor: AppColors.textHint,
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('Cancel',
+                child: Text('Cancel',
                     style: TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w500)),
               ),
@@ -690,24 +693,25 @@ class _QueueTile extends StatelessWidget {
     switch (file.ext) {
       case 'PDF':
         return (Icons.picture_as_pdf_rounded,
-            const Color(0xFFFEE2E2), const Color(0xFFEF4444));
+            AppColors.dangerBorder, AppColors.errorDot);
       case 'MP4': case 'MOV':
         return (Icons.play_circle_filled_rounded,
-            const Color(0xFFDBEAFE), const Color(0xFF3B82F6));
+            AppColors.badgeBlueBg, AppColors.primary);
       case 'DOCX': case 'DOC':
         return (Icons.article_rounded,
-            const Color(0xFFDCFCE7), const Color(0xFF22C55E));
+            AppColors.successBg, AppColors.successDot);
       case 'PPTX': case 'PPT':
         return (Icons.slideshow_rounded,
-            const Color(0xFFFFEDD5), const Color(0xFFF97316));
+            AppColors.warningBg, Color(0xFFF97316));
       default:
         return (Icons.insert_drive_file_rounded,
-            const Color(0xFFF3E8FF), const Color(0xFFA855F7));
+            AppColors.purpleBg, Color(0xFFA855F7));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final (icon, iconBg, iconFg) = _style;
     final isReady = file.status == _FileStatus.ready;
     final isError = file.status == _FileStatus.error;
@@ -722,7 +726,7 @@ class _QueueTile extends StatelessWidget {
               color: iconBg, borderRadius: BorderRadius.circular(12)),
           child: Icon(icon, size: 22, color: iconFg),
         ),
-        const SizedBox(width: 14),
+        SizedBox(width: 14),
         Expanded(
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -730,50 +734,50 @@ class _QueueTile extends StatelessWidget {
             Text(file.name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B))),
-            const SizedBox(height: 5),
+                    color: AppColors.textGray)),
+            SizedBox(height: 5),
             if (isReady)
               Row(children: [
-                const Icon(Icons.check_circle_rounded,
-                    size: 14, color: Color(0xFF22C55E)),
-                const SizedBox(width: 5),
+                Icon(Icons.check_circle_rounded,
+                    size: 14, color: AppColors.successDot),
+                SizedBox(width: 5),
                 Text(file.displaySize,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Color(0xFF22C55E))),
-                const SizedBox(width: 8),
-                const Text('Ready for Review',
+                        color: AppColors.successDot)),
+                SizedBox(width: 8),
+                Text('Ready for Review',
                     style: TextStyle(
-                        fontSize: 12, color: Color(0xFF94A3B8))),
+                        fontSize: 12, color: AppColors.textHint)),
               ])
             else if (isError)
               Row(children: [
-                const Icon(Icons.error_outline_rounded,
-                    size: 14, color: Color(0xFFEF4444)),
-                const SizedBox(width: 5),
+                Icon(Icons.error_outline_rounded,
+                    size: 14, color: AppColors.errorDot),
+                SizedBox(width: 5),
                 Expanded(
                   child: Text(file.errorMsg ?? 'Error',
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFFEF4444))),
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.errorDot)),
                 ),
               ]),
           ]),
         ),
-        InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+        InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
           onTap: onRemove,
           borderRadius: BorderRadius.circular(8),
           child: Container(
             padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.surfaceBg,
               borderRadius: BorderRadius.circular(8),
             ),
-            child: const Icon(Icons.close_rounded,
-                size: 14, color: Color(0xFFCBD5E1)),
+            child: Icon(Icons.close_rounded,
+                size: 14, color: AppColors.borderSoft),
           ),
         ),
       ]),

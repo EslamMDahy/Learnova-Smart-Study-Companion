@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/routing/routes.dart';
+import 'package:learnova/core/theme/app_theme.dart';
 
 /// Public landing page for unauthenticated (guest) visitors.
 ///
@@ -20,8 +21,9 @@ class LandingPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.cardBg,
       body: ListView.builder(
         // Lazily build landing sections to avoid heavy first-frame work on web.
         itemCount: 9,
@@ -76,60 +78,61 @@ class _NavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       height: 56,
-      color: Colors.white,
+      color: AppColors.cardBg,
       padding: const EdgeInsets.symmetric(horizontal: 40),
       child: Row(
         children: [
           // Logo
           Image.asset('assets/logo.webp', height: 28, cacheWidth: (28 * MediaQuery.of(context).devicePixelRatio).round()),
-          const SizedBox(width: 8),
-          const Text(
+          SizedBox(width: 8),
+          Text(
             'Learnova',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF111827),
+              color: AppColors.textTitle,
               letterSpacing: -0.3,
             ),
           ),
 
-          const SizedBox(width: 40),
+          SizedBox(width: 40),
 
           // Nav links (hide on small screens)
           if (MediaQuery.sizeOf(context).width > 700) ...[
-            const _NavLink('Features'),
-            const SizedBox(width: 28),
-            const _NavLink('How It Works'),
-            const SizedBox(width: 28),
-            const _NavLink('Benefits'),
+            _NavLink('Features'),
+            SizedBox(width: 28),
+            _NavLink('How It Works'),
+            SizedBox(width: 28),
+            _NavLink('Benefits'),
           ],
 
-          const Spacer(),
+          Spacer(),
 
           // Auth buttons
           TextButton(
             onPressed: onLogin,
             style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF374151),
+              foregroundColor: AppColors.textGray,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
-            child: const Text('Login',
+            child: Text('Login',
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           ElevatedButton(
             onPressed: onSignUp,
             style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF137FEC),
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
             ),
-            child: const Text('Sign Up',
+            child: Text('Sign Up',
                 style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
           ),
         ],
@@ -144,11 +147,12 @@ class _NavLink extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Text(
       label,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 14,
-        color: Color(0xFF374151),
+        color: AppColors.textGray,
         fontWeight: FontWeight.w500,
       ),
     );
@@ -166,18 +170,19 @@ class _HeroSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final w = MediaQuery.sizeOf(context).width;
     final isMobile = w < 700;
 
     return Container(
-      color: Colors.white,
+      color: AppColors.cardBg,
       padding: EdgeInsets.fromLTRB(isMobile ? 24 : 80, 60, isMobile ? 24 : 80, 80),
       child: isMobile
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _HeroText(onGetStarted: onGetStarted, onLogin: onLogin),
-                const SizedBox(height: 40),
+                SizedBox(height: 40),
                 _HeroMockup(),
               ],
             )
@@ -186,7 +191,7 @@ class _HeroSection extends StatelessWidget {
                 Expanded(
                   child: _HeroText(onGetStarted: onGetStarted, onLogin: onLogin),
                 ),
-                const SizedBox(width: 60),
+                SizedBox(width: 60),
                 Expanded(child: _HeroMockup()),
               ],
             ),
@@ -201,16 +206,17 @@ class _HeroText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Headline with blue highlight
         RichText(
-          text: const TextSpan(
+          text: TextSpan(
             style: TextStyle(
               fontSize: 42,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF0F172A),
+              color: AppColors.textTitle,
               height: 1.15,
               letterSpacing: -1.0,
             ),
@@ -218,26 +224,26 @@ class _HeroText extends StatelessWidget {
               TextSpan(text: 'Smart Study\nCompanion: '),
               TextSpan(
                 text: 'AI-\nPowered',
-                style: TextStyle(color: Color(0xFF137FEC)),
+                style: TextStyle(color: AppColors.primary),
               ),
               TextSpan(text: ' Learning &\nAssessment'),
             ],
           ),
         ),
-        const SizedBox(height: 20),
+        SizedBox(height: 20),
 
         // Subtitle
-        const Text(
+        Text(
           'Automatically extract topics, generate questions, assess\n'
           'students, and personalize learning using advanced AI. Trusted\n'
           'by leading academic institutions.',
           style: TextStyle(
             fontSize: 14.5,
-            color: Color(0xFF475569),
+            color: AppColors.textGray,
             height: 1.65,
           ),
         ),
-        const SizedBox(height: 32),
+        SizedBox(height: 32),
 
         // Buttons
         Row(
@@ -245,24 +251,24 @@ class _HeroText extends StatelessWidget {
             ElevatedButton(
               onPressed: onGetStarted,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF137FEC),
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text('Get Started',
+              child: Text('Get Started',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: 16),
             TextButton(
               onPressed: onLogin,
               style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF374151),
+                foregroundColor: AppColors.textGray,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
-              child: const Text('Login',
+              child: Text('Login',
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
             ),
           ],
@@ -275,10 +281,11 @@ class _HeroText extends StatelessWidget {
 class _HeroMockup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       height: 320,
       decoration: BoxDecoration(
-        color: const Color(0xFF0E7490),
+        color: Color(0xFF0E7490),
         borderRadius: BorderRadius.circular(16),
       ),
       clipBehavior: Clip.antiAlias,
@@ -328,14 +335,14 @@ class _HeroMockup extends StatelessWidget {
                   // Traffic lights
                   Row(
                     children: [
-                      _dot(const Color(0xFFEF4444)),
-                      const SizedBox(width: 6),
-                      _dot(const Color(0xFFF59E0B)),
-                      const SizedBox(width: 6),
-                      _dot(const Color(0xFF22C55E)),
+                      _dot(AppColors.errorDot),
+                      SizedBox(width: 6),
+                      _dot(AppColors.warningText),
+                      SizedBox(width: 6),
+                      _dot(AppColors.successDot),
                     ],
                   ),
-                  const SizedBox(height: 14),
+                  SizedBox(height: 14),
                   // Mock bar chart rows
                   for (final pct in [0.7, 0.45, 0.85, 0.55])
                     Padding(
@@ -350,32 +357,32 @@ class _HeroMockup extends StatelessWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
-                          const SizedBox(width: 10),
+                          SizedBox(width: 10),
                           Expanded(
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(4),
                               child: LinearProgressIndicator(
                                 value: pct,
                                 minHeight: 8,
-                                backgroundColor: Colors.white.withValues(alpha: 0.2),
+                                backgroundColor: AppColors.cardBg.withValues(alpha: 0.2),
                                 valueColor: const AlwaysStoppedAnimation<Color>(
-                                    Color(0xFF137FEC)),
+                                    AppColors.primary),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   // Completed badge
                   Container(
                     padding: const EdgeInsets.symmetric(
                         horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF22C55E),
+                      color: AppColors.successDot,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Row(
+                    child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.check_circle,
@@ -415,36 +422,37 @@ class _HeroMockup extends StatelessWidget {
 class _AudienceSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
 
     return Container(
-      color: const Color(0xFFF8FAFC),
+      color: AppColors.surfaceBg,
       padding: const EdgeInsets.symmetric(vertical: 72, horizontal: 40),
       child: Column(
         children: [
-          const Text(
+          Text(
             'Tailored for the Academic Ecosystem',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
+              color: AppColors.textTitle,
               letterSpacing: -0.4,
             ),
           ),
-          const SizedBox(height: 10),
-          const Text(
+          SizedBox(height: 10),
+          Text(
             'Designed to serve every stakeholder in the educational process with specialized tools.',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF137FEC),
+              color: AppColors.primary,
               height: 1.5,
             ),
           ),
-          const SizedBox(height: 48),
+          SizedBox(height: 48),
           LayoutBuilder(builder: (_, constraints) {
             if (constraints.maxWidth > 800) {
-              return const Row(
+              return Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: _AudienceCard(
@@ -482,7 +490,7 @@ class _AudienceSection extends StatelessWidget {
                 ],
               );
             }
-            return const Column(
+            return Column(
               children: [
                 _AudienceCard(
                   icon: Icons.school_outlined,
@@ -540,17 +548,18 @@ class _AudienceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
-            offset: const Offset(0, 2),
+            offset: Offset(0, 2),
           ),
         ],
       ),
@@ -561,43 +570,43 @@ class _AudienceCard extends StatelessWidget {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(icon, size: 22, color: const Color(0xFF137FEC)),
+            child: Icon(icon, size: 22, color: AppColors.primary),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 17,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
+              color: AppColors.textTitle,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             subtitle,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: Color(0xFF475569),
+              color: AppColors.textGray,
               height: 1.5,
             ),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           ...bullets.map((b) => Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Icon(Icons.check, size: 14, color: Color(0xFF137FEC)),
-                    const SizedBox(width: 8),
+                    Icon(Icons.check, size: 14, color: AppColors.primary),
+                    SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         b,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 13,
-                          color: Color(0xFF374151),
+                          color: AppColors.textGray,
                           height: 1.4,
                         ),
                       ),
@@ -621,32 +630,33 @@ class _FeaturesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
-      color: Colors.white,
+      color: AppColors.cardBg,
       padding: const EdgeInsets.symmetric(vertical: 72, horizontal: 40),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'KEY FEATURES',
             style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF137FEC),
+              color: AppColors.primary,
               letterSpacing: 1.2,
             ),
           ),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
             'Everything needed for modern assessment',
             style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
+              color: AppColors.textTitle,
               letterSpacing: -0.4,
             ),
           ),
-          const SizedBox(height: 40),
+          SizedBox(height: 40),
           LayoutBuilder(builder: (_, constraints) {
             final cols = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
             return _FeatureGrid(columns: cols, onExplore: onExplore);
@@ -662,28 +672,28 @@ class _FeatureGrid extends StatelessWidget {
   final VoidCallback onExplore;
   const _FeatureGrid({required this.columns, required this.onExplore});
 
-  static const _features = [
+  static List<_FeatureItem> get _features => [
     _FeatureItem(
       icon: Icons.description_outlined,
-      color: Color(0xFF3B82F6),
+      color: AppColors.primary,
       title: 'AI Material Processing',
       desc: 'Upload textbooks, PDFs, or lecture notes. Our AI automatically parses and structures the content into learning modules.',
     ),
     _FeatureItem(
       icon: Icons.quiz_outlined,
-      color: Color(0xFF8B5CF6),
+      color: AppColors.purpleText,
       title: 'AI Question Generation',
       desc: 'Automatically generate multiple-choice, short-answer, and essay questions with various difficulty levels.',
     ),
     _FeatureItem(
       icon: Icons.analytics_outlined,
-      color: Color(0xFFF59E0B),
+      color: AppColors.warningText,
       title: 'Auto-Grading & Analytics',
       desc: 'Instant grading for objective questions and AI-assisted grading for subjective answers with detailed rubrics.',
     ),
     _FeatureItem(
       icon: Icons.recommend_outlined,
-      color: Color(0xFF22C55E),
+      color: AppColors.successDot,
       title: 'Personalized Recommendations',
       desc: 'The system identifies knowledge gaps and recommends specific study materials to each student.',
     ),
@@ -697,6 +707,7 @@ class _FeatureGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final rows = <Widget>[];
     for (var i = 0; i < _features.length; i += columns) {
       final rowItems = _features.sublist(
@@ -705,20 +716,20 @@ class _FeatureGrid extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (var j = 0; j < rowItems.length; j++) ...[
-            if (j > 0) const SizedBox(width: 20),
+            if (j > 0) SizedBox(width: 20),
             Expanded(child: _FeatureCard(item: rowItems[j])),
           ],
           // Fill remaining slots if last row is partial
           for (var k = rowItems.length; k < columns; k++) ...[
-            const SizedBox(width: 20),
+            SizedBox(width: 20),
             if (k == columns - 1)
               Expanded(child: _ExploreCta(onTap: onExplore))
             else
-              const Expanded(child: SizedBox()),
+              Expanded(child: SizedBox()),
           ],
         ],
       ));
-      rows.add(const SizedBox(height: 20));
+      rows.add(SizedBox(height: 20));
     }
     // If features filled all cells evenly, add CTA as its own row
     if (_features.length % columns == 0) {
@@ -726,8 +737,8 @@ class _FeatureGrid extends StatelessWidget {
         children: [
           Expanded(child: _ExploreCta(onTap: onExplore)),
           for (var i = 1; i < columns; i++) ...[
-            const SizedBox(width: 20),
-            const Expanded(child: SizedBox()),
+            SizedBox(width: 20),
+            Expanded(child: SizedBox()),
           ],
         ],
       ));
@@ -750,12 +761,13 @@ class _FeatureCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -769,21 +781,21 @@ class _FeatureCard extends StatelessWidget {
             ),
             child: Icon(item.icon, size: 20, color: item.color),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Text(
             item.title,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A),
+              color: AppColors.textTitle,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             item.desc,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
-              color: Color(0xFF475569),
+              color: AppColors.textGray,
               height: 1.5,
             ),
           ),
@@ -799,12 +811,13 @@ class _ExploreCta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: const Color(0xFFF0F9FF),
+        color: AppColors.infoBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFBAE6FD)),
+        border: Border.all(color: AppColors.infoBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -812,37 +825,37 @@ class _ExploreCta extends StatelessWidget {
         children: [
           GestureDetector(
             onTap: onTap,
-            child: const Text(
+            child: Text(
               'Explore the Platform',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF137FEC),
+                color: AppColors.primary,
                 decoration: TextDecoration.underline,
-                decorationColor: Color(0xFF137FEC),
+                decorationColor: AppColors.primary,
               ),
             ),
           ),
-          const SizedBox(height: 6),
-          const Text(
+          SizedBox(height: 6),
+          Text(
             'Discover all features by signing up for a demo.',
             style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF475569),
+              color: AppColors.textGray,
               height: 1.4,
             ),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           GestureDetector(
             onTap: onTap,
-            child: const Text(
+            child: Text(
               'View Full Feature List',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: Color(0xFF137FEC),
+                color: AppColors.primary,
                 decoration: TextDecoration.underline,
-                decorationColor: Color(0xFF137FEC),
+                decorationColor: AppColors.primary,
               ),
             ),
           ),
@@ -859,6 +872,7 @@ class _ExploreCta extends StatelessWidget {
 class _WorkflowSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     const steps = [
       _Step(n: 1, label: 'Upload',     desc: 'Add course materials, PDFs, slides & lecture notes'),
       _Step(n: 2, label: 'Processing', desc: 'AI analyzes and structures your content automatically'),
@@ -868,27 +882,27 @@ class _WorkflowSection extends StatelessWidget {
     ];
 
     return Container(
-      color: const Color(0xFFF8FAFC),
+      color: AppColors.surfaceBg,
       padding: const EdgeInsets.symmetric(vertical: 72, horizontal: 40),
       child: Column(
         children: [
-          const Text(
+          Text(
             'Seamless Workflow Integration',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 26,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF0F172A),
+              color: AppColors.textTitle,
               letterSpacing: -0.4,
             ),
           ),
-          const SizedBox(height: 10),
-          const Text(
+          SizedBox(height: 10),
+          Text(
             'From raw material to graded assessment, in five simple steps.',
             textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 14, color: Color(0xFF475569)),
+            style: TextStyle(fontSize: 14, color: AppColors.textGray),
           ),
-          const SizedBox(height: 56),
+          SizedBox(height: 56),
           LayoutBuilder(builder: (_, c) {
             if (c.maxWidth > 700) {
               return Row(
@@ -900,7 +914,7 @@ class _WorkflowSection extends StatelessWidget {
                         padding: const EdgeInsets.only(top: 22),
                         child: Container(
                           height: 2,
-                          color: const Color(0xFFCBD5E1),
+                          color: AppColors.borderSoft,
                         ),
                       ),
                     );
@@ -937,6 +951,7 @@ class _StepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return SizedBox(
       width: 100,
       child: Column(
@@ -944,37 +959,37 @@ class _StepCard extends StatelessWidget {
           Container(
             width: 44,
             height: 44,
-            decoration: const BoxDecoration(
-              color: Color(0xFF137FEC),
+            decoration: BoxDecoration(
+              color: AppColors.primary,
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
             child: Text(
               '${step.n}',
-              style: const TextStyle(
+              style: TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
               ),
             ),
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Text(
             step.label,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF0F172A),
+              color: AppColors.textTitle,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             step.desc,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 11.5,
-              color: Color(0xFF64748B),
+              color: AppColors.textMuted,
               height: 1.4,
             ),
           ),
@@ -991,22 +1006,23 @@ class _StepCard extends StatelessWidget {
 class _PortalsSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final w = MediaQuery.sizeOf(context).width;
     final isMobile = w < 800;
 
     return Container(
-      color: Colors.white,
+      color: AppColors.cardBg,
       padding: EdgeInsets.symmetric(
           vertical: 72, horizontal: isMobile ? 24 : 80),
       child: isMobile
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [_PortalsText(), const SizedBox(height: 32), _PortalsMockup()],
+              children: [_PortalsText(), SizedBox(height: 32), _PortalsMockup()],
             )
           : Row(
               children: [
                 Expanded(child: _PortalsText()),
-                const SizedBox(width: 60),
+                SizedBox(width: 60),
                 Expanded(child: _PortalsMockup()),
               ],
             ),
@@ -1017,7 +1033,8 @@ class _PortalsSection extends StatelessWidget {
 class _PortalsText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return const Column(
+    Theme.of(context);
+    return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
@@ -1025,7 +1042,7 @@ class _PortalsText extends StatelessWidget {
           style: TextStyle(
             fontSize: 26,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
+            color: AppColors.textTitle,
             height: 1.25,
             letterSpacing: -0.4,
           ),
@@ -1033,7 +1050,7 @@ class _PortalsText extends StatelessWidget {
         SizedBox(height: 12),
         Text(
           'Each user type gets a dedicated interface optimized for their specific tasks and responsibilities.',
-          style: TextStyle(fontSize: 14, color: Color(0xFF475569), height: 1.6),
+          style: TextStyle(fontSize: 14, color: AppColors.textGray, height: 1.6),
         ),
         SizedBox(height: 28),
         _PortalRow(
@@ -1066,6 +1083,7 @@ class _PortalRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1073,26 +1091,26 @@ class _PortalRow extends StatelessWidget {
           width: 36,
           height: 36,
           decoration: BoxDecoration(
-            color: const Color(0xFFEFF6FF),
+            color: AppColors.primarySoft,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Icon(icon, size: 18, color: const Color(0xFF137FEC)),
+          child: Icon(icon, size: 18, color: AppColors.primary),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF0F172A))),
-              const SizedBox(height: 3),
+                      color: AppColors.textTitle)),
+              SizedBox(height: 3),
               Text(desc,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 13,
-                      color: Color(0xFF475569),
+                      color: AppColors.textGray,
                       height: 1.5)),
             ],
           ),
@@ -1105,10 +1123,11 @@ class _PortalRow extends StatelessWidget {
 class _PortalsMockup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       height: 300,
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: AppColors.textTitle,
         borderRadius: BorderRadius.circular(16),
       ),
       clipBehavior: Clip.antiAlias,
@@ -1121,7 +1140,7 @@ class _PortalsMockup extends StatelessWidget {
             right: 0,
             child: Container(
               height: 80,
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -1137,15 +1156,15 @@ class _PortalsMockup extends StatelessWidget {
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                border: Border.all(color: AppColors.cardBg.withValues(alpha: 0.15)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.hub_outlined,
                       size: 36, color: Colors.white.withValues(alpha: 0.8)),
-                  const SizedBox(height: 10),
-                  const Text(
+                  SizedBox(height: 10),
+                  Text(
                     'Unified Learning Ecosystem',
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -1171,6 +1190,7 @@ class _PortalsMockup extends StatelessWidget {
 class _StatsBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     const stats = [
       _Stat('Saves Time',
           'Instructors save hours weekly on grading and question creation.'),
@@ -1183,7 +1203,7 @@ class _StatsBar extends StatelessWidget {
     ];
 
     return Container(
-      color: const Color(0xFFF8FAFC),
+      color: AppColors.surfaceBg,
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 40),
       child: LayoutBuilder(builder: (_, c) {
         if (c.maxWidth > 700) {
@@ -1191,7 +1211,7 @@ class _StatsBar extends StatelessWidget {
             children: stats.expand((s) sync* {
               if (s != stats.first) {
                 yield Container(
-                    width: 1, height: 48, color: const Color(0xFFE2E8F0),
+                    width: 1, height: 48, color: AppColors.border,
                     margin: const EdgeInsets.symmetric(horizontal: 20));
               }
               yield Expanded(child: _StatChip(stat: s));
@@ -1221,18 +1241,19 @@ class _StatChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(stat.title,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF0F172A))),
-        const SizedBox(height: 4),
+                color: AppColors.textTitle)),
+        SizedBox(height: 4),
         Text(stat.desc,
-            style: const TextStyle(
-                fontSize: 12, color: Color(0xFF64748B), height: 1.4)),
+            style: TextStyle(
+                fontSize: 12, color: AppColors.textMuted, height: 1.4)),
       ],
     );
   }
@@ -1249,12 +1270,13 @@ class _CtaBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
-      color: const Color(0xFF137FEC),
+      color: AppColors.primary,
       padding: const EdgeInsets.symmetric(vertical: 72, horizontal: 40),
       child: Column(
         children: [
-          const Text(
+          Text(
             'Transform Learning with AI',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -1264,8 +1286,8 @@ class _CtaBanner extends StatelessWidget {
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 12),
-          const Text(
+          SizedBox(height: 12),
+          Text(
             'Join the institutions that are already modernising their educational\ninfrastructure with Smart Study Companion.',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -1274,7 +1296,7 @@ class _CtaBanner extends StatelessWidget {
               height: 1.6,
             ),
           ),
-          const SizedBox(height: 36),
+          SizedBox(height: 36),
           Wrap(
             spacing: 12,
             runSpacing: 12,
@@ -1283,28 +1305,28 @@ class _CtaBanner extends StatelessWidget {
               ElevatedButton(
                 onPressed: onSignUp,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: const Color(0xFF137FEC),
+                  backgroundColor: AppColors.cardBg,
+                  foregroundColor: AppColors.primary,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(
                       horizontal: 28, vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('Sign Up',
+                child: Text('Sign Up',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
               OutlinedButton(
                 onPressed: onLogin,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  side: const BorderSide(color: Colors.white60, width: 1.5),
+                  side: BorderSide(color: Colors.white60, width: 1.5),
                   padding: const EdgeInsets.symmetric(
                       horizontal: 28, vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('Login',
+                child: Text('Login',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
               ),
             ],
@@ -1326,8 +1348,9 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
-      color: Colors.white,
+      color: AppColors.cardBg,
       padding: const EdgeInsets.fromLTRB(40, 52, 40, 28),
       child: Column(
         children: [
@@ -1344,25 +1367,25 @@ class _Footer extends StatelessWidget {
                       children: [
                         Row(children: [
                           Image.asset('assets/logo.webp', height: 22, cacheWidth: (22 * MediaQuery.of(context).devicePixelRatio).round()),
-                          const SizedBox(width: 6),
-                          const Text('Learnova',
+                          SizedBox(width: 6),
+                          Text('Learnova',
                               style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
-                                  color: Color(0xFF0F172A))),
+                                  color: AppColors.textTitle)),
                         ]),
-                        const SizedBox(height: 10),
-                        const Text(
+                        SizedBox(height: 10),
+                        Text(
                           'Empowering education through fast, intelligent, flexible, scalable, and secure tools.',
                           style: TextStyle(
                               fontSize: 12,
-                              color: Color(0xFF64748B),
+                              color: AppColors.textMuted,
                               height: 1.5),
                         ),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 40),
+                  SizedBox(width: 40),
                   Expanded(child: _FooterLinks()),
                 ],
               );
@@ -1372,32 +1395,32 @@ class _Footer extends StatelessWidget {
               children: [
                 Row(children: [
                   Image.asset('assets/logo.webp', height: 22, cacheWidth: (22 * MediaQuery.of(context).devicePixelRatio).round()),
-                  const SizedBox(width: 6),
-                  const Text('Learnova',
+                  SizedBox(width: 6),
+                  Text('Learnova',
                       style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A))),
+                          color: AppColors.textTitle)),
                 ]),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 _FooterLinks(),
               ],
             );
           }),
-          const SizedBox(height: 36),
-          const Divider(color: Color(0xFFE2E8F0)),
-          const SizedBox(height: 16),
-          const Row(
+          SizedBox(height: 36),
+          Divider(color: AppColors.border),
+          SizedBox(height: 16),
+          Row(
             children: [
               Text(
                 '© 2025 Learnova. All rights reserved.',
-                style: TextStyle(fontSize: 12, color: Color(0xFF94A3B8)),
+                style: TextStyle(fontSize: 12, color: AppColors.textHint),
               ),
               Spacer(),
               // Social icons
-              Icon(Icons.language, size: 18, color: Color(0xFF94A3B8)),
+              Icon(Icons.language, size: 18, color: AppColors.textHint),
               SizedBox(width: 12),
-              Icon(Icons.send, size: 18, color: Color(0xFF94A3B8)),
+              Icon(Icons.send, size: 18, color: AppColors.textHint),
             ],
           ),
         ],
@@ -1409,9 +1432,10 @@ class _Footer extends StatelessWidget {
 class _FooterLinks extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return LayoutBuilder(builder: (_, c) {
       if (c.maxWidth > 500) {
-        return const Row(
+        return Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(child: _FooterCol(title: 'Platform', links: ['Features', 'Pricing', 'For Institutions'])),
@@ -1420,7 +1444,7 @@ class _FooterLinks extends StatelessWidget {
           ],
         );
       }
-      return const Column(
+      return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _FooterCol(title: 'Platform', links: ['Features', 'Pricing', 'For Institutions']),
@@ -1441,20 +1465,21 @@ class _FooterCol extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(title,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFF0F172A))),
-        const SizedBox(height: 12),
+                color: AppColors.textTitle)),
+        SizedBox(height: 12),
         ...links.map((l) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(l,
-                  style: const TextStyle(
-                      fontSize: 13, color: Color(0xFF64748B))),
+                  style: TextStyle(
+                      fontSize: 13, color: AppColors.textMuted)),
             )),
       ],
     );

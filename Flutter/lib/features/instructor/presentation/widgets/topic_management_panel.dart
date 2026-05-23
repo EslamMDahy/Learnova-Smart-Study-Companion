@@ -17,18 +17,18 @@ import '../../data/mock_services.dart';
 
 // ── Colors ────────────────────────────────────────────────────────────────────
 class _C {
-  static const blue       = Color(0xFF137FEC);
-  static const blueSoft   = Color(0xFFEFF6FF);
-  static const blueBdr    = Color(0xFFBFDBFE);
-  static const purple     = Color(0xFF7C3AED);
-  static const purpleSoft = Color(0xFFF5F3FF);
-  static const purpleBdr  = Color(0xFFDDD6FE);
-  static const green      = Color(0xFF16A34A);
-  static const greenSoft  = Color(0xFFF0FDF4);
-  static const amber      = Color(0xFFD97706);
-  static const amberSoft  = Color(0xFFFFFBEB);
-  static const red        = Color(0xFFDC2626);
-  static const redSoft    = Color(0xFFFEF2F2);
+  static Color get blue => AppColors.primary;
+  static Color get blueSoft => AppColors.primarySoft;
+  static Color get blueBdr => AppColors.badgeBlueBorder;
+  static Color get purple => AppColors.purpleText;
+  static Color get purpleSoft => AppColors.purpleBg;
+  static Color get purpleBdr => AppColors.purpleBorder;
+  static Color get green => AppColors.successText;
+  static Color get greenSoft => AppColors.successBg;
+  static Color get amber => AppColors.warningText;
+  static Color get amberSoft => AppColors.warningSoftBg;
+  static Color get red => AppColors.dangerText;
+  static Color get redSoft => AppColors.dangerBg;
 }
 
 // ── Providers ─────────────────────────────────────────────────────────────────
@@ -88,7 +88,7 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
     ref.read(_aiGeneratingProvider(widget.moduleId).notifier).state = true;
 
     // Simulate AI extraction from materials
-    await Future.delayed(const Duration(milliseconds: 1800));
+    await Future.delayed(Duration(milliseconds: 1800));
 
     if (!mounted) {
       ref.read(_aiGeneratingProvider(widget.moduleId).notifier).state = false;
@@ -100,10 +100,10 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
 
     // Generate AI topics (simulated)
     final aiTopics = [
-      const TopicCreateRequest(title: 'Introduction & Overview', source: TopicSource.ai),
-      const TopicCreateRequest(title: 'Core Concepts & Terminology', source: TopicSource.ai),
-      const TopicCreateRequest(title: 'Practical Applications', source: TopicSource.ai, difficulty: TopicDifficulty.intermediate),
-      const TopicCreateRequest(title: 'Advanced Techniques', source: TopicSource.ai, difficulty: TopicDifficulty.advanced),
+      TopicCreateRequest(title: 'Introduction & Overview', source: TopicSource.ai),
+      TopicCreateRequest(title: 'Core Concepts & Terminology', source: TopicSource.ai),
+      TopicCreateRequest(title: 'Practical Applications', source: TopicSource.ai, difficulty: TopicDifficulty.intermediate),
+      TopicCreateRequest(title: 'Advanced Techniques', source: TopicSource.ai, difficulty: TopicDifficulty.advanced),
     ];
 
     // Only add topics not already present
@@ -185,13 +185,13 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('Delete Topic'),
+        title: Text('Delete Topic'),
         content: Text('Delete "${t.title}"? This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: const Text('Delete', style: TextStyle(color: Color(0xFFDC2626)))),
+              child: Text('Delete', style: TextStyle(color: AppColors.dangerText))),
         ],
       ),
     );
@@ -208,6 +208,7 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final topics   = ref.watch(_topicsProvider(widget.moduleId));
     final loading  = ref.watch(_topicsLoadingProvider(widget.moduleId));
     final aiGen    = ref.watch(_aiGeneratingProvider(widget.moduleId));
@@ -221,36 +222,36 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
         // ── Header ───────────────────────────────────────────────────────────
         Container(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 14),
-          decoration: const BoxDecoration(
-            color: Colors.white,
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
             border: Border(bottom: BorderSide(color: AppColors.border)),
           ),
           child: Row(children: [
             Container(
               width: 36, height: 36,
               decoration: BoxDecoration(color: _C.blueSoft, borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.topic_outlined, size: 18, color: _C.blue),
+              child: Icon(Icons.topic_outlined, size: 18, color: _C.blue),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(widget.moduleTitle,
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
               Text('${topics.length} topic${topics.length == 1 ? "" : "s"}'
                   '${aiCount > 0 ? " · $aiCount AI" : ""}'
                   '${manualCount > 0 ? " · $manualCount Manual" : ""}',
-                  style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
             ])),
             // AI Generate button
             _AiGenerateButton(loading: aiGen, onTap: _generateWithAi),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             // Manual Add button
             FilledButton.icon(
               onPressed: _openAddDialog,
-              icon: const Icon(Icons.add, size: 16),
-              label: const Text('Add Topic'),
+              icon: Icon(Icons.add, size: 16),
+              label: Text('Add Topic'),
               style: FilledButton.styleFrom(
                 backgroundColor: _C.purple,
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               ),
             ),
@@ -259,9 +260,9 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
 
         // ── Legend row ────────────────────────────────────────────────────────
         Container(
-          color: Colors.white,
+          color: AppColors.cardBg,
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 10),
-          child: const Wrap(spacing: 14, runSpacing: 6, children: [
+          child: Wrap(spacing: 14, runSpacing: 6, children: [
             _BadgeLegend(label: 'AI Generated', bg: _C.blueSoft, fg: _C.blue),
             _BadgeLegend(label: 'Added Manually', bg: _C.purpleSoft, fg: _C.purple),
             _DiffDot(label: 'Beginner', color: _C.green),
@@ -274,14 +275,14 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
         // ── Body ─────────────────────────────────────────────────────────────
         Expanded(
           child: loading
-              ? const Center(child: CircularProgressIndicator())
+              ? Center(child: CircularProgressIndicator())
               : aiGen
                   ? _AiLoadingState()
                   : topics.isEmpty
                       ? _EmptyState(onGenerate: _generateWithAi, onAdd: _openAddDialog)
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-                          separatorBuilder: (_, __) => const SizedBox(height: 8),
+                          separatorBuilder: (_, __) => SizedBox(height: 8),
                           itemCount: topics.length,
                           itemBuilder: (_, i) => _TopicCard(
                             topic: topics[i],
@@ -313,6 +314,7 @@ class _AiGenerateButtonState extends State<_AiGenerateButton> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return MouseRegion(
       cursor: widget.loading ? MouseCursor.defer : SystemMouseCursors.click,
       onEnter: (_) => setState(() => _h = true),
@@ -320,25 +322,25 @@ class _AiGenerateButtonState extends State<_AiGenerateButton> {
       child: GestureDetector(
         onTap: widget.loading ? null : widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+          duration: Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
-            color: _h && !widget.loading ? _C.blueSoft : Colors.white,
+            color: _h && !widget.loading ? _C.blueSoft : AppColors.cardBg,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: _h && !widget.loading ? _C.blue : AppColors.border),
           ),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             if (widget.loading)
-              const SizedBox(
+              SizedBox(
                 width: 14, height: 14,
                 child: CircularProgressIndicator(strokeWidth: 2, color: _C.blue),
               )
             else
-              const Icon(Icons.auto_awesome_rounded, size: 15, color: _C.blue),
-            const SizedBox(width: 7),
+              Icon(Icons.auto_awesome_rounded, size: 15, color: _C.blue),
+            SizedBox(width: 7),
             Text(
               widget.loading ? 'Generating…' : 'Generate with AI',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _C.blue),
+              style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _C.blue),
             ),
           ]),
         ),
@@ -365,38 +367,39 @@ class _TopicCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final lo = outcomes.where((o) => o.id.toString() == topic.linkedOutcomeId).firstOrNull;
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
       child: Row(children: [
         _SourceBadge(source: topic.source),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(topic.title,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textTitle)),
-          const SizedBox(height: 6),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textTitle)),
+          SizedBox(height: 6),
           Wrap(spacing: 6, runSpacing: 4, children: [
             _DifficultyChip(difficulty: topic.difficulty),
             if (lo != null) _LoChip(code: lo.code, description: lo.title, difficulty: lo.difficulty),
           ]),
         ])),
-        const SizedBox(width: 8),
+        SizedBox(width: 8),
         IconButton(
-          icon: const Icon(Icons.edit_outlined, size: 17),
+          icon: Icon(Icons.edit_outlined, size: 17),
           color: AppColors.textMuted,
           tooltip: 'Edit',
           onPressed: onEdit,
           visualDensity: VisualDensity.compact,
         ),
         IconButton(
-          icon: const Icon(Icons.delete_outline, size: 17),
-          color: const Color(0xFFDC2626),
+          icon: Icon(Icons.delete_outline, size: 17),
+          color: AppColors.dangerText,
           tooltip: 'Delete',
           onPressed: onDelete,
           visualDensity: VisualDensity.compact,
@@ -468,13 +471,14 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final isEdit = widget.existing != null;
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.cardBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 500),
+        constraints: BoxConstraints(maxWidth: 500),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -491,19 +495,19 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
                   size: 18, color: isEdit ? _C.purple : _C.blue,
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(isEdit ? 'Edit Topic' : 'Add Topic Manually',
-                    style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
                 Text(isEdit ? 'Update topic details.' : 'Add a topic the AI might have missed.',
-                    style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
               ]),
             ]),
-            const SizedBox(height: 22),
+            SizedBox(height: 22),
 
             // Topic Name
-            const _FieldLabel('Topic Name', required: true),
-            const SizedBox(height: 6),
+            _FieldLabel('Topic Name', required: true),
+            SizedBox(height: 6),
             TextField(
               controller: _titleCtrl,
               onChanged: (_) { if (_titleError != null) setState(() => _titleError = null); },
@@ -514,46 +518,46 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(9)),
                 focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(9),
-                    borderSide: const BorderSide(color: _C.blue, width: 1.5)),
+                    borderSide: BorderSide(color: _C.blue, width: 1.5)),
                 isDense: true,
               ),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
 
             // Source
-            const _FieldLabel('Source'),
-            const SizedBox(height: 8),
+            _FieldLabel('Source'),
+            SizedBox(height: 8),
             Row(children: [
               Expanded(child: _RadioChip(
                 label: 'AI Generated', icon: Icons.auto_awesome,
                 selected: _source == TopicSource.ai, selectedColor: _C.blue,
                 onTap: () => setState(() => _source = TopicSource.ai),
               )),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Expanded(child: _RadioChip(
                 label: 'Manual', icon: Icons.edit_note_rounded,
                 selected: _source == TopicSource.manual, selectedColor: _C.purple,
                 onTap: () => setState(() => _source = TopicSource.manual),
               )),
             ]),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
 
             // Difficulty
-            const _FieldLabel('Difficulty Level'),
-            const SizedBox(height: 8),
+            _FieldLabel('Difficulty Level'),
+            SizedBox(height: 8),
             Row(children: [
               Expanded(child: _DifficultyBtn(
                 label: 'Beginner', color: _C.green,
                 selected: _difficulty == TopicDifficulty.beginner,
                 onTap: () => setState(() => _difficulty = TopicDifficulty.beginner),
               )),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Expanded(child: _DifficultyBtn(
                 label: 'Intermediate', color: _C.amber,
                 selected: _difficulty == TopicDifficulty.intermediate,
                 onTap: () => setState(() => _difficulty = TopicDifficulty.intermediate),
               )),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Expanded(child: _DifficultyBtn(
                 label: 'Advanced', color: _C.red,
                 selected: _difficulty == TopicDifficulty.advanced,
@@ -563,12 +567,12 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
 
             // Learning Outcome link
             if (widget.outcomes.isNotEmpty) ...[
-              const SizedBox(height: 18),
-              const _FieldLabel('Link to Learning Outcome'),
-              const SizedBox(height: 4),
-              const Text('Connect this topic to a course learning outcome.',
+              SizedBox(height: 18),
+              _FieldLabel('Link to Learning Outcome'),
+              SizedBox(height: 4),
+              Text('Connect this topic to a course learning outcome.',
                   style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               DropdownButtonFormField<int?>(
                 value: _linkedOutcomeId,
                 decoration: InputDecoration(
@@ -577,17 +581,17 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(9)),
                   focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(9),
-                      borderSide: const BorderSide(color: _C.blue, width: 1.5)),
+                      borderSide: BorderSide(color: _C.blue, width: 1.5)),
                   isDense: true,
                 ),
                 items: [
-                  const DropdownMenuItem<int?>(
+                  DropdownMenuItem<int?>(
                       child: Text('— None —', style: TextStyle(color: AppColors.textMuted))),
                   ...widget.outcomes.map((o) => DropdownMenuItem<int?>(
                     value: o.id,
                     child: Row(children: [
                       _DiffDotInline(o.difficulty),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Expanded(child: Text('${o.code} – ${o.title}',
                           overflow: TextOverflow.ellipsis)),
                     ]),
@@ -597,15 +601,15 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
               ),
             ],
 
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             // Actions
             Row(mainAxisAlignment: MainAxisAlignment.end, children: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Cancel'),
+                child: Text('Cancel'),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               FilledButton(
                 onPressed: _submit,
                 style: FilledButton.styleFrom(backgroundColor: _C.blue),
@@ -633,33 +637,33 @@ class _EmptyState extends StatelessWidget {
       Container(
         width: 64, height: 64,
         decoration: BoxDecoration(color: _C.blueSoft, borderRadius: BorderRadius.circular(16)),
-        child: const Icon(Icons.topic_outlined, size: 30, color: _C.blue),
+        child: Icon(Icons.topic_outlined, size: 30, color: _C.blue),
       ),
-      const SizedBox(height: 16),
-      const Text('No topics yet',
+      SizedBox(height: 16),
+      Text('No topics yet',
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-      const SizedBox(height: 6),
-      const Text(
+      SizedBox(height: 6),
+      Text(
         'Generate topics automatically from materials,\nor add them manually.',
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
       ),
-      const SizedBox(height: 20),
+      SizedBox(height: 20),
       Row(mainAxisSize: MainAxisSize.min, children: [
         FilledButton.icon(
           onPressed: onGenerate,
-          icon: const Icon(Icons.auto_awesome_rounded, size: 16),
-          label: const Text('Generate with AI'),
+          icon: Icon(Icons.auto_awesome_rounded, size: 16),
+          label: Text('Generate with AI'),
           style: FilledButton.styleFrom(backgroundColor: _C.blue),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         OutlinedButton.icon(
           onPressed: onAdd,
-          icon: const Icon(Icons.add, size: 16),
-          label: const Text('Add Manually'),
+          icon: Icon(Icons.add, size: 16),
+          label: Text('Add Manually'),
           style: OutlinedButton.styleFrom(
             foregroundColor: _C.purple,
-            side: const BorderSide(color: _C.purple),
+            side: BorderSide(color: _C.purple),
           ),
         ),
       ]),
@@ -675,19 +679,19 @@ class _AiLoadingState extends StatelessWidget {
       Container(
         width: 64, height: 64,
         decoration: BoxDecoration(color: _C.blueSoft, borderRadius: BorderRadius.circular(16)),
-        child: const Icon(Icons.auto_awesome_rounded, size: 30, color: _C.blue),
+        child: Icon(Icons.auto_awesome_rounded, size: 30, color: _C.blue),
       ),
-      const SizedBox(height: 16),
-      const Text('AI is analyzing materials…',
+      SizedBox(height: 16),
+      Text('AI is analyzing materials…',
           style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-      const SizedBox(height: 8),
-      const Text('Extracting topics from course materials.',
+      SizedBox(height: 8),
+      Text('Extracting topics from course materials.',
           style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-      const SizedBox(height: 20),
-      const SizedBox(
+      SizedBox(height: 20),
+      SizedBox(
         width: 180,
         child: LinearProgressIndicator(
-          backgroundColor: Color(0xFFDBEAFE),
+          backgroundColor: AppColors.badgeBlueBg,
           color: _C.blue,
           minHeight: 4,
         ),
@@ -706,6 +710,7 @@ class _SourceBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final isAi = source == TopicSource.ai;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -717,7 +722,7 @@ class _SourceBadge extends StatelessWidget {
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(isAi ? Icons.auto_awesome : Icons.edit_note_rounded,
             size: 12, color: isAi ? _C.blue : _C.purple),
-        const SizedBox(width: 4),
+        SizedBox(width: 4),
         Text(isAi ? 'AI' : 'Manual',
             style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
                 color: isAi ? _C.blue : _C.purple)),
@@ -732,6 +737,7 @@ class _DifficultyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     late Color color, bg;
     switch (difficulty) {
       case TopicDifficulty.beginner:     color = _C.green; bg = _C.greenSoft; break;
@@ -754,6 +760,7 @@ class _LoChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     // Color matches LO difficulty
     Color dotColor;
     switch (difficulty) {
@@ -766,14 +773,14 @@ class _LoChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
         decoration: BoxDecoration(
-          color: const Color(0xFFF0F9FF),
+          color: AppColors.infoBg,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFFBAE6FD)),
+          border: Border.all(color: AppColors.infoBorder),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Container(width: 6, height: 6, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
-          const SizedBox(width: 5),
-          Text(code, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: Color(0xFF0369A1))),
+          SizedBox(width: 5),
+          Text(code, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.infoText)),
         ]),
       ),
     );
@@ -786,6 +793,7 @@ class _DiffDotInline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     Color c;
     switch (difficulty) {
       case OutcomeDifficulty.beginner:     c = _C.green; break;
@@ -802,8 +810,8 @@ class _BadgeLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
     Container(width: 8, height: 8, decoration: BoxDecoration(color: fg, shape: BoxShape.circle)),
-    const SizedBox(width: 4),
-    Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+    SizedBox(width: 4),
+    Text(label, style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
   ]);
 }
 
@@ -813,8 +821,8 @@ class _DiffDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
     Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-    const SizedBox(width: 4),
-    Text(label, style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
+    SizedBox(width: 4),
+    Text(label, style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
   ]);
 }
 
@@ -823,8 +831,8 @@ class _FieldLabel extends StatelessWidget {
   const _FieldLabel(this.text, {this.required = false});
   @override
   Widget build(BuildContext context) => Row(children: [
-    Text(text, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-    if (required) const Text(' *', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: Color(0xFFEF4444))),
+    Text(text, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+    if (required) Text(' *', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.errorDot)),
   ]);
 }
 
@@ -837,7 +845,7 @@ class _RadioChip extends StatelessWidget {
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: AnimatedContainer(
-      duration: const Duration(milliseconds: 120),
+      duration: Duration(milliseconds: 120),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: selected ? selectedColor.withOpacity(0.08) : AppColors.pageBg,
@@ -846,7 +854,7 @@ class _RadioChip extends StatelessWidget {
       ),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         Icon(icon, size: 15, color: selected ? selectedColor : AppColors.textMuted),
-        const SizedBox(width: 6),
+        SizedBox(width: 6),
         Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600,
             color: selected ? selectedColor : AppColors.textMuted)),
       ]),
@@ -862,10 +870,10 @@ class _DifficultyBtn extends StatelessWidget {
     child: GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 120),
+        duration: Duration(milliseconds: 120),
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: BoxDecoration(
-          color: selected ? color.withOpacity(0.08) : Colors.white,
+          color: selected ? color.withOpacity(0.08) : AppColors.cardBg,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: selected ? color : AppColors.border, width: selected ? 1.5 : 1),
         ),

@@ -35,20 +35,20 @@ part 'materials_tab_dialogs.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 class _K {
   _K._();
-  static const purple     = Color(0xFF7C3AED);
-  static const purpleSoft = Color(0xFFF5F3FF);
-  static const purpleBd   = Color(0xFFDDD6FE);
-  static const amber      = Color(0xFFD97706);
-  static const amberSoft  = Color(0xFFFFFBEB);
-  static const green      = Color(0xFF16A34A);
-  static const greenSoft  = Color(0xFFF0FDF4);
-  static const redSoft    = Color(0xFFFFF1F2);
-  static const blue       = Color(0xFF2563EB);
-  static const blueSoft   = Color(0xFFEFF6FF);
-  static const blueMid    = Color(0xFFDBEAFE);
-  static const div        = Color(0xFFEEEEEE);
-  static const bg         = Color(0xFFF6F7F9);
-  static const sidebar    = Color(0xFFFAFAFA);
+  static Color get purple => AppColors.purpleText;
+  static Color get purpleSoft => AppColors.purpleBg;
+  static Color get purpleBd => AppColors.purpleBorder;
+  static Color get amber => AppColors.warningText;
+  static Color get amberSoft => AppColors.warningSoftBg;
+  static Color get green => AppColors.successText;
+  static Color get greenSoft => AppColors.successBg;
+  static Color get redSoft => AppColors.dangerBg;
+  static Color get blue => AppColors.primary;
+  static Color get blueSoft => AppColors.primarySoft;
+  static Color get blueMid => AppColors.badgeBlueBg;
+  static Color get div => AppColors.divider;
+  static Color get bg => AppColors.pageBg;
+  static Color get sidebar => AppColors.surfaceBg;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -198,13 +198,13 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
     }
     try {
       final map = jsonDecode(raw) as Map<String, dynamic>;
-      final expanded = ((map['expanded'] as List?) ?? const [])
+      final expanded = ((map['expanded'] as List?) ?? [])
           .map((e) => (e as num).toInt())
           .toSet();
-      final expandedMaterials = ((map['expandedMaterials'] as List?) ?? const [])
+      final expandedMaterials = ((map['expandedMaterials'] as List?) ?? [])
           .map((e) => (e as num).toInt())
           .toSet();
-      final expandedTopics = ((map['expandedTopics'] as List?) ?? const [])
+      final expandedTopics = ((map['expandedTopics'] as List?) ?? [])
           .map((e) => (e as num).toInt())
           .toSet();
       final selectedType = map['selectedType']?.toString();
@@ -311,6 +311,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     super.build(context);
     final st = ref.watch(courseDetailsControllerProvider(widget.course.id));
     _maybeRestoreUiState(st);
@@ -1101,7 +1102,7 @@ Future<void> _showCreateModuleDialog() async {
         barrierColor: Colors.black.withOpacity(0.35),
         builder: (_) => _ConfirmDialogWidget(title: 'Delete Module',
             body: 'Delete "${m.title}"? This will also remove all its materials.',
-            confirm: 'Delete', confirmColor: const Color(0xFFEF4444)));
+            confirm: 'Delete', confirmColor: AppColors.errorDot));
     if (ok != true || !mounted) return;
 
     final success = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
@@ -1229,7 +1230,7 @@ Future<void> _showCreateModuleDialog() async {
     Color difficultyColor(TopicDifficulty value) {
       switch (value) {
         case TopicDifficulty.advanced:
-          return const Color(0xFFDC2626);
+          return AppColors.dangerText;
         case TopicDifficulty.intermediate:
           return _K.amber;
         case TopicDifficulty.beginner:
@@ -1240,11 +1241,11 @@ Future<void> _showCreateModuleDialog() async {
     Color difficultyBg(TopicDifficulty value) {
       switch (value) {
         case TopicDifficulty.advanced:
-          return const Color(0xFFFFF1F2);
+          return AppColors.dangerBg;
         case TopicDifficulty.intermediate:
-          return const Color(0xFFFFFBEB);
+          return AppColors.warningSoftBg;
         case TopicDifficulty.beginner:
-          return const Color(0xFFEFF6FF);
+          return AppColors.primarySoft;
       }
     }
 
@@ -1266,7 +1267,7 @@ Future<void> _showCreateModuleDialog() async {
         case TopicReadiness.review:
           return _K.amberSoft;
         case TopicReadiness.draft:
-          return const Color(0xFFF1F5F9);
+          return AppColors.headerBg;
       }
     }
 
@@ -1277,7 +1278,7 @@ Future<void> _showCreateModuleDialog() async {
               title: 'Delete Topic',
               body: 'Delete "${topic.title}"? This action cannot be undone.',
               confirm: 'Delete',
-              confirmColor: const Color(0xFFDC2626),
+              confirmColor: AppColors.dangerText,
             ),
           ) ??
           false;
@@ -1301,17 +1302,17 @@ Future<void> _showCreateModuleDialog() async {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
+                gradient: LinearGradient(
+                  colors: [AppColors.primary, AppColors.purpleText],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+              child: Icon(Icons.tune_rounded, color: Colors.white, size: 20),
             ),
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 720),
+              constraints: BoxConstraints(maxHeight: 720),
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1320,13 +1321,13 @@ Future<void> _showCreateModuleDialog() async {
                       width: double.infinity,
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFF8FAFF), Color(0xFFFFFFFF)],
+                        gradient: LinearGradient(
+                          colors: [AppColors.surfaceBg, AppColors.cardBg],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE8EEF8)),
+                        border: Border.all(color: AppColors.borderSoft),
                       ),
                       child: Wrap(
                         spacing: 8,
@@ -1367,9 +1368,9 @@ Future<void> _showCreateModuleDialog() async {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     _CardWidget(
-                      header: const _HdrWidget(
+                      header: _HdrWidget(
                         icon: Icons.edit_note_rounded,
                         iconColor: AppColors.primary,
                         title: 'Core details',
@@ -1379,37 +1380,37 @@ Future<void> _showCreateModuleDialog() async {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'Topic title',
                               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: 8),
                             _DialogTextField(
                               controller: titleCtrl,
                               hintText: 'Write a concise, teachable topic name',
                               autofocus: true,
                             ),
-                            const SizedBox(height: 14),
-                            const Text(
+                            SizedBox(height: 14),
+                            Text(
                               'Description',
                               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: 8),
                             _DialogTextField(
                               controller: descriptionCtrl,
                               hintText: 'Add a short summary, scope, or teaching angle for this topic',
                               multiline: true,
                             ),
-                            const SizedBox(height: 14),
-                            const Text(
+                            SizedBox(height: 14),
+                            Text(
                               'Hierarchy',
                               style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: 8),
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFF8FAFC),
+                                color: AppColors.surfaceBg,
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(color: _K.div),
                               ),
@@ -1417,10 +1418,10 @@ Future<void> _showCreateModuleDialog() async {
                                 child: DropdownButton<int?>(
                                   value: selectedParentTopicId,
                                   isExpanded: true,
-                                  dropdownColor: Colors.white,
+                                  dropdownColor: AppColors.cardBg,
                                   borderRadius: BorderRadius.circular(14),
                                   items: [
-                                    const DropdownMenuItem<int?>(
+                                    DropdownMenuItem<int?>(
                                       value: null,
                                       child: Text('Top-level topic'),
                                     ),
@@ -1435,24 +1436,24 @@ Future<void> _showCreateModuleDialog() async {
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 8),
+                            SizedBox(height: 8),
                             Text(
                               selectedParentTopicId == null
                                   ? 'This item appears as a top-level topic inside the material.'
                                   : 'This item becomes a subtopic. Subtopics are final-level items and cannot contain children.',
-                              style: const TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.45),
+                              style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.45),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(
                           child: _CardWidget(
-                            header: const _HdrWidget(
+                            header: _HdrWidget(
                               icon: Icons.settings_suggest_rounded,
                               iconColor: AppColors.primary,
                               title: 'Delivery setup',
@@ -1462,11 +1463,11 @@ Future<void> _showCreateModuleDialog() async {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Difficulty',
                                     style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
                                   ),
-                                  const SizedBox(height: 8),
+                                  SizedBox(height: 8),
                                   Wrap(
                                     spacing: 8,
                                     runSpacing: 8,
@@ -1484,17 +1485,17 @@ Future<void> _showCreateModuleDialog() async {
                                         backgroundColor: difficultyBg(value),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                                         side: BorderSide(
-                                          color: selected ? difficultyColor(value) : const Color(0xFFE5E7EB),
+                                          color: selected ? difficultyColor(value) : AppColors.borderGray,
                                         ),
                                       );
                                     }).toList(),
                                   ),
-                                  const SizedBox(height: 16),
-                                  const Text(
+                                  SizedBox(height: 16),
+                                  Text(
                                     'Readiness',
                                     style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
                                   ),
-                                  const SizedBox(height: 8),
+                                  SizedBox(height: 8),
                                   Wrap(
                                     spacing: 8,
                                     runSpacing: 8,
@@ -1512,7 +1513,7 @@ Future<void> _showCreateModuleDialog() async {
                                         backgroundColor: readinessBg(value),
                                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
                                         side: BorderSide(
-                                          color: selected ? readinessFg(value) : const Color(0xFFE5E7EB),
+                                          color: selected ? readinessFg(value) : AppColors.borderGray,
                                         ),
                                       );
                                     }).toList(),
@@ -1522,10 +1523,10 @@ Future<void> _showCreateModuleDialog() async {
                             ),
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        SizedBox(width: 16),
                         Expanded(
                           child: _CardWidget(
-                            header: const _HdrWidget(
+                            header: _HdrWidget(
                               icon: Icons.sticky_note_2_outlined,
                               iconColor: AppColors.primary,
                               title: 'Instructor notes',
@@ -1535,11 +1536,11 @@ Future<void> _showCreateModuleDialog() async {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  const Text(
+                                  Text(
                                     'Use notes for examples, misconceptions, teaching cues, or assessment reminders.',
                                     style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
                                   ),
-                                  const SizedBox(height: 10),
+                                  SizedBox(height: 10),
                                   _DialogTextField(
                                     controller: notesCtrl,
                                     hintText: 'Add delivery notes for this topic',
@@ -1552,9 +1553,9 @@ Future<void> _showCreateModuleDialog() async {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     _CardWidget(
-                      header: const _HdrWidget(
+                      header: _HdrWidget(
                         icon: Icons.flag_outlined,
                         iconColor: AppColors.primary,
                         title: 'Learning outcome alignment',
@@ -1564,21 +1565,21 @@ Future<void> _showCreateModuleDialog() async {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
+                            Text(
                               'Select the course outcomes this topic supports.',
                               style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
                             ),
-                            const SizedBox(height: 12),
+                            SizedBox(height: 12),
                             if (outcomes.isEmpty)
                               Container(
                                 width: double.infinity,
                                 padding: const EdgeInsets.all(14),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
+                                  color: AppColors.surfaceBg,
                                   borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                                  border: Border.all(color: AppColors.border),
                                 ),
-                                child: const Text(
+                                child: Text(
                                   'No course outcomes yet. Add them in the Outcomes tab first.',
                                   style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
                                 ),
@@ -1599,7 +1600,7 @@ Future<void> _showCreateModuleDialog() async {
                                           ),
                                           child: Text(
                                             '${lo.code} • ${lo.title}',
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                               fontSize: 12.5,
                                               fontWeight: FontWeight.w700,
                                               color: AppColors.primary,
@@ -1609,12 +1610,12 @@ Future<void> _showCreateModuleDialog() async {
                                       )
                                       .toList(),
                                 ),
-                                const SizedBox(height: 12),
+                                SizedBox(height: 12),
                               ],
                               Container(
-                                constraints: const BoxConstraints(maxHeight: 220),
+                                constraints: BoxConstraints(maxHeight: 220),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFFF8FAFC),
+                                  color: AppColors.surfaceBg,
                                   borderRadius: BorderRadius.circular(14),
                                   border: Border.all(color: _K.div),
                                 ),
@@ -1623,7 +1624,7 @@ Future<void> _showCreateModuleDialog() async {
                                   child: ListView.separated(
                                     shrinkWrap: true,
                                     itemCount: outcomes.length,
-                                    separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFEAECEF)),
+                                    separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.borderSoft),
                                     itemBuilder: (_, i) {
                                       final lo = outcomes[i];
                                       final selected = selectedOutcomeIds.contains(lo.id);
@@ -1631,7 +1632,7 @@ Future<void> _showCreateModuleDialog() async {
                                         hoverColor: Colors.transparent,
                                         splashColor: Colors.transparent,
                                         highlightColor: Colors.transparent,
-                                        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                                        overlayColor: WidgetStatePropertyAll(Colors.transparent),
                                         onTap: () => setDialogState(() {
                                           if (selected) {
                                             selectedOutcomeIds.remove(lo.id);
@@ -1647,18 +1648,18 @@ Future<void> _showCreateModuleDialog() async {
                                                 width: 18,
                                                 height: 18,
                                                 decoration: BoxDecoration(
-                                                  color: selected ? AppColors.primary : Colors.white,
+                                                  color: selected ? AppColors.primary : AppColors.cardBg,
                                                   borderRadius: BorderRadius.circular(5),
                                                   border: Border.all(
-                                                    color: selected ? AppColors.primary : const Color(0xFFCBD5E1),
+                                                    color: selected ? AppColors.primary : AppColors.borderSoft,
                                                     width: 1.4,
                                                   ),
                                                 ),
                                                 child: selected
-                                                    ? const Icon(Icons.check, size: 12, color: Colors.white)
+                                                    ? Icon(Icons.check, size: 12, color: Colors.white)
                                                     : null,
                                               ),
-                                              const SizedBox(width: 10),
+                                              SizedBox(width: 10),
                                               Container(
                                                 padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                                                 decoration: BoxDecoration(
@@ -1667,14 +1668,14 @@ Future<void> _showCreateModuleDialog() async {
                                                 ),
                                                 child: Text(
                                                   lo.code,
-                                                  style: const TextStyle(
+                                                  style: TextStyle(
                                                     fontSize: 10,
                                                     fontWeight: FontWeight.w800,
                                                     color: AppColors.badgeBlueFg,
                                                   ),
                                                 ),
                                               ),
-                                              const SizedBox(width: 8),
+                                              SizedBox(width: 8),
                                               Expanded(
                                                 child: Text(
                                                   lo.title,
@@ -1698,18 +1699,18 @@ Future<void> _showCreateModuleDialog() async {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     _CardWidget(
-                      header: const _HdrWidget(
+                      header: _HdrWidget(
                         icon: Icons.warning_amber_rounded,
-                        iconColor: Color(0xFFDC2626),
+                        iconColor: AppColors.dangerText,
                         title: 'Danger zone',
                       ),
                       child: Padding(
                         padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
                         child: Row(
                           children: [
-                            const Expanded(
+                            Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
@@ -1725,7 +1726,7 @@ Future<void> _showCreateModuleDialog() async {
                                 ],
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: 12),
                             AppButton(
                               label: 'Delete topic',
                               onTap: () async {
@@ -1745,7 +1746,7 @@ Future<void> _showCreateModuleDialog() async {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     _DialogActions(
                       confirmLabel: 'Save changes',
                       onCancel: () => Navigator.pop(dialogContext, false),

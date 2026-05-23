@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:learnova/shared/widgets/design_tokens.dart';
 // استدعاء صفحة النتيجة لإعادة بناء حالتها عند التسليم
 import 'student_quiz_result_page.dart';
 
@@ -16,37 +17,38 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xffF8FAFC),
+      backgroundColor: AppColors.bg,
       body: Column(
         children: [
           /// 1. الشريط العلوي (العنوان والتايمر)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: Color(0xffE2E8F0))),
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              border: Border(bottom: BorderSide(color: AppColors.border)),
             ),
             child: Row(
               children: [
-                const Text(
+                Text(
                   "Mid-Term Assessment: Computer Science 101",
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
-                    color: Color(0xff0F172A),
+                    color: AppColors.textTitle,
                   ),
                 ),
-                const Spacer(),
-                const Icon(Icons.timer_outlined,
-                    size: 18, color: Color(0xff64748B)),
-                const SizedBox(width: 8),
-                const Text(
+                Spacer(),
+                Icon(Icons.timer_outlined,
+                    size: 18, color: AppColors.textMuted),
+                SizedBox(width: 8),
+                Text(
                   "00:45:12",
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
-                    color: Color(0xff0F172A),
+                    color: AppColors.textTitle,
                   ),
                 ),
               ],
@@ -62,23 +64,23 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                 Container(
                   width: 280,
                   height: double.infinity,
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(right: BorderSide(color: Color(0xffE2E8F0))),
+                  decoration: BoxDecoration(
+                    color: AppColors.cardBg,
+                    border: Border(right: BorderSide(color: AppColors.border)),
                   ),
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text(
+                      Text(
                         "Question Palette",
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
-                          color: Color(0xff0F172A),
+                          color: AppColors.textTitle,
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      SizedBox(height: 20),
 
                       /// شبكة أرقام الأسئلة
                       Expanded(
@@ -100,16 +102,16 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                               alignment: Alignment.center,
                               decoration: BoxDecoration(
                                 color: isAnswered
-                                    ? const Color(0xff1D8CF8)
+                                    ? AppColors.primary
                                     : (isCurrent
-                                        ? const Color(0xffEFF6FF)
-                                        : Colors.white),
+                                        ? AppColors.infoBg
+                                        : AppColors.cardBg),
                                 border: Border.all(
                                   color: isCurrent
-                                      ? const Color(0xff1D8CF8)
+                                      ? AppColors.primary
                                       : (isAnswered
-                                          ? const Color(0xff1D8CF8)
-                                          : const Color(0xffE2E8F0)),
+                                          ? AppColors.primary
+                                          : AppColors.border),
                                   width: isCurrent ? 2 : 1,
                                 ),
                                 borderRadius: BorderRadius.circular(8),
@@ -122,8 +124,8 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                                   color: isAnswered
                                       ? Colors.white
                                       : (isCurrent
-                                          ? const Color(0xff1D8CF8)
-                                          : const Color(0xff475569)),
+                                          ? AppColors.primary
+                                          : AppColors.textGray),
                                 ),
                               ),
                             );
@@ -131,7 +133,7 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                         ),
                       ),
 
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
 
                       /// زر الـ Submit Assessment الأخضر في أسفل الـ Palette
                       SizedBox(
@@ -151,14 +153,13 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                             );
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(
-                                0xff10B981), // اللون الأخضر التفاعلي
+                            backgroundColor: AppColors.successDot, // اللون الأخضر التفاعلي
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(8)),
                             elevation: 0,
                           ),
-                          child: const Text(
+                          child: Text(
                             "Submit Assessment",
                             style: TextStyle(
                                 fontWeight: FontWeight.w800, fontSize: 14),
@@ -183,24 +184,23 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                               children: [
                                 Text(
                                   "Question $_currentQuestion",
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w800,
-                                    color: Color(
-                                        0xff1D8CF8), // تمييز تايتل السؤال بالأزرق
+                                    color: AppColors.primary, // تمييز تايتل السؤال بالأزرق
                                   ),
                                 ),
-                                const SizedBox(height: 16),
-                                const Text(
+                                SizedBox(height: 16),
+                                Text(
                                   "Which of the following sorting algorithms has a time complexity of O(n log n) in the average case?",
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
-                                    color: Color(0xff0F172A),
+                                    color: AppColors.textTitle,
                                     height: 1.5,
                                   ),
                                 ),
-                                const SizedBox(height: 32),
+                                SizedBox(height: 32),
 
                                 /// قائمة الاختيارات الأربعة
                                 _buildOption(0, "Bubble Sort"),
@@ -212,9 +212,9 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                           ),
                         ),
 
-                        const SizedBox(height: 24),
-                        const Divider(color: Color(0xffE2E8F0)),
-                        const SizedBox(height: 16),
+                        SizedBox(height: 24),
+                        Divider(color: AppColors.border),
+                        SizedBox(height: 16),
 
                         /// 🚀 أزرار التنقل (Previous و Next Question) في أسفل الصفحة كما طلبت
                         Row(
@@ -224,16 +224,16 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                               onPressed: _currentQuestion > 1
                                   ? () => setState(() => _currentQuestion--)
                                   : null, // يتعطل لو في أول سؤال
-                              icon: const Icon(Icons.chevron_left_rounded,
+                              icon: Icon(Icons.chevron_left_rounded,
                                   size: 18),
-                              label: const Text("Previous",
+                              label: Text("Previous",
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13)),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xff475569),
+                                foregroundColor: AppColors.textGray,
                                 side:
-                                    const BorderSide(color: Color(0xffE2E8F0)),
+                                    BorderSide(color: AppColors.border),
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 20, vertical: 14),
                                 shape: RoundedRectangleBorder(
@@ -244,14 +244,14 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                               onPressed: _currentQuestion < 20
                                   ? () => setState(() => _currentQuestion++)
                                   : null, // يتعطل لو في آخر سؤال
-                              icon: const Text("Next Question",
+                              icon: Text("Next Question",
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
                                       fontSize: 13)),
-                              label: const Icon(Icons.chevron_right_rounded,
+                              label: Icon(Icons.chevron_right_rounded,
                                   size: 18),
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xff1D8CF8),
+                                backgroundColor: AppColors.primary,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 padding: const EdgeInsets.symmetric(
@@ -284,11 +284,11 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
         margin: const EdgeInsets.only(bottom: 14),
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xffEFF6FF) : Colors.white,
+          color: isSelected ? AppColors.infoBg : AppColors.cardBg,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color:
-                isSelected ? const Color(0xff1D8CF8) : const Color(0xffE2E8F0),
+                isSelected ? AppColors.primary : AppColors.border,
             width: isSelected ? 1.5 : 1,
           ),
         ),
@@ -299,19 +299,19 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                   ? Icons.radio_button_checked_rounded
                   : Icons.radio_button_off_rounded,
               color: isSelected
-                  ? const Color(0xff1D8CF8)
-                  : const Color(0xff94A3B8),
+                  ? AppColors.primary
+                  : AppColors.textHint,
               size: 20,
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: 14),
             Text(
               text,
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
                 color: isSelected
-                    ? const Color(0xff1D8CF8)
-                    : const Color(0xff334155),
+                    ? AppColors.primary
+                    : AppColors.textGray,
               ),
             ),
           ],

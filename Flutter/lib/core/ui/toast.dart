@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:learnova/core/theme/app_theme.dart';
 
 enum AppToastType { success, info, warning, error }
 
@@ -111,7 +112,7 @@ class AppToast {
 
     _current = entry;
     overlay.insert(entry);
-    _autoTimer = Timer(duration + const Duration(milliseconds: 500), dismiss);
+    _autoTimer = Timer(duration + Duration(milliseconds: 500), dismiss);
   }
 }
 
@@ -141,42 +142,42 @@ class _Tokens {
     switch (t) {
       case AppToastType.success:
         return _Tokens(
-          glow: const Color(0xFF22C55E),
-          iconGrad: [const Color(0xFF15803D), const Color(0xFF4ADE80)],
-          bar: const Color(0xFF16A34A),
-          titleColor: const Color(0xFF14532D),
-          messageColor: const Color(0xFF166534),
-          borderColor: const Color(0xFFBBF7D0),
+          glow: AppColors.successDot,
+          iconGrad: [Color(0xFF15803D), Color(0xFF4ADE80)],
+          bar: AppColors.successText,
+          titleColor: AppColors.successText,
+          messageColor: AppColors.successText,
+          borderColor: AppColors.successDot,
           icon: override ?? Icons.check_rounded,
         );
       case AppToastType.warning:
         return _Tokens(
-          glow: const Color(0xFFF59E0B),
-          iconGrad: [const Color(0xFFB45309), const Color(0xFFFCD34D)],
-          bar: const Color(0xFFD97706),
-          titleColor: const Color(0xFF451A03),
-          messageColor: const Color(0xFF78350F),
-          borderColor: const Color(0xFFFDE68A),
+          glow: AppColors.warningText,
+          iconGrad: [AppColors.warningText, Color(0xFFFCD34D)],
+          bar: AppColors.warningText,
+          titleColor: AppColors.warningText,
+          messageColor: AppColors.warningText,
+          borderColor: AppColors.warningBorder,
           icon: override ?? Icons.warning_rounded,
         );
       case AppToastType.error:
         return _Tokens(
-          glow: const Color(0xFFEF4444),
-          iconGrad: [const Color(0xFFB91C1C), const Color(0xFFFCA5A5)],
-          bar: const Color(0xFFDC2626),
-          titleColor: const Color(0xFF450A0A),
-          messageColor: const Color(0xFF7F1D1D),
-          borderColor: const Color(0xFFFECACA),
+          glow: AppColors.errorDot,
+          iconGrad: [AppColors.dangerTitle, Color(0xFFFCA5A5)],
+          bar: AppColors.dangerText,
+          titleColor: AppColors.dangerTitle,
+          messageColor: AppColors.dangerText,
+          borderColor: AppColors.dangerBorder,
           icon: override ?? Icons.close_rounded,
         );
       case AppToastType.info:
         return _Tokens(
-          glow: const Color(0xFF137FEC),
-          iconGrad: [const Color(0xFF1558A8), const Color(0xFF60AFFE)],
-          bar: const Color(0xFF137FEC),
-          titleColor: const Color(0xFF0C2D5A),
-          messageColor: const Color(0xFF1E4A8A),
-          borderColor: const Color(0xFFBFDBFE),
+          glow: AppColors.primary,
+          iconGrad: [Color(0xFF1558A8), AppColors.infoText],
+          bar: AppColors.primary,
+          titleColor: Color(0xFF0C2D5A),
+          messageColor: Color(0xFF1E4A8A),
+          borderColor: AppColors.badgeBlueBorder,
           icon: override ?? Icons.info_rounded,
         );
     }
@@ -207,14 +208,14 @@ class _ToastRoot extends StatefulWidget {
 class _ToastRootState extends State<_ToastRoot>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 440))..forward();
+      vsync: this, duration: Duration(milliseconds: 440))..forward();
 
   late final Animation<Offset> _slide = Tween<Offset>(
-    begin: const Offset(0.6, 0), end: Offset.zero,
+    begin: Offset(0.6, 0), end: Offset.zero,
   ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutExpo));
 
   late final Animation<double> _fade = Tween<double>(begin: 0.0, end: 1.0)
-      .animate(CurvedAnimation(parent: _c, curve: const Interval(0.0, 0.55)));
+      .animate(CurvedAnimation(parent: _c, curve: Interval(0.0, 0.55)));
 
   late final Animation<double> _scale = Tween<double>(begin: 0.88, end: 1.0)
       .animate(CurvedAnimation(parent: _c, curve: Curves.easeOutBack));
@@ -278,6 +279,7 @@ class _ToastCardState extends State<_ToastCard>
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final t = widget.tokens;
     final hasAction = (widget.actionLabel?.trim().isNotEmpty ?? false)
         && widget.onAction != null;
@@ -286,10 +288,10 @@ class _ToastCardState extends State<_ToastCard>
       onEnter: (_) => _setHover(true),
       onExit:  (_) => _setHover(false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
+        duration: Duration(milliseconds: 200),
         decoration: BoxDecoration(
           // ── Light white with faint blue tint ──────────────────────
-          color: const Color(0xFFFAFCFF),
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: _hovered ? t.borderColor : t.borderColor.withOpacity(0.6),
@@ -300,12 +302,12 @@ class _ToastCardState extends State<_ToastCard>
               color: t.glow.withOpacity(_hovered ? 0.18 : 0.10),
               blurRadius: _hovered ? 40 : 24,
               spreadRadius: -4,
-              offset: const Offset(0, 8),
+              offset: Offset(0, 8),
             ),
             BoxShadow(
               color: Colors.black.withOpacity(kIsWeb ? 0.06 : 0.09),
               blurRadius: 20,
-              offset: const Offset(0, 4),
+              offset: Offset(0, 4),
             ),
           ],
         ),
@@ -333,14 +335,14 @@ class _ToastCardState extends State<_ToastCard>
                       BoxShadow(
                         color: t.glow.withOpacity(0.35),
                         blurRadius: 10,
-                        offset: const Offset(0, 3),
+                        offset: Offset(0, 3),
                       ),
                     ],
                   ),
                   child: Icon(t.icon, color: Colors.white, size: 19),
                 ),
 
-                const SizedBox(width: 13),
+                SizedBox(width: 13),
 
                 // Title + message + optional action
                 Expanded(child: Column(
@@ -355,7 +357,7 @@ class _ToastCardState extends State<_ToastCard>
                         height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(widget.message,
                       maxLines: hasAction ? 2 : 3,
                       overflow: TextOverflow.ellipsis,
@@ -367,7 +369,7 @@ class _ToastCardState extends State<_ToastCard>
                       ),
                     ),
                     if (hasAction) ...[
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       GestureDetector(
                         onTap: () { widget.onAction?.call(); widget.onDismiss(); },
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -379,7 +381,7 @@ class _ToastCardState extends State<_ToastCard>
                               letterSpacing: 0.1,
                             ),
                           ),
-                          const SizedBox(width: 3),
+                          SizedBox(width: 3),
                           Icon(Icons.arrow_forward_rounded,
                               size: 13, color: t.bar),
                         ]),
@@ -388,13 +390,13 @@ class _ToastCardState extends State<_ToastCard>
                   ],
                 )),
 
-                const SizedBox(width: 6),
+                SizedBox(width: 6),
 
                 // Close button
                 GestureDetector(
                   onTap: widget.onDismiss,
                   child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 150),
+                    duration: Duration(milliseconds: 150),
                     width: 28, height: 28,
                     decoration: BoxDecoration(
                       color: _hovered

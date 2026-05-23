@@ -81,7 +81,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
       if (_orgId.isEmpty) {
         // Show warning only after a brief delay to allow AdminDashboardController
         // to finish its own loading — avoids false warnings for users who do have an org.
-        await Future.delayed(const Duration(milliseconds: 400));
+        await Future.delayed(Duration(milliseconds: 400));
         if (!mounted || _orgId.isNotEmpty) return;
         AppToast.warning(
           context,
@@ -107,6 +107,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final state = ref.watch(userManagementControllerProvider);
     final users = _applyFilters(state.users);
 
@@ -119,15 +120,15 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
           child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const AppSectionHeader(
+                  AppSectionHeader(
                     title: 'User Management',
                     subtitle:
                         'Manage student and instructor accounts, roles, and permissions.',
                   ),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
 
                   _StatsRow(isNarrow: isNarrow, users: state.users),
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
 
                   FigmaUmFiltersBar(
                     controller: _search,
@@ -137,7 +138,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                     onSearchChanged: (v) {
                       ref.read(userManagementControllerProvider.notifier).search(v);
                       _searchDebounce?.cancel();
-                      _searchDebounce = Timer(const Duration(milliseconds: 280), () {
+                      _searchDebounce = Timer(Duration(milliseconds: 280), () {
                         if (!mounted) return;
                         setState(() {});
                       });
@@ -158,7 +159,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                             .refresh(),
                   ),
 
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
 
                   _UsersTableFigma(
                     isNarrow: isNarrow,
@@ -231,6 +232,7 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final total = users.length;
     final instructors = users.where((e) {
       final r = e.systemRole.toLowerCase();
@@ -245,37 +247,37 @@ class _StatsRow extends StatelessWidget {
         title: 'Total Users',
         value: '$total',
         subtitle: '+12% from last month',
-        subtitleColor: const Color(0xFF16A34A),
-        iconBg: const Color(0x1A137FEC),
+        subtitleColor: AppColors.successText,
+        iconBg: Color(0x1A137FEC),
         icon: Icons.people_alt_outlined,
-        iconColor: const Color(0xFF137FEC),
+        iconColor: AppColors.primary,
       ),
       FigmaUmStatCard(
         title: 'Active Instructors',
         value: '$instructors',
         subtitle: 'Across 12 Departments',
         subtitleColor: AppColors.cGray500,
-        iconBg: const Color(0xFFFAF5FF),
+        iconBg: AppColors.purpleBg,
         icon: Icons.school_outlined,
-        iconColor: const Color(0xFF9333EA),
+        iconColor: AppColors.purpleText,
       ),
       FigmaUmStatCard(
         title: 'Active Students',
         value: '$students',
         subtitle: '+5% new enrollments',
-        subtitleColor: const Color(0xFF16A34A),
-        iconBg: const Color(0xFFFFF7ED),
+        subtitleColor: AppColors.successText,
+        iconBg: AppColors.warningBg,
         icon: Icons.groups_outlined,
-        iconColor: const Color(0xFFEA580C),
+        iconColor: AppColors.warningText,
       ),
       FigmaUmStatCard(
         title: 'Pending Approvals',
         value: '$pending',
         subtitle: 'Requires attention',
-        subtitleColor: const Color(0xFFCA8A04),
-        iconBg: const Color(0xFFFEFCE8),
+        subtitleColor: AppColors.warningText,
+        iconBg: AppColors.warningSoftBg,
         icon: Icons.hourglass_bottom_rounded,
-        iconColor: const Color(0xFFCA8A04),
+        iconColor: AppColors.warningText,
         fixedWidth: isNarrow ? null : 319,
       ),
     ];
@@ -287,11 +289,11 @@ class _StatsRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(child: updated[0]),
-        const SizedBox(width: 16),
+        SizedBox(width: 16),
         Expanded(child: updated[1]),
-        const SizedBox(width: 16),
+        SizedBox(width: 16),
         Expanded(child: updated[2]),
-        const SizedBox(width: 16),
+        SizedBox(width: 16),
         SizedBox(width: 319, child: updated[3]),
       ],
     );
@@ -327,6 +329,7 @@ class _UsersTableFigma extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final total = totalCount <= 0 ? users.length : totalCount;
     final from = users.isEmpty ? 0 : ((page - 1) * pageSize + 1);
     final to = users.isEmpty ? 0 : (from + users.length - 1);
@@ -337,7 +340,7 @@ class _UsersTableFigma extends StatelessWidget {
         color: AppColors.cBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.cBorder),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
         ],
       ),
@@ -360,10 +363,10 @@ class _UsersTableFigma extends StatelessWidget {
             onRetry: onRetry,
             child: ListView.separated(
               shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
+              physics: NeverScrollableScrollPhysics(),
               itemCount: users.length,
               separatorBuilder: (_, __) =>
-                  const Divider(height: 1, color: AppColors.cBorderSoft),
+                  Divider(height: 1, color: AppColors.cBorderSoft),
               itemBuilder: (_, i) => _UserRowFigma(
                 user: users[i],
                 isNarrow: isNarrow,
@@ -396,6 +399,7 @@ class _UserRowFigma extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return SizedBox(
       height: 91,
       child: Padding(
@@ -410,11 +414,11 @@ class _UserRowFigma extends StatelessWidget {
                 onChanged: (_) {},
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
-                side: const BorderSide(color: Color(0xFFD1D5DB)),
+                side: BorderSide(color: AppColors.borderSoft),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
               ),
             ),
-            const SizedBox(width: 16),
+            SizedBox(width: 16),
 
             Expanded(
               flex: 5,
@@ -426,23 +430,23 @@ class _UserRowFigma extends StatelessWidget {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFDBEAFE),
+                        color: AppColors.badgeBlueBg,
                         borderRadius: BorderRadius.circular(9999),
                         border: Border.all(color: AppColors.cBorderSoft),
                       ),
                       alignment: Alignment.center,
                       child: Text(
                         _initials(user.fullName),
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           height: 20 / 14,
-                          color: Color(0xFF2563EB),
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -451,7 +455,7 @@ class _UserRowFigma extends StatelessWidget {
                           Text(
                             user.fullName,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -459,11 +463,11 @@ class _UserRowFigma extends StatelessWidget {
                               color: AppColors.cText,
                             ),
                           ),
-                          const SizedBox(height: 2),
+                          SizedBox(height: 2),
                           Text(
                             user.email,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
@@ -471,15 +475,15 @@ class _UserRowFigma extends StatelessWidget {
                               color: AppColors.cGray500,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          const Text(
+                          SizedBox(height: 2),
+                          Text(
                             'ID: —',
                             style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 10,
                               fontWeight: FontWeight.w400,
                               height: 20 / 10,
-                              color: Color(0xFF9CA3AF),
+                              color: AppColors.textHint,
                             ),
                           ),
                         ],
@@ -502,7 +506,7 @@ class _UserRowFigma extends StatelessWidget {
             ),
 
             if (!isNarrow)
-              const Expanded(
+              Expanded(
                 flex: 3,
                 child: Padding(
                   padding: EdgeInsets.only(left: _kCellLeftPad),
@@ -514,14 +518,14 @@ class _UserRowFigma extends StatelessWidget {
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
                       height: 20 / 14,
-                      color: Color(0xFF4B5563),
+                      color: AppColors.textGray,
                     ),
                   ),
                 ),
               ),
 
             if (!isNarrow)
-              const Expanded(
+              Expanded(
                 flex: 2,
                 child: Padding(
                   padding: EdgeInsets.only(left: _kCellLeftPad),
@@ -554,13 +558,13 @@ class _UserRowFigma extends StatelessWidget {
                 child: SizedBox(
                   width: 28,
                   height: 28,
-                  child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+                  child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
                     onTap: onActionTap,
                     borderRadius: BorderRadius.circular(9999),
-                    child: const Icon(
+                    child: Icon(
                       Icons.more_vert,
                       size: 20,
-                      color: Color(0xFF9CA3AF),
+                      color: AppColors.textHint,
                     ),
                   ),
                 ),

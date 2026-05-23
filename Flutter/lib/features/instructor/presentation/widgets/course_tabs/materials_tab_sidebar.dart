@@ -55,9 +55,10 @@ class _SidebarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: 268,
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _K.sidebar,
         border: Border(right: BorderSide(color: _K.div)),
       ),
@@ -66,15 +67,15 @@ class _SidebarWidget extends StatelessWidget {
           Container(
             height: 44,
             padding: const EdgeInsets.symmetric(horizontal: 14),
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
               border: Border(bottom: BorderSide(color: _K.div)),
             ),
             child: Row(
               children: [
-                const Icon(Icons.folder_open_rounded, size: 14, color: AppColors.textHint),
-                const SizedBox(width: 7),
-                const Expanded(
+                Icon(Icons.folder_open_rounded, size: 14, color: AppColors.textHint),
+                SizedBox(width: 7),
+                Expanded(
                   child: Text(
                     'STRUCTURE',
                     style: TextStyle(
@@ -90,7 +91,7 @@ class _SidebarWidget extends StatelessWidget {
                     hoverColor: Colors.transparent,
                     splashColor: Colors.transparent,
                     highlightColor: Colors.transparent,
-                    overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                    overlayColor: WidgetStatePropertyAll(Colors.transparent),
                     onTap: onClearSelection,
                     borderRadius: BorderRadius.circular(999),
                     child: Container(
@@ -101,7 +102,7 @@ class _SidebarWidget extends StatelessWidget {
                       ),
                       child: Text(
                         '${treeSelection.totalCount}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                           color: AppColors.primary,
@@ -109,19 +110,19 @@ class _SidebarWidget extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: 4),
+                  SizedBox(width: 4),
                 ],
                 InkWell(
                   hoverColor: Colors.transparent,
                   splashColor: Colors.transparent,
                   highlightColor: Colors.transparent,
-                  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                  overlayColor: WidgetStatePropertyAll(Colors.transparent),
                   onTap: onToggleSelectionMode,
                   borderRadius: BorderRadius.circular(999),
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                     decoration: BoxDecoration(
-                      color: selectionMode ? _K.blueSoft : const Color(0xFFF8FAFC),
+                      color: selectionMode ? _K.blueSoft : AppColors.surfaceBg,
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
                         color: selectionMode ? AppColors.primary.withOpacity(0.18) : _K.div,
@@ -135,7 +136,7 @@ class _SidebarWidget extends StatelessWidget {
                           size: 12,
                           color: selectionMode ? AppColors.primary : AppColors.textHint,
                         ),
-                        const SizedBox(width: 4),
+                        SizedBox(width: 4),
                         Text(
                           'Select',
                           style: TextStyle(
@@ -148,9 +149,9 @@ class _SidebarWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: 4),
                 if (state.modulesLoading)
-                  const SizedBox(
+                  SizedBox(
                     width: 12,
                     height: 12,
                     child: CircularProgressIndicator(strokeWidth: 1.5),
@@ -161,7 +162,7 @@ class _SidebarWidget extends StatelessWidget {
           ),
           Expanded(
             child: state.modulesLoading && state.modules.isEmpty
-                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
+                ? Center(child: CircularProgressIndicator(strokeWidth: 2))
                 : state.modules.isEmpty
                     ? _SidebarEmpty(onAdd: onAddModule)
                     : Builder(
@@ -169,7 +170,7 @@ class _SidebarWidget extends StatelessWidget {
                           final modules = [...state.modules]
                             ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
                           return ReorderableListView.builder(
-                            key: const PageStorageKey('course-materials-sidebar-scroll'),
+                            key: PageStorageKey('course-materials-sidebar-scroll'),
                             buildDefaultDragHandles: false,
                             proxyDecorator: (child, index, animation) {
                               return AnimatedBuilder(
@@ -188,7 +189,7 @@ class _SidebarWidget extends StatelessWidget {
                                             BoxShadow(
                                               color: AppColors.primary.withOpacity(0.14),
                                               blurRadius: 16,
-                                              offset: const Offset(0, 8),
+                                              offset: Offset(0, 8),
                                             ),
                                           ],
                                         ),
@@ -257,7 +258,7 @@ class _SidebarWidget extends StatelessWidget {
           ),
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: const BoxDecoration(
+            decoration: BoxDecoration(
               border: Border(top: BorderSide(color: _K.div)),
             ),
             child: SizedBox(
@@ -265,8 +266,8 @@ class _SidebarWidget extends StatelessWidget {
               height: 36,
               child: ElevatedButton.icon(
                 onPressed: onAddModule,
-                icon: const Icon(Icons.add_rounded, size: 15),
-                label: const Text(
+                icon: Icon(Icons.add_rounded, size: 15),
+                label: Text(
                   'Add Module',
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
                 ),
@@ -310,9 +311,9 @@ class _SidebarEmpty extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.folder_open_outlined, size: 28, color: AppColors.textHint),
-              const SizedBox(height: 12),
-              const Text(
+              Icon(Icons.folder_open_outlined, size: 28, color: AppColors.textHint),
+              SizedBox(height: 12),
+              Text(
                 'No modules yet',
                 style: TextStyle(
                   fontSize: 13.5,
@@ -320,20 +321,20 @@ class _SidebarEmpty extends StatelessWidget {
                   color: AppColors.textTitle,
                 ),
               ),
-              const SizedBox(height: 6),
-              const Text(
+              SizedBox(height: 6),
+              Text(
                 'Create your first module to start building the course structure.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, height: 1.45),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: onAdd,
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Create first module'),
+                icon: Icon(Icons.add_rounded, size: 16),
+                label: Text('Create first module'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
+                  side: BorderSide(color: AppColors.primary),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
@@ -432,6 +433,7 @@ class _ModuleRowWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final selected = _isSel || isDragging;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -440,23 +442,23 @@ class _ModuleRowWidget extends StatelessWidget {
           hoverColor: Colors.transparent,
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
-          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          overlayColor: WidgetStatePropertyAll(Colors.transparent),
           onTap: onModuleTap,
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
+            duration: Duration(milliseconds: 160),
             curve: Curves.easeOutCubic,
             margin: const EdgeInsets.fromLTRB(6, 0, 6, 2),
             padding: const EdgeInsets.fromLTRB(6, 7, 6, 7),
             decoration: BoxDecoration(
-              color: selected ? const Color(0xFFF7FAFF) : Colors.transparent,
+              color: selected ? AppColors.hoverBg : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: selected ? const Color(0xFFD5E5FF) : Colors.transparent,
+                color: selected ? AppColors.infoBorder : Colors.transparent,
               ),
             ),
             child: Row(
               children: [
-                dragHandle ?? const SizedBox(width: 18, height: 18),
+                dragHandle ?? SizedBox(width: 18, height: 18),
                 if (selectionMode)
                   Padding(
                     padding: const EdgeInsets.only(right: 4),
@@ -467,7 +469,7 @@ class _ModuleRowWidget extends StatelessWidget {
                         tristate: true,
                         visualDensity: VisualDensity.compact,
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.1),
+                        side: BorderSide(color: AppColors.borderSoft, width: 1.1),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                         onChanged: (value) => onModuleCheckChanged(value == true),
                       ),
@@ -476,15 +478,15 @@ class _ModuleRowWidget extends StatelessWidget {
                 Icon(
                   isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded,
                   size: 14,
-                  color: const Color(0xFF94A3B8),
+                  color: AppColors.textHint,
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: 4),
                 Icon(
                   Icons.folder_rounded,
                   size: 14,
-                  color: selected ? AppColors.primary : const Color(0xFFEAB308),
+                  color: selected ? AppColors.primary : Color(0xFFEAB308),
                 ),
-                const SizedBox(width: 6),
+                SizedBox(width: 6),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -497,13 +499,13 @@ class _ModuleRowWidget extends StatelessWidget {
                           fontSize: 12.2,
                           height: 1.1,
                           fontWeight: FontWeight.w700,
-                          color: selected ? AppColors.primary : const Color(0xFF0F172A),
+                          color: selected ? AppColors.primary : AppColors.textTitle,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      SizedBox(height: 2),
                       Text(
                         '${materials.length} material${materials.length == 1 ? '' : 's'}',
-                        style: const TextStyle(fontSize: 10.2, color: Color(0xFF94A3B8), height: 1.1),
+                        style: TextStyle(fontSize: 10.2, color: AppColors.textHint, height: 1.1),
                       ),
                     ],
                   ),
@@ -512,23 +514,23 @@ class _ModuleRowWidget extends StatelessWidget {
                   Container(
                     width: 7,
                     height: 7,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFF22C55E),
+                    decoration: BoxDecoration(
+                      color: AppColors.successDot,
                       shape: BoxShape.circle,
                     ),
                   ),
                 if (isExpanded) ...[
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6),
                   InkWell(
                     hoverColor: Colors.transparent,
                     splashColor: Colors.transparent,
                     highlightColor: Colors.transparent,
-                    overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                    overlayColor: WidgetStatePropertyAll(Colors.transparent),
                     onTap: onAddMaterial,
                     borderRadius: BorderRadius.circular(8),
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.all(2),
-                      child: Icon(Icons.add_rounded, size: 14, color: Color(0xFF94A3B8)),
+                      child: Icon(Icons.add_rounded, size: 14, color: AppColors.textHint),
                     ),
                   ),
                 ],
@@ -538,7 +540,7 @@ class _ModuleRowWidget extends StatelessWidget {
         ),
         AnimatedCrossFade(
           crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-          duration: const Duration(milliseconds: 180),
+          duration: Duration(milliseconds: 180),
           firstChild: const SizedBox.shrink(),
           secondChild: _buildChildren(),
         ),
@@ -548,7 +550,7 @@ class _ModuleRowWidget extends StatelessWidget {
 
   Widget _buildChildren() {
     if (loading) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.symmetric(vertical: 10),
         child: Center(
           child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5)),
@@ -560,11 +562,11 @@ class _ModuleRowWidget extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(34, 6, 6, 4),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: _K.div),
         ),
-        child: const Row(
+        child: Row(
           children: [
             Icon(Icons.info_outline_rounded, size: 14, color: AppColors.textHint),
             SizedBox(width: 8),
@@ -674,10 +676,11 @@ class _MatRowWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const iconMap = {
-      'video': (Icons.play_circle_outline_rounded, Color(0xFF2563EB)),
-      'pdf': (Icons.picture_as_pdf_outlined, Color(0xFFEF4444)),
-      'quiz': (Icons.quiz_outlined, Color(0xFF7C3AED)),
+    Theme.of(context);
+    final iconMap = <String, (IconData, Color)>{
+      'video': (Icons.play_circle_outline_rounded, AppColors.primary),
+      'pdf': (Icons.picture_as_pdf_outlined, AppColors.errorDot),
+      'quiz': (Icons.quiz_outlined, AppColors.purpleText),
     };
     final (ico, col) = iconMap[material.type] ?? (Icons.article_outlined, AppColors.textMuted);
     final roots = _rootTopicsForMaterial(topics);
@@ -689,16 +692,16 @@ class _MatRowWidget extends StatelessWidget {
           hoverColor: Colors.transparent,
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
-          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          overlayColor: WidgetStatePropertyAll(Colors.transparent),
           onTap: onTap,
           child: Container(
             margin: const EdgeInsets.fromLTRB(0, 1, 4, 1),
             padding: const EdgeInsets.fromLTRB(8, 7, 6, 7),
             decoration: BoxDecoration(
-              color: isSelected ? const Color(0xFFF7FAFF) : Colors.transparent,
+              color: isSelected ? AppColors.hoverBg : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isSelected ? const Color(0xFFD5E5FF) : Colors.transparent,
+                color: isSelected ? AppColors.infoBorder : Colors.transparent,
               ),
             ),
             child: Row(
@@ -713,7 +716,7 @@ class _MatRowWidget extends StatelessWidget {
                         tristate: true,
                         visualDensity: VisualDensity.compact,
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.1),
+                        side: BorderSide(color: AppColors.borderSoft, width: 1.1),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                         onChanged: (value) => onCheckChanged(value == true),
                       ),
@@ -723,17 +726,17 @@ class _MatRowWidget extends StatelessWidget {
                   hoverColor: Colors.transparent,
                   splashColor: Colors.transparent,
                   highlightColor: Colors.transparent,
-                  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                  overlayColor: WidgetStatePropertyAll(Colors.transparent),
                   onTap: roots.isNotEmpty ? onToggleExpanded : null,
                   child: Icon(
                     roots.isEmpty
                         ? Icons.remove_rounded
                         : (isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded),
                     size: 13,
-                    color: const Color(0xFF94A3B8),
+                    color: AppColors.textHint,
                   ),
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: 4),
                 Container(
                   width: 16,
                   height: 16,
@@ -744,7 +747,7 @@ class _MatRowWidget extends StatelessWidget {
                   ),
                   child: Icon(ico, size: 10, color: col),
                 ),
-                const SizedBox(width: 7),
+                SizedBox(width: 7),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -757,14 +760,14 @@ class _MatRowWidget extends StatelessWidget {
                           fontSize: 12,
                           height: 1.1,
                           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                          color: isSelected ? AppColors.primary : const Color(0xFF334155),
+                          color: isSelected ? AppColors.primary : AppColors.textGray,
                         ),
                       ),
                       if (topics.isNotEmpty) ...[
-                        const SizedBox(height: 2),
+                        SizedBox(height: 2),
                         Text(
                           '${roots.length} topic${roots.length == 1 ? '' : 's'}',
-                          style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), height: 1.1),
+                          style: TextStyle(fontSize: 10, color: AppColors.textHint, height: 1.1),
                         ),
                       ],
                     ],
@@ -852,6 +855,7 @@ class _SidebarTopicNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final selected = active?.type == _CType.topic && active?.topic?.id == topic.id;
     final children = depth == 0 ? _childTopicsForParent(allTopics, topic.id) : const <TopicItem>[];
     final isRootTopic = depth == 0;
@@ -869,34 +873,34 @@ class _SidebarTopicNode extends StatelessWidget {
                   left: 6,
                   top: 0,
                   bottom: children.isNotEmpty && isExpanded ? -2 : 14,
-                  child: Container(width: 1, color: const Color(0xFFE2E8F0)),
+                  child: Container(width: 1, color: AppColors.border),
                 )
               else
                 Positioned(
                   left: 6,
                   top: 0,
                   bottom: 14,
-                  child: Container(width: 1, color: const Color(0xFFE2E8F0)),
+                  child: Container(width: 1, color: AppColors.border),
                 ),
               Positioned(
                 left: 6,
                 top: 14,
-                child: Container(width: 10, height: 1, color: const Color(0xFFE2E8F0)),
+                child: Container(width: 10, height: 1, color: AppColors.border),
               ),
               InkWell(
                 hoverColor: Colors.transparent,
                 splashColor: Colors.transparent,
                 highlightColor: Colors.transparent,
-                overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                overlayColor: WidgetStatePropertyAll(Colors.transparent),
                 onTap: () => onTap(topic),
                 child: Container(
                   margin: const EdgeInsets.only(left: 16),
                   padding: const EdgeInsets.fromLTRB(6, 5, 6, 5),
                   decoration: BoxDecoration(
-                    color: selected ? const Color(0xFFEFF6FF) : Colors.transparent,
+                    color: selected ? AppColors.primarySoft : Colors.transparent,
                     borderRadius: BorderRadius.circular(7),
                     border: Border.all(
-                      color: selected ? const Color(0xFFD5E5FF) : Colors.transparent,
+                      color: selected ? AppColors.infoBorder : Colors.transparent,
                     ),
                   ),
                   child: Row(
@@ -911,7 +915,7 @@ class _SidebarTopicNode extends StatelessWidget {
                               tristate: true,
                               visualDensity: VisualDensity.compact,
                               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.1),
+                              side: BorderSide(color: AppColors.borderSoft, width: 1.1),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
                               onChanged: (value) => onTopicCheckChanged(topic, value == true),
                             ),
@@ -922,25 +926,25 @@ class _SidebarTopicNode extends StatelessWidget {
                           hoverColor: Colors.transparent,
                           splashColor: Colors.transparent,
                           highlightColor: Colors.transparent,
-                          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                          overlayColor: WidgetStatePropertyAll(Colors.transparent),
                           onTap: children.isNotEmpty ? onToggleExpanded : null,
                           child: Icon(
                             children.isEmpty
                                 ? Icons.remove_rounded
                                 : (isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded),
                             size: 12,
-                            color: const Color(0xFF94A3B8),
+                            color: AppColors.textHint,
                           ),
                         )
                       else
-                        const SizedBox(width: 12, height: 12),
-                      const SizedBox(width: 4),
+                        SizedBox(width: 12, height: 12),
+                      SizedBox(width: 4),
                       Icon(
                         isRootTopic ? Icons.topic_outlined : Icons.subdirectory_arrow_right_rounded,
                         size: isRootTopic ? 12 : 11,
-                        color: selected ? AppColors.primary : const Color(0xFF94A3B8),
+                        color: selected ? AppColors.primary : AppColors.textHint,
                       ),
-                      const SizedBox(width: 5),
+                      SizedBox(width: 5),
                       Expanded(
                         child: Text(
                           topic.title,
@@ -950,17 +954,17 @@ class _SidebarTopicNode extends StatelessWidget {
                             fontSize: isRootTopic ? 11.2 : 10.7,
                             height: 1.15,
                             fontWeight: selected ? FontWeight.w700 : (isRootTopic ? FontWeight.w600 : FontWeight.w500),
-                            color: selected ? AppColors.primary : (isRootTopic ? const Color(0xFF334155) : const Color(0xFF64748B)),
+                            color: selected ? AppColors.primary : (isRootTopic ? AppColors.textGray : AppColors.textMuted),
                           ),
                         ),
                       ),
                       if (isRootTopic && children.isNotEmpty)
                         Text(
                           '${children.length}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.w700,
-                            color: Color(0xFF94A3B8),
+                            color: AppColors.textHint,
                           ),
                         ),
                     ],
@@ -1019,30 +1023,31 @@ class _FooterWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       height: 56,
-      decoration: BoxDecoration(color: Colors.white,
-          border: const Border(top: BorderSide(color: _K.div)),
+      decoration: BoxDecoration(color: AppColors.cardBg,
+          border: Border(top: BorderSide(color: _K.div)),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05),
-              blurRadius: 16, offset: const Offset(0, -4))]),
+              blurRadius: 16, offset: Offset(0, -4))]),
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Row(children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(7)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(_icon, size: 13, color: AppColors.primary), const SizedBox(width: 6),
-            ConstrainedBox(constraints: const BoxConstraints(maxWidth: 200),
+            Icon(_icon, size: 13, color: AppColors.primary), SizedBox(width: 6),
+            ConstrainedBox(constraints: BoxConstraints(maxWidth: 200),
                 child: Text(_label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
                         color: AppColors.primary))),
           ])),
-        const Spacer(),
+        Spacer(),
         _Btn(icon: Icons.auto_awesome_rounded, label: canGenerate ? 'Generate Questions' : 'No content yet',
             primary: true, disabled: !canGenerate, onTap: canGenerate ? onGenerate : null),
-        const SizedBox(width: 8),
-        InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), onTap: onClose, borderRadius: BorderRadius.circular(6),
-            child: const Padding(padding: EdgeInsets.all(7),
+        SizedBox(width: 8),
+        InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), onTap: onClose, borderRadius: BorderRadius.circular(6),
+            child: Padding(padding: EdgeInsets.all(7),
                 child: Icon(Icons.close_rounded, size: 15, color: AppColors.textHint))),
       ]),
     );
@@ -1060,13 +1065,13 @@ class _EmptyStateWidget extends StatelessWidget {
         color: _K.bg,
         child: Center(
           child: Container(
-            constraints: const BoxConstraints(maxWidth: 420),
+            constraints: BoxConstraints(maxWidth: 420),
             padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.cardBg,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(color: _K.div),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(color: Color(0x08000000), blurRadius: 18, offset: Offset(0, 8)),
               ],
             ),
@@ -1080,25 +1085,25 @@ class _EmptyStateWidget extends StatelessWidget {
                     color: _K.blueSoft,
                     borderRadius: BorderRadius.circular(22),
                   ),
-                  child: const Icon(Icons.folder_open_rounded, size: 36, color: AppColors.primary),
+                  child: Icon(Icons.folder_open_rounded, size: 36, color: AppColors.primary),
                 ),
-                const SizedBox(height: 18),
-                const Text('Select a module or material', style: TextStyle(
+                SizedBox(height: 18),
+                Text('Select a module or material', style: TextStyle(
                     fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                const SizedBox(height: 8),
-                const Text(
+                SizedBox(height: 8),
+                Text(
                   'Use the structure panel to explore your modules, reorder them by dragging, or open a material to manage topics and content.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: _K.blueSoft,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Row(
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.drag_indicator_rounded, size: 16, color: AppColors.primary),
@@ -1107,12 +1112,12 @@ class _EmptyStateWidget extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 22),
+                SizedBox(height: 22),
                 OutlinedButton.icon(onPressed: onCreate,
-                    icon: const Icon(Icons.add_rounded, size: 15),
-                    label: const Text('New Module'),
+                    icon: Icon(Icons.add_rounded, size: 15),
+                    label: Text('New Module'),
                     style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary,
-                        side: const BorderSide(color: AppColors.primary),
+                        side: BorderSide(color: AppColors.primary),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
               ],
@@ -1151,13 +1156,14 @@ class _ModulePanelWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final description = (module.description ?? '').trim();
     final hasDescription = description.isNotEmpty;
     final readyMaterials = materials.where((m) => m.status == 'ready').length;
     final processingMaterials = materials.where((m) => m.status != 'ready').length;
 
     return Container(
-      color: const Color(0xFFF8FAFC),
+      color: AppColors.surfaceBg,
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 24, 24, 112),
         child: LayoutBuilder(
@@ -1172,10 +1178,10 @@ class _ModulePanelWidget extends StatelessWidget {
                   materialCount: materials.length,
                   onUpload: uploading ? null : onUpload,
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 if (uploading) ...[
                   _UploadProgressWidget(progress: uploadProgress),
-                  const SizedBox(height: 18),
+                  SizedBox(height: 18),
                 ],
                 _CanvasSection(
                   title: 'Overview',
@@ -1188,7 +1194,7 @@ class _ModulePanelWidget extends StatelessWidget {
                           final children = [
                             _SoftStatTile(
                               icon: Icons.layers_rounded,
-                              iconBg: const Color(0xFFEAF2FF),
+                              iconBg: AppColors.infoBg,
                               iconFg: AppColors.primary,
                               label: 'Position',
                               value: '#${module.orderIndex + 1}',
@@ -1196,16 +1202,16 @@ class _ModulePanelWidget extends StatelessWidget {
                             ),
                             _SoftStatTile(
                               icon: module.isPublished ? Icons.visibility_rounded : Icons.visibility_off_rounded,
-                              iconBg: module.isPublished ? const Color(0xFFEAFBF0) : const Color(0xFFFFF4E5),
-                              iconFg: module.isPublished ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                              iconBg: module.isPublished ? AppColors.successBg : AppColors.warningBg,
+                              iconFg: module.isPublished ? AppColors.successText : AppColors.warningText,
                               label: 'Visibility',
                               value: module.isPublished ? 'Published' : 'Draft',
                               description: module.isPublished ? 'Students can access this module.' : 'Hidden from students right now.',
                             ),
                             _SoftStatTile(
                               icon: Icons.folder_open_rounded,
-                              iconBg: const Color(0xFFF1F5F9),
-                              iconFg: const Color(0xFF64748B),
+                              iconBg: AppColors.headerBg,
+                              iconFg: AppColors.textMuted,
                               label: 'Materials',
                               value: '${materials.length}',
                               description: '$readyMaterials ready and $processingMaterials processing.',
@@ -1217,7 +1223,7 @@ class _ModulePanelWidget extends StatelessWidget {
                               children: [
                                 for (var i = 0; i < children.length; i++) ...[
                                   children[i],
-                                  if (i != children.length - 1) const SizedBox(height: 12),
+                                  if (i != children.length - 1) SizedBox(height: 12),
                                 ],
                               ],
                             );
@@ -1227,13 +1233,13 @@ class _ModulePanelWidget extends StatelessWidget {
                             children: [
                               for (var i = 0; i < children.length; i++) ...[
                                 Expanded(child: children[i]),
-                                if (i != children.length - 1) const SizedBox(width: 14),
+                                if (i != children.length - 1) SizedBox(width: 14),
                               ],
                             ],
                           );
                         },
                       ),
-                      const SizedBox(height: 14),
+                      SizedBox(height: 14),
                       _DescriptionBlock(
                         hasDescription: hasDescription,
                         description: description,
@@ -1241,7 +1247,7 @@ class _ModulePanelWidget extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 _CanvasSection(
                   title: 'Materials',
                   icon: Icons.folder_copy_rounded,
@@ -1278,25 +1284,25 @@ class _ModulePanelWidget extends StatelessWidget {
                     children: [
                       _ActionTile(
                         icon: Icons.drive_file_rename_outline_rounded,
-                        iconBg: const Color(0xFFEAF2FF),
+                        iconBg: AppColors.infoBg,
                         iconFg: AppColors.primary,
                         title: 'Rename module',
                         subtitle: 'Update the module title shown across the course.',
                         onTap: onRename,
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       _ActionTile(
                         icon: Icons.notes_rounded,
-                        iconBg: const Color(0xFFF1F5F9),
-                        iconFg: const Color(0xFF64748B),
+                        iconBg: AppColors.headerBg,
+                        iconFg: AppColors.textMuted,
                         title: 'Edit description',
                         subtitle: hasDescription ? 'Refine the current summary and teaching context.' : 'Add a short summary for this module.',
                         onTap: onEditDescription,
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       _ActionTile(
                         icon: Icons.upload_file_rounded,
-                        iconBg: const Color(0xFFEAF2FF),
+                        iconBg: AppColors.infoBg,
                         iconFg: AppColors.primary,
                         title: 'Upload material',
                         subtitle: uploading ? 'Upload in progress…' : 'Add a PDF, video, or document to this module.',
@@ -1306,7 +1312,7 @@ class _ModulePanelWidget extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 _CanvasSection(
                   title: 'Module status',
                   icon: Icons.tune_rounded,
@@ -1315,26 +1321,26 @@ class _ModulePanelWidget extends StatelessWidget {
                     children: [
                       _ActionTile(
                         icon: module.isPublished ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                        iconBg: module.isPublished ? const Color(0xFFFFF4E5) : const Color(0xFFEAFBF0),
-                        iconFg: module.isPublished ? const Color(0xFFD97706) : const Color(0xFF16A34A),
+                        iconBg: module.isPublished ? AppColors.warningBg : AppColors.successBg,
+                        iconFg: module.isPublished ? AppColors.warningText : AppColors.successText,
                         title: module.isPublished ? 'Unpublish module' : 'Publish module',
                         subtitle: module.isPublished ? 'Hide this module from students.' : 'Make this module visible to students.',
                         onTap: onTogglePublish,
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       _ActionTile(
                         icon: Icons.swap_vert_rounded,
-                        iconBg: const Color(0xFFF1F5F9),
-                        iconFg: const Color(0xFF64748B),
+                        iconBg: AppColors.headerBg,
+                        iconFg: AppColors.textMuted,
                         title: 'Change position',
                         subtitle: 'Currently #${module.orderIndex + 1} in the course structure.',
                         onTap: onChangePosition,
                       ),
-                      const SizedBox(height: 10),
+                      SizedBox(height: 10),
                       _ActionTile(
                         icon: Icons.share_rounded,
-                        iconBg: const Color(0xFFEAFBF0),
-                        iconFg: const Color(0xFF16A34A),
+                        iconBg: AppColors.successBg,
+                        iconFg: AppColors.successText,
                         title: 'Share with another course',
                         subtitle: module.sharedWithCourseIds.isEmpty
                             ? 'Not shared with any other course.'
@@ -1344,7 +1350,7 @@ class _ModulePanelWidget extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 _CanvasDangerSection(onDelete: onDelete),
               ],
             );
@@ -1354,7 +1360,7 @@ class _ModulePanelWidget extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(flex: 8, child: mainColumn),
-                  const SizedBox(width: 20),
+                  SizedBox(width: 20),
                   SizedBox(width: 320, child: sideColumn),
                 ],
               );
@@ -1363,7 +1369,7 @@ class _ModulePanelWidget extends StatelessWidget {
             return Column(
               children: [
                 mainColumn,
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 sideColumn,
               ],
             );
@@ -1387,16 +1393,17 @@ class _ModuleCanvasHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final description = (module.description ?? '').trim();
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(22),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x080F172A),
+            color: AppColors.shadowThin,
             blurRadius: 18,
             offset: Offset(0, 8),
           ),
@@ -1414,32 +1421,32 @@ class _ModuleCanvasHeader extends StatelessWidget {
                 children: [
                   _HeaderChip(
                     label: module.isPublished ? 'Published' : 'Draft',
-                    bg: module.isPublished ? const Color(0xFFEAFBF0) : const Color(0xFFFFF4E5),
-                    fg: module.isPublished ? const Color(0xFF16A34A) : const Color(0xFFD97706),
+                    bg: module.isPublished ? AppColors.successBg : AppColors.warningBg,
+                    fg: module.isPublished ? AppColors.successText : AppColors.warningText,
                   ),
                   _HeaderChip(
                     label: '$materialCount material${materialCount == 1 ? '' : 's'}',
-                    bg: const Color(0xFFF1F5F9),
-                    fg: const Color(0xFF475569),
+                    bg: AppColors.headerBg,
+                    fg: AppColors.textGray,
                   ),
                 ],
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               Text(
                 module.title,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 30,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textTitle,
                   height: 1.05,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(
                 description.isNotEmpty
                     ? description
                     : 'Organize files, manage visibility, and keep this module ready for students.',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 13.5,
                   color: AppColors.textMuted,
                   height: 1.6,
@@ -1451,14 +1458,14 @@ class _ModuleCanvasHeader extends StatelessWidget {
           final side = Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.surfaceBg,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Text(
+                Text(
                   'Module order',
                   style: TextStyle(
                     fontSize: 11.5,
@@ -1466,32 +1473,32 @@ class _ModuleCanvasHeader extends StatelessWidget {
                     color: AppColors.textMuted,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(
                   '#${module.orderIndex + 1}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textTitle,
                     height: 1,
                   ),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 Text(
                   'Updated ${_relativeDate(module.updatedAt)}',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.8,
                     color: AppColors.textMuted,
                     height: 1.4,
                   ),
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: onUpload,
-                    icon: const Icon(Icons.upload_rounded, size: 16),
-                    label: const Text('Upload material'),
+                    icon: Icon(Icons.upload_rounded, size: 16),
+                    label: Text('Upload material'),
                     style: ElevatedButton.styleFrom(
                       elevation: 0,
                       backgroundColor: AppColors.primary,
@@ -1510,7 +1517,7 @@ class _ModuleCanvasHeader extends StatelessWidget {
           if (compact) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [titleBlock, const SizedBox(height: 18), side],
+              children: [titleBlock, SizedBox(height: 18), side],
             );
           }
 
@@ -1518,7 +1525,7 @@ class _ModuleCanvasHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(child: titleBlock),
-              const SizedBox(width: 18),
+              SizedBox(width: 18),
               SizedBox(width: 240, child: side),
             ],
           );
@@ -1541,6 +1548,7 @@ class _HeaderChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -1576,15 +1584,16 @@ class _CanvasSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(compactHeader ? 18 : 20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x080F172A),
+            color: AppColors.shadowThin,
             blurRadius: 20,
             offset: Offset(0, 8),
           ),
@@ -1599,16 +1608,16 @@ class _CanvasSection extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAF2FF),
+                  color: AppColors.infoBg,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, size: 18, color: AppColors.primary),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Expanded(
                 child: Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textTitle,
@@ -1618,7 +1627,7 @@ class _CanvasSection extends StatelessWidget {
               if (trailing != null) trailing!,
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           child,
         ],
       ),
@@ -1645,11 +1654,12 @@ class _SoftStatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -1664,33 +1674,33 @@ class _SoftStatTile extends StatelessWidget {
             ),
             child: Icon(icon, size: 20, color: iconFg),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 11.5,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textMuted,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textTitle,
                     height: 1.2,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(
                   description,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textMuted,
                     height: 1.45,
@@ -1716,11 +1726,12 @@ class _DescriptionBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
@@ -1730,17 +1741,17 @@ class _DescriptionBlock extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+              color: AppColors.headerBg,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.notes_rounded, size: 18, color: Color(0xFF64748B)),
+            child: Icon(Icons.notes_rounded, size: 18, color: AppColors.textMuted),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Description',
                   style: TextStyle(
                     fontSize: 11.5,
@@ -1748,22 +1759,22 @@ class _DescriptionBlock extends StatelessWidget {
                     color: AppColors.textMuted,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(
                   hasDescription ? description : 'No description added yet',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14.5,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textTitle,
                     height: 1.35,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Text(
                   hasDescription
                       ? 'This text helps instructors and students understand the purpose of the module.'
                       : 'Add a short summary to make this module clearer for instructors and students.',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textMuted,
                     height: 1.5,
@@ -1806,6 +1817,7 @@ class _ActionTileState extends State<_ActionTile> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final disabled = widget.onTap == null;
     return MouseRegion(
       cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
@@ -1816,13 +1828,13 @@ class _ActionTileState extends State<_ActionTile> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
+          duration: Duration(milliseconds: 140),
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             color: widget.emphasis
-                ? const Color(0xFFEFF6FF)
-                : (_hovered && !disabled ? const Color(0xFFF8FAFC) : const Color(0xFFFDFDFD)),
+                ? AppColors.primarySoft
+                : (_hovered && !disabled ? AppColors.surfaceBg : AppColors.cardBg),
             borderRadius: BorderRadius.circular(18),
           ),
           child: Opacity(
@@ -1839,7 +1851,7 @@ class _ActionTileState extends State<_ActionTile> {
                   ),
                   child: Icon(widget.icon, size: 18, color: widget.iconFg),
                 ),
-                const SizedBox(width: 14),
+                SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1852,10 +1864,10 @@ class _ActionTileState extends State<_ActionTile> {
                           color: _hovered && !disabled ? AppColors.primary : AppColors.textTitle,
                         ),
                       ),
-                      const SizedBox(height: 5),
+                      SizedBox(height: 5),
                       Text(
                         widget.subtitle,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textMuted,
                           height: 1.45,
@@ -1864,7 +1876,7 @@ class _ActionTileState extends State<_ActionTile> {
                     ],
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Icon(
                   Icons.arrow_forward_rounded,
                   size: 16,
@@ -1886,49 +1898,50 @@ class _CanvasDangerSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF5F5),
+        color: AppColors.dangerBg,
         borderRadius: BorderRadius.circular(24),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: const [
-              Icon(Icons.delete_outline_rounded, size: 18, color: Color(0xFFDC2626)),
+            children: [
+              Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.dangerText),
               SizedBox(width: 10),
               Text(
                 'Danger zone',
                 style: TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF991B1B),
+                  color: AppColors.dangerTitle,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          const Text(
+          SizedBox(height: 14),
+          Text(
             'Delete this module only when you are sure its content is no longer needed in the course.',
             style: TextStyle(
               fontSize: 12,
-              color: Color(0xFF7F1D1D),
+              color: AppColors.dangerText,
               height: 1.5,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: onDelete,
-              icon: const Icon(Icons.delete_outline_rounded, size: 16),
-              label: const Text('Delete module'),
+              icon: Icon(Icons.delete_outline_rounded, size: 16),
+              label: Text('Delete module'),
               style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFFDC2626),
-                side: const BorderSide(color: Color(0xFFFCA5A5)),
+                foregroundColor: AppColors.dangerText,
+                side: BorderSide(color: Color(0xFFFCA5A5)),
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -1954,7 +1967,7 @@ class _HPill extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: Colors.white.withOpacity(0.2)),
+          border: Border.all(color: AppColors.cardBg.withOpacity(0.2)),
         ),
         child: Text(
           l,
@@ -1984,7 +1997,7 @@ class _UploadProgressWidget extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: _K.div),
         ),
@@ -1993,13 +2006,13 @@ class _UploadProgressWidget extends StatelessWidget {
           children: [
             Row(
               children: [
-                const SizedBox(
+                SizedBox(
                   width: 14,
                   height: 14,
                   child: CircularProgressIndicator(strokeWidth: 1.5),
                 ),
-                const SizedBox(width: 10),
-                const Expanded(
+                SizedBox(width: 10),
+                Expanded(
                   child: Text(
                     'Uploading material…',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
@@ -2007,7 +2020,7 @@ class _UploadProgressWidget extends StatelessWidget {
                 ),
                 Text(
                   '${(progress * 100).toInt()}%',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.primary,
@@ -2015,12 +2028,12 @@ class _UploadProgressWidget extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
                 value: progress,
-                backgroundColor: const Color(0xFFE2E8F0),
+                backgroundColor: AppColors.border,
                 color: AppColors.primary,
                 minHeight: 4,
               ),
@@ -2037,21 +2050,22 @@ class _ModuleHeroWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final description = (module.description ?? '').trim();
     return Container(
       padding: const EdgeInsets.fromLTRB(26, 24, 26, 24),
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF145CCB), Color(0xFF137FEC), Color(0xFF4CB5FF)],
+          colors: [Color(0xFF145CCB), AppColors.primary, AppColors.infoText],
         ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withOpacity(0.16),
             blurRadius: 18,
-            offset: const Offset(0, 8),
+            offset: Offset(0, 8),
           ),
         ],
       ),
@@ -2059,28 +2073,28 @@ class _ModuleHeroWidget extends StatelessWidget {
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 980;
           final rightCard = Container(
-            constraints: const BoxConstraints(minWidth: 180),
+            constraints: BoxConstraints(minWidth: 180),
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.14),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withOpacity(0.16)),
+              border: Border.all(color: AppColors.cardBg.withOpacity(0.16)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text('Module order', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white.withOpacity(0.74))),
-                const SizedBox(height: 8),
-                Text('#${module.orderIndex + 1}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white, height: 1.0)),
-                const SizedBox(height: 14),
+                SizedBox(height: 8),
+                Text('#${module.orderIndex + 1}', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white, height: 1.0)),
+                SizedBox(height: 14),
                 Text('Updated ${_relativeDate(module.updatedAt)}', style: TextStyle(fontSize: 11.8, height: 1.45, color: Colors.white.withOpacity(0.86))),
               ],
             ),
           );
 
           final body = ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 760),
+            constraints: BoxConstraints(maxWidth: 760),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2088,18 +2102,18 @@ class _ModuleHeroWidget extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _HPill(module.isPublished ? '● Live' : '● Draft', module.isPublished ? const Color(0xFF4ADE80) : const Color(0xFFFBBF24)),
+                    _HPill(module.isPublished ? '● Live' : '● Draft', module.isPublished ? Color(0xFF4ADE80) : Color(0xFFFBBF24)),
                     const _HPill('MODULE', Colors.white70),
                     _HPill('$materialCount material${materialCount == 1 ? '' : 's'}', Colors.white70),
                     if (module.isShared) _HPill('Shared', Colors.white70),
                   ],
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 Text(
                   module.title,
-                  style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white, height: 1.04),
+                  style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white, height: 1.04),
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Text(
                   description.isNotEmpty
                       ? description
@@ -2113,12 +2127,12 @@ class _ModuleHeroWidget extends StatelessWidget {
           if (compact) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [body, const SizedBox(height: 20), rightCard],
+              children: [body, SizedBox(height: 20), rightCard],
             );
           }
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: body), const SizedBox(width: 20), rightCard],
+            children: [Expanded(child: body), SizedBox(width: 20), rightCard],
           );
         },
       ),
@@ -2136,11 +2150,12 @@ class _ModuleInsightsStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final items = [
       (Icons.folder_copy_rounded, 'Materials', '$materialCount total', _K.blueSoft, AppColors.primary),
       (Icons.verified_rounded, 'Ready', '$readyMaterials available', _K.greenSoft, _K.green),
       (Icons.sync_rounded, 'Processing', '$processingMaterials pending', _K.amberSoft, _K.amber),
-      (Icons.share_rounded, 'Shared', sharedCount == 0 ? 'Only in this course' : 'Shared with $sharedCount', const Color(0xFFF0FDF4), const Color(0xFF16A34A)),
+      (Icons.share_rounded, 'Shared', sharedCount == 0 ? 'Only in this course' : 'Shared with $sharedCount', AppColors.successBg, AppColors.successText),
     ];
 
     return LayoutBuilder(
@@ -2157,13 +2172,13 @@ class _ModuleInsightsStrip extends StatelessWidget {
           children: items.map((item) => SizedBox(
             width: itemWidth,
             child: Container(
-              constraints: const BoxConstraints(minHeight: 92),
+              constraints: BoxConstraints(minHeight: 92),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.cardBg,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: _K.div),
-                boxShadow: const [BoxShadow(color: Color(0x05000000), blurRadius: 10, offset: Offset(0, 3))],
+                boxShadow: [BoxShadow(color: Color(0x05000000), blurRadius: 10, offset: Offset(0, 3))],
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2174,15 +2189,15 @@ class _ModuleInsightsStrip extends StatelessWidget {
                     decoration: BoxDecoration(color: item.$4, borderRadius: BorderRadius.circular(13)),
                     child: Icon(item.$1, size: 20, color: item.$5),
                   ),
-                  const SizedBox(width: 14),
+                  SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(item.$2, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-                        const SizedBox(height: 6),
-                        Text(item.$3, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle, height: 1.28)),
+                        Text(item.$2, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                        SizedBox(height: 6),
+                        Text(item.$3, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle, height: 1.28)),
                       ],
                     ),
                   ),
@@ -2209,11 +2224,12 @@ class _MiniInfoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
-        color: const Color(0xFFFAFBFD),
+        color: AppColors.hoverBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _K.div),
       ),
@@ -2226,21 +2242,21 @@ class _MiniInfoTile extends StatelessWidget {
             decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
             child: Icon(icon, size: 18, color: iconFg),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
-                const SizedBox(height: 4),
+                Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
+                SizedBox(height: 4),
                 Text(
                   value,
                   maxLines: multiline ? null : 1,
                   overflow: multiline ? TextOverflow.visible : TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textTitle, height: 1.45),
+                  style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textTitle, height: 1.45),
                 ),
-                const SizedBox(height: 4),
-                Text(caption, style: const TextStyle(fontSize: 11.8, color: AppColors.textMuted, height: 1.55)),
+                SizedBox(height: 4),
+                Text(caption, style: TextStyle(fontSize: 11.8, color: AppColors.textMuted, height: 1.55)),
               ],
             ),
           ),
@@ -2263,10 +2279,11 @@ class _SectionNoteWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final isDanger = tone == _SectionTone.danger;
-    final bg = isDanger ? const Color(0xFFFFF5F5) : const Color(0xFFFAFBFD);
-    final border = isDanger ? const Color(0xFFFECACA) : _K.div;
-    final fg = isDanger ? const Color(0xFFDC2626) : AppColors.primary;
+    final bg = isDanger ? AppColors.dangerBg : AppColors.hoverBg;
+    final border = isDanger ? AppColors.dangerBorder : _K.div;
+    final fg = isDanger ? AppColors.dangerText : AppColors.primary;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -2281,9 +2298,9 @@ class _SectionNoteWidget extends StatelessWidget {
           final textBlock = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: isDanger ? const Color(0xFFB91C1C) : AppColors.textTitle)),
-              const SizedBox(height: 6),
-              Text(description, style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted, height: 1.45)),
+              Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: isDanger ? AppColors.dangerTitle : AppColors.textTitle)),
+              SizedBox(height: 6),
+              Text(description, style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, height: 1.45)),
             ],
           );
           final button = OutlinedButton(
@@ -2299,12 +2316,12 @@ class _SectionNoteWidget extends StatelessWidget {
           if (compact) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [textBlock, const SizedBox(height: 14), button],
+              children: [textBlock, SizedBox(height: 14), button],
             );
           }
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: textBlock), const SizedBox(width: 14), button],
+            children: [Expanded(child: textBlock), SizedBox(width: 14), button],
           );
         },
       ),
@@ -2322,7 +2339,7 @@ class _MatEmptyWidget extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFFFAFBFD),
+            color: AppColors.hoverBg,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: _K.div),
           ),
@@ -2332,20 +2349,20 @@ class _MatEmptyWidget extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(14)),
-                child: const Icon(Icons.upload_file_outlined, size: 24, color: AppColors.primary),
+                child: Icon(Icons.upload_file_outlined, size: 24, color: AppColors.primary),
               ),
-              const SizedBox(height: 12),
-              const Text('No materials yet', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-              const SizedBox(height: 5),
-              const Text('Upload a PDF, video, or document to turn this module into usable learning content.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, height: 1.5)),
-              const SizedBox(height: 14),
+              SizedBox(height: 12),
+              Text('No materials yet', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+              SizedBox(height: 5),
+              Text('Upload a PDF, video, or document to turn this module into usable learning content.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, height: 1.5)),
+              SizedBox(height: 14),
               OutlinedButton.icon(
                 onPressed: onUpload,
-                icon: const Icon(Icons.upload_rounded, size: 14),
-                label: const Text('Upload material'),
+                icon: Icon(Icons.upload_rounded, size: 14),
+                label: Text('Upload material'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,
-                  side: const BorderSide(color: AppColors.primary),
+                  side: BorderSide(color: AppColors.primary),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
@@ -2360,32 +2377,33 @@ class _ModuleMaterialCard extends StatelessWidget {
   final VoidCallback onTap;
   const _ModuleMaterialCard({required this.material, required this.onTap});
 
-  static const _colors = {
-    'video': (Icons.play_circle_filled_rounded, Color(0xFFDBEAFE), Color(0xFF2563EB), 'Video'),
-    'pdf': (Icons.picture_as_pdf_rounded, Color(0xFFFEE2E2), Color(0xFFDC2626), 'PDF'),
-    'quiz': (Icons.quiz_rounded, Color(0xFFF3E8FF), Color(0xFF9333EA), 'Quiz'),
+  static Map<String, (IconData, Color, Color, String)> get _colors => {
+    'video': (Icons.play_circle_filled_rounded, AppColors.badgeBlueBg, AppColors.primary, 'Video'),
+    'pdf': (Icons.picture_as_pdf_rounded, AppColors.dangerBorder, AppColors.dangerText, 'PDF'),
+    'quiz': (Icons.quiz_rounded, AppColors.purpleBg, AppColors.purpleText, 'Quiz'),
   };
-  static const _status = {
-    'ready': ('Ready', Color(0xFFDCFCE7), Color(0xFF16A34A)),
-    'processing': ('Processing', Color(0xFFFEF3C7), Color(0xFFD97706)),
-    'uploaded': ('Processing', Color(0xFFFEF3C7), Color(0xFFD97706)),
-    'draft_upload': ('Uploading', Color(0xFFE0F2FE), Color(0xFF0369A1)),
-    'error': ('Error', Color(0xFFFEF2F2), Color(0xFFDC2626)),
+  static Map<String, (String, Color, Color)> get _status => {
+    'ready': ('Ready', AppColors.successBg, AppColors.successText),
+    'processing': ('Processing', AppColors.warningSoftBg, AppColors.warningText),
+    'uploaded': ('Processing', AppColors.warningSoftBg, AppColors.warningText),
+    'draft_upload': ('Uploading', AppColors.infoBg, AppColors.infoText),
+    'error': ('Error', AppColors.dangerBg, AppColors.dangerText),
   };
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final (ico, ib, ic, typeLabel) = _colors[material.type] ??
-        (Icons.insert_drive_file_rounded, const Color(0xFFF1F5F9), AppColors.textMuted, material.type.toUpperCase());
+        (Icons.insert_drive_file_rounded, AppColors.headerBg, AppColors.textMuted, material.type.toUpperCase());
     final (sl, sb, sf) = _status[material.status] ??
-        (material.status, const Color(0xFFF1F5F9), AppColors.textMuted);
+        (material.status, AppColors.headerBg, AppColors.textMuted);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          color: const Color(0xFFFAFBFD),
+          color: AppColors.hoverBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: _K.div),
         ),
@@ -2397,33 +2415,33 @@ class _ModuleMaterialCard extends StatelessWidget {
               decoration: BoxDecoration(color: ib, borderRadius: BorderRadius.circular(12)),
               child: Icon(ico, size: 22, color: ic),
             ),
-            const SizedBox(width: 14),
+            SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(material.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textTitle, height: 1.3)),
-                  const SizedBox(height: 5),
+                  Text(material.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textTitle, height: 1.3)),
+                  SizedBox(height: 5),
                   Wrap(
                     spacing: 10,
                     runSpacing: 4,
                     children: [
-                      Text(typeLabel, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 0.4)),
+                      Text(typeLabel, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 0.4)),
                       if (material.pageCount != null)
-                        Text('${material.pageCount} pages', style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
+                        Text('${material.pageCount} pages', style: TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
                     ],
                   ),
                 ],
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
               decoration: BoxDecoration(color: sb, borderRadius: BorderRadius.circular(999)),
               child: Text(sl, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: sf)),
             ),
-            const SizedBox(width: 8),
-            const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textHint),
+            SizedBox(width: 8),
+            Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textHint),
           ],
         ),
       ),

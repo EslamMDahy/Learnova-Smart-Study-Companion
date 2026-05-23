@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learnova/core/routing/routes.dart';
+import 'package:learnova/core/theme/app_theme.dart';
 
 class StudentCoursesPage extends StatelessWidget {
   const StudentCoursesPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     // تحديث تدرجات الألوان (Gradients) لتصبح أكثر حيوية وجاذبية وعصرية
     final courses = [
       {
@@ -21,8 +23,8 @@ class StudentCoursesPage extends StatelessWidget {
             "A comprehensive introduction to machine learning concepts, algorithms, and applications.",
         "status": "Open",
         "button": "Enroll",
-        "gradient1": const Color(0xff4F46E5), // Indigo
-        "gradient2": const Color(0xff06B6D4), // Cyan
+        "gradient1": Color(0xff4F46E5), // Indigo
+        "gradient2": Color(0xff06B6D4), // Cyan
       },
       {
         "title": "Advanced Algorithms",
@@ -36,8 +38,8 @@ class StudentCoursesPage extends StatelessWidget {
             "Deep dive into graph algorithms, dynamic programming, and NP-completeness.",
         "status": "Waitlist",
         "button": "Join Waitlist",
-        "gradient1": const Color(0xff7C3AED), // Purple
-        "gradient2": const Color(0xffEC4899), // Pink
+        "gradient1": AppColors.purpleText, // Purple
+        "gradient2": Color(0xffEC4899), // Pink
       },
       {
         "title": "Data Structures",
@@ -51,8 +53,8 @@ class StudentCoursesPage extends StatelessWidget {
             "Fundamental data structures including arrays, linked lists, stacks, queues, trees, and graphs.",
         "status": "Enrolled",
         "button": "Enrolled",
-        "gradient1": const Color(0xff1E3A8A), // Royal Blue
-        "gradient2": const Color(0xff3B82F6), // Light Blue
+        "gradient1": Color(0xff1E3A8A), // Royal Blue
+        "gradient2": AppColors.primary, // Light Blue
       },
       {
         "title": "Full Stack Development",
@@ -65,8 +67,8 @@ class StudentCoursesPage extends StatelessWidget {
         "description": "Modern web development with React, Node.js, and SQL.",
         "status": "Open",
         "button": "Enroll",
-        "gradient1": const Color(0xff0F766E), // Teal
-        "gradient2": const Color(0xff10B981), // Emerald
+        "gradient1": Color(0xff0F766E), // Teal
+        "gradient2": AppColors.successDot, // Emerald
       },
       {
         "title": "Engineering Ethics",
@@ -80,8 +82,8 @@ class StudentCoursesPage extends StatelessWidget {
             "Ethical considerations in engineering practice and sustainability.",
         "status": "Closed",
         "button": "Closed",
-        "gradient1": const Color(0xff374151), // Cool Gray
-        "gradient2": const Color(0xff6B7280), // Slate
+        "gradient1": AppColors.textGray, // Cool Gray
+        "gradient2": AppColors.textGray500, // Slate
       },
       {
         "title": "Digital Media Arts",
@@ -95,46 +97,46 @@ class StudentCoursesPage extends StatelessWidget {
             "Exploration of digital tools for creative expression and graphic design.",
         "status": "Open",
         "button": "Enroll",
-        "gradient1": const Color(0xffF59E0B), // Amber
-        "gradient2": const Color(0xffEF4444), // Red
+        "gradient1": AppColors.warningText, // Amber
+        "gradient2": AppColors.errorDot, // Red
       },
     ];
 
     return Scaffold(
-      backgroundColor: const Color(0xffF8FAFC),
+      backgroundColor: AppColors.bg,
       body: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 36),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             /// TITLE
-            const Text(
+            Text(
               "My Courses",
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w800,
-                color: Color(0xff0F172A),
+                color: AppColors.textTitle,
                 letterSpacing: -0.5,
               ),
             ),
-            const SizedBox(height: 6),
-            const Text(
+            SizedBox(height: 6),
+            Text(
               "Manage your curriculum, AI assessments, and student cohorts.",
               style: TextStyle(
                 fontSize: 15,
-                color: Color(0xff64748B),
+                color: AppColors.textMuted,
               ),
             ),
-            const SizedBox(height: 32),
+            SizedBox(height: 32),
 
             /// TOP BAR
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                const Text(
+                Text(
                   "Showing 24 courses",
                   style: TextStyle(
-                    color: Color(0xff475569),
+                    color: AppColors.textGray,
                     fontWeight: FontWeight.w600,
                     fontSize: 14,
                   ),
@@ -142,13 +144,13 @@ class StudentCoursesPage extends StatelessWidget {
                 Row(
                   children: [
                     _topIconButton(Icons.grid_view_rounded, true),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     _topIconButton(Icons.view_agenda_outlined, false),
                   ],
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             /// GRID
             LayoutBuilder(
@@ -159,7 +161,7 @@ class StudentCoursesPage extends StatelessWidget {
 
                 return GridView.builder(
                   shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
+                  physics: NeverScrollableScrollPhysics(),
                   itemCount: courses.length,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: count,
@@ -181,14 +183,14 @@ class StudentCoursesPage extends StatelessWidget {
                       },
                       child: Container(
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.cardBg,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xffE2E8F0)),
+                          border: Border.all(color: AppColors.border),
                           boxShadow: [
                             BoxShadow(
                               color: Colors.black.withOpacity(0.015),
                               blurRadius: 12,
-                              offset: const Offset(0, 4),
+                              offset: Offset(0, 4),
                             )
                           ],
                         ),
@@ -226,23 +228,23 @@ class StudentCoursesPage extends StatelessWidget {
                                         ),
                                         decoration: BoxDecoration(
                                           color: isClosed
-                                              ? const Color(0xffEF4444)
+                                              ? AppColors.errorDot
                                               : isWaitlist
-                                                  ? const Color(0xffF59E0B)
-                                                  : const Color(0xff10B981),
+                                                  ? AppColors.warningText
+                                                  : AppColors.successDot,
                                           borderRadius:
                                               BorderRadius.circular(6),
                                         ),
                                         child: Text(
                                           status,
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 8),
+                                      SizedBox(width: 8),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 10,
@@ -255,18 +257,18 @@ class StudentCoursesPage extends StatelessWidget {
                                         ),
                                         child: Text(
                                           course['credits'].toString(),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                       ),
-                                      const Spacer(),
+                                      Spacer(),
                                       if (isEnrolled)
-                                        const CircleAvatar(
+                                        CircleAvatar(
                                           radius: 11,
-                                          backgroundColor: Color(0xff1D8CF8),
+                                          backgroundColor: AppColors.primary,
                                           child: Icon(
                                             Icons.check,
                                             size: 13,
@@ -275,21 +277,21 @@ class StudentCoursesPage extends StatelessWidget {
                                         ),
                                     ],
                                   ),
-                                  const Spacer(),
+                                  Spacer(),
                                   Text(
                                     course['code'].toString(),
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: Colors.white70,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  const SizedBox(height: 2),
+                                  SizedBox(height: 2),
                                   Text(
                                     course['title'].toString(),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 20,
                                       fontWeight: FontWeight.w700,
@@ -310,16 +312,16 @@ class StudentCoursesPage extends StatelessWidget {
                                     /// TEACHER
                                     Row(
                                       children: [
-                                        const CircleAvatar(
+                                        CircleAvatar(
                                           radius: 16,
-                                          backgroundColor: Color(0xffEFF6FF),
+                                          backgroundColor: AppColors.infoBg,
                                           child: Icon(
                                             Icons.person,
-                                            color: Color(0xff1D8CF8),
+                                            color: AppColors.primary,
                                             size: 16,
                                           ),
                                         ),
-                                        const SizedBox(width: 12),
+                                        SizedBox(width: 12),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment:
@@ -327,16 +329,16 @@ class StudentCoursesPage extends StatelessWidget {
                                             children: [
                                               Text(
                                                 course['teacher'].toString(),
-                                                style: const TextStyle(
+                                                style: TextStyle(
                                                   fontWeight: FontWeight.w700,
                                                   fontSize: 13,
-                                                  color: Color(0xff0F172A),
+                                                  color: AppColors.textTitle,
                                                 ),
                                               ),
                                               Text(
                                                 course['department'].toString(),
-                                                style: const TextStyle(
-                                                  color: Color(0xff64748B),
+                                                style: TextStyle(
+                                                  color: AppColors.textMuted,
                                                   fontSize: 11,
                                                 ),
                                               ),
@@ -345,58 +347,58 @@ class StudentCoursesPage extends StatelessWidget {
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 12),
+                                    SizedBox(height: 12),
 
                                     /// SCHEDULE & LOCATION
                                     Row(
                                       children: [
-                                        const Icon(Icons.access_time_rounded,
-                                            size: 14, color: Color(0xff94A3B8)),
-                                        const SizedBox(width: 6),
+                                        Icon(Icons.access_time_rounded,
+                                            size: 14, color: AppColors.textHint),
+                                        SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
                                             course['schedule'].toString(),
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w500,
-                                                color: Color(0xff475569)),
+                                                color: AppColors.textGray),
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 6),
+                                    SizedBox(height: 6),
                                     Row(
                                       children: [
-                                        const Icon(Icons.location_on_outlined,
-                                            size: 14, color: Color(0xff94A3B8)),
-                                        const SizedBox(width: 6),
+                                        Icon(Icons.location_on_outlined,
+                                            size: 14, color: AppColors.textHint),
+                                        SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
                                             course['location'].toString(),
-                                            style: const TextStyle(
+                                            style: TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w500,
-                                                color: Color(0xff475569)),
+                                                color: AppColors.textGray),
                                           ),
                                         ),
                                       ],
                                     ),
-                                    const SizedBox(height: 12),
+                                    SizedBox(height: 12),
 
                                     /// DESCRIPTION (تم تحديد حد أقصى سطرين للملائمة مع الطول الجديد)
                                     Text(
                                       course['description'].toString(),
                                       maxLines: 2,
                                       overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         height: 1.4,
                                         fontSize: 12,
-                                        color: Color(0xff64748B),
+                                        color: AppColors.textMuted,
                                       ),
                                     ),
 
                                     // السبيسر السحري الذي يقوم بحجز المساحة ودفع زر Enroll ونهاية المحتوى إلى الأسفل تماماً لتوحيد الطول
-                                    const Spacer(),
+                                    Spacer(),
 
                                     /// BUTTON (Enroll)
                                     SizedBox(
@@ -407,22 +409,22 @@ class StudentCoursesPage extends StatelessWidget {
                                         style: ElevatedButton.styleFrom(
                                           elevation: 0,
                                           backgroundColor: isClosed
-                                              ? const Color(0xffF1F5F9)
+                                              ? AppColors.headerBg
                                               : isWaitlist
                                                   ? Colors.white
                                                   : isEnrolled
-                                                      ? const Color(0xffF1F5F9)
-                                                      : const Color(0xff1D8CF8),
+                                                      ? AppColors.headerBg
+                                                      : AppColors.primary,
                                           foregroundColor: isClosed
-                                              ? const Color(0xff94A3B8)
+                                              ? AppColors.textHint
                                               : isWaitlist
-                                                  ? const Color(0xff1D8CF8)
+                                                  ? AppColors.primary
                                                   : isEnrolled
-                                                      ? const Color(0xff475569)
+                                                      ? AppColors.textGray
                                                       : Colors.white,
                                           side: isWaitlist
-                                              ? const BorderSide(
-                                                  color: Color(0xff1D8CF8),
+                                              ? BorderSide(
+                                                  color: AppColors.primary,
                                                   width: 1.5,
                                                 )
                                               : null,
@@ -433,7 +435,7 @@ class StudentCoursesPage extends StatelessWidget {
                                         ),
                                         child: Text(
                                           course['button'].toString(),
-                                          style: const TextStyle(
+                                          style: TextStyle(
                                             fontWeight: FontWeight.w700,
                                             fontSize: 13,
                                           ),
@@ -452,24 +454,24 @@ class StudentCoursesPage extends StatelessWidget {
                 );
               },
             ),
-            const SizedBox(height: 48),
+            SizedBox(height: 48),
 
             /// PAGINATION
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _paginationButton(Icons.chevron_left, false),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 _pageNumber("1", true),
                 _pageNumber("2", false),
                 _pageNumber("3", false),
-                const Padding(
+                Padding(
                   padding: EdgeInsets.symmetric(horizontal: 8),
                   child:
-                      Text("...", style: TextStyle(color: Color(0xff94A3B8))),
+                      Text("...", style: TextStyle(color: AppColors.textHint)),
                 ),
                 _pageNumber("8", false),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 _paginationButton(Icons.chevron_right, true),
               ],
             ),
@@ -484,15 +486,15 @@ class StudentCoursesPage extends StatelessWidget {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: active ? const Color(0xff1D8CF8) : Colors.white,
+        color: active ? AppColors.primary : AppColors.cardBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-            color: active ? Colors.transparent : const Color(0xffE2E8F0)),
+            color: active ? Colors.transparent : AppColors.border),
       ),
       child: Icon(
         icon,
         size: 18,
-        color: active ? Colors.white : const Color(0xff64748B),
+        color: active ? Colors.white : AppColors.textMuted,
       ),
     );
   }
@@ -502,14 +504,14 @@ class StudentCoursesPage extends StatelessWidget {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xffE2E8F0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Icon(
         icon,
         size: 18,
-        color: const Color(0xff64748B),
+        color: AppColors.textMuted,
       ),
     );
   }
@@ -520,14 +522,14 @@ class StudentCoursesPage extends StatelessWidget {
       width: 36,
       height: 36,
       decoration: BoxDecoration(
-        color: active ? const Color(0xff1D8CF8) : Colors.transparent,
+        color: active ? AppColors.primary : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
       alignment: Alignment.center,
       child: Text(
         number,
         style: TextStyle(
-          color: active ? Colors.white : const Color(0xff64748B),
+          color: active ? Colors.white : AppColors.textMuted,
           fontWeight: FontWeight.w700,
           fontSize: 13,
         ),

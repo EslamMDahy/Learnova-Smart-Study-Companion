@@ -271,6 +271,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       decoration: BoxDecoration(
         color: AppColors.pageBg,
@@ -283,7 +284,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                const Expanded(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -311,7 +312,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                 InkWell(
                   borderRadius: BorderRadius.circular(10),
                   onTap: () => Navigator.of(context).pop(),
-                  child: const Padding(
+                  child: Padding(
                     padding: EdgeInsets.all(6),
                     child: Icon(
                       Icons.close_rounded,
@@ -328,9 +329,9 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
               padding: const EdgeInsets.fromLTRB(18, 12, 18, 18),
               child: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.cardBg,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: const Color(0xFFE8EDF3)),
+                  border: Border.all(color: AppColors.borderGray),
                 ),
                 child: Column(
                   children: <Widget>[
@@ -342,9 +343,9 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             _buildMetaSection(),
-                            const SizedBox(height: 18),
+                            SizedBox(height: 18),
                             _buildQuestionTextSection(),
-                            const SizedBox(height: 18),
+                            SizedBox(height: 18),
                             if (_type == QuestionType.multipleChoice || _type == QuestionType.multiSelect) ...<Widget>[
                               _buildMultipleChoiceSection(),
                             ] else if (_type == QuestionType.trueFalse) ...<Widget>[
@@ -352,13 +353,13 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                             ] else ...<Widget>[
                               _buildWrittenAnswerSection(),
                             ],
-                            const SizedBox(height: 18),
+                            SizedBox(height: 18),
                             _buildExplanationSection(),
                             if (_error != null) ...<Widget>[
-                              const SizedBox(height: 12),
+                              SizedBox(height: 12),
                               Text(
                                 _error!,
-                                style: const TextStyle(
+                                style: TextStyle(
                                   color: AppColors.dangerText,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w500,
@@ -378,13 +379,13 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
             child: Row(
               children: <Widget>[
-                const Spacer(),
+                Spacer(),
                 ElevatedButton(
                   onPressed: _saving ? null : () => _submit(addAnother: true),
                   style: _primaryButtonStyle(),
                   child: Text(_saving ? 'Adding...' : 'Add Another'),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 ElevatedButton(
                   onPressed: _saving ? null : () => _submit(addAnother: false),
                   style: _primaryButtonStyle(),
@@ -401,15 +402,15 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
   Widget _buildTabs() {
     return Container(
       height: 62,
-      decoration: const BoxDecoration(
-        border: Border(bottom: BorderSide(color: Color(0xFFE8EDF3))),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.borderGray)),
       ),
       child: TabBar(
         controller: _tabController,
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textMuted,
-        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-        unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        unselectedLabelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
         indicatorColor: AppColors.primary,
         indicatorWeight: 2,
         dividerColor: Colors.transparent,
@@ -432,7 +433,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       Expanded(
         flex: 2,
         child: _targets.isEmpty || _selectedTopicId == null
-            ? const _ReadonlyField(
+            ? _ReadonlyField(
                 label: 'Target Topic',
                 value: 'No topic selected',
               )
@@ -452,7 +453,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                 },
               ),
       ),
-      const SizedBox(width: 16),
+      SizedBox(width: 16),
       Expanded(
         child: AppModernDropdown<QuestionDifficulty>(
           label: 'Difficulty',
@@ -486,7 +487,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
           return Column(
             children: <Widget>[
               fields.first,
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               fields.last,
             ],
           );
@@ -502,14 +503,14 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       children: <Widget>[
         Row(
           children: <Widget>[
-            const Expanded(child: _SectionLabel('Question Text')),
+            Expanded(child: _SectionLabel('Question Text')),
             TextButton.icon(
               onPressed: widget.showAiHint ? () {} : null,
-              icon: const Icon(Icons.auto_awesome_outlined, size: 14),
-              label: const Text('Generate with AI'),
+              icon: Icon(Icons.auto_awesome_outlined, size: 14),
+              label: Text('Generate with AI'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,
-                textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                textStyle: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
                 padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
@@ -517,40 +518,40 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
             ),
           ],
         ),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         Container(
           decoration: BoxDecoration(
-            color: const Color(0xFFF9FAFB),
+            color: AppColors.surfaceBg,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: AppColors.border),
           ),
           child: Column(
             children: <Widget>[
               Container(
                 height: 36,
                 padding: const EdgeInsets.symmetric(horizontal: 12),
-                decoration: const BoxDecoration(
-                  color: Color(0xFFF9FAFB),
-                  border: Border(bottom: BorderSide(color: Color(0xFFE2E8F0))),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceBg,
+                  border: Border(bottom: BorderSide(color: AppColors.border)),
                 ),
                 child: Row(
                   children: <Widget>[
                     _ToolbarButton(label: 'B'),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4),
                     _ToolbarButton(label: 'I', italic: true),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4),
                     _ToolbarButton(label: 'U', underlined: true),
-                    const SizedBox(width: 8),
-                    const Icon(Icons.format_list_bulleted_rounded, size: 16, color: AppColors.textMuted),
-                    const SizedBox(width: 10),
-                    const Icon(Icons.image_outlined, size: 16, color: AppColors.textMuted),
-                    const SizedBox(width: 10),
-                    const Icon(Icons.code_rounded, size: 16, color: AppColors.textMuted),
-                    const Spacer(),
+                    SizedBox(width: 8),
+                    Icon(Icons.format_list_bulleted_rounded, size: 16, color: AppColors.textMuted),
+                    SizedBox(width: 10),
+                    Icon(Icons.image_outlined, size: 16, color: AppColors.textMuted),
+                    SizedBox(width: 10),
+                    Icon(Icons.code_rounded, size: 16, color: AppColors.textMuted),
+                    Spacer(),
                     if (_selectedTarget != null)
                       Text(
                         _selectedTarget!.label,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textMuted,
@@ -586,12 +587,12 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       children: <Widget>[
         Row(
           children: <Widget>[
-            const _SectionLabel('Answer Options'),
-            const SizedBox(width: 8),
+            _SectionLabel('Answer Options'),
+            SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFFF8FAFC),
+                color: AppColors.surfaceBg,
                 borderRadius: BorderRadius.circular(999),
                 border: Border.all(color: AppColors.border),
               ),
@@ -602,7 +603,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
             ),
           ],
         ),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         ...List<Widget>.generate(_optionCtrls.length, (int index) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -636,25 +637,25 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                                 color: _correctIdx == index ? AppColors.primary : AppColors.borderSoft,
                                 width: _correctIdx == index ? 5 : 1.5,
                               ),
-                              color: Colors.white,
+                              color: AppColors.cardBg,
                             ),
                           ),
                         ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
                         'Option ${String.fromCharCode(65 + index)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 11.5,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textMuted,
                         ),
                       ),
-                      const SizedBox(height: 6),
+                      SizedBox(height: 6),
                       TextField(
                         controller: _optionCtrls[index],
                         decoration: _inputDecoration(
@@ -670,12 +671,12 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
         }),
         TextButton.icon(
           onPressed: () => setState(() => _optionCtrls.add(TextEditingController())),
-          icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
-          label: const Text('Add another option'),
+          icon: Icon(Icons.add_circle_outline_rounded, size: 16),
+          label: Text('Add another option'),
           style: TextButton.styleFrom(
             foregroundColor: AppColors.primary,
             padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           ),
         ),
       ],
@@ -686,8 +687,8 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const _SectionLabel('Correct Answer'),
-        const SizedBox(height: 12),
+        _SectionLabel('Correct Answer'),
+        SizedBox(height: 12),
         Row(
           children: <Widget>[
             Expanded(
@@ -697,7 +698,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                 onTap: () => setState(() => _correctBool = true),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: _BooleanAnswerCard(
                 label: 'False',
@@ -718,8 +719,8 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const _SectionLabel('Expected Answer'),
-        const SizedBox(height: 10),
+        _SectionLabel('Expected Answer'),
+        SizedBox(height: 10),
         TextField(
           controller: _answerCtrl,
           maxLines: 4,
@@ -736,15 +737,15 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const _SectionLabel('Explanation (Optional)'),
-          const SizedBox(height: 10),
+          _SectionLabel('Explanation (Optional)'),
+          SizedBox(height: 10),
           TextField(
             controller: _explanationCtrl,
             maxLines: 3,
             decoration: _inputDecoration('Explain why the correct answer is correct...'),
           ),
-          const SizedBox(height: 8),
-          const Row(
+          SizedBox(height: 8),
+          Row(
             children: <Widget>[
               Icon(Icons.info_outline_rounded, size: 14, color: AppColors.textMuted),
               SizedBox(width: 6),
@@ -770,32 +771,32 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       elevation: 0,
       padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+      textStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
     );
   }
 
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(
+      hintStyle: TextStyle(
         fontFamily: 'Inter',
         fontSize: 13.5,
         fontWeight: FontWeight.w400,
         color: AppColors.textHint,
       ),
       filled: true,
-      fillColor: const Color(0xFFF9FAFB),
+      fillColor: AppColors.surfaceBg,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: BorderSide(color: AppColors.border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: BorderSide(color: AppColors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
     );
@@ -813,36 +814,37 @@ class _ReadonlyField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.w700,
             fontSize: 12,
-            color: Color(0xFF374151),
+            color: AppColors.textGray,
           ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         Container(
           height: 44,
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           alignment: Alignment.centerLeft,
           decoration: BoxDecoration(
-            color: const Color(0xFFF9FAFB),
+            color: AppColors.surfaceBg,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: AppColors.border),
           ),
           child: Text(
             value,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Inter',
               fontWeight: FontWeight.w600,
               fontSize: 13,
-              color: Color(0xFF374151),
+              color: AppColors.textGray,
             ),
           ),
         ),
@@ -858,9 +860,10 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w700,
         color: AppColors.textTitle,
@@ -882,7 +885,8 @@ class _ToolbarButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    TextStyle style = const TextStyle(
+    Theme.of(context);
+    TextStyle style = TextStyle(
       fontSize: 11.5,
       fontWeight: FontWeight.w700,
       color: AppColors.textMuted,
@@ -910,13 +914,14 @@ class _BooleanAnswerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(10),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFF0F7FF) : Colors.white,
+          color: selected ? AppColors.infoBg : AppColors.cardBg,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
@@ -935,7 +940,7 @@ class _BooleanAnswerCard extends StatelessWidget {
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Text(
               label,
               style: TextStyle(

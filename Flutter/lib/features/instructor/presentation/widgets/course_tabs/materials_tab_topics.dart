@@ -9,35 +9,36 @@ class _TopicsSidebarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       Container(
         padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
         child: Row(children: [
           Container(
             width: 24,
             height: 24,
             decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(7)),
             alignment: Alignment.center,
-            child: const Icon(Icons.tag_rounded, size: 13, color: AppColors.primary),
+            child: Icon(Icons.tag_rounded, size: 13, color: AppColors.primary),
           ),
-          const SizedBox(width: 8),
-          const Text('Topics', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+          SizedBox(width: 8),
+          Text('Topics', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
           if (!loading && topics.isNotEmpty) ...[
-            const SizedBox(width: 6),
+            SizedBox(width: 6),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(10)),
-              child: Text('${topics.length}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
+              child: Text('${topics.length}', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
             ),
           ],
-          const Spacer(),
-          if (loading) const SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 1.5)),
+          Spacer(),
+          if (loading) SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 1.5)),
         ]),
       ),
       Container(
         padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
+        decoration: BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
         child: SizedBox(
           width: double.infinity,
           child: _AddTopicBtnW(
@@ -51,7 +52,7 @@ class _TopicsSidebarWidget extends StatelessWidget {
       ),
       Expanded(
         child: loading
-            ? const Center(
+            ? Center(
                 child: Column(mainAxisSize: MainAxisSize.min, children: [
                   CircularProgressIndicator(strokeWidth: 2),
                   SizedBox(height: 8),
@@ -79,6 +80,7 @@ class _AddTopicUnifiedBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       child: GestureDetector(
@@ -88,7 +90,7 @@ class _AddTopicUnifiedBtn extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.primary,
             borderRadius: BorderRadius.circular(10),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
                 color: Color(0x1A137FEC),
                 blurRadius: 10,
@@ -96,7 +98,7 @@ class _AddTopicUnifiedBtn extends StatelessWidget {
               ),
             ],
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.add_rounded, size: 16, color: Colors.white),
@@ -127,6 +129,7 @@ class _GhostActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Material(
       color: bg,
       borderRadius: BorderRadius.circular(10),
@@ -137,7 +140,7 @@ class _GhostActionButton extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
             Icon(icon, size: 14, color: fg),
-            const SizedBox(width: 6),
+            SizedBox(width: 6),
             Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
           ]),
         ),
@@ -202,23 +205,24 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Dialog(
       elevation: 0,
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 540),
+          constraints: BoxConstraints(maxWidth: 540),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.cardBg,
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.16),
                   blurRadius: 42,
                   spreadRadius: 2,
-                  offset: const Offset(0, 20),
+                  offset: Offset(0, 20),
                 ),
               ],
             ),
@@ -232,7 +236,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                 ),
                 Container(
                   padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     border: Border(top: BorderSide(color: _K.div)),
                   ),
                   child: Row(children: [
@@ -243,17 +247,17 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(12)),
-                          side: const BorderSide(color: _K.div),
+                          side: BorderSide(color: _K.div),
                         ),
-                        child: const Text('Cancel'),
+                        child: Text('Cancel'),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: _submit,
-                        icon: const Icon(Icons.add_rounded, size: 16),
-                        label: const Text('Create Topic'),
+                        icon: Icon(Icons.add_rounded, size: 16),
+                        label: Text('Create Topic'),
                         style: ElevatedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 13),
                           backgroundColor: AppColors.primary,
@@ -277,19 +281,19 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
   Widget _dialogHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
           border: Border(bottom: BorderSide(color: _K.div))),
       child: Row(children: [
         Container(
           width: 38, height: 38,
           decoration: BoxDecoration(
-            color: const Color(0xFFEAF3FF),
+            color: AppColors.infoBg,
             borderRadius: BorderRadius.circular(12),
           ),
-          child: const Icon(Icons.tag_rounded, color: AppColors.primary, size: 18),
+          child: Icon(Icons.tag_rounded, color: AppColors.primary, size: 18),
         ),
-        const SizedBox(width: 12),
-        const Expanded(
+        SizedBox(width: 12),
+        Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Add Topic', style: TextStyle(
                 fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
@@ -300,7 +304,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
         ),
         IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: const Icon(Icons.close_rounded, size: 18),
+          icon: Icon(Icons.close_rounded, size: 18),
           splashRadius: 20,
         ),
       ]),
@@ -310,13 +314,13 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
   Widget _manualBody() {
     final outcomes = widget.outcomes;
     return Column(
-      key: const ValueKey('manual'),
+      key: ValueKey('manual'),
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Topic name', style: TextStyle(
+        Text('Topic name', style: TextStyle(
             fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         TextField(
           controller: _titleCtrl,
           autofocus: true,
@@ -324,35 +328,35 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
           decoration: InputDecoration(
             hintText: 'e.g. Introduction to Robotics',
             errorText: _titleError,
-            prefixIcon: const Icon(Icons.tag_rounded, size: 16, color: AppColors.primary),
+            prefixIcon: Icon(Icons.tag_rounded, size: 16, color: AppColors.primary),
             filled: true,
-            fillColor: const Color(0xFFF8FAFC),
+            fillColor: AppColors.surfaceBg,
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: _K.div)),
+                borderSide: BorderSide(color: _K.div)),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: _K.div)),
+                borderSide: BorderSide(color: _K.div)),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
+                borderSide: BorderSide(color: AppColors.primary, width: 1.4)),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           ),
         ),
         if (outcomes.isNotEmpty) ...[
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
           Row(children: [
-            const Text('Link to Learning Outcomes',
+            Text('Link to Learning Outcomes',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-            const SizedBox(width: 6),
+            SizedBox(width: 6),
             Text('(optional)',
                 style: TextStyle(fontSize: 11, color: AppColors.textMuted.withOpacity(0.7))),
           ]),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Container(
-            constraints: const BoxConstraints(maxHeight: 160),
+            constraints: BoxConstraints(maxHeight: 160),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.surfaceBg,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: _K.div),
             ),
@@ -367,11 +371,11 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                   final selected = _selectedOutcomeIds.contains(lo.id);
                   Color dotColor;
                   switch (lo.difficulty) {
-                    case OutcomeDifficulty.intermediate: dotColor = const Color(0xFFD97706); break;
-                    case OutcomeDifficulty.advanced: dotColor = const Color(0xFFDC2626); break;
-                    default: dotColor = const Color(0xFF16A34A);
+                    case OutcomeDifficulty.intermediate: dotColor = AppColors.warningText; break;
+                    case OutcomeDifficulty.advanced: dotColor = AppColors.dangerText; break;
+                    default: dotColor = AppColors.successText;
                   }
-                  return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+                  return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
                     onTap: () => setState(() {
                       if (selected) {
                         _selectedOutcomeIds.remove(lo.id);
@@ -384,7 +388,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                       decoration: BoxDecoration(
                         color: selected ? AppColors.primary.withOpacity(0.06) : Colors.transparent,
                         border: i < outcomes.length - 1
-                            ? const Border(bottom: BorderSide(color: Color(0xFFEEEEEE)))
+                            ? Border(bottom: BorderSide(color: AppColors.divider))
                             : null,
                       ),
                       child: Row(children: [
@@ -394,20 +398,20 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                             color: selected ? AppColors.primary : Colors.transparent,
                             borderRadius: BorderRadius.circular(4),
                             border: Border.all(
-                              color: selected ? AppColors.primary : const Color(0xFFCBD5E1),
+                              color: selected ? AppColors.primary : AppColors.borderSoft,
                               width: 1.5,
                             ),
                           ),
                           child: selected
-                              ? const Icon(Icons.check, size: 11, color: Colors.white)
+                              ? Icon(Icons.check, size: 11, color: Colors.white)
                               : null,
                         ),
-                        const SizedBox(width: 10),
+                        SizedBox(width: 10),
                         Container(
                           width: 7, height: 7,
                           decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
                         ),
-                        const SizedBox(width: 7),
+                        SizedBox(width: 7),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -415,9 +419,9 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(lo.code,
-                              style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg)),
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg)),
                         ),
-                        const SizedBox(width: 8),
+                        SizedBox(width: 8),
                         Expanded(child: Text(lo.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -437,10 +441,10 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text('${_selectedOutcomeIds.length} outcome${_selectedOutcomeIds.length == 1 ? '' : 's'} linked',
-                  style: const TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                  style: TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w600)),
             ),
         ],
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -448,7 +452,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: _K.blueMid),
           ),
-          child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Icon(Icons.info_outline_rounded, size: 16, color: AppColors.primary),
             SizedBox(width: 8),
             Expanded(child: Text(
@@ -487,8 +491,9 @@ class _PreferencesDialogShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.cardBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
       child: ConstrainedBox(
@@ -502,24 +507,24 @@ class _PreferencesDialogShell extends StatelessWidget {
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  if (leading != null) ...[leading!, const SizedBox(width: 12)],
+                  if (leading != null) ...[leading!, SizedBox(width: 12)],
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w800,
                             color: AppColors.textTitle,
                           ),
                         ),
                         if (subtitle != null) ...[
-                          const SizedBox(height: 8),
+                          SizedBox(height: 8),
                           Text(
                             subtitle!,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12.5,
                               height: 1.45,
                               color: AppColors.textMuted,
@@ -529,11 +534,11 @@ class _PreferencesDialogShell extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+                  SizedBox(width: 12),
+                  InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
                     borderRadius: BorderRadius.circular(10),
                     onTap: () => Navigator.pop(context),
-                    child: const Padding(
+                    child: Padding(
                       padding: EdgeInsets.all(6),
                       child: Icon(
                         Icons.close_rounded,
@@ -544,7 +549,7 @@ class _PreferencesDialogShell extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
               child,
             ],
           ),
@@ -569,10 +574,11 @@ class _DialogTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       constraints: BoxConstraints(minHeight: multiline ? 104 : 48),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderSoft),
       ),
@@ -618,6 +624,7 @@ class _DialogActions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       children: [
         Expanded(
@@ -629,7 +636,7 @@ class _DialogActions extends StatelessWidget {
             height: 40,
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Expanded(
           child: AppButton(
             label: confirmLabel,
@@ -671,6 +678,7 @@ class _ShareModuleDialogState extends ConsumerState<_ShareModuleDialog> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final coursesAsync = ref.watch(_shareTargetCoursesProvider(widget.currentCourseId));
     return _PreferencesDialogShell(
       title: 'Share with Another Course',
@@ -679,10 +687,10 @@ class _ShareModuleDialogState extends ConsumerState<_ShareModuleDialog> {
         width: 38,
         height: 38,
         decoration: BoxDecoration(
-          color: const Color(0xFFEAF3FF),
+          color: AppColors.infoBg,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: const Icon(Icons.copy_all_rounded, size: 18, color: Color(0xFF7C3AED)),
+        child: Icon(Icons.copy_all_rounded, size: 18, color: AppColors.purpleText),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -692,7 +700,7 @@ class _ShareModuleDialogState extends ConsumerState<_ShareModuleDialog> {
             width: double.infinity,
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.surfaceBg,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: AppColors.border),
             ),
@@ -701,24 +709,24 @@ class _ShareModuleDialogState extends ConsumerState<_ShareModuleDialog> {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
+                  color: AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: const Icon(Icons.folder_rounded, size: 18, color: Color(0xFF137FEC)),
+                child: Icon(Icons.folder_rounded, size: 18, color: AppColors.primary),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(widget.module.title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                  Text(widget.module.title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
                   if (widget.module.description != null && widget.module.description!.isNotEmpty)
-                    Text(widget.module.description!, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
+                    Text(widget.module.description!, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
                 ]),
               ),
             ]),
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           coursesAsync.when(
-            loading: () => const Padding(
+            loading: () => Padding(
               padding: EdgeInsets.symmetric(vertical: 18),
               child: Center(child: CircularProgressIndicator()),
             ),
@@ -726,11 +734,11 @@ class _ShareModuleDialogState extends ConsumerState<_ShareModuleDialog> {
               width: double.infinity,
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFFFF1F2),
+                color: AppColors.dangerBg,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFFECDD3)),
+                border: Border.all(color: Color(0xFFFECDD3)),
               ),
-              child: Text('Could not load your courses: $error', style: const TextStyle(fontSize: 13, color: Color(0xFF9F1239))),
+              child: Text('Could not load your courses: $error', style: TextStyle(fontSize: 13, color: Color(0xFF9F1239))),
             ),
             data: (courses) {
               if (courses.isEmpty) {
@@ -738,11 +746,11 @@ class _ShareModuleDialogState extends ConsumerState<_ShareModuleDialog> {
                   width: double.infinity,
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFFBEB),
+                    color: AppColors.warningSoftBg,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: const Color(0xFFFDE68A)),
+                    border: Border.all(color: AppColors.warningBorder),
                   ),
-                  child: const Text('No other instructor courses are available for sharing yet.', style: TextStyle(fontSize: 13, color: Color(0xFF92400E))),
+                  child: Text('No other instructor courses are available for sharing yet.', style: TextStyle(fontSize: 13, color: AppColors.warningText)),
                 );
               }
 
@@ -762,25 +770,25 @@ class _ShareModuleDialogState extends ConsumerState<_ShareModuleDialog> {
               );
             },
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
+              color: AppColors.warningSoftBg,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFFDE68A)),
+              border: Border.all(color: AppColors.warningBorder),
             ),
-            child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Icon(Icons.info_outline_rounded, size: 15, color: Color(0xFFD97706)),
+            child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Icon(Icons.info_outline_rounded, size: 15, color: AppColors.warningText),
               SizedBox(width: 8),
               Expanded(child: Text(
                 'This creates an independent copy in the selected course using the current backend copy endpoint.',
-                style: TextStyle(fontSize: 13, height: 1.5, color: Color(0xFF92400E)),
+                style: TextStyle(fontSize: 13, height: 1.5, color: AppColors.warningText),
               )),
             ]),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
           _DialogActions(
             onCancel: () => Navigator.pop(context),
             onConfirm: _selectedCourse == null ? null : () => Navigator.pop(context, _selectedCourse),
@@ -798,6 +806,7 @@ class _DescriptionDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _PreferencesDialogShell(
       title: 'Edit Description',
       subtitle: 'Update the module description shown in preferences and sharing flows.',
@@ -810,7 +819,7 @@ class _DescriptionDialog extends StatelessWidget {
             hintText: 'Write a short helpful description',
             multiline: true,
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           _DialogActions(
             onCancel: () => Navigator.pop(context, false),
             onConfirm: () => Navigator.pop(context, true),
@@ -836,6 +845,7 @@ class _ChangeModulePositionDialogState extends State<_ChangeModulePositionDialog
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _PreferencesDialogShell(
       title: 'Change Position',
       subtitle: 'Move "${widget.module.title}" to a new order inside this course.',
@@ -857,7 +867,7 @@ class _ChangeModulePositionDialogState extends State<_ChangeModulePositionDialog
               if (value != null) setState(() => _selectedPosition = value);
             },
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           _DialogActions(
             onCancel: () => Navigator.pop(context),
             onConfirm: () => Navigator.pop(context, _selectedPosition),
@@ -890,12 +900,12 @@ class _AddTopicBtnW extends StatelessWidget {
   const _AddTopicBtnW({required this.icon, required this.label, required this.onTap,
       required this.color, required this.bg});
   @override
-  Widget build(BuildContext context) => InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), onTap: onTap,
+  Widget build(BuildContext context) => InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), onTap: onTap,
       borderRadius: BorderRadius.circular(7), child: Container(
         padding: const EdgeInsets.symmetric(vertical: 6),
         decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(7)),
         child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 13, color: color), const SizedBox(width: 5),
+          Icon(icon, size: 13, color: color), SizedBox(width: 5),
           Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
         ])));
 }
@@ -918,13 +928,13 @@ class _TopicsEmptyW extends StatelessWidget {
               color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.tag_rounded, size: 22, color: AppColors.primary),
+            child: Icon(Icons.tag_rounded, size: 22, color: AppColors.primary),
           ),
-          const SizedBox(height: 12),
-          const Text('No topics yet',
+          SizedBox(height: 12),
+          Text('No topics yet',
               style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-          const SizedBox(height: 6),
-          const Text(
+          SizedBox(height: 6),
+          Text(
             'Use the "Add Topic" button above to add the first topic for this material.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.6),
@@ -940,39 +950,40 @@ class _TopicItemW extends StatelessWidget {
   const _TopicItemW({required this.topic, required this.index, required this.onTap});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final readiness = _topicReadinessMeta(topic.readiness);
     return Material(
-      color: Colors.white,
+      color: AppColors.cardBg,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         hoverColor: Colors.transparent,
         splashColor: Colors.transparent,
         highlightColor: Colors.transparent,
-        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        overlayColor: WidgetStatePropertyAll(Colors.transparent),
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Container(
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: const Color(0xFFE8ECF2)),
-            boxShadow: const [BoxShadow(color: Color(0x0A0F172A), blurRadius: 10, offset: Offset(0, 4))],
+            border: Border.all(color: AppColors.borderSoft),
+            boxShadow: [BoxShadow(color: AppColors.shadowSoft, blurRadius: 10, offset: Offset(0, 4))],
           ),
           child: Row(children: [
             Container(
               width: 34,
               height: 34,
               decoration: BoxDecoration(
-                gradient: const LinearGradient(colors: [Color(0xFFEEF2FF), Color(0xFFF5F3FF)]),
+                gradient: LinearGradient(colors: [AppColors.badgeIndigoBg, AppColors.purpleBg]),
                 borderRadius: BorderRadius.circular(10),
               ),
               alignment: Alignment.center,
-              child: Text('${index + 1}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary)),
+              child: Text('${index + 1}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary)),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text(topic.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-              const SizedBox(height: 7),
+              Text(topic.title, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+              SizedBox(height: 7),
               Wrap(spacing: 6, runSpacing: 6, children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -982,23 +993,23 @@ class _TopicItemW extends StatelessWidget {
                 if (topic.estimatedDurationMinutes != null)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(999)),
-                    child: Text('~${topic.estimatedDurationMinutes} min', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                    decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(999)),
+                    child: Text('~${topic.estimatedDurationMinutes} min', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
                   ),
                 if (topic.learningOutcomeIds.isNotEmpty)
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(999)),
-                    child: Text('${topic.learningOutcomeIds.length} LO${topic.learningOutcomeIds.length == 1 ? '' : 's'}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                    decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(999)),
+                    child: Text('${topic.learningOutcomeIds.length} LO${topic.learningOutcomeIds.length == 1 ? '' : 's'}', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
                   ),
               ]),
             ])),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Container(
               width: 30,
               height: 30,
-              decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(10)),
-              child: const Icon(Icons.arrow_forward_ios_rounded, size: 13, color: AppColors.textHint),
+              decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(10)),
+              child: Icon(Icons.arrow_forward_ios_rounded, size: 13, color: AppColors.textHint),
             ),
           ]),
         ),
@@ -1038,6 +1049,7 @@ class _TopicPanelWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final mappedOutcomes = outcomes
         .where((o) => topic.learningOutcomeIds.contains(o.id) || topic.linkedOutcomeIds.contains(o.id.toString()) || topic.linkedOutcomeId == o.id.toString())
         .toList();
@@ -1063,7 +1075,7 @@ class _TopicPanelWidget extends StatelessWidget {
     );
 
     return Container(
-      color: const Color(0xFFF4F7FB),
+      color: AppColors.pageBg,
       child: Column(
         children: [
           _TopicStudioTopBar(
@@ -1078,7 +1090,7 @@ class _TopicPanelWidget extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(24, 22, 24, 42),
               child: Center(
                 child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 1320),
+                  constraints: BoxConstraints(maxWidth: 1320),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1096,7 +1108,7 @@ class _TopicPanelWidget extends StatelessWidget {
                         onEditTopic: onEditTopic,
                         onGenerate: onGenerate,
                       ),
-                      const SizedBox(height: 18),
+                      SizedBox(height: 18),
                       LayoutBuilder(
                         builder: (context, constraints) {
                           final wide = constraints.maxWidth >= 1080;
@@ -1111,17 +1123,17 @@ class _TopicPanelWidget extends StatelessWidget {
                                 isSubtopic: isSubtopic,
                                 parentTopicTitle: parentTopic?.title,
                               ),
-                              const SizedBox(height: 16),
+                              SizedBox(height: 16),
                               _TopicOutcomeBoard(
                                 outcomes: mappedOutcomes,
                                 onEditTopic: onEditTopic,
                               ),
-                              const SizedBox(height: 16),
+                              SizedBox(height: 16),
                               _TopicNotesBoard(
                                 topic: topic,
                                 onEditTopic: onEditTopic,
                               ),
-                              const SizedBox(height: 16),
+                              SizedBox(height: 16),
                               if (!isSubtopic)
                                 _TopicSubtopicBoard(
                                   topic: topic,
@@ -1151,7 +1163,7 @@ class _TopicPanelWidget extends StatelessWidget {
                             return Column(
                               children: [
                                 sideRail,
-                                const SizedBox(height: 16),
+                                SizedBox(height: 16),
                                 mainColumn,
                               ],
                             );
@@ -1161,7 +1173,7 @@ class _TopicPanelWidget extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Expanded(child: mainColumn),
-                              const SizedBox(width: 18),
+                              SizedBox(width: 18),
                               SizedBox(width: 360, child: sideRail),
                             ],
                           );
@@ -1215,12 +1227,13 @@ class _TopicStudioTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       height: 54,
       padding: const EdgeInsets.symmetric(horizontal: 18),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        border: Border(bottom: BorderSide(color: Color(0xFFE7ECF3))),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        border: Border(bottom: BorderSide(color: AppColors.borderGray)),
       ),
       child: Row(
         children: [
@@ -1230,51 +1243,51 @@ class _TopicStudioTopBar extends StatelessWidget {
               tooltip: 'Back to PDF',
               onTap: onBack,
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
           ],
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              color: const Color(0xFFF1F5F9),
+              color: AppColors.headerBg,
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: AppColors.border),
             ),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.picture_as_pdf_outlined, size: 14, color: AppColors.textMuted),
-                const SizedBox(width: 6),
+                Icon(Icons.picture_as_pdf_outlined, size: 14, color: AppColors.textMuted),
+                SizedBox(width: 6),
                 ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 190),
+                  constraints: BoxConstraints(maxWidth: 190),
                   child: Text(
                     materialTitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted),
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 12),
-          const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textHint),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
+          Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textHint),
+          SizedBox(width: 12),
           Expanded(
             child: Text(
               topicTitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: Color(0xFF0F172A)),
+              style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w800, color: AppColors.textTitle),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           TextButton.icon(
             onPressed: onEditTopic,
-            icon: const Icon(Icons.edit_rounded, size: 16),
-            label: const Text('Edit topic'),
+            icon: Icon(Icons.edit_rounded, size: 16),
+            label: Text('Edit topic'),
             style: TextButton.styleFrom(
               foregroundColor: AppColors.primary,
-              textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+              textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
             ),
           ),
         ],
@@ -1314,17 +1327,20 @@ class _TopicStudioHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final created = '${topic.createdAt.day}/${topic.createdAt.month}/${topic.createdAt.year}';
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF08111F), Color(0xFF0B2C73), Color(0xFF137FEC)],
+        gradient: LinearGradient(
+          colors: AppColors.isDark
+              ? [Color(0xFF08111F), Color(0xFF0B2C73), AppColors.primary]
+              : [AppColors.primary, AppColors.infoText, AppColors.purpleText],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(28),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(color: Color(0x24137FEC), blurRadius: 34, offset: Offset(0, 18)),
         ],
       ),
@@ -1350,7 +1366,7 @@ class _TopicStudioHero extends StatelessWidget {
               height: 220,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: const Color(0xFF7C3AED).withOpacity(0.24),
+                color: AppColors.purpleText.withOpacity(0.24),
               ),
             ),
           ),
@@ -1378,10 +1394,10 @@ class _TopicStudioHero extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     Text(
                       topic.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 30,
                         height: 1.13,
                         fontWeight: FontWeight.w900,
@@ -1389,7 +1405,7 @@ class _TopicStudioHero extends StatelessWidget {
                         letterSpacing: -0.7,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Wrap(
                       spacing: 14,
                       runSpacing: 9,
@@ -1401,7 +1417,7 @@ class _TopicStudioHero extends StatelessWidget {
                         _TopicHeroPathItem(icon: Icons.calendar_today_outlined, label: 'Created $created'),
                       ],
                     ),
-                    const SizedBox(height: 22),
+                    SizedBox(height: 22),
                     Wrap(
                       spacing: 10,
                       runSpacing: 10,
@@ -1433,7 +1449,7 @@ class _TopicStudioHero extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       left,
-                      const SizedBox(height: 18),
+                      SizedBox(height: 18),
                       metrics,
                     ],
                   );
@@ -1443,7 +1459,7 @@ class _TopicStudioHero extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(child: left),
-                    const SizedBox(width: 26),
+                    SizedBox(width: 26),
                     SizedBox(width: 350, child: metrics),
                   ],
                 );
@@ -1471,19 +1487,20 @@ class _TopicHeroMetrics extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.12),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.14)),
+        border: Border.all(color: AppColors.cardBg.withOpacity(0.14)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Expanded(
+              Expanded(
                 child: Text(
                   'Readiness score',
                   style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
@@ -1491,17 +1508,17 @@ class _TopicHeroMetrics extends StatelessWidget {
               ),
               Text(
                 '$coverageScore%',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w900, color: Colors.white),
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _TopicProgressTrack(value: coverageScore / 100, bright: true),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Row(
             children: [
               Expanded(child: _TopicGlassMetric(label: 'Outcomes', value: mappedOutcomesCount == 0 ? '0' : '$mappedOutcomesCount')),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Expanded(child: _TopicGlassMetric(label: isSubtopic ? 'Level' : 'Subtopics', value: isSubtopic ? 'Leaf' : '$subtopicCount')),
             ],
           ),
@@ -1532,6 +1549,7 @@ class _TopicBriefBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final summary = (topic.description?.trim().isNotEmpty ?? false)
         ? topic.description!.trim()
         : 'No topic brief yet. Add a concise teaching scope so the instructor, question generator, and reviewers know what this topic should cover.';
@@ -1547,11 +1565,11 @@ class _TopicBriefBoard extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               height: 1.65,
-              color: (topic.description?.trim().isNotEmpty ?? false) ? const Color(0xFF334155) : AppColors.textMuted,
+              color: (topic.description?.trim().isNotEmpty ?? false) ? AppColors.textGray : AppColors.textMuted,
               fontWeight: (topic.description?.trim().isNotEmpty ?? false) ? FontWeight.w600 : FontWeight.w500,
             ),
           ),
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
           LayoutBuilder(
             builder: (context, constraints) {
               final wide = constraints.maxWidth > 720;
@@ -1637,6 +1655,7 @@ class _TopicOutcomeBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _TopicStudioCard(
       title: 'Outcome alignment',
       subtitle: outcomes.isEmpty
@@ -1645,15 +1664,15 @@ class _TopicOutcomeBoard extends StatelessWidget {
       icon: Icons.flag_outlined,
       action: TextButton.icon(
         onPressed: onEditTopic,
-        icon: const Icon(Icons.add_link_rounded, size: 16),
+        icon: Icon(Icons.add_link_rounded, size: 16),
         label: Text(outcomes.isEmpty ? 'Map outcomes' : 'Update map'),
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
-          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+          textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
         ),
       ),
       child: outcomes.isEmpty
-          ? const _TopicEmptyPanel(
+          ? _TopicEmptyPanel(
               icon: Icons.flag_outlined,
               title: 'No mapped outcomes',
               message: 'Open the edit popup and connect this topic to the outcomes it supports before generating graded questions.',
@@ -1662,7 +1681,7 @@ class _TopicOutcomeBoard extends StatelessWidget {
               children: [
                 for (var i = 0; i < outcomes.length; i++) ...[
                   _OutcomeTilePro(outcome: outcomes[i], index: i),
-                  if (i != outcomes.length - 1) const SizedBox(height: 10),
+                  if (i != outcomes.length - 1) SizedBox(height: 10),
                 ],
               ],
             ),
@@ -1678,6 +1697,7 @@ class _TopicNotesBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final notes = topic.instructorNotes?.trim();
     final hasNotes = notes != null && notes.isNotEmpty;
     return _TopicStudioCard(
@@ -1690,16 +1710,16 @@ class _TopicNotesBoard extends StatelessWidget {
         label: Text(hasNotes ? 'Edit notes' : 'Add notes'),
         style: TextButton.styleFrom(
           foregroundColor: AppColors.primary,
-          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+          textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
         ),
       ),
       child: Container(
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: hasNotes ? const Color(0xFFF8FAFC) : const Color(0xFFFFFBEB),
+          color: hasNotes ? AppColors.surfaceBg : AppColors.warningSoftBg,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: hasNotes ? const Color(0xFFE2E8F0) : const Color(0xFFFDE68A)),
+          border: Border.all(color: hasNotes ? AppColors.border : AppColors.warningBorder),
         ),
         child: Text(
           hasNotes
@@ -1708,7 +1728,7 @@ class _TopicNotesBoard extends StatelessWidget {
           style: TextStyle(
             fontSize: 13.5,
             height: 1.65,
-            color: hasNotes ? const Color(0xFF334155) : const Color(0xFF92400E),
+            color: hasNotes ? AppColors.textGray : AppColors.warningText,
             fontWeight: hasNotes ? FontWeight.w600 : FontWeight.w500,
           ),
         ),
@@ -1732,20 +1752,21 @@ class _TopicSubtopicBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _TopicStudioCard(
       title: 'Subtopic map',
       subtitle: 'Break a broad topic into smaller teachable anchors.',
       icon: Icons.account_tree_outlined,
       action: FilledButton.icon(
         onPressed: onAddSubtopic,
-        icon: const Icon(Icons.add_rounded, size: 16),
-        label: const Text('Add subtopic'),
+        icon: Icon(Icons.add_rounded, size: 16),
+        label: Text('Add subtopic'),
         style: FilledButton.styleFrom(
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(13)),
-          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
+          textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w800),
         ),
       ),
       child: subtopics.isEmpty
@@ -1762,7 +1783,7 @@ class _TopicSubtopicBoard extends StatelessWidget {
                     index: i,
                     onTap: () => onOpenSubtopic(subtopics[i]),
                   ),
-                  if (i != subtopics.length - 1) const SizedBox(height: 10),
+                  if (i != subtopics.length - 1) SizedBox(height: 10),
                 ],
               ],
             ),
@@ -1777,6 +1798,7 @@ class _TopicParentBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _TopicStudioCard(
       title: 'Hierarchy',
       subtitle: 'This item is a final-level subtopic.',
@@ -1784,23 +1806,23 @@ class _TopicParentBoard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: const Color(0xFFF8FAFC),
+          color: AppColors.surfaceBg,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE2E8F0)),
+          border: Border.all(color: AppColors.border),
         ),
         child: Row(
           children: [
-            const _TopicSoftIcon(icon: Icons.subdirectory_arrow_right_rounded, color: AppColors.primary, bg: AppColors.primarySoft),
-            const SizedBox(width: 12),
+            _TopicSoftIcon(icon: Icons.subdirectory_arrow_right_rounded, color: AppColors.primary, bg: AppColors.primarySoft),
+            SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Parent topic', style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, fontWeight: FontWeight.w700)),
-                  const SizedBox(height: 4),
+                  Text('Parent topic', style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, fontWeight: FontWeight.w700)),
+                  SizedBox(height: 4),
                   Text(
                     parentTopicTitle ?? 'Parent topic',
-                    style: const TextStyle(fontSize: 15, color: AppColors.textTitle, fontWeight: FontWeight.w800),
+                    style: TextStyle(fontSize: 15, color: AppColors.textTitle, fontWeight: FontWeight.w800),
                   ),
                 ],
               ),
@@ -1839,6 +1861,7 @@ class _TopicCommandRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final outcomeTotal = totalOutcomesCount == 0 ? mappedOutcomesCount : totalOutcomesCount;
     final outcomeProgress = outcomeTotal == 0 ? 0.0 : (mappedOutcomesCount / outcomeTotal).clamp(0.0, 1.0).toDouble();
 
@@ -1857,14 +1880,14 @@ class _TopicCommandRail extends StatelessWidget {
                 primary: true,
                 onTap: onEditTopic,
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               _TopicCommandButton(
                 icon: Icons.auto_awesome_rounded,
                 title: isSubtopic ? 'Generate from subtopic' : 'Generate questions',
                 subtitle: 'Use this item as the generation anchor.',
                 onTap: onGenerate,
               ),
-              const SizedBox(height: 10),
+              SizedBox(height: 10),
               _TopicCommandButton(
                 icon: Icons.edit_note_rounded,
                 title: 'Draft manual question',
@@ -1872,7 +1895,7 @@ class _TopicCommandRail extends StatelessWidget {
                 onTap: onAddManualQuestion,
               ),
               if (!isSubtopic) ...[
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 _TopicCommandButton(
                   icon: Icons.account_tree_outlined,
                   title: 'Add subtopic',
@@ -1883,7 +1906,7 @@ class _TopicCommandRail extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         _TopicStudioCard(
           title: 'Review health',
           subtitle: 'Quick signal before generating questions.',
@@ -1891,13 +1914,13 @@ class _TopicCommandRail extends StatelessWidget {
           child: Column(
             children: [
               _TopicHealthRow(label: 'Topic readiness', value: coverageScore / 100, trailing: '$coverageScore%'),
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               _TopicHealthRow(
                 label: 'Outcome alignment',
                 value: outcomeProgress,
                 trailing: '$mappedOutcomesCount/$outcomeTotal',
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               _TopicHealthRow(
                 label: isSubtopic ? 'Hierarchy depth' : 'Subtopic structure',
                 value: isSubtopic ? 1.0 : (subtopicCount > 0 ? 1.0 : 0.0),
@@ -1906,7 +1929,7 @@ class _TopicCommandRail extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         _TopicStudioCard(
           title: 'Delivery timeline',
           subtitle: 'Recommended order for preparing this topic.',
@@ -1959,14 +1982,15 @@ class _TopicStudioCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE7ECF3)),
-        boxShadow: const [BoxShadow(color: Color(0x080F172A), blurRadius: 18, offset: Offset(0, 8))],
+        border: Border.all(color: AppColors.borderGray),
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 18, offset: Offset(0, 8))],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1975,24 +1999,24 @@ class _TopicStudioCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _TopicSoftIcon(icon: icon, color: AppColors.primary, bg: AppColors.primarySoft),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                    const SizedBox(height: 4),
-                    Text(subtitle, style: const TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
+                    Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+                    SizedBox(height: 4),
+                    Text(subtitle, style: TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
                   ],
                 ),
               ),
               if (action != null) ...[
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 action!,
               ],
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           child,
         ],
       ),
@@ -2019,26 +2043,27 @@ class _TopicSummaryTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(15),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
           _TopicSoftIcon(icon: icon, color: accent, bg: soft),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textMuted)),
-                const SizedBox(height: 5),
-                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                const SizedBox(height: 3),
-                Text(helper, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, height: 1.35, color: AppColors.textMuted)),
+                Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textMuted)),
+                SizedBox(height: 5),
+                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+                SizedBox(height: 3),
+                Text(helper, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12, height: 1.35, color: AppColors.textMuted)),
               ],
             ),
           ),
@@ -2065,8 +2090,9 @@ class _TopicCommandButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = primary ? AppColors.primary : const Color(0xFFF8FAFC);
-    final fg = primary ? Colors.white : const Color(0xFF0F172A);
+    Theme.of(context);
+    final bg = primary ? AppColors.primary : AppColors.surfaceBg;
+    final fg = primary ? Colors.white : AppColors.textTitle;
     final sub = primary ? Colors.white.withOpacity(0.72) : AppColors.textMuted;
     return Material(
       color: bg,
@@ -2078,7 +2104,7 @@ class _TopicCommandButton extends StatelessWidget {
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: primary ? AppColors.primary : const Color(0xFFE2E8F0)),
+            border: Border.all(color: primary ? AppColors.primary : AppColors.border),
           ),
           child: Row(
             children: [
@@ -2091,13 +2117,13 @@ class _TopicCommandButton extends StatelessWidget {
                 ),
                 child: Icon(icon, size: 20, color: primary ? Colors.white : AppColors.primary),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: fg)),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(subtitle, style: TextStyle(fontSize: 12, height: 1.35, color: sub, fontWeight: FontWeight.w500)),
                   ],
                 ),
@@ -2119,13 +2145,14 @@ class _OutcomeTilePro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final code = outcome.code.trim().isEmpty ? 'LO${index + 1}' : outcome.code;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -2137,17 +2164,17 @@ class _OutcomeTilePro extends StatelessWidget {
               borderRadius: BorderRadius.circular(14),
             ),
             alignment: Alignment.center,
-            child: Text(code, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary)),
+            child: Text(code, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary)),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(outcome.title, style: const TextStyle(fontSize: 14, height: 1.35, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
+                Text(outcome.title, style: TextStyle(fontSize: 14, height: 1.35, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
                 if (outcome.description?.trim().isNotEmpty ?? false) ...[
-                  const SizedBox(height: 5),
-                  Text(outcome.description!.trim(), maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12.5, height: 1.4, color: AppColors.textMuted)),
+                  SizedBox(height: 5),
+                  Text(outcome.description!.trim(), maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 12.5, height: 1.4, color: AppColors.textMuted)),
                 ],
               ],
             ),
@@ -2167,6 +2194,7 @@ class _SubtopicTilePro extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final readiness = _topicReadinessMeta(subtopic.readiness);
     return Material(
       color: Colors.transparent,
@@ -2176,9 +2204,9 @@ class _SubtopicTilePro extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: const Color(0xFFF8FAFC),
+            color: AppColors.surfaceBg,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: AppColors.border),
           ),
           child: Row(
             children: [
@@ -2190,20 +2218,20 @@ class _SubtopicTilePro extends StatelessWidget {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 alignment: Alignment.center,
-                child: Text('${index + 1}', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                child: Text('${index + 1}', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.primary)),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(subtopic.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                    const SizedBox(height: 5),
-                    Text('${subtopic.difficulty.label} • ${readiness.label}', style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted)),
+                    Text(subtopic.title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+                    SizedBox(height: 5),
+                    Text('${subtopic.difficulty.label} • ${readiness.label}', style: TextStyle(fontSize: 12.5, color: AppColors.textMuted)),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
+              Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
             ],
           ),
         ),
@@ -2221,16 +2249,17 @@ class _TopicHealthRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Expanded(child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: Color(0xFF334155)))),
-            Text(trailing, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
+            Expanded(child: Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textGray))),
+            Text(trailing, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         _TopicProgressTrack(value: value),
       ],
     );
@@ -2247,6 +2276,7 @@ class _TopicTimelineStep extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -2256,24 +2286,24 @@ class _TopicTimelineStep extends StatelessWidget {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: done ? _K.green : const Color(0xFFEFF6FF),
+                color: done ? _K.green : AppColors.primarySoft,
                 borderRadius: BorderRadius.circular(10),
               ),
               alignment: Alignment.center,
               child: done
-                  ? const Icon(Icons.check_rounded, size: 16, color: Colors.white)
-                  : Text('$index', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                  ? Icon(Icons.check_rounded, size: 16, color: Colors.white)
+                  : Text('$index', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary)),
             ),
             if (!last)
               Container(
                 width: 2,
                 height: 26,
                 margin: const EdgeInsets.symmetric(vertical: 4),
-                color: const Color(0xFFE2E8F0),
+                color: AppColors.border,
               ),
           ],
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Expanded(
           child: Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -2282,7 +2312,7 @@ class _TopicTimelineStep extends StatelessWidget {
               style: TextStyle(
                 fontSize: 13,
                 height: 1.35,
-                color: done ? const Color(0xFF0F172A) : AppColors.textMuted,
+                color: done ? AppColors.textTitle : AppColors.textMuted,
                 fontWeight: FontWeight.w800,
               ),
             ),
@@ -2302,26 +2332,27 @@ class _TopicEmptyPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _TopicSoftIcon(icon: icon, color: AppColors.primary, bg: AppColors.primarySoft),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900, color: Color(0xFF0F172A))),
-                const SizedBox(height: 5),
-                Text(message, style: const TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.textMuted)),
+                Text(title, style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+                SizedBox(height: 5),
+                Text(message, style: TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.textMuted)),
               ],
             ),
           ),
@@ -2339,12 +2370,13 @@ class _TopicProgressTrack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final v = value.clamp(0.0, 1.0).toDouble();
     return ClipRRect(
       borderRadius: BorderRadius.circular(999),
       child: Container(
         height: 8,
-        color: bright ? Colors.white.withOpacity(0.16) : const Color(0xFFE2E8F0),
+        color: bright ? Colors.white.withOpacity(0.16) : AppColors.border,
         alignment: Alignment.centerLeft,
         child: FractionallySizedBox(
           widthFactor: v,
@@ -2352,8 +2384,8 @@ class _TopicProgressTrack extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 colors: bright
-                    ? const [Colors.white, Color(0xFFBAE6FD)]
-                    : const [Color(0xFF137FEC), Color(0xFF7C3AED)],
+                    ? [Colors.white, AppColors.infoBorder]
+                    : [AppColors.primary, AppColors.purpleText],
               ),
             ),
           ),
@@ -2371,19 +2403,20 @@ class _TopicGlassChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.14)),
+        border: Border.all(color: AppColors.cardBg.withOpacity(0.14)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: Colors.white),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)),
+          SizedBox(width: 6),
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white)),
         ],
       ),
     );
@@ -2398,13 +2431,14 @@ class _TopicHeroPathItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 14, color: Colors.white.withOpacity(0.78)),
-        const SizedBox(width: 6),
+        SizedBox(width: 6),
         ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 240),
+          constraints: BoxConstraints(maxWidth: 240),
           child: Text(
             label,
             maxLines: 1,
@@ -2428,6 +2462,7 @@ class _TopicHeroButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Material(
       color: primary ? Colors.white : Colors.white.withOpacity(0.12),
       borderRadius: BorderRadius.circular(14),
@@ -2443,14 +2478,14 @@ class _TopicHeroButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 17, color: primary ? const Color(0xFF0F172A) : Colors.white),
-              const SizedBox(width: 8),
+              Icon(icon, size: 17, color: primary ? AppColors.textTitle : Colors.white),
+              SizedBox(width: 8),
               Text(
                 label,
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w900,
-                  color: primary ? const Color(0xFF0F172A) : Colors.white,
+                  color: primary ? AppColors.textTitle : Colors.white,
                 ),
               ),
             ],
@@ -2469,19 +2504,20 @@ class _TopicGlassMetric extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.10),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: AppColors.cardBg.withOpacity(0.10)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.72))),
-          const SizedBox(height: 5),
-          Text(value, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
+          SizedBox(height: 5),
+          Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white)),
         ],
       ),
     );
@@ -2497,10 +2533,11 @@ class _TopicIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: const Color(0xFFF8FAFC),
+        color: AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,
@@ -2510,7 +2547,7 @@ class _TopicIconButton extends StatelessWidget {
             height: 36,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
+              border: Border.all(color: AppColors.border),
             ),
             child: Icon(icon, size: 15, color: AppColors.textMuted),
           ),
@@ -2529,6 +2566,7 @@ class _TopicSoftIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: 42,
       height: 42,
@@ -2553,6 +2591,7 @@ class _TopicSubtopicsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _CardWidget(
       header: _HdrWidget(
         icon: Icons.account_tree_outlined,
@@ -2560,8 +2599,8 @@ class _TopicSubtopicsCard extends StatelessWidget {
         title: 'Subtopics',
         trailing: ElevatedButton.icon(
           onPressed: onAddSubtopic,
-          icon: const Icon(Icons.add_rounded, size: 16),
-          label: const Text('Add Subtopic'),
+          icon: Icon(Icons.add_rounded, size: 16),
+          label: Text('Add Subtopic'),
           style: ElevatedButton.styleFrom(
             elevation: 0,
             backgroundColor: AppColors.primary,
@@ -2578,14 +2617,14 @@ class _TopicSubtopicsCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.all(18),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8FAFC),
+                  color: AppColors.surfaceBg,
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: const Color(0xFFE2E8F0)),
+                  border: Border.all(color: AppColors.border),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'No subtopics yet',
                       style: TextStyle(
                         fontSize: 14,
@@ -2593,20 +2632,20 @@ class _TopicSubtopicsCard extends StatelessWidget {
                         color: AppColors.textTitle,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    SizedBox(height: 6),
                     Text(
                       'Break "${topic.title}" into smaller teaching units so questions and notes stay organized.',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
                         height: 1.5,
                         color: AppColors.textMuted,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     TextButton.icon(
                       onPressed: onAddSubtopic,
-                      icon: const Icon(Icons.add_rounded, size: 16),
-                      label: const Text('Create first subtopic'),
+                      icon: Icon(Icons.add_rounded, size: 16),
+                      label: Text('Create first subtopic'),
                     ),
                   ],
                 ),
@@ -2618,15 +2657,15 @@ class _TopicSubtopicsCard extends StatelessWidget {
                       hoverColor: Colors.transparent,
                       splashColor: Colors.transparent,
                       highlightColor: Colors.transparent,
-                      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                      overlayColor: WidgetStatePropertyAll(Colors.transparent),
                       borderRadius: BorderRadius.circular(16),
                       onTap: () => onOpenSubtopic(subtopic),
                       child: Container(
                         padding: const EdgeInsets.all(14),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: AppColors.cardBg,
                           borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: const Color(0xFFE5E7EB)),
+                          border: Border.all(color: AppColors.borderGray),
                         ),
                         child: Row(
                           children: [
@@ -2634,32 +2673,32 @@ class _TopicSubtopicsCard extends StatelessWidget {
                               width: 40,
                               height: 40,
                               decoration: BoxDecoration(
-                                color: const Color(0xFFEAF3FF),
+                                color: AppColors.infoBg,
                                 borderRadius: BorderRadius.circular(12),
                               ),
-                              child: const Icon(
+                              child: Icon(
                                 Icons.subdirectory_arrow_right_rounded,
                                 color: AppColors.primary,
                                 size: 18,
                               ),
                             ),
-                            const SizedBox(width: 12),
+                            SizedBox(width: 12),
                             Expanded(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(
                                     subtopic.title,
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 14,
                                       fontWeight: FontWeight.w700,
                                       color: AppColors.textTitle,
                                     ),
                                   ),
-                                  const SizedBox(height: 4),
+                                  SizedBox(height: 4),
                                   Text(
                                     '${subtopic.difficulty.label} • ${subtopic.readiness.label}',
-                                    style: const TextStyle(
+                                    style: TextStyle(
                                       fontSize: 12,
                                       color: AppColors.textMuted,
                                     ),
@@ -2667,12 +2706,12 @@ class _TopicSubtopicsCard extends StatelessWidget {
                                 ],
                               ),
                             ),
-                            const Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
+                            Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(height: 10),
+                    SizedBox(height: 10),
                   ],
                 ],
               ),
@@ -2706,6 +2745,7 @@ class _TopicHeroCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final created = '${topic.createdAt.day}/${topic.createdAt.month}/${topic.createdAt.year}';
     final statusChips = [
       _TopicStatusChip(
@@ -2715,7 +2755,7 @@ class _TopicHeroCard extends StatelessWidget {
         bg: AppColors.primarySoft,
       ),
       if (topic.isRequired)
-        const _TopicStatusChip(
+        _TopicStatusChip(
           icon: Icons.check_circle_outline_rounded,
           label: 'Required',
           fg: _K.blue,
@@ -2728,13 +2768,15 @@ class _TopicHeroCard extends StatelessWidget {
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [Color(0xFF0F172A), Color(0xFF1D4ED8), Color(0xFF7C3AED)],
+        gradient: LinearGradient(
+          colors: AppColors.isDark
+              ? [Color(0xFF0F172A), AppColors.infoText, AppColors.purpleText]
+              : [AppColors.primary, AppColors.infoText, AppColors.purpleText],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             color: Color(0x1A1D4ED8),
             blurRadius: 30,
@@ -2748,7 +2790,7 @@ class _TopicHeroCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Wrap(spacing: 8, runSpacing: 8, children: statusChips),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2758,7 +2800,7 @@ class _TopicHeroCard extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: Colors.white.withOpacity(0.14),
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.white.withOpacity(0.14)),
+                    border: Border.all(color: AppColors.cardBg.withOpacity(0.14)),
                   ),
                   child: Icon(
                     isSubtopic ? Icons.subdirectory_arrow_right_rounded : Icons.auto_stories_rounded,
@@ -2766,21 +2808,21 @@ class _TopicHeroCard extends StatelessWidget {
                     size: 28,
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         topic.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 25,
                           fontWeight: FontWeight.w800,
                           color: Colors.white,
                           height: 1.2,
                         ),
                       ),
-                      const SizedBox(height: 8),
+                      SizedBox(height: 8),
                       Wrap(
                         spacing: 12,
                         runSpacing: 8,
@@ -2796,21 +2838,21 @@ class _TopicHeroCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 16),
+                SizedBox(width: 16),
                 FilledButton.icon(
                   onPressed: onManage,
                   style: FilledButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF111827),
+                    backgroundColor: AppColors.cardBg,
+                    foregroundColor: AppColors.textTitle,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   ),
-                  icon: const Icon(Icons.tune_rounded, size: 18),
-                  label: const Text('Manage'),
+                  icon: Icon(Icons.tune_rounded, size: 18),
+                  label: Text('Manage'),
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             Row(
               children: [
                 Expanded(
@@ -2820,7 +2862,7 @@ class _TopicHeroCard extends StatelessWidget {
                     helper: mappedOutcomesCount == 0 ? 'Needs alignment' : 'Aligned with course goals',
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: _HeroStat(
                     label: 'Question workflow',
@@ -2828,7 +2870,7 @@ class _TopicHeroCard extends StatelessWidget {
                     helper: topic.readiness == TopicReadiness.ready ? 'Safe to build assessment coverage' : 'Refine content first',
                   ),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: _HeroStat(
                     label: isSubtopic ? 'Hierarchy' : 'Topic type',
@@ -2864,6 +2906,7 @@ class _TopicInsightsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final cards = [
       _TopicInsightData(
         title: 'Delivery status',
@@ -3015,6 +3058,7 @@ class _TopicStatusChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
@@ -3026,7 +3070,7 @@ class _TopicStatusChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: fg),
-          const SizedBox(width: 6),
+          SizedBox(width: 6),
           Text(
             label,
             style: TextStyle(
@@ -3049,11 +3093,12 @@ class _TopicBreadcrumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 14, color: Colors.white.withOpacity(0.78)),
-        const SizedBox(width: 5),
+        SizedBox(width: 5),
         Text(
           text,
           style: TextStyle(
@@ -3080,12 +3125,13 @@ class _HeroStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.10),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: AppColors.cardBg.withOpacity(0.10)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -3098,16 +3144,16 @@ class _HeroStat extends StatelessWidget {
               color: Colors.white.withOpacity(0.78),
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15.5,
               fontWeight: FontWeight.w800,
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             helper,
             style: TextStyle(
@@ -3129,11 +3175,12 @@ class _TopicInsightCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE9EEF5)),
+        border: Border.all(color: AppColors.borderSoft),
       ),
       padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
       child: Column(
@@ -3148,20 +3195,20 @@ class _TopicInsightCard extends StatelessWidget {
             ),
             child: Icon(data.icon, color: data.accent, size: 20),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Text(
             data.title,
-            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+            style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             data.value,
-            style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: AppColors.textTitle),
+            style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w800, color: AppColors.textTitle),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             data.caption,
-            style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
+            style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
           ),
         ],
       ),
@@ -3176,8 +3223,9 @@ class _TopicSmartActionsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _CardWidget(
-      header: const _HdrWidget(
+      header: _HdrWidget(
         icon: Icons.flash_on_rounded,
         iconColor: AppColors.primary,
         title: 'Smart Actions',
@@ -3186,7 +3234,7 @@ class _TopicSmartActionsCard extends StatelessWidget {
         children: [
           for (var i = 0; i < actions.length; i++) ...[
             _TopicActionTile(data: actions[i]),
-            if (i != actions.length - 1) const Divider(height: 1, color: Color(0xFFEEF2F6)),
+            if (i != actions.length - 1) Divider(height: 1, color: AppColors.borderSoft),
           ],
         ],
       ),
@@ -3201,6 +3249,7 @@ class _TopicActionTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -3218,19 +3267,19 @@ class _TopicActionTile extends StatelessWidget {
                 ),
                 child: Icon(data.icon, color: data.accent, size: 20),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(data.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-                    const SizedBox(height: 4),
-                    Text(data.subtitle, style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.4)),
+                    Text(data.title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                    SizedBox(height: 4),
+                    Text(data.subtitle, style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.4)),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              const Icon(Icons.arrow_outward_rounded, size: 18, color: AppColors.textMuted),
+              SizedBox(width: 12),
+              Icon(Icons.arrow_outward_rounded, size: 18, color: AppColors.textMuted),
             ],
           ),
         ),
@@ -3246,8 +3295,9 @@ class _TopicTimelineCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _CardWidget(
-      header: const _HdrWidget(
+      header: _HdrWidget(
         icon: Icons.schedule_rounded,
         iconColor: AppColors.primary,
         title: 'Topic timeline',
@@ -3269,22 +3319,22 @@ class _TopicTimelineCard extends StatelessWidget {
                     ),
                     child: Icon(entries[i].icon, size: 16, color: AppColors.primary),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(entries[i].title, style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-                        const SizedBox(height: 4),
-                        Text(entries[i].subtitle, style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.45)),
+                        Text(entries[i].title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                        SizedBox(height: 4),
+                        Text(entries[i].subtitle, style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.45)),
                       ],
                     ),
                   ),
                 ],
               ),
-              if (i != entries.length - 1) const Padding(
+              if (i != entries.length - 1) Padding(
                 padding: EdgeInsets.only(left: 15, top: 8, bottom: 8),
-                child: Divider(height: 1, color: Color(0xFFEEF2F6)),
+                child: Divider(height: 1, color: AppColors.borderSoft),
               ),
             ],
           ],
@@ -3297,25 +3347,25 @@ class _TopicTimelineCard extends StatelessWidget {
 _TopicMeta _topicReadinessMeta(TopicReadiness readiness) {
   switch (readiness) {
     case TopicReadiness.ready:
-      return const _TopicMeta(
+      return _TopicMeta(
         label: 'Ready',
         icon: Icons.check_circle_rounded,
         fg: _K.green,
         bg: _K.greenSoft,
       );
     case TopicReadiness.review:
-      return const _TopicMeta(
+      return _TopicMeta(
         label: 'Needs Review',
         icon: Icons.pending_actions_rounded,
         fg: _K.amber,
         bg: _K.amberSoft,
       );
     case TopicReadiness.draft:
-      return const _TopicMeta(
+      return _TopicMeta(
         label: 'Draft',
         icon: Icons.edit_note_rounded,
         fg: AppColors.textMuted,
-        bg: Color(0xFFF1F5F9),
+        bg: AppColors.headerBg,
       );
   }
 }
@@ -3323,25 +3373,25 @@ _TopicMeta _topicReadinessMeta(TopicReadiness readiness) {
 _TopicMeta _topicDifficultyMeta(TopicDifficulty difficulty) {
   switch (difficulty) {
     case TopicDifficulty.beginner:
-      return const _TopicMeta(
+      return _TopicMeta(
         label: 'Beginner',
         icon: Icons.wb_sunny_outlined,
         fg: _K.blue,
         bg: _K.blueSoft,
       );
     case TopicDifficulty.intermediate:
-      return const _TopicMeta(
+      return _TopicMeta(
         label: 'Intermediate',
         icon: Icons.stacked_bar_chart_rounded,
         fg: _K.amber,
         bg: _K.amberSoft,
       );
     case TopicDifficulty.advanced:
-      return const _TopicMeta(
+      return _TopicMeta(
         label: 'Advanced',
         icon: Icons.local_fire_department_outlined,
-        fg: Color(0xFFDC2626),
-        bg: Color(0xFFFEF2F2),
+        fg: AppColors.dangerText,
+        bg: AppColors.dangerBg,
       );
   }
 }

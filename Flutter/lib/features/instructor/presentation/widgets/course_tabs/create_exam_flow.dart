@@ -195,29 +195,30 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final filtered = _filteredQuestions;
     return Container(
-      color: const Color(0xFFF8FAFC),
+      color: AppColors.surfaceBg,
       child: SafeArea(
         top: false,
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(28, 38, 28, 44),
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1160),
+              constraints: BoxConstraints(maxWidth: 1160),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildTitleBlock(),
-                  const SizedBox(height: 24),
+                  SizedBox(height: 24),
                   _buildStepper(),
-                  const SizedBox(height: 30),
+                  SizedBox(height: 30),
                   if (_error != null) ...[
                     _ErrorBanner(message: _error!),
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                   ],
                   AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 140),
+                    duration: Duration(milliseconds: 140),
                     switchInCurve: Curves.easeOut,
                     switchOutCurve: Curves.easeIn,
                     child: KeyedSubtree(
@@ -229,7 +230,7 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
                       },
                     ),
                   ),
-                  const SizedBox(height: 26),
+                  SizedBox(height: 26),
                   _buildFooter(),
                 ],
               ),
@@ -245,26 +246,26 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
     return Container(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 24),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
         children: [
           IconButton(
             onPressed: _saving ? null : _cancelFlow,
-            icon: const Icon(Icons.close_rounded),
+            icon: Icon(Icons.close_rounded),
             tooltip: 'Close',
           ),
-          const SizedBox(width: 8),
-          const Text(
+          SizedBox(width: 8),
+          Text(
             'Create Exam',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
           ),
-          const Spacer(),
+          Spacer(),
           Text(
             widget.course.title,
-            style: const TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600),
+            style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600),
           ),
         ],
       ),
@@ -283,26 +284,26 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Create New Exam',
-                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)),
+                style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.textTitle),
               ),
-              const SizedBox(height: 4),
-              Text('Step $_step: $subtitle', style: const TextStyle(color: AppColors.textMuted)),
+              SizedBox(height: 4),
+              Text('Step $_step: $subtitle', style: TextStyle(color: AppColors.textMuted)),
             ],
           ),
         ),
         OutlinedButton.icon(
           onPressed: _saving ? null : _cancelFlow,
-          icon: const Icon(Icons.save_outlined, size: 16),
-          label: const Text('Save Draft'),
+          icon: Icon(Icons.save_outlined, size: 16),
+          label: Text('Save Draft'),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         ElevatedButton.icon(
           onPressed: _saving ? null : _createExam,
           icon: _saving
-              ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
-              : const Icon(Icons.rocket_launch_outlined, size: 16),
+              ? SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+              : Icon(Icons.rocket_launch_outlined, size: 16),
           label: Text(_saving ? 'Publishing...' : 'Publish Quiz'),
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.primary,
@@ -335,21 +336,21 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
             controller: _titleCtrl,
             decoration: _input('e.g., Midterm Exam - ${widget.course.title}'),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
           _Label('Description'),
           TextField(
             controller: _descriptionCtrl,
             maxLines: 3,
             decoration: _input('Short description visible to students...'),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
           _Label('Instructions'),
           TextField(
             controller: _instructionsCtrl,
             maxLines: 5,
             decoration: _input('Enter detailed instructions here...'),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
           Row(
             children: [
               Expanded(
@@ -360,13 +361,13 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
                     DropdownButtonFormField<String>(
                       value: 'quiz',
                       decoration: _input('Quiz'),
-                      items: const [DropdownMenuItem(value: 'quiz', child: Text('Quiz'))],
+                      items: [DropdownMenuItem(value: 'quiz', child: Text('Quiz'))],
                       onChanged: null,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 18),
+              SizedBox(width: 18),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -404,14 +405,14 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
                         controller: _searchCtrl,
                         onChanged: (_) => setState(() {}),
                         decoration: _input('Search questions by keyword, topic, or module').copyWith(
-                          prefixIcon: const Icon(Icons.search_rounded, size: 18),
+                          prefixIcon: Icon(Icons.search_rounded, size: 18),
                         ),
                       ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     DropdownButton<String>(
                       value: _difficultyFilter,
-                      items: const [
+                      items: [
                         DropdownMenuItem(value: 'all', child: Text('Any Difficulty')),
                         DropdownMenuItem(value: 'easy', child: Text('Easy')),
                         DropdownMenuItem(value: 'medium', child: Text('Medium')),
@@ -419,10 +420,10 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
                       ],
                       onChanged: (value) => setState(() => _difficultyFilter = value ?? 'all'),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12),
                     DropdownButton<String>(
                       value: _typeFilter,
-                      items: const [
+                      items: [
                         DropdownMenuItem(value: 'all', child: Text('All Types')),
                         DropdownMenuItem(value: 'multiple_choice', child: Text('Multiple Choice')),
                         DropdownMenuItem(value: 'multi_select', child: Text('Multi Select')),
@@ -435,9 +436,9 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               if (_savedQuestions.isEmpty)
-                const _EmptyExamQuestions()
+                _EmptyExamQuestions()
               else
                 ...filtered.map((q) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
@@ -460,7 +461,7 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
             ],
           ),
         ),
-        const SizedBox(width: 24),
+        SizedBox(width: 24),
         SizedBox(width: 320, child: _buildSummaryCard()),
       ],
     );
@@ -478,8 +479,8 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _SectionTitle(icon: Icons.timer_outlined, title: 'Timing & Attempts'),
-                    const SizedBox(height: 20),
+                    _SectionTitle(icon: Icons.timer_outlined, title: 'Timing & Attempts'),
+                    SizedBox(height: 20),
                     Row(
                       children: [
                         Expanded(
@@ -495,7 +496,7 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 16),
+                        SizedBox(width: 16),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -504,7 +505,7 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
                               DropdownButtonFormField<int>(
                                 value: _maxAttempts,
                                 decoration: _input('Attempts'),
-                                items: const [
+                                items: [
                                   DropdownMenuItem(value: 1, child: Text('1 attempt')),
                                   DropdownMenuItem(value: 2, child: Text('2 attempts')),
                                   DropdownMenuItem(value: 3, child: Text('3 attempts')),
@@ -520,24 +521,24 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
                   ],
                 ),
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
               _Card(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _SectionTitle(icon: Icons.security_outlined, title: 'Display & Security'),
-                    const SizedBox(height: 8),
+                    _SectionTitle(icon: Icons.security_outlined, title: 'Display & Security'),
+                    SizedBox(height: 8),
                     SwitchListTile(
                       value: _shuffleQuestions,
                       onChanged: (value) => setState(() => _shuffleQuestions = value),
-                      title: const Text('Shuffle Questions'),
-                      subtitle: const Text('Randomize question order for each attempt.'),
+                      title: Text('Shuffle Questions'),
+                      subtitle: Text('Randomize question order for each attempt.'),
                     ),
                     SwitchListTile(
                       value: _shuffleOptions,
                       onChanged: (value) => setState(() => _shuffleOptions = value),
-                      title: const Text('Shuffle Options'),
-                      subtitle: const Text('Randomize answer options for objective questions.'),
+                      title: Text('Shuffle Options'),
+                      subtitle: Text('Randomize answer options for objective questions.'),
                     ),
                   ],
                 ),
@@ -545,7 +546,7 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
             ],
           ),
         ),
-        const SizedBox(width: 24),
+        SizedBox(width: 24),
         SizedBox(width: 320, child: _buildSummaryCard()),
       ],
     );
@@ -560,21 +561,21 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Quiz Summary', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 18),
+          Text('Quiz Summary', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
+          SizedBox(height: 18),
           _SummaryRow('Selected Questions', '$_selectedCount'),
-          const Divider(height: 24),
+          Divider(height: 24),
           _SummaryRow('Total Points', '$totalPoints'),
-          const Divider(height: 24),
+          Divider(height: 24),
           _SummaryRow('Difficulty', difficulty),
-          const SizedBox(height: 18),
+          SizedBox(height: 18),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Text(
+            child: Text(
               'This exam is created from saved question-bank items. Only database-saved questions can be attached.',
               style: TextStyle(fontSize: 12, color: AppColors.primary, fontWeight: FontWeight.w600),
             ),
@@ -598,10 +599,10 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
       children: [
         OutlinedButton.icon(
           onPressed: _saving ? null : _back,
-          icon: const Icon(Icons.arrow_back_rounded, size: 16),
+          icon: Icon(Icons.arrow_back_rounded, size: 16),
           label: Text(_step == 1 ? 'Back to Question Bank' : 'Back'),
         ),
-        const Spacer(),
+        Spacer(),
         ElevatedButton(
           onPressed: _saving ? null : _next,
           style: ElevatedButton.styleFrom(
@@ -610,7 +611,7 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
           ),
           child: _saving
-              ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+              ? SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
               : Text(_step == 3 ? 'Finish & Create Exam' : 'Next'),
         ),
       ],
@@ -631,13 +632,14 @@ class _SelectableQuestionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return InkWell(
       onTap: () => onChanged(!selected),
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
@@ -648,13 +650,13 @@ class _SelectableQuestionCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Checkbox(value: selected, onChanged: (value) => onChanged(value ?? false)),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(question.text, style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-                  const SizedBox(height: 10),
+                  Text(question.text, style: TextStyle(fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                  SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -684,7 +686,8 @@ class _StepChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = done ? const Color(0xFF16A34A) : active ? AppColors.primary : AppColors.textMuted;
+    Theme.of(context);
+    final color = done ? AppColors.successText : active ? AppColors.primary : AppColors.textMuted;
     return Row(
       children: [
         CircleAvatar(
@@ -692,7 +695,7 @@ class _StepChip extends StatelessWidget {
           backgroundColor: color,
           child: Icon(done ? Icons.check : null, size: 14, color: Colors.white),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: 8),
         Text('$index. $label', style: TextStyle(color: color, fontWeight: FontWeight.w800, fontSize: 12)),
       ],
     );
@@ -704,6 +707,7 @@ class _StepLine extends StatelessWidget {
   const _StepLine({required this.active});
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Expanded(
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 12),
@@ -721,11 +725,12 @@ class _Card extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
@@ -739,9 +744,10 @@ class _Label extends StatelessWidget {
   const _Label(this.text);
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
-      child: Text(text, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+      child: Text(text, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
     );
   }
 }
@@ -750,10 +756,10 @@ InputDecoration _input(String hint) {
   return InputDecoration(
     hintText: hint,
     filled: true,
-    fillColor: const Color(0xFFF8FAFC),
-    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.border)),
-    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
+    fillColor: AppColors.surfaceBg,
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.primary)),
     contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
   );
 }
@@ -765,11 +771,12 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       children: [
         Icon(icon, color: AppColors.primary),
-        const SizedBox(width: 10),
-        Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+        SizedBox(width: 10),
+        Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
       ],
     );
   }
@@ -782,10 +789,11 @@ class _SummaryRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       children: [
-        Expanded(child: Text(label, style: const TextStyle(color: AppColors.textMuted, fontSize: 12))),
-        Text(value, style: const TextStyle(fontWeight: FontWeight.w800)),
+        Expanded(child: Text(label, style: TextStyle(color: AppColors.textMuted, fontSize: 12))),
+        Text(value, style: TextStyle(fontWeight: FontWeight.w800)),
       ],
     );
   }
@@ -797,14 +805,15 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: AppColors.border),
       ),
-      child: Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+      child: Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
     );
   }
 }
@@ -815,6 +824,7 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
@@ -823,7 +833,7 @@ class _ErrorBanner extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.dangerText.withValues(alpha: 0.25)),
       ),
-      child: Text(message, style: const TextStyle(color: AppColors.dangerText, fontWeight: FontWeight.w700)),
+      child: Text(message, style: TextStyle(color: AppColors.dangerText, fontWeight: FontWeight.w700)),
     );
   }
 }
@@ -833,7 +843,8 @@ class _EmptyExamQuestions extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const _Card(
+    Theme.of(context);
+    return _Card(
       child: Column(
         children: [
           Icon(Icons.quiz_outlined, size: 36, color: AppColors.textMuted),

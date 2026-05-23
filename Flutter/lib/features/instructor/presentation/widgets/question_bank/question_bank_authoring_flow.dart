@@ -10,6 +10,7 @@ import '../../../data/modules_materials_providers.dart';
 import '../../../data/topics_models.dart';
 import '../../controllers/course_details_controller.dart';
 import '../add_question_sheet.dart' as add_question_sheet;
+import 'package:learnova/core/theme/app_theme.dart';
 
 class QuestionBankAuthoringFlow extends ConsumerStatefulWidget {
   final MyCourseItem course;
@@ -352,10 +353,11 @@ class _QuestionBankAuthoringFlowState
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     if (_loading) {
       return _wrapBody(
-        const Scaffold(
-          backgroundColor: Color(0xFFF8FAFC),
+        Scaffold(
+          backgroundColor: AppColors.surfaceBg,
           body: Center(child: CircularProgressIndicator()),
         ),
       );
@@ -374,14 +376,14 @@ class _QuestionBankAuthoringFlowState
         .toList();
 
     final Widget body = Scaffold(
-      backgroundColor: const Color(0xFFF8FAFC),
+      backgroundColor: AppColors.surfaceBg,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
           child: Column(
             children: <Widget>[
               _buildHeader(),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
               Expanded(
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,7 +394,7 @@ class _QuestionBankAuthoringFlowState
                         allQuestions: allQuestions,
                       ),
                     ),
-                    const SizedBox(width: 20),
+                    SizedBox(width: 20),
                     SizedBox(
                       width: 280,
                       child: _buildSummaryPane(
@@ -429,34 +431,34 @@ class _QuestionBankAuthoringFlowState
               children: <Widget>[
                 TextButton.icon(
                   onPressed: _closeFlow,
-                  icon: const Icon(Icons.arrow_back_rounded, size: 18),
-                  label: const Text('Back to content'),
+                  icon: Icon(Icons.arrow_back_rounded, size: 18),
+                  label: Text('Back to content'),
                   style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF475467),
+                    foregroundColor: AppColors.textGray,
                     padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
                     tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
+                SizedBox(height: 8),
+                Text(
                   'Add Questions',
                   style: TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF101828),
+                    color: AppColors.textTitle,
                     height: 1.05,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text(
+                SizedBox(height: 8),
+                Text(
                   'Build the question bank for the selected content.',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w500,
-                    color: Color(0xFF667085),
+                    color: AppColors.textMuted,
                   ),
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 Wrap(
                   spacing: 10,
                   runSpacing: 10,
@@ -475,7 +477,7 @@ class _QuestionBankAuthoringFlowState
               ],
             ),
           ),
-          const SizedBox(width: 24),
+          SizedBox(width: 24),
           Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
@@ -484,33 +486,33 @@ class _QuestionBankAuthoringFlowState
                     ? null
                     : _saveDraftQuestions,
                 icon: _savingDrafts
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : const Icon(Icons.save_outlined, size: 18),
+                    : Icon(Icons.save_outlined, size: 18),
                 label: Text(
                   _savingDrafts
                       ? 'Saving...'
                       : 'Save Questions (${_draftQuestions.length})',
                 ),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF1570EF),
-                  side: const BorderSide(color: Color(0xFF1570EF)),
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(color: AppColors.primary),
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(14),
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               ElevatedButton.icon(
                 onPressed: _savingDrafts ? null : _openAddQuestion,
-                icon: const Icon(Icons.add_rounded, size: 18),
-                label: const Text('Add New Question'),
+                icon: Icon(Icons.add_rounded, size: 18),
+                label: Text('Add New Question'),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF1570EF),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
@@ -534,33 +536,33 @@ class _QuestionBankAuthoringFlowState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         _buildAiGeneratorBanner(),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         _buildFiltersBar(allQuestions),
-        const SizedBox(height: 18),
+        SizedBox(height: 18),
         Row(
           children: <Widget>[
-            const Text(
+            Text(
               'AVAILABLE QUESTIONS',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
                 letterSpacing: 1.15,
-                color: Color(0xFF667085),
+                color: AppColors.textMuted,
               ),
             ),
-            const Spacer(),
+            Spacer(),
             _countPill(
               '${filteredQuestions.length} question${filteredQuestions.length == 1 ? '' : 's'}',
             ),
           ],
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         Expanded(
           child: filteredQuestions.isEmpty
               ? _buildEmptyState()
               : ListView.separated(
                   itemCount: filteredQuestions.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 12),
+                  separatorBuilder: (_, __) => SizedBox(height: 12),
                   itemBuilder: (BuildContext context, int index) {
                     final QuestionModel question = filteredQuestions[index];
                     return _buildQuestionCard(
@@ -578,27 +580,27 @@ class _QuestionBankAuthoringFlowState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 20),
       decoration: BoxDecoration(
-        color: const Color(0xFFF3F8FF),
+        color: AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFD8E6F8)),
+        border: Border.all(color: AppColors.borderSoft),
       ),
       child: Row(
         children: <Widget>[
           Container(
             width: 44,
             height: 44,
-            decoration: const BoxDecoration(
-              color: Colors.white,
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.auto_awesome_rounded,
               color: Color(0xFF2F80ED),
               size: 20,
             ),
           ),
-          const SizedBox(width: 16),
-          const Expanded(
+          SizedBox(width: 16),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -607,7 +609,7 @@ class _QuestionBankAuthoringFlowState
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF101828),
+                    color: AppColors.textTitle,
                   ),
                 ),
                 SizedBox(height: 6),
@@ -615,26 +617,26 @@ class _QuestionBankAuthoringFlowState
                   'Let AI analyze the selected content and suggest relevant questions for your bank.',
                   style: TextStyle(
                     fontSize: 14,
-                    color: Color(0xFF667085),
+                    color: AppColors.textMuted,
                     height: 1.45,
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           OutlinedButton(
             onPressed: _handleGeneratePressed,
             style: OutlinedButton.styleFrom(
-              foregroundColor: const Color(0xFF1570EF),
-              backgroundColor: Colors.white,
-              side: const BorderSide(color: Color(0xFFD0D5DD)),
+              foregroundColor: AppColors.primary,
+              backgroundColor: AppColors.cardBg,
+              side: BorderSide(color: AppColors.borderSoft),
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(
+            child: Text(
               'Generate Questions',
               style: TextStyle(fontWeight: FontWeight.w800),
             ),
@@ -652,9 +654,9 @@ class _QuestionBankAuthoringFlowState
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: const Color(0xFFE4E7EC)),
+        border: Border.all(color: AppColors.borderGray),
       ),
       child: Row(
         children: <Widget>[
@@ -662,19 +664,19 @@ class _QuestionBankAuthoringFlowState
             child: Container(
               height: 48,
               decoration: BoxDecoration(
-                color: const Color(0xFFF9FAFB),
+                color: AppColors.surfaceBg,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: const Color(0xFFE4E7EC)),
+                border: Border.all(color: AppColors.borderGray),
               ),
               child: TextField(
                 controller: _searchCtrl,
                 onChanged: (_) => setState(() {}),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 14,
-                  color: Color(0xFF344054),
+                  color: AppColors.textGray,
                   fontWeight: FontWeight.w500,
                 ),
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Search questions by keyword or',
                   hintStyle: TextStyle(
                     color: Color(0xFF98A2B3),
@@ -684,7 +686,7 @@ class _QuestionBankAuthoringFlowState
                   prefixIcon: Icon(
                     Icons.search_rounded,
                     size: 20,
-                    color: Color(0xFF667085),
+                    color: AppColors.textMuted,
                   ),
                   border: InputBorder.none,
                   contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: 14),
@@ -692,7 +694,7 @@ class _QuestionBankAuthoringFlowState
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           _FilterMenu(
             width: 150,
             label: _selectedTopicFilter,
@@ -703,7 +705,7 @@ class _QuestionBankAuthoringFlowState
               });
             },
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           _FilterMenu(
             width: 140,
             label: _selectedDifficultyFilter,
@@ -714,7 +716,7 @@ class _QuestionBankAuthoringFlowState
               });
             },
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           _FilterMenu(
             width: 132,
             label: _selectedTypeFilter,
@@ -740,10 +742,10 @@ class _QuestionBankAuthoringFlowState
       child: Container(
         padding: const EdgeInsets.all(18),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: selected ? const Color(0xFFB2DDFF) : const Color(0xFFE4E7EC),
+            color: selected ? Color(0xFFB2DDFF) : AppColors.borderGray,
             width: selected ? 1.4 : 1,
           ),
         ),
@@ -756,23 +758,23 @@ class _QuestionBankAuthoringFlowState
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(4),
               ),
-              side: const BorderSide(color: Color(0xFFD0D5DD)),
+              side: BorderSide(color: AppColors.borderSoft),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
                     question.text,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF101828),
+                      color: AppColors.textTitle,
                       height: 1.45,
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   Wrap(
                     spacing: 12,
                     runSpacing: 8,
@@ -790,10 +792,10 @@ class _QuestionBankAuthoringFlowState
                 ],
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             if (_draftQuestions.any((QuestionModel item) => item.id == question.id)) ...<Widget>[
               _draftPill(),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
             ],
             _difficultyPill(question.difficultyLabel),
           ],
@@ -808,9 +810,9 @@ class _QuestionBankAuthoringFlowState
         width: 380,
         padding: const EdgeInsets.all(28),
         decoration: BoxDecoration(
-          color: const Color(0xFFFCFCFD),
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFFE4E7EC)),
+          border: Border.all(color: AppColors.borderGray),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -818,41 +820,41 @@ class _QuestionBankAuthoringFlowState
             Container(
               width: 56,
               height: 56,
-              decoration: const BoxDecoration(
-                color: Color(0xFFEAF3FF),
+              decoration: BoxDecoration(
+                color: AppColors.infoBg,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.playlist_add_check_circle_outlined,
-                color: Color(0xFF1570EF),
+                color: AppColors.primary,
                 size: 28,
               ),
             ),
-            const SizedBox(height: 18),
-            const Text(
+            SizedBox(height: 18),
+            Text(
               'No questions yet',
               style: TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
-                color: Color(0xFF101828),
+                color: AppColors.textTitle,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
+            SizedBox(height: 8),
+            Text(
               'Start by adding your first manual question for the selected topic or subtopic.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Color(0xFF667085),
+                color: AppColors.textMuted,
                 height: 1.5,
               ),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: 18),
             ElevatedButton.icon(
               onPressed: _openAddQuestion,
-              icon: const Icon(Icons.add_rounded, size: 18),
-              label: const Text('Add New Question'),
+              icon: Icon(Icons.add_rounded, size: 18),
+              label: Text('Add New Question'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF1570EF),
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
@@ -881,39 +883,39 @@ class _QuestionBankAuthoringFlowState
         Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.cardBg,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE4E7EC)),
+            border: Border.all(color: AppColors.borderGray),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              const Text(
+              Text(
                 'Question Summary',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF101828),
+                  color: AppColors.textTitle,
                 ),
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
               _summaryRow('Draft Questions', '$draftCount'),
               _summaryRow('Selected Targets', '${_targets.length}'),
               _summaryRow('Difficulty', difficulty, emphasizeValue: true),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF5F8FF),
+                  color: AppColors.surfaceBg,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Row(
+                child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Icon(
                       Icons.info_outline_rounded,
                       size: 18,
-                      color: Color(0xFF1570EF),
+                      color: AppColors.primary,
                     ),
                     SizedBox(width: 10),
                     Expanded(
@@ -921,7 +923,7 @@ class _QuestionBankAuthoringFlowState
                         'Questions are kept as drafts here. They will be added to the database only when you click Save Questions.',
                         style: TextStyle(
                           fontSize: 12,
-                          color: Color(0xFF475467),
+                          color: AppColors.textGray,
                           height: 1.5,
                         ),
                       ),
@@ -940,21 +942,21 @@ class _QuestionBankAuthoringFlowState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFD0D5DD)),
+        border: Border.all(color: AppColors.borderSoft),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          Icon(icon, size: 15, color: const Color(0xFF667085)),
-          const SizedBox(width: 8),
+          Icon(icon, size: 15, color: AppColors.textMuted),
+          SizedBox(width: 8),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: Color(0xFF344054),
+              color: AppColors.textGray,
             ),
           ),
         ],
@@ -966,16 +968,16 @@ class _QuestionBankAuthoringFlowState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: const Color(0xFFF9FAFB),
+        color: AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: const Color(0xFFE4E7EC)),
+        border: Border.all(color: AppColors.borderGray),
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: Color(0xFF475467),
+          color: AppColors.textGray,
         ),
       ),
     );
@@ -985,13 +987,13 @@ class _QuestionBankAuthoringFlowState
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Icon(icon, size: 14, color: const Color(0xFF98A2B3)),
-        const SizedBox(width: 5),
+        Icon(icon, size: 14, color: Color(0xFF98A2B3)),
+        SizedBox(width: 5),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
-            color: Color(0xFF667085),
+            color: AppColors.textMuted,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -1006,16 +1008,16 @@ class _QuestionBankAuthoringFlowState
 
     switch (normalized) {
       case 'easy':
-        textColor = const Color(0xFF027A48);
-        backgroundColor = const Color(0xFFECFDF3);
+        textColor = AppColors.successText;
+        backgroundColor = AppColors.successBg;
         break;
       case 'hard':
-        textColor = const Color(0xFFB42318);
-        backgroundColor = const Color(0xFFFEF3F2);
+        textColor = AppColors.dangerTitle;
+        backgroundColor = AppColors.dangerBg;
         break;
       default:
-        textColor = const Color(0xFFB54708);
-        backgroundColor = const Color(0xFFFFF4ED);
+        textColor = AppColors.warningText;
+        backgroundColor = AppColors.warningBg;
         break;
     }
 
@@ -1040,15 +1042,15 @@ class _QuestionBankAuthoringFlowState
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF3FF),
+        color: AppColors.infoBg,
         borderRadius: BorderRadius.circular(999),
       ),
-      child: const Text(
+      child: Text(
         'Draft',
         style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w800,
-          color: Color(0xFF1570EF),
+          color: AppColors.primary,
         ),
       ),
     );
@@ -1061,17 +1063,17 @@ class _QuestionBankAuthoringFlowState
         children: <Widget>[
           Text(
             label,
-            style: const TextStyle(
-              color: Color(0xFF667085),
+            style: TextStyle(
+              color: AppColors.textMuted,
               fontSize: 14,
               fontWeight: FontWeight.w500,
             ),
           ),
-          const Spacer(),
+          Spacer(),
           Text(
             value,
             style: TextStyle(
-              color: emphasizeValue ? const Color(0xFFB54708) : const Color(0xFF101828),
+              color: emphasizeValue ? AppColors.warningText : AppColors.textTitle,
               fontSize: 14,
               fontWeight: FontWeight.w800,
             ),
@@ -1176,6 +1178,7 @@ class _FilterMenu extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final List<String> normalizedItems = <String>[];
     for (final String item in items) {
       if (!normalizedItems.contains(item)) {
@@ -1193,10 +1196,10 @@ class _FilterMenu extends StatelessWidget {
         surfaceTintColor: Colors.white,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(14),
-          side: const BorderSide(color: Color(0xFFE4E7EC)),
+          side: BorderSide(color: AppColors.borderGray),
         ),
         position: PopupMenuPosition.under,
-        offset: const Offset(0, 8),
+        offset: Offset(0, 8),
         onSelected: onSelected,
         itemBuilder: (BuildContext context) {
           return normalizedItems.map((String item) {
@@ -1207,15 +1210,15 @@ class _FilterMenu extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                 decoration: BoxDecoration(
-                  color: isSelected ? const Color(0xFFF2F4F7) : Colors.transparent,
+                  color: isSelected ? AppColors.headerBg : Colors.transparent,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Text(
                   item,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF344054),
+                    color: AppColors.textGray,
                   ),
                 ),
               ),
@@ -1225,9 +1228,9 @@ class _FilterMenu extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: AppColors.cardBg,
             borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: const Color(0xFFD0D5DD)),
+            border: Border.all(color: AppColors.borderSoft),
           ),
           child: Row(
             children: <Widget>[
@@ -1235,17 +1238,17 @@ class _FilterMenu extends StatelessWidget {
                 child: Text(
                   label,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFF344054),
+                    color: AppColors.textGray,
                   ),
                 ),
               ),
-              const SizedBox(width: 8),
-              const Icon(
+              SizedBox(width: 8),
+              Icon(
                 Icons.keyboard_arrow_down_rounded,
-                color: Color(0xFF667085),
+                color: AppColors.textMuted,
                 size: 20,
               ),
             ],

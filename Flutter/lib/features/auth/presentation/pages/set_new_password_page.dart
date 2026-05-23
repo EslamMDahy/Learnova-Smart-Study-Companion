@@ -14,7 +14,7 @@ class SetNewPasswordPage extends StatelessWidget {
           if (constraints.maxWidth > 900) {
             return Row(
               children: [
-                const Expanded(flex: 5, child: SetNewPasswordLeftPanel()),
+                Expanded(flex: 5, child: SetNewPasswordLeftPanel()),
                 Expanded(
                   flex: 5,
                   child: SetNewPasswordForm(token: token),

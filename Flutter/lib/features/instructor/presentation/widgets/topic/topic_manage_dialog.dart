@@ -50,16 +50,17 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
       child: Container(
         width: 520,
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: BoxConstraints(maxWidth: 520),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(22),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
               color: Color(0x220F172A),
               blurRadius: 28,
@@ -79,15 +80,15 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
                     width: 44,
                     height: 44,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [Color(0xFF137FEC), Color(0xFF8B5CF6)],
+                      gradient: LinearGradient(
+                        colors: [AppColors.primary, AppColors.purpleText],
                       ),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
+                    child: Icon(Icons.tune_rounded, color: Colors.white, size: 20),
                   ),
-                  const SizedBox(width: 14),
-                  const Expanded(
+                  SizedBox(width: 14),
+                  Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -114,34 +115,34 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
                   IconButton(
                     onPressed: _saving || _deleting ? null : () => Navigator.of(context).pop(false),
                     splashRadius: 18,
-                    icon: const Icon(Icons.close_rounded),
+                    icon: Icon(Icons.close_rounded),
                     color: AppColors.textMuted,
                   ),
                 ],
               ),
             ),
-            const Divider(height: 1),
+            Divider(height: 1),
             Flexible(
               child: SingleChildScrollView(
                 padding: const EdgeInsets.fromLTRB(22, 18, 22, 20),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const _SectionLabel('Topic name'),
-                    const SizedBox(height: 8),
+                    _SectionLabel('Topic name'),
+                    SizedBox(height: 8),
                     TextField(
                       controller: _titleCtrl,
                       decoration: _inputDecoration('Write a clear, concise topic title'),
                     ),
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     Row(
                       children: [
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const _SectionLabel('Difficulty'),
-                              const SizedBox(height: 8),
+                              _SectionLabel('Difficulty'),
+                              SizedBox(height: 8),
                               DropdownButtonFormField<TopicDifficulty>(
                                 value: _difficulty,
                                 decoration: _inputDecoration('Select difficulty'),
@@ -163,13 +164,13 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
                             ],
                           ),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              const _SectionLabel('Readiness'),
-                              const SizedBox(height: 8),
+                              _SectionLabel('Readiness'),
+                              SizedBox(height: 8),
                               DropdownButtonFormField<TopicReadiness>(
                                 value: _readiness,
                                 decoration: _inputDecoration('Select readiness'),
@@ -193,17 +194,17 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
                         ),
                       ],
                     ),
-                    const SizedBox(height: 18),
-                    const _SectionLabel('Learning outcomes'),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 18),
+                    _SectionLabel('Learning outcomes'),
+                    SizedBox(height: 8),
                     Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
+                        color: AppColors.surfaceBg,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        border: Border.all(color: AppColors.border),
                       ),
                       child: widget.outcomes.isEmpty
-                          ? const Padding(
+                          ? Padding(
                               padding: EdgeInsets.all(16),
                               child: Text(
                                 'No course outcomes yet. Add them from the Outcomes tab first.',
@@ -229,14 +230,14 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
                                           },
                                   ),
                                   if (i != widget.outcomes.length - 1)
-                                    const Divider(height: 1, indent: 16, endIndent: 16),
+                                    Divider(height: 1, indent: 16, endIndent: 16),
                                 ],
                               ],
                             ),
                     ),
-                    const SizedBox(height: 18),
-                    const _SectionLabel('Instructor notes'),
-                    const SizedBox(height: 8),
+                    SizedBox(height: 18),
+                    _SectionLabel('Instructor notes'),
+                    SizedBox(height: 8),
                     TextField(
                       controller: _notesCtrl,
                       maxLines: 4,
@@ -248,7 +249,7 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
                 ),
               ),
             ),
-            const Divider(height: 1),
+            Divider(height: 1),
             Padding(
               padding: const EdgeInsets.fromLTRB(18, 14, 18, 16),
               child: Row(
@@ -256,26 +257,26 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
                   TextButton.icon(
                     onPressed: _saving || _deleting ? null : _delete,
                     icon: _deleting
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 14,
                             height: 14,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Icon(Icons.delete_outline_rounded, size: 18),
-                    label: const Text('Delete'),
-                    style: TextButton.styleFrom(foregroundColor: const Color(0xFFDC2626)),
+                        : Icon(Icons.delete_outline_rounded, size: 18),
+                    label: Text('Delete'),
+                    style: TextButton.styleFrom(foregroundColor: AppColors.dangerText),
                   ),
-                  const Spacer(),
+                  Spacer(),
                   OutlinedButton(
                     onPressed: _saving || _deleting ? null : () => Navigator.of(context).pop(false),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFFE2E8F0)),
+                      side: BorderSide(color: AppColors.border),
                       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
-                    child: const Text('Cancel'),
+                    child: Text('Cancel'),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   FilledButton.icon(
                     onPressed: _saving || _deleting ? null : _save,
                     style: FilledButton.styleFrom(
@@ -284,13 +285,13 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     icon: _saving
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 14,
                             height: 14,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Icon(Icons.check_rounded, size: 18),
-                    label: const Text('Save changes'),
+                        : Icon(Icons.check_rounded, size: 18),
+                    label: Text('Save changes'),
                   ),
                 ],
               ),
@@ -304,21 +305,21 @@ class _TopicManageDialogState extends State<TopicManageDialog> {
   InputDecoration _inputDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: AppColors.textHint),
+      hintStyle: TextStyle(color: AppColors.textHint),
       filled: true,
-      fillColor: const Color(0xFFF8FAFC),
+      fillColor: AppColors.surfaceBg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: BorderSide(color: AppColors.border),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        borderSide: BorderSide(color: AppColors.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: AppColors.primary),
+        borderSide: BorderSide(color: AppColors.primary),
       ),
     );
   }
@@ -362,9 +363,10 @@ class _SectionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Text(
       text,
-      style: const TextStyle(
+      style: TextStyle(
         fontSize: 13,
         fontWeight: FontWeight.w700,
         color: AppColors.textMuted,
@@ -386,7 +388,8 @@ class _OutcomeTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+    Theme.of(context);
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
       onTap: onChanged == null ? null : () => onChanged!(!selected),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -395,26 +398,26 @@ class _OutcomeTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
+                color: AppColors.primarySoft,
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
                 outcome.code,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                   color: AppColors.primary,
                 ),
               ),
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     outcome.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textTitle,
@@ -427,7 +430,7 @@ class _OutcomeTile extends StatelessWidget {
                         outcome.description!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 12, color: AppColors.textMuted),
+                        style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                       ),
                     ),
                 ],
@@ -460,6 +463,7 @@ class _ChoiceGroup<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Wrap(
       spacing: 8,
       runSpacing: 8,

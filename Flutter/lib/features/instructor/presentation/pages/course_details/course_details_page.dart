@@ -52,27 +52,27 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
     switch (widget.initialTab) {
       case CourseDetailsTab.overview:
         return CourseOverviewTab(
-          key: const PageStorageKey('course-overview-tab'),
+          key: PageStorageKey('course-overview-tab'),
           course: course,
         );
       case CourseDetailsTab.materials:
         return CourseMaterialsTab(
-          key: const PageStorageKey('course-materials-tab'),
+          key: PageStorageKey('course-materials-tab'),
           course: course,
         );
       case CourseDetailsTab.outcomes:
         return CourseOutcomesTab(
-          key: const PageStorageKey('course-outcomes-tab'),
+          key: PageStorageKey('course-outcomes-tab'),
           course: course,
         );
       case CourseDetailsTab.questionBank:
         return CourseQuestionBankTab(
-          key: const PageStorageKey('course-question-bank-tab'),
+          key: PageStorageKey('course-question-bank-tab'),
           course: course,
         );
       case CourseDetailsTab.students:
         return CourseStudentsTab(
-          key: const PageStorageKey('course-students-tab'),
+          key: PageStorageKey('course-students-tab'),
           course: course,
         );
     }
@@ -157,6 +157,7 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     if (widget.cachedCourse != null) {
       return _buildContent(widget.cachedCourse!);
     }
@@ -182,11 +183,11 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
     return Column(children: [
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
           border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
-        child: const Center(
+        child: Center(
           child: SizedBox(
             height: 36,
             child: Center(
@@ -202,7 +203,7 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
           ),
         ),
       ),
-      const Expanded(
+      Expanded(
         child: Center(
           child: CircularProgressIndicator(color: AppColors.primary),
         ),
@@ -216,8 +217,8 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
     return Column(children: [
       Container(
         height: 52,
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
           border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
       ),
@@ -228,14 +229,14 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.error_outline,
+                Icon(Icons.error_outline,
                     color: AppColors.dangerText, size: 40),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Text(
                   'Could not load course',
                   style: AppTextStyles.sectionTitle,
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Text(
                   message,
                   style: AppTextStyles.muted,
@@ -257,8 +258,8 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
       // ── Tab header — centered, does NOT stretch to full width ─────────────
       Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: const BoxDecoration(
-          color: Colors.white,
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
           border: Border(bottom: BorderSide(color: AppColors.border)),
         ),
         child: Center(
@@ -299,6 +300,7 @@ class _PillTabBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return IntrinsicWidth(
       child: Container(
         padding: const EdgeInsets.all(3),
@@ -348,6 +350,7 @@ class _PillTabState extends State<_PillTab> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _hovered = true),
@@ -355,14 +358,14 @@ class _PillTabState extends State<_PillTab> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
+          duration: Duration(milliseconds: 150),
           curve: Curves.easeInOut,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
           decoration: BoxDecoration(
             color: widget.selected
-                ? Colors.white
+                ? AppColors.cardBg
                 : _hovered
-                    ? Colors.white.withOpacity(0.5)
+                    ? AppColors.hoverBg
                     : Colors.transparent,
             borderRadius: BorderRadius.circular(7),
             boxShadow: widget.selected
@@ -370,7 +373,7 @@ class _PillTabState extends State<_PillTab> {
                     BoxShadow(
                       color: Colors.black.withOpacity(0.07),
                       blurRadius: 6,
-                      offset: const Offset(0, 1),
+                      offset: Offset(0, 1),
                     ),
                   ]
                 : [],
@@ -386,7 +389,7 @@ class _PillTabState extends State<_PillTab> {
                     ? AppColors.primary
                     : AppColors.textMuted,
               ),
-              const SizedBox(width: 6),
+              SizedBox(width: 6),
               Text(
                 widget.label,
                 style: TextStyle(

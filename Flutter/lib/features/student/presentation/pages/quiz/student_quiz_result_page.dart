@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'student_quiz_active_page.dart';
+import 'package:learnova/core/theme/app_theme.dart';
 
 class StudentQuizResultPage extends StatefulWidget {
   // متغير لمعرفة هل تم تسليم الاختبار وعرض سيكشن المراجعة أم لا
@@ -18,8 +19,9 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(0xffF8FAFC),
+      backgroundColor: AppColors.bg,
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -27,9 +29,9 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
           Container(
             width: 320,
             height: double.infinity,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(right: BorderSide(color: Color(0xffE2E8F0))),
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              border: Border(right: BorderSide(color: AppColors.border)),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             child: Column(
@@ -40,24 +42,24 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         "Course Content",
                         style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 18,
-                            color: Color(0xff0F172A)),
+                            color: AppColors.textTitle),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: const Color(0xffEFF6FF),
+                          color: AppColors.infoBg,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text(
+                        child: Text(
                           "CS-101",
                           style: TextStyle(
-                              color: Color(0xff1D8CF8),
+                              color: AppColors.primary,
                               fontWeight: FontWeight.w700,
                               fontSize: 12),
                         ),
@@ -65,7 +67,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 Expanded(
                   child: Theme(
                     data: Theme.of(context)
@@ -83,7 +85,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                                 isCompleted: true, isCurrent: false),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         _buildModuleExpansionTile(
                           title: "Module 2: Neural Nets",
                           isInitiallyExpanded: true,
@@ -99,7 +101,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                                 isSelectedQuiz: true),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         _buildModuleExpansionTile(
                           title: "Module 3: Deep Learning",
                           isInitiallyExpanded: false,
@@ -109,7 +111,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                                 isCompleted: false, isCurrent: false),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                         _buildModuleExpansionTile(
                           title: "Module 4: Project",
                           isInitiallyExpanded: false,
@@ -123,18 +125,18 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                     ),
                   ),
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   height: 40,
                   child: ElevatedButton.icon(
                     onPressed: () {},
-                    icon: const Icon(Icons.arrow_back, size: 16),
-                    label: const Text("Back to Dashboard",
+                    icon: Icon(Icons.arrow_back, size: 16),
+                    label: Text("Back to Dashboard",
                         style: TextStyle(
                             fontWeight: FontWeight.w700, fontSize: 13)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xff1D8CF8),
+                      backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
@@ -164,36 +166,36 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                             children: [
                               Row(
                                 children: [
-                                  const Text(
+                                  Text(
                                     "Mid-Term Assessment: Computer Science 101",
                                     style: TextStyle(
                                         fontSize: 20,
                                         fontWeight: FontWeight.w800,
-                                        color: Color(0xff0F172A)),
+                                        color: AppColors.textTitle),
                                   ),
-                                  const SizedBox(width: 12),
+                                  SizedBox(width: 12),
                                   Container(
                                     padding: const EdgeInsets.symmetric(
                                         horizontal: 10, vertical: 4),
                                     decoration: BoxDecoration(
-                                      color: const Color(0xffDCFCE7),
+                                      color: AppColors.successBg,
                                       borderRadius: BorderRadius.circular(12),
                                     ),
-                                    child: const Text(
+                                    child: Text(
                                       "Completed",
                                       style: TextStyle(
-                                          color: Color(0xff15803D),
+                                          color: AppColors.successText,
                                           fontSize: 11,
                                           fontWeight: FontWeight.w700),
                                     ),
                                   ),
                                 ],
                               ),
-                              const SizedBox(height: 8),
-                              const Text(
+                              SizedBox(height: 8),
+                              Text(
                                 "Assessment completed on Oct 24, 2023 • 10:30 AM • ID: #CALC2-2023-MID",
                                 style: TextStyle(
-                                    color: Color(0xff64748B),
+                                    color: AppColors.textMuted,
                                     fontSize: 13,
                                     fontWeight: FontWeight.w500),
                               ),
@@ -205,34 +207,34 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                             OutlinedButton.icon(
                               onPressed: () {},
                               icon:
-                                  const Icon(Icons.download_rounded, size: 15),
-                              label: const Text("Export PDF",
+                                  Icon(Icons.download_rounded, size: 15),
+                              label: Text("Export PDF",
                                   style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700)),
                               style: OutlinedButton.styleFrom(
-                                foregroundColor: const Color(0xff1E293B),
+                                foregroundColor: AppColors.textGray,
                                 side:
-                                    const BorderSide(color: Color(0xffE2E8F0)),
+                                    BorderSide(color: AppColors.border),
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 12),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8)),
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            SizedBox(width: 8),
                             ElevatedButton(
                               onPressed: () {},
                               style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xffF1F5F9),
-                                foregroundColor: const Color(0xff1E293B),
+                                backgroundColor: AppColors.headerBg,
+                                foregroundColor: AppColors.textGray,
                                 elevation: 0,
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 14, vertical: 12),
                                 shape: RoundedRectangleBorder(
                                     borderRadius: BorderRadius.circular(8)),
                               ),
-                              child: const Text("Back to Dashboard",
+                              child: Text("Back to Dashboard",
                                   style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w700)),
@@ -241,7 +243,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                         )
                       ],
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
 
                     /// كروت الإحصائيات
                     Row(
@@ -252,9 +254,9 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                             "/100",
                             true,
                             "",
-                            const Icon(Icons.emoji_events_outlined,
-                                color: Color(0xff94A3B8))),
-                        const SizedBox(width: 16),
+                            Icon(Icons.emoji_events_outlined,
+                                color: AppColors.textHint)),
+                        SizedBox(width: 16),
                         _buildMetricCard(
                             "TIME TAKEN",
                             widget.isSubmitted ? "14m 22s" : "0m 0s",
@@ -262,7 +264,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                             false,
                             "Avg. 43s per question",
                             null),
-                        const SizedBox(width: 16),
+                        SizedBox(width: 16),
                         _buildMetricCard(
                             "ACCURACY RATE",
                             widget.isSubmitted ? "80%" : "0%",
@@ -273,7 +275,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                                 : "0 Correct\n0 Incorrect",
                             null,
                             showProgressCircle: true),
-                        const SizedBox(width: 16),
+                        SizedBox(width: 16),
                         _buildMetricCard(
                             "PERCENTILE",
                             widget.isSubmitted ? "Top 12%" : "Top 0%",
@@ -285,15 +287,15 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                             null),
                       ],
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
 
                     /// كرت تحليل الذكاء الاصطناعي
                     Container(
                       width: double.infinity,
                       decoration: BoxDecoration(
-                        color: Colors.white,
+                        color: AppColors.cardBg,
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xffE2E8F0)),
+                        border: Border.all(color: AppColors.border),
                       ),
                       padding: const EdgeInsets.all(24),
                       child: Column(
@@ -304,23 +306,23 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                               Container(
                                 padding: const EdgeInsets.all(6),
                                 decoration: BoxDecoration(
-                                  color: const Color(0xffEFF6FF),
+                                  color: AppColors.infoBg,
                                   borderRadius: BorderRadius.circular(8),
                                 ),
-                                child: const Icon(Icons.auto_awesome_rounded,
-                                    color: Color(0xff1D8CF8), size: 18),
+                                child: Icon(Icons.auto_awesome_rounded,
+                                    color: AppColors.primary, size: 18),
                               ),
-                              const SizedBox(width: 12),
-                              const Text(
+                              SizedBox(width: 12),
+                              Text(
                                 "AI Learning Analysis",
                                 style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w800,
-                                    color: Color(0xff0F172A)),
+                                    color: AppColors.textTitle),
                               ),
                             ],
                           ),
-                          const SizedBox(height: 24),
+                          SizedBox(height: 24),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -328,29 +330,29 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text("IDENTIFIED WEAKNESSES",
+                                    Text("IDENTIFIED WEAKNESSES",
                                         style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,
-                                            color: Color(0xff64748B),
+                                            color: AppColors.textMuted,
                                             letterSpacing: 0.5)),
-                                    const SizedBox(height: 12),
+                                    SizedBox(height: 12),
                                     _buildAnalysisItem(
                                       icon: Icons.warning_amber_rounded,
-                                      iconColor: const Color(0xffEF4444),
-                                      bgColor: const Color(0xffFEF2F2),
-                                      borderColor: const Color(0xffFEE2E2),
+                                      iconColor: AppColors.errorDot,
+                                      bgColor: AppColors.dangerBg,
+                                      borderColor: AppColors.dangerBorder,
                                       title:
                                           "Integrals of Trigonometric Functions",
                                       subtitle:
                                           "You missed 3 questions related to sin²(x) integration.",
                                     ),
-                                    const SizedBox(height: 12),
+                                    SizedBox(height: 12),
                                     _buildAnalysisItem(
                                       icon: Icons.info_outline_rounded,
-                                      iconColor: const Color(0xffF59E0B),
-                                      bgColor: const Color(0xffFFFBEB),
-                                      borderColor: const Color(0xffFEF3C7),
+                                      iconColor: AppColors.warningText,
+                                      bgColor: AppColors.warningSoftBg,
+                                      borderColor: AppColors.warningSoftBg,
                                       title: "Integration by Parts",
                                       subtitle:
                                           "Slower response time detected. Review formula structure.",
@@ -358,33 +360,33 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                                   ],
                                 ),
                               ),
-                              const SizedBox(width: 24),
+                              SizedBox(width: 24),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    const Text("RECOMMENDED STUDY MATERIALS",
+                                    Text("RECOMMENDED STUDY MATERIALS",
                                         style: TextStyle(
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,
-                                            color: Color(0xff64748B),
+                                            color: AppColors.textMuted,
                                             letterSpacing: 0.5)),
-                                    const SizedBox(height: 12),
+                                    SizedBox(height: 12),
                                     _buildAnalysisItem(
                                       icon: Icons.menu_book_rounded,
-                                      iconColor: const Color(0xffEF4444),
-                                      bgColor: const Color(0xffFEF2F2),
-                                      borderColor: const Color(0xffFEE2E2),
+                                      iconColor: AppColors.errorDot,
+                                      bgColor: AppColors.dangerBg,
+                                      borderColor: AppColors.dangerBorder,
                                       title: "Chapter 4: Advanced Integration",
                                       subtitle: "PDF • 15 mins read",
                                       hasArrow: true,
                                     ),
-                                    const SizedBox(height: 12),
+                                    SizedBox(height: 12),
                                     _buildAnalysisItem(
                                       icon: Icons.play_circle_fill_rounded,
-                                      iconColor: const Color(0xff1D8CF8),
-                                      bgColor: const Color(0xffEFF6FF),
-                                      borderColor: const Color(0xffDBEAFE),
+                                      iconColor: AppColors.primary,
+                                      bgColor: AppColors.infoBg,
+                                      borderColor: AppColors.infoBg,
                                       title: "Video: Mastering Trig Integrals",
                                       subtitle: "Video • 8 mins watch",
                                       hasArrow: true,
@@ -397,7 +399,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                         ],
                       ),
                     ),
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
 
                     /// 🚀 التحكم التلقائي: إما عرض زر البدء أو عرض الـ Question Review Section بالكامل
                     widget.isSubmitted
@@ -416,13 +418,13 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                                   );
                                 },
                                 style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xff1D8CF8),
+                                  backgroundColor: AppColors.primary,
                                   foregroundColor: Colors.white,
                                   elevation: 0,
                                   shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(10)),
                                 ),
-                                child: const Text("take Quiezz",
+                                child: Text("take Quiezz",
                                     style: TextStyle(
                                         fontSize: 14,
                                         fontWeight: FontWeight.w700)),
@@ -439,9 +441,9 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
           Container(
             width: 340,
             height: double.infinity,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(left: BorderSide(color: Color(0xffE2E8F0))),
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              border: Border(left: BorderSide(color: AppColors.border)),
             ),
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -451,35 +453,35 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                   children: [
                     CircleAvatar(
                         radius: 5, backgroundColor: Colors.green.shade500),
-                    const SizedBox(width: 8),
-                    const Text(
+                    SizedBox(width: 8),
+                    Text(
                       "Study Assistant",
                       style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
-                          color: Color(0xff0F172A)),
+                          color: AppColors.textTitle),
                     ),
-                    const SizedBox(width: 6),
-                    const Text("• Online & Ready",
+                    SizedBox(width: 6),
+                    Text("• Online & Ready",
                         style: TextStyle(
                             fontSize: 11,
-                            color: Color(0xff10B981),
+                            color: AppColors.successDot,
                             fontWeight: FontWeight.w600)),
-                    const Spacer(),
-                    const Icon(Icons.more_horiz,
-                        color: Color(0xff64748B), size: 20),
+                    Spacer(),
+                    Icon(Icons.more_horiz,
+                        color: AppColors.textMuted, size: 20),
                   ],
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
                 Expanded(
                   child: ListView(
                     children: [
-                      const Center(
+                      Center(
                         child: Padding(
                           padding: EdgeInsets.symmetric(vertical: 8),
                           child: Text("Today",
                               style: TextStyle(
-                                  color: Color(0xff94A3B8),
+                                  color: AppColors.textHint,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600)),
                         ),
@@ -491,7 +493,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                         child: Row(
                           children: [
                             _buildSuggestionChip("Summarize video"),
-                            const SizedBox(width: 8),
+                            SizedBox(width: 8),
                             _buildSuggestionChip("Quiz me"),
                           ],
                         ),
@@ -507,18 +509,18 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xffF8FAFC),
+                    color: AppColors.bg,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xffE2E8F0)),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: TextField(
                           decoration: InputDecoration(
                             hintText: "Ask a question about this lecture...",
                             hintStyle: TextStyle(
-                                color: Color(0xff94A3B8), fontSize: 13),
+                                color: AppColors.textHint, fontSize: 13),
                             border: InputBorder.none,
                             isDense: true,
                           ),
@@ -527,10 +529,10 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                       Container(
                         padding: const EdgeInsets.all(6),
                         decoration: BoxDecoration(
-                          color: const Color(0xff1D8CF8),
+                          color: AppColors.primary,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Icon(Icons.send_rounded,
+                        child: Icon(Icons.send_rounded,
                             color: Colors.white, size: 14),
                       ),
                     ],
@@ -550,9 +552,9 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xffE2E8F0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -560,22 +562,22 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
           /// 1. ترويسة السيكشن والتبويبات الفلتر (All, Incorrect, Flagged)
           Row(
             children: [
-              const Text(
+              Text(
                 "Question Review",
                 style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xff0F172A)),
+                    color: AppColors.textTitle),
               ),
-              const SizedBox(width: 24),
+              SizedBox(width: 24),
               _buildReviewTab(0, "All (20)"),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               _buildReviewTab(1, "Incorrect (4)"),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               _buildReviewTab(2, "Flagged (1)"),
             ],
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
 
           /// 2. تفاصيل السؤال الحالي المختار للمراجعة
           Row(
@@ -583,25 +585,25 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
             children: [
               Text(
                 "Question $_currentReviewQuestion",
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xff0F172A)),
+                    color: AppColors.textTitle),
               ),
               Container(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: const Color(0xffFEF2F2),
+                  color: AppColors.dangerBg,
                   borderRadius: BorderRadius.circular(6),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.cancel, color: Color(0xffEF4444), size: 14),
+                    Icon(Icons.cancel, color: AppColors.errorDot, size: 14),
                     SizedBox(width: 4),
                     Text("Incorrect",
                         style: TextStyle(
-                            color: Color(0xffEF4444),
+                            color: AppColors.errorDot,
                             fontSize: 11,
                             fontWeight: FontWeight.w700)),
                   ],
@@ -609,16 +611,16 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
               ),
             ],
           ),
-          const SizedBox(height: 12),
-          const Text(
+          SizedBox(height: 12),
+          Text(
             "Which of the following sorting algorithms has a time complexity of O(n log n) in the average case?",
             style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: Color(0xff334155),
+                color: AppColors.textGray,
                 height: 1.4),
           ),
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
 
           /// 3. عرض الاختيارات وحالتها (الإجابة الخطأ والإجابة الصح)
           _buildReviewOption("Bubble Sort",
@@ -630,38 +632,38 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
           _buildReviewOption("Insertion Sort",
               isWrongSelected: false, isCorrectAnswer: false),
 
-          const SizedBox(height: 20),
+          SizedBox(height: 20),
 
           /// 4. صندوق توضيح الذكاء الاصطناعي لسبب الخطأ (AI Explanation)
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xffEFF6FF),
+              color: AppColors.infoBg,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xffBFDBFE)),
+              border: Border.all(color: AppColors.infoBorder),
             ),
-            child: const Column(
+            child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
                     Icon(Icons.lightbulb_outline_rounded,
-                        color: Color(0xff1D8CF8), size: 18),
+                        color: AppColors.primary, size: 18),
                     SizedBox(width: 8),
                     Text("Explanation",
                         style: TextStyle(
                             fontWeight: FontWeight.w800,
                             fontSize: 13,
-                            color: Color(0xff1D8CF8))),
+                            color: AppColors.primary)),
                   ],
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Text(
                   "Merge Sort consistently divides the array in half and takes O(n) time to merge, resulting in O(n log n) complexity. Bubble Sort has an average case complexity of O(n²).",
                   style: TextStyle(
                       fontSize: 12.5,
-                      color: Color(0xff1E40AF),
+                      color: AppColors.infoText,
                       height: 1.4,
                       fontWeight: FontWeight.w500),
                 ),
@@ -669,9 +671,9 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
             ),
           ),
 
-          const SizedBox(height: 24),
-          const Divider(color: Color(0xffE2E8F0)),
-          const SizedBox(height: 12),
+          SizedBox(height: 24),
+          Divider(color: AppColors.border),
+          SizedBox(height: 12),
 
           /// 5. 🚀 أزرار التنقل المضافة (Previous و Next) للتنقل بين مراجعة الأسئلة كما كانت بصفحة الحل
           Row(
@@ -681,13 +683,13 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                 onPressed: _currentReviewQuestion > 1
                     ? () => setState(() => _currentReviewQuestion--)
                     : null,
-                icon: const Icon(Icons.chevron_left_rounded, size: 18),
-                label: const Text("Previous",
+                icon: Icon(Icons.chevron_left_rounded, size: 18),
+                label: Text("Previous",
                     style:
                         TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
                 style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xff475569),
-                  side: const BorderSide(color: Color(0xffE2E8F0)),
+                  foregroundColor: AppColors.textGray,
+                  side: BorderSide(color: AppColors.border),
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   shape: RoundedRectangleBorder(
@@ -698,12 +700,12 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                 onPressed: _currentReviewQuestion < 20
                     ? () => setState(() => _currentReviewQuestion++)
                     : null,
-                icon: const Text("Next Question",
+                icon: Text("Next Question",
                     style:
                         TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
-                label: const Icon(Icons.chevron_right_rounded, size: 18),
+                label: Icon(Icons.chevron_right_rounded, size: 18),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xff1D8CF8),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   elevation: 0,
                   padding:
@@ -728,7 +730,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xff1D8CF8) : const Color(0xffF1F5F9),
+          color: isSelected ? AppColors.primary : AppColors.headerBg,
           borderRadius: BorderRadius.circular(8),
         ),
         child: Text(
@@ -736,7 +738,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
-            color: isSelected ? Colors.white : const Color(0xff64748B),
+            color: isSelected ? Colors.white : AppColors.textMuted,
           ),
         ),
       ),
@@ -746,21 +748,21 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
   /// ويدجت خيارات الأسئلة المصححة داخل سيكشن المراجعة
   Widget _buildReviewOption(String optionText,
       {required bool isWrongSelected, required bool isCorrectAnswer}) {
-    Color cardBg = Colors.white;
-    Color borderBg = const Color(0xffE2E8F0);
+    Color cardBg = AppColors.cardBg;
+    Color borderBg = AppColors.border;
     IconData icon = Icons.radio_button_off_rounded;
-    Color iconColor = const Color(0xff94A3B8);
+    Color iconColor = AppColors.textHint;
 
     if (isWrongSelected) {
-      cardBg = const Color(0xffFEF2F2);
-      borderBg = const Color(0xffFEE2E2);
+      cardBg = AppColors.dangerBg;
+      borderBg = AppColors.dangerBorder;
       icon = Icons.cancel_rounded;
-      iconColor = const Color(0xffEF4444);
+      iconColor = AppColors.errorDot;
     } else if (isCorrectAnswer) {
-      cardBg = const Color(0xffDCFCE7);
-      borderBg = const Color(0xffBBF7D0);
+      cardBg = AppColors.successBg;
+      borderBg = AppColors.greenBorder;
       icon = Icons.check_circle_rounded;
-      iconColor = const Color(0xff10B981);
+      iconColor = AppColors.successDot;
     }
 
     return Container(
@@ -774,7 +776,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
       child: Row(
         children: [
           Icon(icon, color: iconColor, size: 18),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Text(
             optionText,
             style: TextStyle(
@@ -783,10 +785,10 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                   ? FontWeight.w700
                   : FontWeight.w500,
               color: isWrongSelected
-                  ? const Color(0xff991B1B)
+                  ? AppColors.dangerTitle
                   : isCorrectAnswer
-                      ? const Color(0xff166534)
-                      : const Color(0xff334155),
+                      ? AppColors.successText
+                      : AppColors.textGray,
             ),
           ),
         ],
@@ -803,9 +805,9 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
       child: Container(
         height: 160,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xffE2E8F0)),
+          border: Border.all(color: AppColors.border),
         ),
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -815,15 +817,15 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(title,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xff64748B),
+                        color: AppColors.textMuted,
                         letterSpacing: 0.5)),
                 if (trailingIcon != null) trailingIcon,
               ],
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -832,25 +834,25 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                   textBaseline: TextBaseline.alphabetic,
                   children: [
                     Text(value,
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 32,
                             fontWeight: FontWeight.w800,
-                            color: Color(0xff0F172A))),
+                            color: AppColors.textTitle)),
                     if (total.isNotEmpty)
                       Text(total,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
-                              color: Color(0xff94A3B8))),
+                              color: AppColors.textHint)),
                     if (showProgressCircle) ...[
-                      const Spacer(),
+                      Spacer(),
                       SizedBox(
                         width: 22,
                         height: 22,
                         child: CircularProgressIndicator(
                           value: widget.isSubmitted ? 0.8 : 0.0,
                           strokeWidth: 3,
-                          backgroundColor: const Color(0xffEFF6FF),
+                          backgroundColor: AppColors.infoBg,
                           valueColor: AlwaysStoppedAnimation<Color>(
                               Colors.blue.shade600),
                         ),
@@ -859,27 +861,27 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                   ],
                 ),
                 if (showTrendBelow && widget.isSubmitted) ...[
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   Container(
                     padding:
                         const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                        color: const Color(0xffDCFCE7),
+                        color: AppColors.successBg,
                         borderRadius: BorderRadius.circular(6)),
-                    child: const Text("+2% from last attempt",
+                    child: Text("+2% from last attempt",
                         style: TextStyle(
-                            color: Color(0xff15803D),
+                            color: AppColors.successText,
                             fontSize: 10,
                             fontWeight: FontWeight.w700)),
                   ),
                 ],
               ],
             ),
-            const Spacer(),
+            Spacer(),
             if (!showTrendBelow && footerText.isNotEmpty)
               Text(footerText,
-                  style: const TextStyle(
-                      color: Color(0xff64748B),
+                  style: TextStyle(
+                      color: AppColors.textMuted,
                       fontSize: 12,
                       fontWeight: FontWeight.w500,
                       height: 1.3)),
@@ -900,9 +902,9 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xffE2E8F0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Row(
         children: [
@@ -914,28 +916,28 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                 border: Border.all(color: borderColor)),
             child: Icon(icon, color: iconColor, size: 18),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xff0F172A))),
-                const SizedBox(height: 4),
+                        color: AppColors.textTitle)),
+                SizedBox(height: 4),
                 Text(subtitle,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: Color(0xff64748B))),
+                        color: AppColors.textMuted)),
               ],
             ),
           ),
           if (hasArrow)
-            const Icon(Icons.chevron_right_rounded,
-                color: Color(0xff94A3B8), size: 20),
+            Icon(Icons.chevron_right_rounded,
+                color: AppColors.textHint, size: 20),
         ],
       ),
     );
@@ -950,31 +952,31 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
       String? leadingNumber}) {
     Widget leadingIcon;
     if (isCompleted) {
-      leadingIcon = const Icon(Icons.check_circle_outline_rounded,
-          color: Color(0xff10B981), size: 18);
+      leadingIcon = Icon(Icons.check_circle_outline_rounded,
+          color: AppColors.successDot, size: 18);
     } else if (isCurrentModule) {
-      leadingIcon = const Icon(Icons.incomplete_circle_rounded,
-          color: Color(0xff1D8CF8), size: 18);
+      leadingIcon = Icon(Icons.incomplete_circle_rounded,
+          color: AppColors.primary, size: 18);
     } else {
       leadingIcon = CircleAvatar(
         radius: 9,
-        backgroundColor: const Color(0xffF1F5F9),
+        backgroundColor: AppColors.headerBg,
         child: Text(leadingNumber ?? "",
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 10,
-                color: Color(0xff64748B),
+                color: AppColors.textMuted,
                 fontWeight: FontWeight.w700)),
       );
     }
 
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xffF8FAFC),
+        color: AppColors.bg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
             color: isCurrentModule
-                ? const Color(0xffBFDBFE)
-                : const Color(0xffE2E8F0)),
+                ? AppColors.infoBorder
+                : AppColors.border),
       ),
       child: ExpansionTile(
         initiallyExpanded: isInitiallyExpanded,
@@ -984,13 +986,13 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: isCurrentModule
-                    ? const Color(0xff0F172A)
-                    : const Color(0xff475569))),
+                    ? AppColors.textTitle
+                    : AppColors.textGray)),
         trailing: Icon(
             isInitiallyExpanded
                 ? Icons.keyboard_arrow_up_rounded
                 : Icons.keyboard_arrow_down_rounded,
-            color: const Color(0xff64748B),
+            color: AppColors.textMuted,
             size: 18),
         childrenPadding: const EdgeInsets.only(left: 12, right: 12, bottom: 8),
         children: children,
@@ -1004,27 +1006,27 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
       margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-          color: isCurrent ? const Color(0xffEFF6FF) : Colors.transparent,
+          color: isCurrent ? AppColors.infoBg : Colors.transparent,
           borderRadius: BorderRadius.circular(8)),
       child: Row(
         children: [
           Icon(Icons.play_circle_outline_rounded,
               color:
-                  isCurrent ? const Color(0xff1D8CF8) : const Color(0xff94A3B8),
+                  isCurrent ? AppColors.primary : AppColors.textHint,
               size: 16),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Expanded(
             child: Text(title,
                 style: TextStyle(
                     fontSize: 12.5,
                     fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
                     color: isCurrent
-                        ? const Color(0xff1D8CF8)
-                        : const Color(0xff64748B))),
+                        ? AppColors.primary
+                        : AppColors.textMuted)),
           ),
           if (isCompleted)
-            const Icon(Icons.check_circle_rounded,
-                color: Color(0xff10B981), size: 15)
+            Icon(Icons.check_circle_rounded,
+                color: AppColors.successDot, size: 15)
         ],
       ),
     );
@@ -1035,19 +1037,19 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
       margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isSelectedQuiz ? const Color(0xffEFF6FF) : Colors.transparent,
+        color: isSelectedQuiz ? AppColors.infoBg : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
         border:
-            isSelectedQuiz ? Border.all(color: const Color(0xffBFDBFE)) : null,
+            isSelectedQuiz ? Border.all(color: AppColors.infoBorder) : null,
       ),
       child: Row(
         children: [
           Icon(Icons.assignment_outlined,
               color: isSelectedQuiz
-                  ? const Color(0xff1D8CF8)
-                  : const Color(0xff94A3B8),
+                  ? AppColors.primary
+                  : AppColors.textHint,
               size: 16),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Expanded(
             child: Text(title,
                 style: TextStyle(
@@ -1055,12 +1057,12 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
                     fontWeight:
                         isSelectedQuiz ? FontWeight.w700 : FontWeight.w500,
                     color: isSelectedQuiz
-                        ? const Color(0xff1D8CF8)
-                        : const Color(0xff64748B))),
+                        ? AppColors.primary
+                        : AppColors.textMuted)),
           ),
           if (isSelectedQuiz)
-            const Icon(Icons.check_circle_rounded,
-                color: Color(0xff10B981), size: 15)
+            Icon(Icons.check_circle_rounded,
+                color: AppColors.successDot, size: 15)
         ],
       ),
     );
@@ -1072,9 +1074,9 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
       child: Container(
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
-        constraints: const BoxConstraints(maxWidth: 260),
+        constraints: BoxConstraints(maxWidth: 260),
         decoration: BoxDecoration(
-          color: isUser ? const Color(0xff1D8CF8) : const Color(0xffF1F5F9),
+          color: isUser ? AppColors.primary : AppColors.headerBg,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(12),
             topRight: const Radius.circular(12),
@@ -1084,7 +1086,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
         ),
         child: Text(message,
             style: TextStyle(
-                color: isUser ? Colors.white : const Color(0xff334155),
+                color: isUser ? Colors.white : AppColors.textGray,
                 fontSize: 13,
                 height: 1.45)),
       ),
@@ -1095,13 +1097,13 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xff1D8CF8).withOpacity(0.3)),
+        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
       ),
       child: Text(label,
-          style: const TextStyle(
-              color: Color(0xff1D8CF8),
+          style: TextStyle(
+              color: AppColors.primary,
               fontSize: 11,
               fontWeight: FontWeight.w600)),
     );

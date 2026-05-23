@@ -15,14 +15,14 @@ class CourseTopicsTab extends ConsumerWidget {
     final modules = state.modules;
 
     if (state.modulesLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: CircularProgressIndicator());
     }
 
     if (modules.isEmpty) {
-      return const _NoModulesState();
+      return _NoModulesState();
     }
 
-    return const _BackendTopicsPendingState();
+    return _BackendTopicsPendingState();
   }
 }
 
@@ -38,17 +38,17 @@ class _NoModulesState extends StatelessWidget {
               width: 64,
               height: 64,
               decoration: BoxDecoration(
-                color: const Color(0xFFF3E8FF),
+                color: AppColors.purpleBg,
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.topic_outlined,
                 size: 30,
-                color: Color(0xFF7C3AED),
+                color: AppColors.purpleText,
               ),
             ),
-            const SizedBox(height: 16),
-            const Text(
+            SizedBox(height: 16),
+            Text(
               'No Modules Yet',
               style: TextStyle(
                 fontSize: 16,
@@ -56,8 +56,8 @@ class _NoModulesState extends StatelessWidget {
                 color: AppColors.textTitle,
               ),
             ),
-            const SizedBox(height: 8),
-            const Text(
+            SizedBox(height: 8),
+            Text(
               'Create modules in the Materials tab first,\nthen manage their topics here.',
               textAlign: TextAlign.center,
               style: TextStyle(
@@ -79,7 +79,7 @@ class _BackendTopicsPendingState extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 460),
+            constraints: BoxConstraints(maxWidth: 460),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -87,17 +87,17 @@ class _BackendTopicsPendingState extends StatelessWidget {
                   width: 64,
                   height: 64,
                   decoration: BoxDecoration(
-                    color: const Color(0xFFEFF6FF),
+                    color: AppColors.primarySoft,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: const Icon(
+                  child: Icon(
                     Icons.construction_rounded,
                     size: 30,
-                    color: Color(0xFF137FEC),
+                    color: AppColors.primary,
                   ),
                 ),
-                const SizedBox(height: 16),
-                const Text(
+                SizedBox(height: 16),
+                Text(
                   'Topics management is temporarily hidden',
                   style: TextStyle(
                     fontSize: 16,
@@ -106,8 +106,8 @@ class _BackendTopicsPendingState extends StatelessWidget {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                const SizedBox(height: 8),
-                const Text(
+                SizedBox(height: 8),
+                Text(
                   'This tab was using local mock authoring paths. It is now disabled until the backend-driven topics workflow is wired end-to-end.',
                   style: TextStyle(
                     fontSize: 13,

@@ -1,6 +1,9 @@
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:learnova/core/theme/app_theme.dart';
+import 'package:learnova/core/ui/toast.dart';
+import 'package:learnova/features/instructor/data/courses_providers.dart';
 
 class InviteStudentsDialog extends ConsumerStatefulWidget {
   final int courseId;
@@ -12,14 +15,99 @@ class InviteStudentsDialog extends ConsumerStatefulWidget {
 }
 
 class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
-  final bool _loading = false;
+  bool _loading = false;
   PlatformFile? _pickedFile;
   bool _sendAfterUpload = true;
 
   // ألوان التصميم الجديد
-  final Color _accentColor = const Color(0xFF137FEC);
-  final Color _bgLight = const Color(0xFFF8FAFC);
-  final Color _border = const Color(0xFFE2E8F0);
+  Color get _accentColor => AppColors.primary;
+  Color get _bgLight => AppColors.surfaceBg;
+  Color get _border => AppColors.border;
+
+
+  Future<void> _downloadTemplate() async {
+    AppToast.info(
+      context,
+      title: 'Template format',
+      message: 'Use a spreadsheet with one column named email.',
+    );
+  }
+
+  Future<void> _pickFile() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: const ['xlsx', 'xls', 'csv'],
+      allowMultiple: false,
+      withData: true,
+    );
+
+    if (!mounted || result == null || result.files.isEmpty) return;
+
+    final file = result.files.single;
+    final name = file.name.toLowerCase();
+    final valid = name.endsWith('.xlsx') ||
+        name.endsWith('.xls') ||
+        name.endsWith('.csv');
+
+    if (!valid) {
+      AppToast.error(
+        context,
+        title: 'Invalid file',
+        message: 'Please choose an Excel or CSV file.',
+      );
+      return;
+    }
+
+    setState(() => _pickedFile = file);
+  }
+
+  Future<void> _submit() async {
+    final file = _pickedFile;
+    final bytes = file?.bytes;
+
+    if (file == null || bytes == null || bytes.isEmpty) {
+      AppToast.error(
+        context,
+        title: 'No file selected',
+        message: 'Choose an Excel or CSV file before uploading.',
+      );
+      return;
+    }
+
+    setState(() => _loading = true);
+
+    try {
+      final repo = ref.read(coursesRepositoryProvider);
+      await repo.uploadInvitationsFile(
+        courseId: widget.courseId.toString(),
+        bytes: bytes,
+        filename: file.name,
+      );
+
+      if (_sendAfterUpload) {
+        await repo.sendInvitations(courseId: widget.courseId.toString());
+      }
+
+      if (!mounted) return;
+      AppToast.success(
+        context,
+        title: 'Invitations ready',
+        message: _sendAfterUpload
+            ? 'Students were uploaded and invitations were sent.'
+            : 'Students were uploaded successfully.',
+      );
+      Navigator.pop(context, true);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        title: 'Upload failed',
+        message: e.toString(),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -29,13 +117,13 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
       child: Container(
         width: 550,
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
               blurRadius: 40,
-              offset: const Offset(0, 20),
+              offset: Offset(0, 20),
             ),
           ],
         ),
@@ -50,11 +138,11 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildTemplateSection(),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
                     _buildUploadZone(),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
                     _buildSettingsToggle(),
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32),
                     _buildActions(),
                   ],
                 ),
@@ -84,11 +172,11 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
             ),
             child: Icon(Icons.group_add_rounded, color: _accentColor, size: 28),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Invite Students',
                 style: TextStyle(
                   fontSize: 20,
@@ -102,10 +190,10 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
               ),
             ],
           ),
-          const Spacer(),
+          Spacer(),
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: const Icon(Icons.close_rounded),
+            icon: Icon(Icons.close_rounded),
           ),
         ],
       ),
@@ -122,9 +210,9 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
-          const SizedBox(width: 12),
-          const Expanded(
+          Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
+          SizedBox(width: 12),
+          Expanded(
             child: Text(
               'Please use our official template for a smooth import.',
               style: TextStyle(
@@ -135,9 +223,9 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
             ),
           ),
           TextButton.icon(
-            onPressed: () {}, // _downloadTemplate
-            icon: const Icon(Icons.download_rounded, size: 18),
-            label: const Text('Download'),
+            onPressed: _downloadTemplate,
+            icon: Icon(Icons.download_rounded, size: 18),
+            label: Text('Download'),
             style: TextButton.styleFrom(foregroundColor: Colors.amber[900]),
           ),
         ],
@@ -146,8 +234,8 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
   }
 
   Widget _buildUploadZone() {
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
-      onTap: () {}, // _pickFile
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+      onTap: _pickFile,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         width: double.infinity,
@@ -172,7 +260,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
               size: 48,
               color: _pickedFile != null ? _accentColor : Colors.grey[400],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
             Text(
               _pickedFile != null
                   ? _pickedFile!.name
@@ -182,10 +270,10 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
                 fontWeight: FontWeight.w700,
                 color: _pickedFile != null
                     ? _accentColor
-                    : const Color(0xFF475569),
+                    : Color(0xFF475569),
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Text(
               _pickedFile != null
                   ? '${(_pickedFile!.size / 1024).toStringAsFixed(1)} KB'
@@ -208,9 +296,9 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.mark_email_read_outlined, color: Color(0xFF64748B)),
-          const SizedBox(width: 12),
-          const Expanded(
+          Icon(Icons.mark_email_read_outlined, color: AppColors.textMuted),
+          SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -240,11 +328,11 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
             // لون المسار (الـ Track)
             trackColor: WidgetStateProperty.resolveWith<Color>((states) {
               if (states.contains(WidgetState.selected)) {
-                return const Color(
+                return Color(
                   0xFF137FEC,
                 ); // أزرق مريح للعين لما يكون Active
               }
-              return const Color(0xFFE2E8F0); // رمادي فاتح جداً لما يكون المطفي
+              return AppColors.border; // رمادي فاتح جداً لما يكون المطفي
             }),
 
             // إخفاء الحدود الخارجية المزعجة
@@ -267,17 +355,17 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: const Text(
+            child: Text(
               'Cancel',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: 16),
         Expanded(
           flex: 2,
           child: ElevatedButton(
-            onPressed: _loading ? null : () {}, // _submit
+            onPressed: _loading ? null : _submit,
             style: ElevatedButton.styleFrom(
               backgroundColor: _accentColor,
               foregroundColor: Colors.white,
@@ -288,15 +376,15 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
               ),
             ),
             child: _loading
-                ? const SizedBox(
+                ? SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                      color: Colors.white,
+                      color: AppColors.cardBg,
                       strokeWidth: 2,
                     ),
                   )
-                : const Text(
+                : Text(
                     'Upload & Continue',
                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                   ),

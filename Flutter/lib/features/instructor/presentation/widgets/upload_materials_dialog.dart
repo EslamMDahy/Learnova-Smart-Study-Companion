@@ -13,17 +13,18 @@ class UploadMaterialsDialog extends StatefulWidget {
 class _UploadMaterialsDialogState extends State<UploadMaterialsDialog> {
   final bool _isDragging = false;
 
-  static const _border = AppColors.border;
-  static const _text = AppColors.textTitle;
-  static const _muted = AppColors.textMuted;
+  static Color get _border => AppColors.border;
+  static Color get _text => AppColors.textTitle;
+  static Color get _muted => AppColors.textMuted;
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Dialog(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.cardBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 860),
+        constraints: BoxConstraints(maxWidth: 860),
         child: Container(
           padding: const EdgeInsets.all(32),
           child: Column(
@@ -31,7 +32,7 @@ class _UploadMaterialsDialogState extends State<UploadMaterialsDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // ── Header ─────────────────────────────────────────────────
-              const Text(
+              Text(
                 'Upload Course Materials',
                 style: TextStyle(
                   fontSize: 26,
@@ -40,9 +41,9 @@ class _UploadMaterialsDialogState extends State<UploadMaterialsDialog> {
                   height: 1.15,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               RichText(
-                text: const TextSpan(
+                text: TextSpan(
                   style: TextStyle(fontSize: 13.5, color: _muted, height: 1.5),
                   children: [
                     TextSpan(text: 'Add resources for the AI to analyze and generate study aids.\n'),
@@ -60,19 +61,19 @@ class _UploadMaterialsDialogState extends State<UploadMaterialsDialog> {
                   ],
                 ),
               ),
-              const SizedBox(height: 28),
+              SizedBox(height: 28),
 
               // ── Body: drag-drop + queue ────────────────────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(flex: 3, child: _DragDropArea(isDragging: _isDragging)),
-                  const SizedBox(width: 20),
-                  const Expanded(flex: 2, child: _UploadQueue()),
+                  SizedBox(width: 20),
+                  Expanded(flex: 2, child: _UploadQueue()),
                 ],
               ),
 
-              const SizedBox(height: 28),
+              SizedBox(height: 28),
 
               // ── Footer ─────────────────────────────────────────────────
               Row(
@@ -81,18 +82,18 @@ class _UploadMaterialsDialogState extends State<UploadMaterialsDialog> {
                   OutlinedButton(
                     onPressed: () => Navigator.pop(context),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: _border),
+                      side: BorderSide(color: _border),
                       foregroundColor: _muted,
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+                    child: Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   ElevatedButton.icon(
                     onPressed: () {},
-                    icon: const Icon(Icons.save_rounded, size: 18, color: Colors.white),
-                    label: const Text(
+                    icon: Icon(Icons.save_rounded, size: 18, color: Colors.white),
+                    label: Text(
                       'Save to Course',
                       style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
                     ),
@@ -119,24 +120,25 @@ class _DragDropArea extends StatelessWidget {
   final bool isDragging;
   const _DragDropArea({required this.isDragging});
 
-  static const _blue = AppColors.primary;
-  static const _blueCircle = Color(0xFFD0EAFC);
-  static const _bg = AppColors.pageBg;
-  static const _borderColor = AppColors.border;
-  static const _muted = AppColors.textMuted;
-  static const _text = AppColors.textTitle;
+  static Color get _blue => AppColors.primary;
+  static Color get _blueCircle => AppThemeRuntime.isDark ? Color(0xFF172554) : Color(0xFFD0EAFC);
+  static Color get _bg => AppColors.pageBg;
+  static Color get _borderColor => AppColors.border;
+  static Color get _muted => AppColors.textMuted;
+  static Color get _text => AppColors.textTitle;
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       children: [
         // Drop zone
         AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
+          duration: Duration(milliseconds: 160),
           height: 260,
           width: double.infinity,
           decoration: BoxDecoration(
-            color: isDragging ? const Color(0xFFEAF5FE) : _bg,
+            color: isDragging ? AppColors.infoBg : _bg,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: isDragging ? _blue : _borderColor,
@@ -149,18 +151,18 @@ class _DragDropArea extends StatelessWidget {
               Container(
                 width: 72,
                 height: 72,
-                decoration: const BoxDecoration(
+                decoration: BoxDecoration(
                   color: _blueCircle,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.cloud_upload_outlined,
                   size: 36,
                   color: _blue,
                 ),
               ),
-              const SizedBox(height: 16),
-              const Text(
+              SizedBox(height: 16),
+              Text(
                 'Drag & Drop files here',
                 style: TextStyle(
                   fontSize: 17,
@@ -168,17 +170,17 @@ class _DragDropArea extends StatelessWidget {
                   color: _text,
                 ),
               ),
-              const SizedBox(height: 6),
-              const Text(
+              SizedBox(height: 6),
+              Text(
                 'or click to browse from your computer.',
                 style: TextStyle(fontSize: 13, color: _muted),
               ),
-              const SizedBox(height: 4),
-              const Text(
+              SizedBox(height: 4),
+              Text(
                 'AI processing will start automatically upon upload.',
                 style: TextStyle(fontSize: 12, color: _muted),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {},
                 style: ElevatedButton.styleFrom(
@@ -188,7 +190,7 @@ class _DragDropArea extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text(
+                child: Text(
                   'Browse Files',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
@@ -197,7 +199,7 @@ class _DragDropArea extends StatelessWidget {
           ),
         ),
 
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
 
         // Guidelines box
         Container(
@@ -205,9 +207,9 @@ class _DragDropArea extends StatelessWidget {
           decoration: BoxDecoration(
             color: _bg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: const Color(0xFFE2E8F0)),
+            border: Border.all(color: AppColors.border),
           ),
-          child: const Column(
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _GuideRow(
@@ -239,15 +241,16 @@ class _GuideRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(icon, size: 15, color: const Color(0xFF137FEC)),
-        const SizedBox(width: 8),
+        Icon(icon, size: 15, color: AppColors.primary),
+        SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
-            style: const TextStyle(fontSize: 12.5, color: Color(0xFF617589), height: 1.4),
+            style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.4),
           ),
         ),
       ],
@@ -262,12 +265,13 @@ class _UploadQueue extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,76 +279,76 @@ class _UploadQueue extends StatelessWidget {
           // Queue header
           Row(
             children: [
-              const Text(
+              Text(
                 'Upload Queue',
                 style: TextStyle(
                   fontSize: 14,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF111418),
+                  color: AppColors.textTitle,
                 ),
               ),
-              const Spacer(),
+              Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEAF5FE),
+                  color: AppColors.infoBg,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
+                child: Text(
                   '3 Files',
                   style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF137FEC),
+                    color: AppColors.primary,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
 
           // File items
-          const _QueueItem(
+          _QueueItem(
             icon: Icons.picture_as_pdf_rounded,
-            iconColor: Color(0xFFEF4444),
+            iconColor: AppColors.errorDot,
             name: 'Lecture_04_Neural_Nets.pdf',
             sub: '2.4 MB',
             progress: 0.45,
             progressLabel: 'Uploading... 45%',
             showClose: true,
           ),
-          const SizedBox(height: 14),
-          const _QueueItem(
+          SizedBox(height: 14),
+          _QueueItem(
             icon: Icons.description_rounded,
-            iconColor: Color(0xFF137FEC),
+            iconColor: AppColors.primary,
             name: 'Assignment_Brief_v2.docx',
             sub: 'AI Analyzing Content...',
             isAnalyzing: true,
           ),
-          const SizedBox(height: 14),
-          const _QueueItem(
+          SizedBox(height: 14),
+          _QueueItem(
             icon: Icons.video_file_rounded,
-            iconColor: Color(0xFF9333EA),
+            iconColor: AppColors.purpleText,
             name: 'Guest_Speaker_Session.mp4',
             sub: 'Ready for Review',
             isDone: true,
           ),
 
-          const SizedBox(height: 16),
-          const Divider(height: 1, color: Color(0xFFEDF2F7)),
-          const SizedBox(height: 12),
+          SizedBox(height: 16),
+          Divider(height: 1, color: AppColors.border),
+          SizedBox(height: 12),
 
           SizedBox(
             width: double.infinity,
             child: OutlinedButton(
               onPressed: () {},
               style: OutlinedButton.styleFrom(
-                side: const BorderSide(color: Color(0xFFE2E8F0)),
-                foregroundColor: const Color(0xFF617589),
+                side: BorderSide(color: AppColors.border),
+                foregroundColor: AppColors.textMuted,
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: const Text(
+              child: Text(
                 'Clear Completed',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
@@ -381,11 +385,12 @@ class _QueueItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, color: iconColor, size: 28),
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -397,62 +402,62 @@ class _QueueItem extends StatelessWidget {
                       name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF111418),
+                        color: AppColors.textTitle,
                       ),
                     ),
                   ),
                   if (showClose)
-                    const Icon(Icons.close, size: 16, color: Color(0xFF9CA3AF)),
+                    Icon(Icons.close, size: 16, color: AppColors.textHint),
                 ],
               ),
-              const SizedBox(height: 3),
+              SizedBox(height: 3),
               if (progress != null) ...[ 
                 Text(
                   progressLabel ?? sub,
-                  style: const TextStyle(fontSize: 11, color: Color(0xFF617589)),
+                  style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                 ),
-                const SizedBox(height: 5),
+                SizedBox(height: 5),
                 LinearProgressIndicator(
                   value: progress,
                   minHeight: 4,
                   borderRadius: BorderRadius.circular(2),
-                  backgroundColor: const Color(0xFFE2E8F0),
-                  valueColor: const AlwaysStoppedAnimation(Color(0xFF137FEC)),
+                  backgroundColor: AppColors.border,
+                  valueColor: AlwaysStoppedAnimation(AppColors.primary),
                 ),
               ] else if (isAnalyzing) ...[ 
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.sync_rounded, size: 13, color: Color(0xFF9333EA)),
+                    Icon(Icons.sync_rounded, size: 13, color: AppColors.purpleText),
                     SizedBox(width: 4),
                     Text(
                       'AI Analyzing Content...',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF9333EA)),
+                      style: TextStyle(fontSize: 11, color: AppColors.purpleText),
                     ),
                   ],
                 ),
-                const SizedBox(height: 5),
+                SizedBox(height: 5),
                 LinearProgressIndicator(
                   minHeight: 4,
                   borderRadius: BorderRadius.circular(2),
-                  backgroundColor: const Color(0xFFE2E8F0),
-                  valueColor: const AlwaysStoppedAnimation(Color(0xFF9333EA)),
+                  backgroundColor: AppColors.border,
+                  valueColor: AlwaysStoppedAnimation(AppColors.purpleText),
                 ),
               ] else if (isDone) ...[ 
-                const Row(
+                Row(
                   children: [
-                    Icon(Icons.check_circle_rounded, size: 13, color: Color(0xFF16A34A)),
+                    Icon(Icons.check_circle_rounded, size: 13, color: AppColors.successText),
                     SizedBox(width: 4),
                     Text(
                       'Ready for Review',
-                      style: TextStyle(fontSize: 11, color: Color(0xFF16A34A)),
+                      style: TextStyle(fontSize: 11, color: AppColors.successText),
                     ),
                   ],
                 ),
               ] else ...[
-                Text(sub, style: const TextStyle(fontSize: 11, color: Color(0xFF617589))),
+                Text(sub, style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
               ],
             ],
           ),

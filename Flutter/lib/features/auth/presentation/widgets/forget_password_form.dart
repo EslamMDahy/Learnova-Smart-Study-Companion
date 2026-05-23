@@ -71,7 +71,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
               title: 'Forgot password?',
               subtitle: "No worries, we'll send you reset instructions.",
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             if (state.sent && state.successMessage != null) ...[
               AppInfoCard(
@@ -79,7 +79,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
                 title: 'Check your inbox',
                 message: state.successMessage!,
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
             ],
 
             if (state.error != null) ...[
@@ -88,7 +88,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
                 title: 'Something went wrong',
                 message: state.error!,
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
             ],
 
             
@@ -109,14 +109,14 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
                   return null;
                 },
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
 
               AppPrimaryLoadingButton(
                 label: 'Send Reset Link',
                 loading: state.loading,
                 onPressed: _onSend,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
             ] else ...[
               
               AppPrimaryLoadingButton(
@@ -127,7 +127,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
                     .resend(),
                 height: 48,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: 16),
 
               
               if ((state.lastEmail ?? '').trim().isEmpty) ...[
@@ -145,7 +145,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
                     },
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
               ],
             ],
 
@@ -156,7 +156,7 @@ class _ForgetPasswordFormState extends ConsumerState<ForgetPasswordForm> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
           ],
         ),
       ),

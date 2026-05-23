@@ -78,7 +78,7 @@ class _StudentShellState extends ConsumerState<StudentShell> {
       return 4;
     }
 
-    if (path.startsWith(Routes.settings)) {
+    if (path.startsWith(Routes.studentSettings)) {
       return 5;
     }
 
@@ -112,7 +112,7 @@ class _StudentShellState extends ConsumerState<StudentShell> {
         return;
 
       case 5:
-        context.go(Routes.settings);
+        context.go(Routes.studentSettings);
         return;
 
       case 6:

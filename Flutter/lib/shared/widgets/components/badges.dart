@@ -19,12 +19,13 @@ class AppFilterChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bg = selected ? AppColors.title : Colors.white;
+    Theme.of(context);
+    final bg = selected ? AppColors.title : AppColors.cardBg;
     final border = selected ? AppColors.title : AppColors.border;
-    final textColor = selected ? Colors.white : const Color(0xFF334155);
+    final textColor = selected ? Colors.white : AppColors.textGray;
     final weight = selected ? FontWeight.w700 : FontWeight.w500;
 
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
       borderRadius: BorderRadius.circular(8),
       onTap: onTap,
       child: Container(
@@ -56,6 +57,7 @@ class FigmaUmRolePill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final r = role.toLowerCase();
 
     Color bg = AppColors.badgeBlueBg;
@@ -124,6 +126,7 @@ class JrStatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final normalized = jrNormalizeStatus(status);
 
     Color dot = AppColors.warningDot;
@@ -154,11 +157,11 @@ class JrStatusBadge extends StatelessWidget {
             borderRadius: BorderRadius.circular(9999),
           ),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: 8),
         Text(
           label,
           overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'Inter',
             fontSize: 14,
             fontWeight: FontWeight.w500,
@@ -193,15 +196,16 @@ class UpgradePeriodToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(6),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(999),
         border: Border.all(color: AppColors.border),
         boxShadow: [
-          const BoxShadow(
-            color: Color(0x080F172A),
+          BoxShadow(
+            color: AppColors.shadowThin,
             blurRadius: (kIsWeb ? 12 : 18),
             offset: (kIsWeb ? Offset(0, 4) : Offset(0, 8)),
           ),
@@ -215,23 +219,23 @@ class UpgradePeriodToggle extends StatelessWidget {
             selected: !isYearly,
             onTap: isYearly ? onToggle : null,
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           UpgradeToggleChip(
             text: 'Yearly',
             selected: isYearly,
             onTap: !isYearly ? onToggle : null,
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
-              color: const Color(0xFFDCFCE7),
+              color: AppColors.successBg,
               borderRadius: BorderRadius.circular(999),
             ),
-            child: const Text(
+            child: Text(
               'Save more',
               style: TextStyle(
-                color: Color(0xFF166534),
+                color: AppColors.successText,
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
               ),
@@ -257,25 +261,26 @@ class UpgradeToggleChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+    Theme.of(context);
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: AnimatedContainer(
-        duration: kIsWeb ? Duration.zero : const Duration(milliseconds: 180),
+        duration: kIsWeb ? Duration.zero : Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFF2563EB) : const Color(0xFFF8FAFC),
+          color: selected ? AppColors.primary : AppColors.surfaceBg,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color:
-                selected ? const Color(0xFF2563EB) : AppColors.border,
+                selected ? AppColors.primary : AppColors.border,
           ),
         ),
         child: Text(
           text,
           style: TextStyle(
             fontWeight: FontWeight.w900,
-            color: selected ? Colors.white : const Color(0xFF0F172A),
+            color: selected ? Colors.white : AppColors.textTitle,
           ),
         ),
       ),

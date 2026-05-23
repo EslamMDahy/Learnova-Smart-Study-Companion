@@ -1,11 +1,13 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:learnova/core/theme/app_theme.dart';
 
 class SignupLeftPanel extends StatelessWidget {
   const SignupLeftPanel({super.key});
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return LayoutBuilder(
       builder: (context, c) {
         final w = c.maxWidth;
@@ -21,7 +23,7 @@ class SignupLeftPanel extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
           decoration: BoxDecoration(
             image: DecorationImage(
-              image: ResizeImage(const AssetImage('assets/signup.webp'), width: bgCacheWidth),
+              image: ResizeImage(AssetImage('assets/signup.webp'), width: bgCacheWidth),
               fit: BoxFit.cover,
             ),
             gradient: LinearGradient(
@@ -40,8 +42,8 @@ class SignupLeftPanel extends StatelessWidget {
               Row(
                 children: [
                   Image.asset('assets/logo.webp', height: 40, cacheWidth: (40 * dpr).round()),
-                  const SizedBox(width: 12),
-                  const Text(
+                  SizedBox(width: 12),
+                  Text(
                     'Learnova',
                     style: TextStyle(
                       color: Colors.white,
@@ -51,7 +53,7 @@ class SignupLeftPanel extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 40),
+              SizedBox(height: 40),
               Text.rich(
                 TextSpan(
                   children: [
@@ -67,7 +69,7 @@ class SignupLeftPanel extends StatelessWidget {
                     TextSpan(
                       text: 'Modern Campus',
                       style: TextStyle(
-                        color: const Color(0xFFBFDBFE),
+                        color: AppColors.badgeBlueBorder,
                         fontSize: w < 1100 ? 32 : 38,
                         fontWeight: FontWeight.bold,
                         height: 1.2,
@@ -76,10 +78,10 @@ class SignupLeftPanel extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxTextWidth),
-                child: const Text(
+                child: Text(
                   'Experience personalized assessments, adaptive question banks, and intelligent insights designed for students, instructors, and administrators.',
                   style: TextStyle(
                     color: Colors.white70,
@@ -88,8 +90,8 @@ class SignupLeftPanel extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(height: 30),
-              const Wrap(
+              SizedBox(height: 30),
+              Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
@@ -104,7 +106,7 @@ class SignupLeftPanel extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 50),
+              SizedBox(height: 50),
             ],
           ),
         );
@@ -121,20 +123,21 @@ class _FeatureTag extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
       decoration: BoxDecoration(
-        border: Border.all(color: Colors.white.withValues(alpha: 0.20), width: 1.2),
+        border: Border.all(color: AppColors.cardBg.withValues(alpha: 0.20), width: 1.2),
         borderRadius: BorderRadius.circular(50),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: Colors.white, size: 18),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Text(
             title,
-            style: const TextStyle(
+            style: TextStyle(
               color: Colors.white,
               fontSize: 13,
               fontWeight: FontWeight.w600,

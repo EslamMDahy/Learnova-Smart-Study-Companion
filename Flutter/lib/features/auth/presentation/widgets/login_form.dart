@@ -46,7 +46,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
         context.replace(clean.toString());
 
         _successTimer?.cancel();
-        _successTimer = Timer(const Duration(seconds: 3), () {
+        _successTimer = Timer(Duration(seconds: 3), () {
           if (!mounted) return;
           setState(() {
             _showResetSuccess    = false;
@@ -90,7 +90,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
         } else if (UserStorage.isInstructor) {
           context.go(Routes.instructorDashboard);
         } else {
-          context.go(Routes.home);
+          context.go(Routes.studentDashboard);
         }
         break;
 
@@ -107,6 +107,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final state = ref.watch(loginControllerProvider);
 
     // Derived from AsyncValue — no manual bool flags needed.
@@ -120,11 +121,11 @@ class _LoginFormState extends ConsumerState<LoginForm> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const AppFormHeader(
+            AppFormHeader(
               title: 'Login',
               subtitle: 'Please sign in to access your dashboard.',
             ),
-            const SizedBox(height: 24),
+            SizedBox(height: 24),
 
             if (_showVerifiedSuccess && err == null) ...[
               AppSuccessBanner(
@@ -133,7 +134,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                     'Your email has been verified successfully. You can log in now.',
                 onClose: () => setState(() => _showVerifiedSuccess = false),
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
             ],
 
             if (_showResetSuccess && err == null) ...[
@@ -143,12 +144,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                     'Your password has been updated. Log in with the new one.',
                 onClose: () => setState(() => _showResetSuccess = false),
               ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
             ],
 
             if (err != null) ...[
               AppErrorBox(message: err),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
             ],
 
             AppLabeledIconField(
@@ -166,7 +167,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               },
             ),
 
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
 
             AppLabeledIconField(
               label: 'Password',
@@ -192,7 +193,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               ),
             ),
 
-            const SizedBox(height: 16),
+            SizedBox(height: 16),
 
             AppRememberForgotRow(
               value: rememberMe,
@@ -201,7 +202,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               onForgot: () => context.go(Routes.forgotPassword),
             ),
 
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
 
             AppPrimaryLoadingButton(
               label: 'Log In',
@@ -209,9 +210,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               onPressed: _onLogin,
             ),
 
-            const SizedBox(height: 28),
-            const AppAuthOrDivider(),
-            const SizedBox(height: 24),
+            SizedBox(height: 28),
+            AppAuthOrDivider(),
+            SizedBox(height: 24),
 
             AppSocialButton(
               label: 'Google',
@@ -219,7 +220,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               disabled: isLoading,
               onTap: () {},
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             AppSocialButton(
               label: 'Microsoft',
               imagePath: 'assets/microsoft.png',
@@ -227,12 +228,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               onTap: () {},
             ),
 
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text(
+                Text(
                   "Don't have an account? ",
                   style: TextStyle(color: Colors.black),
                 ),
@@ -240,9 +241,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   hoverColor: Colors.transparent,
                   splashColor: Colors.transparent,
                   highlightColor: Colors.transparent,
-                  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+                  overlayColor: WidgetStatePropertyAll(Colors.transparent),
                   onTap: isLoading ? null : () => context.go(Routes.signup),
-                  child: const Text(
+                  child: Text(
                     'Sign up',
                     style: TextStyle(
                       color: AppColors.primary,
@@ -253,7 +254,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               ],
             ),
 
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
           ],
         ),
       ),

@@ -80,6 +80,7 @@ class _AppLabeledTextFieldState extends State<AppLabeledTextField> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final hasError = widget.errorText != null;
     final borderColor = hasError
         ? AppColors.dangerBorder
@@ -100,7 +101,7 @@ class _AppLabeledTextFieldState extends State<AppLabeledTextField> {
               ? BoxConstraints(minHeight: widget.height)
               : null,
           decoration: BoxDecoration(
-            color: widget.enabled ? Colors.white : AppColors.pageBg,
+            color: widget.enabled ? AppColors.fieldBg : AppColors.fieldDisabledBg,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: borderColor, width: borderWidth),
           ),
@@ -175,15 +176,16 @@ class FigmaUmSearch40 extends StatelessWidget {
     this.hint = 'Search by name, ID, or email...',
   });
 
-  static const Color _text   = Color(0xFF111418);
-  static const Color _muted  = Color(0xFF617589);
-  static const Color _bg     = Color(0xFFF0F2F4);
+  static Color get _text => AppColors.textTitle;
+  static Color get _muted => AppColors.textMuted;
+  static Color get _bg => AppColors.headerBg;
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Theme(
       data: Theme.of(context).copyWith(
-        inputDecorationTheme: const InputDecorationTheme(
+        inputDecorationTheme: InputDecorationTheme(
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
@@ -197,9 +199,9 @@ class FigmaUmSearch40 extends StatelessWidget {
         child: SizedBox(
           height: 40,
           child: Row(children: [
-            const SizedBox(width: 14),
-            const Icon(Icons.search, size: 18, color: _muted),
-            const SizedBox(width: 10),
+            SizedBox(width: 14),
+            Icon(Icons.search, size: 18, color: _muted),
+            SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: controller,
@@ -219,7 +221,7 @@ class FigmaUmSearch40 extends StatelessWidget {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w500,
                       height: 19 / 14,
@@ -255,6 +257,7 @@ class AppReadOnlyInput extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -263,14 +266,14 @@ class AppReadOnlyInput extends StatelessWidget {
         Container(
           height: 44,
           decoration: BoxDecoration(
-            color: AppColors.pageBg,
+            color: AppColors.fieldDisabledBg,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: AppColors.borderSoft),
           ),
           child: Row(children: [
-            const SizedBox(width: 14),
+            SizedBox(width: 14),
             Icon(icon, size: 18, color: AppColors.muted),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Expanded(
               child: Text(
                 value,
@@ -281,7 +284,7 @@ class AppReadOnlyInput extends StatelessWidget {
             if (rightTag != null) ...[
               Text(rightTag!.toUpperCase(), style: AppText.mutedSmall.copyWith(
                   fontWeight: FontWeight.w700, letterSpacing: 0.3)),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
             ],
           ]),
         ),

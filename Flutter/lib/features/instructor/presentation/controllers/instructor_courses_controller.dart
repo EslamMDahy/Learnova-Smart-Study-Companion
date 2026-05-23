@@ -31,7 +31,7 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
     try {
       final res = await _ref.read(coursesRepositoryProvider).myCourses(
         cancelToken: _cancel,
-        enrichMissingModuleCounts: false,
+        enrichMissingModuleCounts: true,
       );
       state = state.copyWith(loading: false, items: res.items);
     } catch (e) {
@@ -44,6 +44,88 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
       );
     }
   }
+
+
+  MyCourseItem _fallbackUpdatedCourse(
+    MyCourseItem course,
+    CourseUpdateRequest payload,
+  ) {
+    return course.copyWith(
+      title: payload.title?.trim().isNotEmpty == true
+          ? payload.title!.trim()
+          : course.title,
+      courseCode: payload.courseCode?.trim().isNotEmpty == true
+          ? payload.courseCode!.trim()
+          : course.courseCode,
+      category: payload.category?.trim().isNotEmpty == true
+          ? payload.category!.trim()
+          : course.category,
+      courseType: payload.courseType != null
+          ? payload.courseType!.trim()
+          : course.courseType,
+      isPublic: payload.isPublic,
+      visibilityLevel: payload.visibilityLevel != null
+          ? payload.visibilityLevel!.trim()
+          : course.visibilityLevel,
+      status: payload.status != null ? payload.status!.trim() : course.status,
+      updatedAt: DateTime.now(),
+    );
+  }
+
+  void _replaceCourse(MyCourseItem updated) {
+    state = state.copyWith(
+      items: state.items
+          .map((course) => course.id == updated.id ? updated : course)
+          .toList(growable: false),
+      error: null,
+    );
+  }
+
+  Future<MyCourseItem> updateCourse(
+    MyCourseItem course,
+    CourseUpdateRequest payload,
+  ) async {
+    try {
+      final updated = await _ref.read(coursesRepositoryProvider).updateCourse(
+            courseId: course.id,
+            payload: payload,
+          );
+
+      final next = updated ?? _fallbackUpdatedCourse(course, payload);
+      _replaceCourse(next);
+      return next;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+      state = state.copyWith(error: failure.message);
+      rethrow;
+    }
+  }
+
+  Future<MyCourseItem> archiveCourse(MyCourseItem course) {
+    return updateCourse(
+      course,
+      const CourseUpdateRequest(status: 'archived'),
+    );
+  }
+
+  Future<void> deleteCourse(MyCourseItem course) async {
+    try {
+      await _ref.read(coursesRepositoryProvider).deleteCourse(courseId: course.id);
+      state = state.copyWith(
+        items: state.items
+            .where((item) => item.id != course.id)
+            .toList(growable: false),
+        error: null,
+      );
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+      state = state.copyWith(error: failure.message);
+      rethrow;
+    }
+  }
+
 
   /// Creates a course and returns the typed backend response.
   ///

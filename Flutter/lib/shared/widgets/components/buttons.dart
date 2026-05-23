@@ -29,6 +29,7 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final h = height ??
         (variant == AppButtonVariant.danger
             ? 42
@@ -42,7 +43,7 @@ class AppButton extends StatelessWidget {
     Color bg = AppColors.primary;
     Color? border;
     Color fg = Colors.white;
-    List<BoxShadow> shadow = const [
+    List<BoxShadow> shadow = [
       BoxShadow(
         blurRadius: 2,
         offset: Offset(0, 1),
@@ -54,7 +55,7 @@ class AppButton extends StatelessWidget {
       case AppButtonVariant.primary:
         bg = AppColors.primary;
         fg = Colors.white;
-        shadow = const [
+        shadow = [
           BoxShadow(
             blurRadius: 2,
             offset: Offset(0, 1),
@@ -64,10 +65,10 @@ class AppButton extends StatelessWidget {
         break;
 
       case AppButtonVariant.soft:
-        bg = Colors.white;
+        bg = AppColors.cardBg;
         border = AppColors.borderSoft;
         fg = AppColors.title;
-        shadow = const [
+        shadow = [
           BoxShadow(
             blurRadius: 2,
             offset: Offset(0, 1),
@@ -77,10 +78,10 @@ class AppButton extends StatelessWidget {
         break;
 
       case AppButtonVariant.primarySoft:
-        bg = Colors.white;
+        bg = AppColors.cardBg;
         border = AppColors.border;
         fg = AppColors.title;
-        shadow = const [
+        shadow = [
           BoxShadow(
             blurRadius: 2,
             offset: Offset(0, 1),
@@ -90,15 +91,15 @@ class AppButton extends StatelessWidget {
         break;
 
       case AppButtonVariant.danger:
-        bg = Colors.white;
+        bg = AppColors.cardBg;
         border = AppColors.dangerBorder;
         fg = AppColors.dangerText;
-        shadow = const [];
+        shadow = [];
         break;
     }
 
     final child = loading
-        ? const SizedBox(
+        ? SizedBox(
             width: 18,
             height: 18,
             child: CircularProgressIndicator(strokeWidth: 2),
@@ -116,7 +117,7 @@ class AppButton extends StatelessWidget {
       cursor: (loading || onTap == null)
           ? SystemMouseCursors.basic
           : SystemMouseCursors.click,
-      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
         onTap: (loading ? null : onTap),
         borderRadius: BorderRadius.circular(8),
         child: Container(
@@ -153,6 +154,7 @@ class AppSoftButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return AppButton(
       label: label,
       onTap: onTap,

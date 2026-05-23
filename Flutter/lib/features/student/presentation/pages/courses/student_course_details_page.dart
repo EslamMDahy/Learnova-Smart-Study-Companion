@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:learnova/features/student/presentation/pages/quiz/student_quiz_result_page.dart';
+import 'package:learnova/core/theme/app_theme.dart';
 // 1. إضافة الـ import الصحيح لصفحة الكويز (تأكد من تعديل المسار لو كان مختلفاً في مجلدات مشروعك)
 
 class StudentCourseDetailsPage extends StatelessWidget {
@@ -7,9 +8,9 @@ class StudentCourseDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Scaffold(
-      backgroundColor: const Color(
-          0xffF8FAFC), // خلفية الصفحة الأساسية الفاتحة المطابقة للنظام
+      backgroundColor: AppColors.bg, // خلفية الصفحة الأساسية الفاتحة المطابقة للنظام
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -17,9 +18,9 @@ class StudentCourseDetailsPage extends StatelessWidget {
           Container(
             width: 320,
             height: double.infinity,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(right: BorderSide(color: Color(0xffE2E8F0))),
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              border: Border(right: BorderSide(color: AppColors.border)),
             ),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             child: Column(
@@ -30,25 +31,25 @@ class StudentCourseDetailsPage extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         "Course Content",
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 18,
-                          color: Color(0xff0F172A),
+                          color: AppColors.textTitle,
                         ),
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 10, vertical: 5),
                         decoration: BoxDecoration(
-                          color: const Color(0xffEFF6FF),
+                          color: AppColors.infoBg,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: const Text(
+                        child: Text(
                           "CS-101",
                           style: TextStyle(
-                            color: Color(0xff1D8CF8),
+                            color: AppColors.primary,
                             fontWeight: FontWeight.w700,
                             fontSize: 12,
                           ),
@@ -57,7 +58,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
 
                 /// نظام Modules (Accordion)
                 Expanded(
@@ -83,7 +84,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
                                 isCompleted: false, isCurrent: false),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
 
                         /// Module 2
                         _buildModuleExpansionTile(
@@ -104,7 +105,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
                                 isLocked: false),
                           ],
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
 
                         /// Module 3
                         _buildModuleExpansionTile(
@@ -141,7 +142,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
                       width: double.infinity,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
-                        gradient: const LinearGradient(
+                        gradient: LinearGradient(
                           colors: [Color(0xff1E1B4B), Color(0xff312E81)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -150,39 +151,39 @@ class StudentCourseDetailsPage extends StatelessWidget {
                           BoxShadow(
                             color: Colors.black.withOpacity(0.06),
                             blurRadius: 20,
-                            offset: const Offset(0, 8),
+                            offset: Offset(0, 8),
                           )
                         ],
                       ),
                       child: Center(
                         child: CircleAvatar(
                           radius: 36,
-                          backgroundColor: Colors.white.withOpacity(0.9),
-                          child: const Icon(
+                          backgroundColor: AppColors.cardBg.withOpacity(0.9),
+                          child: Icon(
                             Icons.play_arrow_rounded,
                             size: 44,
-                            color: Color(0xff1D8CF8),
+                            color: AppColors.primary,
                           ),
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
 
                     /// TITLE & INSTRUCTOR INFO
-                    const Text(
+                    Text(
                       "1.2 Setting Up Your Production Environment",
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xff0F172A),
+                        color: AppColors.textTitle,
                       ),
                     ),
-                    const SizedBox(height: 8),
-                    const Text(
+                    SizedBox(height: 8),
+                    Text(
                       "In this lesson, we will explore the industrial standards for setting up scalable architectures.",
-                      style: TextStyle(color: Color(0xff64748B), fontSize: 14),
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 14),
                     ),
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24),
 
                     /// NAVIGATION TABS
                     Row(
@@ -193,18 +194,18 @@ class StudentCourseDetailsPage extends StatelessWidget {
                         _buildTabItem("AI Resources", false),
                       ],
                     ),
-                    const Divider(color: Color(0xffE2E8F0), height: 1),
-                    const SizedBox(height: 28),
+                    Divider(color: AppColors.border, height: 1),
+                    SizedBox(height: 28),
 
                     /// TIMELINE / LESSON OBJECTIVES
-                    const Text(
+                    Text(
                       "Lesson Timeline",
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: Color(0xff0F172A)),
+                          color: AppColors.textTitle),
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     _buildTimelineItem("02:15",
                         "Introduction and setup overview of required SDKs."),
                     _buildTimelineItem("08:45",
@@ -222,9 +223,9 @@ class StudentCourseDetailsPage extends StatelessWidget {
           Container(
             width: 340,
             height: double.infinity,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(left: BorderSide(color: Color(0xffE2E8F0))),
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              border: Border(left: BorderSide(color: AppColors.border)),
             ),
             padding: const EdgeInsets.all(20),
             child: Column(
@@ -232,29 +233,29 @@ class StudentCourseDetailsPage extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    const Icon(Icons.auto_awesome,
-                        color: Color(0xff1D8CF8), size: 20),
-                    const SizedBox(width: 8),
-                    const Text(
+                    Icon(Icons.auto_awesome,
+                        color: AppColors.primary, size: 20),
+                    SizedBox(width: 8),
+                    Text(
                       "AI Learning Tutor",
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
-                        color: Color(0xff0F172A),
+                        color: AppColors.textTitle,
                       ),
                     ),
-                    const Spacer(),
+                    Spacer(),
                     CircleAvatar(
                       radius: 4,
                       backgroundColor: Colors.green.shade500,
                     ),
-                    const SizedBox(width: 6),
-                    const Text("Online",
+                    SizedBox(width: 6),
+                    Text("Online",
                         style:
-                            TextStyle(fontSize: 12, color: Color(0xff64748B))),
+                            TextStyle(fontSize: 12, color: AppColors.textMuted)),
                   ],
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: 20),
 
                 /// CHAT MESSAGES AREA
                 Expanded(
@@ -275,18 +276,18 @@ class StudentCourseDetailsPage extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xffF8FAFC),
+                    color: AppColors.bg,
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xffE2E8F0)),
+                    border: Border.all(color: AppColors.border),
                   ),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: TextField(
                           decoration: InputDecoration(
                             hintText: "Ask AI a question...",
                             hintStyle: TextStyle(
-                                color: Color(0xff94A3B8), fontSize: 13),
+                                color: AppColors.textHint, fontSize: 13),
                             border: InputBorder.none,
                             isDense: true,
                           ),
@@ -294,10 +295,10 @@ class StudentCourseDetailsPage extends StatelessWidget {
                       ),
                       IconButton(
                         onPressed: () {},
-                        icon: const Icon(Icons.send_rounded,
-                            color: Color(0xff1D8CF8), size: 18),
+                        icon: Icon(Icons.send_rounded,
+                            color: AppColors.primary, size: 18),
                         padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
+                        constraints: BoxConstraints(),
                       ),
                     ],
                   ),
@@ -320,23 +321,23 @@ class StudentCourseDetailsPage extends StatelessWidget {
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xffF8FAFC),
+        color: AppColors.bg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xffE2E8F0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: ExpansionTile(
         initiallyExpanded: isInitiallyExpanded,
         title: Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: Color(0xff1E293B),
+            color: AppColors.textGray,
           ),
         ),
-        trailing: const Icon(
+        trailing: Icon(
           Icons.keyboard_arrow_down_rounded,
-          color: Color(0xff64748B),
+          color: AppColors.textMuted,
           size: 20,
         ),
         collapsedBackgroundColor: Colors.transparent,
@@ -354,12 +355,12 @@ class StudentCourseDetailsPage extends StatelessWidget {
       margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: isCurrent ? const Color(0xffEFF6FF) : Colors.white,
+        color: isCurrent ? AppColors.infoBg : AppColors.cardBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
           color: isCurrent
-              ? const Color(0xffBFDBFE)
-              : const Color(0xffE2E8F0).withOpacity(0.6),
+              ? AppColors.infoBorder
+              : AppColors.border.withOpacity(0.6),
         ),
       ),
       child: Row(
@@ -369,13 +370,13 @@ class StudentCourseDetailsPage extends StatelessWidget {
                 ? Icons.check_circle_rounded
                 : Icons.play_circle_outline_rounded,
             color: isCompleted
-                ? const Color(0xff10B981)
+                ? AppColors.successDot
                 : (isCurrent
-                    ? const Color(0xff1D8CF8)
-                    : const Color(0xff94A3B8)),
+                    ? AppColors.primary
+                    : AppColors.textHint),
             size: 16,
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Expanded(
             child: Text(
               title,
@@ -385,8 +386,8 @@ class StudentCourseDetailsPage extends StatelessWidget {
                 fontSize: 12.5,
                 fontWeight: isCurrent ? FontWeight.w700 : FontWeight.w500,
                 color: isCurrent
-                    ? const Color(0xff1D8CF8)
-                    : const Color(0xff334155),
+                    ? AppColors.primary
+                    : AppColors.textGray,
               ),
             ),
           ),
@@ -395,8 +396,8 @@ class StudentCourseDetailsPage extends StatelessWidget {
             style: TextStyle(
               fontSize: 11,
               color: isCurrent
-                  ? const Color(0xff1D8CF8).withOpacity(0.7)
-                  : const Color(0xff94A3B8),
+                  ? AppColors.primary.withOpacity(0.7)
+                  : AppColors.textHint,
             ),
           ),
         ],
@@ -414,7 +415,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
           Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => const StudentQuizResultPage()),
+                builder: (context) => StudentQuizResultPage()),
           );
         }
       },
@@ -422,19 +423,19 @@ class StudentCourseDetailsPage extends StatelessWidget {
         margin: const EdgeInsets.symmetric(vertical: 2),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: const Color(0xffE2E8F0).withOpacity(0.6)),
+          border: Border.all(color: AppColors.border.withOpacity(0.6)),
         ),
         child: Row(
           children: [
             Icon(
               isLocked ? Icons.lock_outline_rounded : Icons.assignment_outlined,
               color:
-                  isLocked ? const Color(0xff94A3B8) : const Color(0xffF59E0B),
+                  isLocked ? AppColors.textHint : AppColors.warningText,
               size: 16,
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: 10),
             Expanded(
               child: Text(
                 title,
@@ -444,23 +445,23 @@ class StudentCourseDetailsPage extends StatelessWidget {
                   fontSize: 12.5,
                   fontWeight: FontWeight.w600,
                   color: isLocked
-                      ? const Color(0xff94A3B8)
-                      : const Color(0xff334155),
+                      ? AppColors.textHint
+                      : AppColors.textGray,
                 ),
               ),
             ),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
               decoration: BoxDecoration(
-                color: const Color(0xffFEF3C7),
+                color: AppColors.warningSoftBg,
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Text(
                 questionsCount,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xffB45309),
+                  color: AppColors.warningText,
                 ),
               ),
             ),
@@ -477,7 +478,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
       decoration: BoxDecoration(
         border: Border(
           bottom: BorderSide(
-            color: isActive ? const Color(0xff1D8CF8) : Colors.transparent,
+            color: isActive ? AppColors.primary : Colors.transparent,
             width: 2,
           ),
         ),
@@ -487,7 +488,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
         style: TextStyle(
           fontSize: 14,
           fontWeight: isActive ? FontWeight.w700 : FontWeight.w500,
-          color: isActive ? const Color(0xff1D8CF8) : const Color(0xff64748B),
+          color: isActive ? AppColors.primary : AppColors.textMuted,
         ),
       ),
     );
@@ -500,7 +501,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: isSelected
-            ? const Color(0xffEFF6FF).withOpacity(0.5)
+            ? AppColors.infoBg.withOpacity(0.5)
             : Colors.transparent,
         borderRadius: BorderRadius.circular(8),
       ),
@@ -511,8 +512,8 @@ class StudentCourseDetailsPage extends StatelessWidget {
             width: 60,
             child: Text(
               time,
-              style: const TextStyle(
-                color: Color(0xff1D8CF8),
+              style: TextStyle(
+                color: AppColors.primary,
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
               ),
@@ -521,9 +522,9 @@ class StudentCourseDetailsPage extends StatelessWidget {
           Expanded(
             child: Text(
               text,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 13,
-                color: Color(0xff475569),
+                color: AppColors.textGray,
                 height: 1.5,
               ),
             ),
@@ -539,9 +540,9 @@ class StudentCourseDetailsPage extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(12),
-        constraints: const BoxConstraints(maxWidth: 260),
+        constraints: BoxConstraints(maxWidth: 260),
         decoration: BoxDecoration(
-          color: isUser ? const Color(0xff1D8CF8) : const Color(0xffF1F5F9),
+          color: isUser ? AppColors.primary : AppColors.headerBg,
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(12),
             topRight: const Radius.circular(12),
@@ -552,7 +553,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
         child: Text(
           message,
           style: TextStyle(
-            color: isUser ? Colors.white : const Color(0xff334155),
+            color: isUser ? Colors.white : AppColors.textGray,
             fontSize: 13,
             height: 1.4,
           ),

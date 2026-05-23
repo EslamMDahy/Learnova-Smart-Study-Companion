@@ -30,11 +30,11 @@ abstract final class _H {
     switch (v.trim().toLowerCase()) {
       case 'published':
       case 'active':
-        return const Color(0xFF16A34A);
+        return AppColors.successText;
       case 'draft':
-        return const Color(0xFFD97706);
+        return AppColors.warningText;
       case 'archived':
-        return const Color(0xFF64748B);
+        return AppColors.textMuted;
       default:
         return AppColors.primary;
     }
@@ -44,13 +44,13 @@ abstract final class _H {
     switch (v.trim().toLowerCase()) {
       case 'published':
       case 'active':
-        return const Color(0xFFDCFCE7);
+        return AppColors.successBg;
       case 'draft':
-        return const Color(0xFFFEF3C7);
+        return AppColors.warningSoftBg;
       case 'archived':
-        return const Color(0xFFE2E8F0);
+        return AppColors.border;
       default:
-        return const Color(0xFFEFF6FF);
+        return AppColors.primarySoft;
     }
   }
 
@@ -79,14 +79,14 @@ abstract final class _H {
 
   // Shared decoration reused by multiple cards
   static BoxDecoration cardDecoration({
-    Color color = Colors.white,
+    Color? color,
     double radius = 16,
   }) =>
       BoxDecoration(
-        color: color,
+        color: color ?? AppColors.cardBg,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: AppColors.border),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
               color: Color(0x09000000), blurRadius: 12, offset: Offset(0, 3)),
         ],
@@ -94,7 +94,7 @@ abstract final class _H {
 
   static BoxDecoration surfaceDecoration({double radius = 14}) =>
       BoxDecoration(
-        color: const Color(0xFFFAFBFD),
+        color: AppColors.hoverBg,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: AppColors.border),
       );
@@ -162,7 +162,7 @@ class CourseOverviewTab extends ConsumerWidget {
                   setupProgress: setupProgress,
                   setupLabel: setupLabel,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
 
                 // ── Smart next-action banner ──────────────────────────────
                 _NextActionBanner(
@@ -173,7 +173,7 @@ class CourseOverviewTab extends ConsumerWidget {
                   draftModules: draftModules,
                   courseId: course.id,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
 
                 // ── Stat cards ────────────────────────────────────────────
                 _ResponsiveStatsGrid(
@@ -190,7 +190,7 @@ class CourseOverviewTab extends ConsumerWidget {
                               : '$publishedModules published module${publishedModules == 1 ? '' : 's'}',
                       icon: Icons.view_module_rounded,
                       accent: AppColors.primary,
-                      softColor: const Color(0xFFEFF6FF),
+                      softColor: AppColors.primarySoft,
                       loading: state.modulesLoading,
                     ),
                     _InsightStatCard(
@@ -200,8 +200,8 @@ class CourseOverviewTab extends ConsumerWidget {
                           ? 'Add modules first'
                           : '${avgMaterialsPerModule.toStringAsFixed(avgMaterialsPerModule == avgMaterialsPerModule.roundToDouble() ? 0 : 1)} avg per module',
                       icon: Icons.folder_rounded,
-                      accent: const Color(0xFF7C3AED),
-                      softColor: const Color(0xFFF3E8FF),
+                      accent: AppColors.purpleText,
+                      softColor: AppColors.purpleBg,
                     ),
                     _InsightStatCard(
                       title: 'Students',
@@ -212,8 +212,8 @@ class CourseOverviewTab extends ConsumerWidget {
                               ? '1 learner enrolled'
                               : '$studentCount learners enrolled',
                       icon: Icons.people_alt_rounded,
-                      accent: const Color(0xFF16A34A),
-                      softColor: const Color(0xFFDCFCE7),
+                      accent: AppColors.successText,
+                      softColor: AppColors.successBg,
                     ),
                     _InsightStatCard(
                       title: 'Course status',
@@ -227,7 +227,7 @@ class CourseOverviewTab extends ConsumerWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
 
                 // ── Sections (wide / narrow) ──────────────────────────────
                 if (isWide)
@@ -322,7 +322,7 @@ class _NextActionBanner extends ConsumerWidget {
             alignment: Alignment.center,
             child: Icon(icon, size: 18, color: accent),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -336,10 +336,10 @@ class _NextActionBanner extends ConsumerWidget {
                     fontFamily: 'Inter',
                   ),
                 ),
-                const SizedBox(height: 3),
+                SizedBox(height: 3),
                 Text(
                   body,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12,
                     color: AppColors.textMuted,
                     height: 1.45,
@@ -350,7 +350,7 @@ class _NextActionBanner extends ConsumerWidget {
             ),
           ),
           if (cta != null && onCta != null) ...[
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             GestureDetector(
               onTap: onCta,
               child: MouseRegion(
@@ -364,7 +364,7 @@ class _NextActionBanner extends ConsumerWidget {
                   ),
                   child: Text(
                     cta,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
@@ -394,7 +394,7 @@ class _NextActionBanner extends ConsumerWidget {
       return (
         Icons.add_box_outlined,
         AppColors.primary,
-        const Color(0xFFEFF6FF),
+        AppColors.primarySoft,
         'Start by creating your first module',
         'A module is the building block of your course. Add at least one to unlock materials, questions, and learner delivery.',
         'Create Module',
@@ -406,8 +406,8 @@ class _NextActionBanner extends ConsumerWidget {
     if (materialCount == 0) {
       return (
         Icons.upload_file_outlined,
-        const Color(0xFF7C3AED),
-        const Color(0xFFF5F3FF),
+        AppColors.purpleText,
+        AppColors.purpleBg,
         'Upload your first learning material',
         'You have $moduleCount module${moduleCount == 1 ? '' : 's'} ready. Add PDFs, slides, or documents to give your course substance.',
         'Upload',
@@ -419,8 +419,8 @@ class _NextActionBanner extends ConsumerWidget {
     if (questionCount == 0) {
       return (
         Icons.auto_awesome_rounded,
-        const Color(0xFF7C3AED),
-        const Color(0xFFF5F3FF),
+        AppColors.purpleText,
+        AppColors.purpleBg,
         'Your content is ready — build the question bank',
         'You have $materialCount material${materialCount == 1 ? '' : 's'} uploaded. Generate or create questions to activate assessments.',
         'Generate',
@@ -435,8 +435,8 @@ class _NextActionBanner extends ConsumerWidget {
     if (draftModules > 0) {
       return (
         Icons.edit_note_rounded,
-        const Color(0xFFD97706),
-        const Color(0xFFFFFBEB),
+        AppColors.warningText,
+        AppColors.warningSoftBg,
         '$draftModules module${draftModules == 1 ? '' : 's'} still in draft',
         'Review and publish your draft modules so enrolled students can access the full curriculum.',
         null,
@@ -448,8 +448,8 @@ class _NextActionBanner extends ConsumerWidget {
     if (studentCount == 0) {
       return (
         Icons.person_add_outlined,
-        const Color(0xFF0EA5E9),
-        const Color(0xFFEFF9FF),
+        AppColors.primary,
+        AppColors.infoBg,
         'Your course is ready — invite students',
         'Modules, materials, and questions are in place. Start enrolling learners to put the course to work.',
         'Invite',
@@ -460,8 +460,8 @@ class _NextActionBanner extends ConsumerWidget {
     // All good
     return (
       Icons.verified_rounded,
-      const Color(0xFF16A34A),
-      const Color(0xFFF0FDF4),
+      AppColors.successText,
+      AppColors.successBg,
       'Course is live and running',
       '$studentCount student${studentCount == 1 ? '' : 's'} enrolled · $questionCount question${questionCount == 1 ? '' : 's'} in bank · All modules published.',
       null,
@@ -499,6 +499,7 @@ class _WideLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -520,13 +521,13 @@ class _WideLayout extends StatelessWidget {
                   setupProgress: setupProgress,
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               _SectionCard(
                 title: 'Recent insights',
                 subtitle:
                     'A quick operational snapshot of this course based on the content already created.',
                 icon: Icons.insights_rounded,
-                iconColor: const Color(0xFF7C3AED),
+                iconColor: AppColors.purpleText,
                 child: _RecentInsightsSection(
                   course: course,
                   moduleCount: moduleCount,
@@ -540,7 +541,7 @@ class _WideLayout extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 14),
+        SizedBox(width: 14),
         Expanded(
           flex: 5,
           child: Column(
@@ -550,9 +551,9 @@ class _WideLayout extends StatelessWidget {
                 subtitle:
                     'Browse the modules currently shaping this course.',
                 icon: Icons.account_tree_rounded,
-                iconColor: const Color(0xFF0EA5E9),
+                iconColor: AppColors.primary,
                 trailing: modulesLoading
-                    ? const SizedBox(
+                    ? SizedBox(
                         width: 16,
                         height: 16,
                         child:
@@ -565,13 +566,13 @@ class _WideLayout extends StatelessWidget {
                   materials: materials,
                 ),
               ),
-              const SizedBox(height: 14),
+              SizedBox(height: 14),
               _SectionCard(
                 title: 'Quick actions',
                 subtitle:
                     'Jump into the most common instructor workflows without leaving the overview.',
                 icon: Icons.bolt_rounded,
-                iconColor: const Color(0xFFD97706),
+                iconColor: AppColors.warningText,
                 child: _QuickActions(
                   courseId: course.id,
                   hasContent: hasContent,
@@ -611,6 +612,7 @@ class _NarrowLayout extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       children: [
         _SectionCard(
@@ -627,26 +629,26 @@ class _NarrowLayout extends StatelessWidget {
             setupProgress: setupProgress,
           ),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _SectionCard(
           title: 'Quick actions',
           subtitle:
               'Jump into the most common instructor workflows without leaving the overview.',
           icon: Icons.bolt_rounded,
-          iconColor: const Color(0xFFD97706),
+          iconColor: AppColors.warningText,
           child: _QuickActions(
             courseId: course.id,
             hasContent: hasContent,
           ),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _SectionCard(
           title: 'Course structure',
           subtitle: 'Browse the modules currently shaping this course.',
           icon: Icons.account_tree_rounded,
-          iconColor: const Color(0xFF0EA5E9),
+          iconColor: AppColors.primary,
           trailing: modulesLoading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 16,
                   height: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
@@ -658,13 +660,13 @@ class _NarrowLayout extends StatelessWidget {
             materials: materials,
           ),
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _SectionCard(
           title: 'Recent insights',
           subtitle:
               'A quick operational snapshot of this course based on the content already created.',
           icon: Icons.insights_rounded,
-          iconColor: const Color(0xFF7C3AED),
+          iconColor: AppColors.purpleText,
           child: _RecentInsightsSection(
             course: course,
             moduleCount: moduleCount,
@@ -704,21 +706,22 @@ class _OverviewHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(20),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF145CCB), Color(0xFF137FEC), Color(0xFF4CB5FF)],
+          colors: [Color(0xFF145CCB), AppColors.primary, AppColors.infoText],
         ),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withOpacity(0.22),
             blurRadius: 22,
-            offset: const Offset(0, 8),
+            offset: Offset(0, 8),
           ),
         ],
       ),
@@ -755,17 +758,17 @@ class _OverviewHero extends StatelessWidget {
                         Colors.white),
                   ],
                 ),
-                const SizedBox(height: 14),
+                SizedBox(height: 14),
                 Text(
                   course.safeTitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     height: 1.15,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Text(
                   _buildSummary(),
                   style: TextStyle(
@@ -775,7 +778,7 @@ class _OverviewHero extends StatelessWidget {
                   ),
                 ),
                 if ((course.category ?? '').trim().isNotEmpty) ...[
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   Text(
                     'Category: ${course.category!.trim()}',
                     style: TextStyle(
@@ -807,7 +810,7 @@ class _OverviewHero extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         leftCol,
-                        const SizedBox(height: 18),
+                        SizedBox(height: 18),
                         progressPanel,
                       ],
                     )
@@ -815,11 +818,11 @@ class _OverviewHero extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         leftCol,
-                        const SizedBox(width: 20),
+                        SizedBox(width: 20),
                         progressPanel,
                       ],
                     ),
-              const SizedBox(height: 18),
+              SizedBox(height: 18),
               Wrap(
                 spacing: 10,
                 runSpacing: 10,
@@ -859,25 +862,26 @@ class _HeroStat extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: 132,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.12),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.14)),
+        border: Border.all(color: AppColors.cardBg.withOpacity(0.14)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w800,
                 color: Colors.white),
           ),
-          const SizedBox(height: 2),
+          SizedBox(height: 2),
           Text(
             label,
             style: TextStyle(
@@ -906,12 +910,13 @@ class _HeroProgressPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.14),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.16)),
+        border: Border.all(color: AppColors.cardBg.withOpacity(0.16)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -925,15 +930,15 @@ class _HeroProgressPanel extends StatelessWidget {
                   color: Colors.white.withOpacity(0.14),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: const Icon(Icons.timeline_rounded,
+                child: Icon(Icons.timeline_rounded,
                     color: Colors.white, size: 18),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Course readiness',
                       style: TextStyle(
                           fontSize: 13,
@@ -951,19 +956,19 @@ class _HeroProgressPanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               Text(
                 '${(setupProgress * 100).round()}%',
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.w800,
                     color: Colors.white,
                     height: 1),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Padding(
                 padding: const EdgeInsets.only(bottom: 3),
                 child: Text(
@@ -976,17 +981,17 @@ class _HeroProgressPanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           ClipRRect(
             borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               value: setupProgress,
               minHeight: 8,
-              backgroundColor: Colors.white.withOpacity(0.16),
+              backgroundColor: AppColors.cardBg.withOpacity(0.16),
               color: Colors.white,
             ),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -996,7 +1001,7 @@ class _HeroProgressPanel extends StatelessWidget {
                   value: _H.formatDate(createdAt),
                 ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Expanded(
                 child: _MetaChip(
                   icon: Icons.update_rounded,
@@ -1021,6 +1026,7 @@ class _MetaChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -1030,7 +1036,7 @@ class _MetaChip extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, size: 14, color: Colors.white.withOpacity(0.88)),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1042,10 +1048,10 @@ class _MetaChip extends StatelessWidget {
                       color: Colors.white.withOpacity(0.68),
                       fontWeight: FontWeight.w600),
                 ),
-                const SizedBox(height: 2),
+                SizedBox(height: 2),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 11.5,
                       color: Colors.white,
                       fontWeight: FontWeight.w700),
@@ -1075,12 +1081,13 @@ class _ResponsiveStatsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     if (isWide) {
       return Row(
         children: [
           for (var i = 0; i < children.length; i++) ...[
             Expanded(child: children[i]),
-            if (i != children.length - 1) const SizedBox(width: 12),
+            if (i != children.length - 1) SizedBox(width: 12),
           ],
         ],
       );
@@ -1090,13 +1097,13 @@ class _ResponsiveStatsGrid extends StatelessWidget {
         children: [
           Row(children: [
             Expanded(child: children[0]),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(child: children[1]),
           ]),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Row(children: [
             Expanded(child: children[2]),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(child: children[3]),
           ]),
         ],
@@ -1106,7 +1113,7 @@ class _ResponsiveStatsGrid extends StatelessWidget {
       children: [
         for (var i = 0; i < children.length; i++) ...[
           children[i],
-          if (i != children.length - 1) const SizedBox(height: 12),
+          if (i != children.length - 1) SizedBox(height: 12),
         ],
       ],
     );
@@ -1136,6 +1143,7 @@ class _InsightStatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: _H.cardDecoration(),
@@ -1153,7 +1161,7 @@ class _InsightStatCard extends StatelessWidget {
                 ),
                 child: Icon(icon, color: accent, size: 20),
               ),
-              const Spacer(),
+              Spacer(),
               Container(
                 width: 8,
                 height: 8,
@@ -1162,9 +1170,9 @@ class _InsightStatCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           loading
-              ? const SizedBox(
+              ? SizedBox(
                   width: 18,
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
@@ -1178,15 +1186,15 @@ class _InsightStatCard extends StatelessWidget {
                     height: 1,
                   ),
                 ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(title,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textTitle)),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(subtitle,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 11.5,
                   color: AppColors.textMuted,
                   height: 1.45)),
@@ -1218,6 +1226,7 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       decoration: _H.cardDecoration(radius: 18),
@@ -1239,19 +1248,19 @@ class _SectionCard extends StatelessWidget {
                   alignment: Alignment.center,
                   child: Icon(icon, size: 18, color: iconColor),
                 ),
-                const SizedBox(width: 12),
+                SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(title,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 15,
                               fontWeight: FontWeight.w800,
                               color: AppColors.textTitle)),
-                      const SizedBox(height: 3),
+                      SizedBox(height: 3),
                       Text(subtitle,
-                          style: const TextStyle(
+                          style: TextStyle(
                               fontSize: 11.5,
                               color: AppColors.textMuted,
                               height: 1.4)),
@@ -1259,13 +1268,13 @@ class _SectionCard extends StatelessWidget {
                   ),
                 ),
                 if (trailing != null) ...[
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   trailing!,
                 ],
               ],
             ),
           ),
-          const Divider(height: 1, color: AppColors.border),
+          Divider(height: 1, color: AppColors.border),
           Padding(
             padding: const EdgeInsets.all(18),
             child: child,
@@ -1296,6 +1305,7 @@ class _SetupProgressSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final steps = [
       _SetupStep(
         title: 'Create modules',
@@ -1340,22 +1350,22 @@ class _SetupProgressSection extends StatelessWidget {
                   minHeight: 8,
                   backgroundColor: AppColors.pageBg,
                   color: setupProgress == 1
-                      ? const Color(0xFF16A34A)
+                      ? AppColors.successText
                       : AppColors.primary,
                 ),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Text(
               '${(setupProgress * 100).round()}%',
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textTitle),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: _H.surfaceDecoration(),
@@ -1363,7 +1373,7 @@ class _SetupProgressSection extends StatelessWidget {
             children: [
               for (var i = 0; i < steps.length; i++) ...[
                 _SetupProgressTile(step: steps[i]),
-                if (i != steps.length - 1) const SizedBox(height: 12),
+                if (i != steps.length - 1) SizedBox(height: 12),
               ],
             ],
           ),
@@ -1393,10 +1403,11 @@ class _SetupProgressTile extends StatelessWidget {
   final _SetupStep step;
   const _SetupProgressTile({required this.step});
 
-  static const _doneColor = Color(0xFF16A34A);
+  static Color get _doneColor => AppColors.successText;
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1404,7 +1415,7 @@ class _SetupProgressTile extends StatelessWidget {
           width: 28,
           height: 28,
           decoration: BoxDecoration(
-            color: step.done ? const Color(0xFFDCFCE7) : AppColors.pageBg,
+            color: step.done ? AppColors.successBg : AppColors.pageBg,
             shape: BoxShape.circle,
             border: Border.all(
                 color: step.done ? _doneColor : AppColors.border),
@@ -1415,7 +1426,7 @@ class _SetupProgressTile extends StatelessWidget {
             color: step.done ? _doneColor : AppColors.textHint,
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1441,8 +1452,8 @@ class _SetupProgressTile extends StatelessWidget {
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
                       color: step.done
-                          ? const Color(0xFFDCFCE7)
-                          : const Color(0xFFF1F5F9),
+                          ? AppColors.successBg
+                          : AppColors.headerBg,
                       borderRadius: BorderRadius.circular(999),
                     ),
                     child: Text(
@@ -1456,10 +1467,10 @@ class _SetupProgressTile extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 3),
+              SizedBox(height: 3),
               Text(
                 step.description,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 11.5,
                     color: AppColors.textMuted,
                     height: 1.4),
@@ -1488,12 +1499,13 @@ class _CourseStructureSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     if (modulesLoading && modules.isEmpty) {
-      return const _SectionPlaceholder(
+      return _SectionPlaceholder(
           message: 'Loading modules and materials...');
     }
     if (modules.isEmpty) {
-      return const _FriendlyEmptyState(
+      return _FriendlyEmptyState(
         icon: Icons.view_module_rounded,
         title: 'No modules yet',
         message:
@@ -1509,7 +1521,7 @@ class _CourseStructureSection extends StatelessWidget {
             isPublished: modules[i].isPublished as bool,
             orderIndex: (modules[i].orderIndex as int?) ?? i,
           ),
-          if (i != modules.length - 1) const SizedBox(height: 10),
+          if (i != modules.length - 1) SizedBox(height: 10),
         ],
       ],
     );
@@ -1536,6 +1548,7 @@ class _RecentInsightsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final insights = _buildInsights();
     return Column(
       children: [
@@ -1546,7 +1559,7 @@ class _RecentInsightsSection extends StatelessWidget {
             title: insights[i].title,
             description: insights[i].description,
           ),
-          if (i != insights.length - 1) const SizedBox(height: 12),
+          if (i != insights.length - 1) SizedBox(height: 12),
         ],
       ],
     );
@@ -1558,7 +1571,7 @@ class _RecentInsightsSection extends StatelessWidget {
 
     list.add((
       icon: Icons.schedule_rounded,
-      color: const Color(0xFF0EA5E9),
+      color: AppColors.primary,
       title: 'Last updated ${_H.relativeDate(course.updatedAt)}',
       description:
           'Your course shell was created on ${_H.formatDate(course.createdAt)} and is being actively maintained.',
@@ -1567,7 +1580,7 @@ class _RecentInsightsSection extends StatelessWidget {
     if (moduleCount == 0) {
       list.add((
         icon: Icons.lightbulb_outline_rounded,
-        color: const Color(0xFFF59E0B),
+        color: AppColors.warningText,
         title: 'Start by building the course structure',
         description:
             'Create your first module to unlock materials, topics, and a richer course overview.',
@@ -1575,7 +1588,7 @@ class _RecentInsightsSection extends StatelessWidget {
     } else if (draftModules > 0) {
       list.add((
         icon: Icons.edit_note_rounded,
-        color: const Color(0xFFF59E0B),
+        color: AppColors.warningText,
         title: '$draftModules module${draftModules == 1 ? '' : 's'} still in draft',
         description:
             'Review unpublished modules before learners access the full curriculum.',
@@ -1583,7 +1596,7 @@ class _RecentInsightsSection extends StatelessWidget {
     } else {
       list.add((
         icon: Icons.verified_rounded,
-        color: const Color(0xFF16A34A),
+        color: AppColors.successText,
         title: 'All modules are published',
         description:
             'Your instructional structure is visible and ready for enrolled learners.',
@@ -1593,7 +1606,7 @@ class _RecentInsightsSection extends StatelessWidget {
     if (materialCount == 0) {
       list.add((
         icon: Icons.folder_off_rounded,
-        color: const Color(0xFF7C3AED),
+        color: AppColors.purpleText,
         title: 'No learning materials uploaded yet',
         description:
             'Add PDFs, slides, or videos to give the course substance and support AI-assisted workflows.',
@@ -1601,7 +1614,7 @@ class _RecentInsightsSection extends StatelessWidget {
     } else if (questionCount == 0) {
       list.add((
         icon: Icons.quiz_outlined,
-        color: const Color(0xFFEA580C),
+        color: AppColors.warningText,
         title: 'Materials are ready for assessment design',
         description:
             'You have uploaded content. Next, create or generate questions to activate the question bank.',
@@ -1609,7 +1622,7 @@ class _RecentInsightsSection extends StatelessWidget {
     } else {
       list.add((
         icon: Icons.auto_graph_rounded,
-        color: const Color(0xFFEA580C),
+        color: AppColors.warningText,
         title: '$questionCount question${questionCount == 1 ? '' : 's'} prepared',
         description:
             'Your question bank has started taking shape and can support upcoming quizzes or exams.',
@@ -1619,7 +1632,7 @@ class _RecentInsightsSection extends StatelessWidget {
     if (studentCount == 0) {
       list.add((
         icon: Icons.people_outline_rounded,
-        color: const Color(0xFF16A34A),
+        color: AppColors.successText,
         title: 'No students enrolled yet',
         description:
             'Invite learners once the course content and question bank are ready for delivery.',
@@ -1627,7 +1640,7 @@ class _RecentInsightsSection extends StatelessWidget {
     } else {
       list.add((
         icon: Icons.groups_rounded,
-        color: const Color(0xFF16A34A),
+        color: AppColors.successText,
         title: '$studentCount student${studentCount == 1 ? '' : 's'} enrolled',
         description:
             'Learner reach has started. Keep refining materials and assessments to support engagement.',
@@ -1653,6 +1666,7 @@ class _InsightRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: _H.surfaceDecoration(),
@@ -1669,19 +1683,19 @@ class _InsightRow extends StatelessWidget {
             alignment: Alignment.center,
             child: Icon(icon, size: 18, color: color),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textTitle)),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(description,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontSize: 11.5,
                         color: AppColors.textMuted,
                         height: 1.45)),
@@ -1712,12 +1726,13 @@ class _ModuleTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final accent =
-        isPublished ? AppColors.primary : const Color(0xFFD97706);
+        isPublished ? AppColors.primary : AppColors.warningText;
     final chipBg =
-        isPublished ? const Color(0xFFDCFCE7) : const Color(0xFFFEF3C7);
+        isPublished ? AppColors.successBg : AppColors.warningSoftBg;
     final chipFg =
-        isPublished ? const Color(0xFF16A34A) : const Color(0xFFD97706);
+        isPublished ? AppColors.successText : AppColors.warningText;
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -1734,7 +1749,7 @@ class _ModuleTile extends StatelessWidget {
             alignment: Alignment.center,
             child: Icon(Icons.folder_rounded, size: 18, color: accent),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1743,21 +1758,21 @@ class _ModuleTile extends StatelessWidget {
                   title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textTitle),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   'Module ${orderIndex + 1} · $materialCount file${materialCount == 1 ? '' : 's'}',
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontSize: 11.5, color: AppColors.textMuted),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           Container(
             padding:
                 const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
@@ -1799,7 +1814,7 @@ class _QuickActions extends ConsumerWidget {
       (
         Icons.add_box_outlined,
         AppColors.primary,
-        const Color(0xFFEFF6FF),
+        AppColors.primarySoft,
         'Create Module',
         'Add a new content module',
         () {},
@@ -1807,8 +1822,8 @@ class _QuickActions extends ConsumerWidget {
       ),
       (
         Icons.upload_file_outlined,
-        const Color(0xFF9333EA),
-        const Color(0xFFF3E8FF),
+        AppColors.purpleText,
+        AppColors.purpleBg,
         'Upload Material',
         'Add videos, PDFs, or docs',
         () {},
@@ -1816,8 +1831,8 @@ class _QuickActions extends ConsumerWidget {
       ),
       (
         Icons.flag_outlined,
-        const Color(0xFF16A34A),
-        const Color(0xFFDCFCE7),
+        AppColors.successText,
+        AppColors.successBg,
         'Learning Outcomes',
         'Manage course learning goals',
         () => showCourseOutcomesDialog(context, ref, courseId),
@@ -1825,8 +1840,8 @@ class _QuickActions extends ConsumerWidget {
       ),
       (
         Icons.auto_awesome_rounded,
-        const Color(0xFF7C3AED),
-        const Color(0xFFF3E8FF),
+        AppColors.purpleText,
+        AppColors.purpleBg,
         'Generate Questions',
         canGenerate
             ? 'Select mixed course content scope'
@@ -1842,8 +1857,8 @@ class _QuickActions extends ConsumerWidget {
       ),
       (
         Icons.quiz_outlined,
-        const Color(0xFFEA580C),
-        const Color(0xFFFFEDD5),
+        AppColors.warningText,
+        AppColors.warningBg,
         'Add Question',
         'Grow your question bank',
         () {},
@@ -1851,8 +1866,8 @@ class _QuickActions extends ConsumerWidget {
       ),
       (
         Icons.person_add_outlined,
-        const Color(0xFF0EA5E9),
-        const Color(0xFFE0F2FE),
+        AppColors.primary,
+        AppColors.infoBg,
         'Invite Students',
         'Send course invitations',
         () {},
@@ -1868,15 +1883,15 @@ class _QuickActions extends ConsumerWidget {
             margin: const EdgeInsets.only(bottom: 12),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFFFFBEB),
+              color: AppColors.warningSoftBg,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFFDE68A)),
+              border: Border.all(color: AppColors.warningBorder),
             ),
-            child: const Row(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Icon(Icons.info_outline_rounded,
-                    size: 16, color: Color(0xFFD97706)),
+                    size: 16, color: AppColors.warningText),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -1909,7 +1924,7 @@ class _QuickActions extends ConsumerWidget {
                     decoration: BoxDecoration(
                       border: Border.all(color: AppColors.border),
                       borderRadius: BorderRadius.circular(12),
-                      color: const Color(0xFFFAFBFC),
+                      color: AppColors.hoverBg,
                     ),
                     child: Row(
                       children: [
@@ -1923,19 +1938,19 @@ class _QuickActions extends ConsumerWidget {
                           alignment: Alignment.center,
                           child: Icon(a.$1, size: 17, color: a.$2),
                         ),
-                        const SizedBox(width: 12),
+                        SizedBox(width: 12),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(a.$4,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       fontSize: 12.5,
                                       fontWeight: FontWeight.w700,
                                       color: AppColors.textTitle)),
-                              const SizedBox(height: 2),
+                              SizedBox(height: 2),
                               Text(a.$5,
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                       fontSize: 11,
                                       color: AppColors.textMuted)),
                             ],
@@ -1977,6 +1992,7 @@ class _FriendlyEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -1992,17 +2008,17 @@ class _FriendlyEmptyState extends StatelessWidget {
             ),
             child: Icon(icon, color: AppColors.primary),
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Text(title,
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                   color: AppColors.textTitle)),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 11.5, color: AppColors.textMuted, height: 1.5),
           ),
         ],
@@ -2017,11 +2033,12 @@ class _SectionPlaceholder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 14),
       child: Center(
         child: Text(message,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 12, color: AppColors.textMuted)),
       ),
     );
@@ -2037,12 +2054,13 @@ class _HeroBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        border: Border.all(color: AppColors.cardBg.withOpacity(0.12)),
       ),
       child: Text(
         label,

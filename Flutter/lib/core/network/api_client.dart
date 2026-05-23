@@ -365,6 +365,8 @@ class ApiClient implements ITokenRefreshScheduler {
     }
   }
 
+  Future<String> refreshAccessToken() => _refreshAccessToken();
+
   Future<String> _callRefreshEndpoint() async {
     final url = '${Env.baseUrl}${Endpoints.refresh}';
     try {

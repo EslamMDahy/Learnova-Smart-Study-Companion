@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:learnova/core/theme/app_theme.dart';
 
 class StudentQuizHistoryPage extends StatelessWidget {
   const StudentQuizHistoryPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     // تم استخدام Padding خارجي مريح (64 من اليمين والشمال، و 40 من فوق وتحت) 
     // ليعطي نفس إحساس الفراغ والابتعاد عن الـ Sidebar والـ Header الموجود في الصورة.
     return SingleChildScrollView(
@@ -13,24 +15,24 @@ class StudentQuizHistoryPage extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           /// TITLE SECTION
-          const Text(
+          Text(
             'My Quiz History',
             style: TextStyle(
               fontSize: 28,
               fontWeight: FontWeight.w700,
-              color: Color(0xff1e293b),
+              color: AppColors.textGray,
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 6),
-          const Text(
+          SizedBox(height: 6),
+          Text(
             'View your past results, scores, and performance metrics across all courses.',
             style: TextStyle(
               fontSize: 14,
-              color: Color(0xff64748b),
+              color: AppColors.textMuted,
             ),
           ),
-          const SizedBox(height: 32),
+          SizedBox(height: 32),
 
           /// STATS CARDS
           Row(
@@ -41,35 +43,35 @@ class StudentQuizHistoryPage extends StatelessWidget {
                   value: '24',
                   subText: '↑ +2 this week',
                   icon: Icons.assignment_turned_in_outlined,
-                  iconColor: const Color(0xff3b82f6),
-                  subTextColor: const Color(0xff22c55e),
+                  iconColor: AppColors.primary,
+                  subTextColor: AppColors.successDot,
                 ),
               ),
-              const SizedBox(width: 24),
+              SizedBox(width: 24),
               Expanded(
                 child: _statCard(
                   title: 'Average Score',
                   value: '82%',
                   subText: 'Top 15% of class average',
                   icon: Icons.bar_chart_rounded,
-                  iconColor: const Color(0xff22c55e),
-                  subTextColor: const Color(0xff64748b),
+                  iconColor: AppColors.successDot,
+                  subTextColor: AppColors.textMuted,
                 ),
               ),
-              const SizedBox(width: 24),
+              SizedBox(width: 24),
               Expanded(
                 child: _statCard(
                   title: 'Pending Retakes',
                   value: '2',
                   subText: 'Due within 3 days',
                   icon: Icons.assignment_late_outlined,
-                  iconColor: const Color(0xfff97316),
-                  subTextColor: const Color(0xfff97316),
+                  iconColor: AppColors.warningText,
+                  subTextColor: AppColors.warningText,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 32),
+          SizedBox(height: 32),
 
           /// SEARCH & FILTER BAR
           Row(
@@ -79,67 +81,67 @@ class StudentQuizHistoryPage extends StatelessWidget {
                 child: Container(
                   height: 40,
                   decoration: BoxDecoration(
-                    color: const Color(0xfff1f5f9),
+                    color: AppColors.headerBg,
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: const TextField(
+                  child: TextField(
                     textAlignVertical: TextAlignVertical.center,
                     decoration: InputDecoration(
                       isDense: true,
                       border: InputBorder.none,
                       hintText: 'Search by quiz name, topic...',
-                      hintStyle: TextStyle(color: Color(0xff94a3b8), fontSize: 13),
-                      prefixIcon: Icon(Icons.search, size: 18, color: Color(0xff94a3b8)),
+                      hintStyle: TextStyle(color: AppColors.textHint, fontSize: 13),
+                      prefixIcon: Icon(Icons.search, size: 18, color: AppColors.textHint),
                     ),
                   ),
                 ),
               ),
-              const SizedBox(width: 16),
+              SizedBox(width: 16),
               _filterButton('All Courses'),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               _filterButton('Status: All'),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               // زر More Filters المتناسق مع الصورة
               Container(
                 height: 40,
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xffe2e8f0)),
+                  border: Border.all(color: AppColors.border),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.tune, size: 16, color: Color(0xff64748b)),
+                    Icon(Icons.tune, size: 16, color: AppColors.textMuted),
                     SizedBox(width: 8),
                     Text(
                       'More Filters',
-                      style: TextStyle(color: Color(0xff64748b), fontSize: 13, fontWeight: FontWeight.w500),
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w500),
                     ),
                   ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          SizedBox(height: 24),
 
           /// DATA TABLE CONTAINER
           Container(
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppColors.cardBg,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xffe2e8f0)),
+              border: Border.all(color: AppColors.border),
             ),
             child: Column(
               children: [
                 /// TABLE HEADER
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  decoration: const BoxDecoration(
-                    color: Color(0xfff8fafc),
+                  decoration: BoxDecoration(
+                    color: AppColors.bg,
                     borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
-                    border: Border(bottom: BorderSide(color: const Color(0xffe2e8f0))),
+                    border: Border(bottom: BorderSide(color: AppColors.border)),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
                       Expanded(flex: 4, child: Text('QUIZ DETAILS', style: _headerStyle)),
                       Expanded(flex: 2, child: Text('DATE TAKEN', style: _headerStyle)),
@@ -161,15 +163,15 @@ class StudentQuizHistoryPage extends StatelessWidget {
                   duration: '45m 12s',
                   score: '88%',
                   progress: 0.88,
-                  progressColor: const Color(0xff22c55e),
+                  progressColor: AppColors.successDot,
                   status: 'Passed',
-                  statusColor: const Color(0xff22c55e),
-                  actions: const Row(
+                  statusColor: AppColors.successDot,
+                  actions: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Icon(Icons.visibility_outlined, size: 18, color: Color(0xff64748b)),
+                      Icon(Icons.visibility_outlined, size: 18, color: AppColors.textMuted),
                       SizedBox(width: 12),
-                      Icon(Icons.refresh, size: 18, color: Color(0xff64748b)),
+                      Icon(Icons.refresh, size: 18, color: AppColors.textMuted),
                     ],
                   ),
                 ),
@@ -183,13 +185,13 @@ class StudentQuizHistoryPage extends StatelessWidget {
                   duration: '28m 05s',
                   score: '92%',
                   progress: 0.92,
-                  progressColor: const Color(0xff22c55e),
+                  progressColor: AppColors.successDot,
                   status: 'Passed',
-                  statusColor: const Color(0xff22c55e),
-                  actions: const Row(
+                  statusColor: AppColors.successDot,
+                  actions: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Icon(Icons.visibility_outlined, size: 18, color: Color(0xff64748b)),
+                      Icon(Icons.visibility_outlined, size: 18, color: AppColors.textMuted),
                     ],
                   ),
                 ),
@@ -203,29 +205,29 @@ class StudentQuizHistoryPage extends StatelessWidget {
                   duration: '55m 00s',
                   score: '45%',
                   progress: 0.45,
-                  progressColor: const Color(0xffef4444),
+                  progressColor: AppColors.errorDot,
                   status: 'Failed',
-                  statusColor: const Color(0xffef4444),
+                  statusColor: AppColors.errorDot,
                   actions: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      const Icon(Icons.visibility_outlined, size: 18, color: Color(0xff64748b)),
-                      const SizedBox(width: 12),
+                      Icon(Icons.visibility_outlined, size: 18, color: AppColors.textMuted),
+                      SizedBox(width: 12),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xffeff6ff),
+                          color: AppColors.infoBg,
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: const Color(0xffbfdbfe)),
+                          border: Border.all(color: AppColors.infoBorder),
                         ),
-                        child: const Row(
+                        child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.refresh, size: 14, color: Color(0xff2563eb)),
+                            Icon(Icons.refresh, size: 14, color: AppColors.primary),
                             SizedBox(width: 4),
                             Text(
                               'Retake',
-                              style: TextStyle(color: Color(0xff2563eb), fontSize: 12, fontWeight: FontWeight.w600),
+                              style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
                             ),
                           ],
                         ),
@@ -245,11 +247,11 @@ class StudentQuizHistoryPage extends StatelessWidget {
                   progress: 0.0,
                   progressColor: Colors.transparent,
                   status: 'Pending',
-                  statusColor: const Color(0xfff59e0b),
-                  actions: const Row(
+                  statusColor: AppColors.warningText,
+                  actions: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Icon(Icons.info_outline, size: 18, color: Color(0xff64748b)),
+                      Icon(Icons.info_outline, size: 18, color: AppColors.textMuted),
                     ],
                   ),
                 ),
@@ -263,14 +265,14 @@ class StudentQuizHistoryPage extends StatelessWidget {
                   duration: '1h 12m',
                   score: '76%',
                   progress: 0.76,
-                  progressColor: const Color(0xffeab308),
+                  progressColor: AppColors.warningDot,
                   status: 'Passed',
-                  statusColor: const Color(0xff22c55e),
+                  statusColor: AppColors.successDot,
                   isLast: true, // لإلغاء الخط السفلي لآخر عنصر في الجدول
-                  actions: const Row(
+                  actions: Row(
                     mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Icon(Icons.visibility_outlined, size: 18, color: Color(0xff64748b)),
+                      Icon(Icons.visibility_outlined, size: 18, color: AppColors.textMuted),
                     ],
                   ),
                 ),
@@ -280,13 +282,13 @@ class StudentQuizHistoryPage extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                   child: Row(
                     children: [
-                      const Text(
+                      Text(
                         'Showing 1-5 of 24 results',
-                        style: TextStyle(color: Color(0xff64748b), fontSize: 13),
+                        style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                       ),
-                      const Spacer(),
+                      Spacer(),
                       _pageButton('Previous', disabled: true),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       _pageButton('Next', disabled: false),
                     ],
                   ),
@@ -299,10 +301,10 @@ class StudentQuizHistoryPage extends StatelessWidget {
     );
   }
 
-  static const _headerStyle = TextStyle(
+  static TextStyle get _headerStyle => TextStyle(
     fontSize: 11,
     fontWeight: FontWeight.w600,
-    color: Color(0xff64748b),
+    color: AppColors.textMuted,
     letterSpacing: 0.5,
   );
 
@@ -317,9 +319,9 @@ class StudentQuizHistoryPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xffe2e8f0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -329,7 +331,7 @@ class StudentQuizHistoryPage extends StatelessWidget {
             children: [
               Text(
                 title,
-                style: const TextStyle(color: Color(0xff64748b), fontSize: 13, fontWeight: FontWeight.w500),
+                style: TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w500),
               ),
               Container(
                 padding: const EdgeInsets.all(6),
@@ -341,12 +343,12 @@ class StudentQuizHistoryPage extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Text(
             value,
-            style: const TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: Color(0xff0f172a)),
+            style: TextStyle(fontSize: 28, fontWeight: FontWeight.w700, color: AppColors.textTitle),
           ),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(
             subText,
             style: TextStyle(color: subTextColor, fontSize: 12, fontWeight: FontWeight.w500),
@@ -361,17 +363,17 @@ class StudentQuizHistoryPage extends StatelessWidget {
       height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: const Color(0xfff1f5f9),
+        color: AppColors.headerBg,
         borderRadius: BorderRadius.circular(8),
       ),
       child: Row(
         children: [
           Text(
             text,
-            style: const TextStyle(fontSize: 13, color: Color(0xff334155), fontWeight: FontWeight.w500),
+            style: TextStyle(fontSize: 13, color: AppColors.textGray, fontWeight: FontWeight.w500),
           ),
-          const SizedBox(width: 8),
-          const Icon(Icons.keyboard_arrow_down, size: 16, color: Color(0xff64748b)),
+          SizedBox(width: 8),
+          Icon(Icons.keyboard_arrow_down, size: 16, color: AppColors.textMuted),
         ],
       ),
     );
@@ -395,7 +397,7 @@ class StudentQuizHistoryPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
-        border: isLast ? null : const Border(bottom: BorderSide(color: Color(0xffe2e8f0))),
+        border: isLast ? null : Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
         children: [
@@ -407,27 +409,27 @@ class StudentQuizHistoryPage extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: Color(0xff0f172a)),
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.textTitle),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Row(
                   children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: const Color(0xffe0e7ff),
+                        color: AppColors.badgeIndigoBg,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
                         code,
-                        style: const TextStyle(color: Color(0xff4338ca), fontSize: 10, fontWeight: FontWeight.w700),
+                        style: TextStyle(color: AppColors.badgeIndigoFg, fontSize: 10, fontWeight: FontWeight.w700),
                       ),
                     ),
                     if (subtitle.isNotEmpty) ...[
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8),
                       Text(
                         subtitle,
-                        style: const TextStyle(color: Color(0xff94a3b8), fontSize: 12),
+                        style: TextStyle(color: AppColors.textHint, fontSize: 12),
                       ),
                     ]
                   ],
@@ -442,9 +444,9 @@ class StudentQuizHistoryPage extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(date, style: const TextStyle(fontSize: 13, color: Color(0xff334155), fontWeight: FontWeight.w500)),
-                const SizedBox(height: 2),
-                Text(time, style: const TextStyle(fontSize: 11, color: Color(0xff94a3b8))),
+                Text(date, style: TextStyle(fontSize: 13, color: AppColors.textGray, fontWeight: FontWeight.w500)),
+                SizedBox(height: 2),
+                Text(time, style: TextStyle(fontSize: 11, color: AppColors.textHint)),
               ],
             ),
           ),
@@ -456,7 +458,7 @@ class StudentQuizHistoryPage extends StatelessWidget {
               duration,
               style: TextStyle(
                 fontSize: 13, 
-                color: duration == '-' ? const Color(0xff94a3b8) : const Color(0xff64748b)
+                color: duration == '-' ? AppColors.textHint : AppColors.textMuted
               ),
             ),
           ),
@@ -471,11 +473,11 @@ class StudentQuizHistoryPage extends StatelessWidget {
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
-                    color: score == 'Not graded' ? const Color(0xff94a3b8) : const Color(0xff0f172a),
+                    color: score == 'Not graded' ? AppColors.textHint : AppColors.textTitle,
                   ),
                 ),
                 if (progress > 0) ...[
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   Expanded(
                     child: SizedBox(
                       width: 40,
@@ -484,13 +486,13 @@ class StudentQuizHistoryPage extends StatelessWidget {
                         child: LinearProgressIndicator(
                           value: progress,
                           minHeight: 4,
-                          backgroundColor: const Color(0xfff1f5f9),
+                          backgroundColor: AppColors.headerBg,
                           valueColor: AlwaysStoppedAnimation(progressColor),
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16), // مسافة تضمن تباعد البروجرس بار عن العمود القادم
+                  SizedBox(width: 16), // مسافة تضمن تباعد البروجرس بار عن العمود القادم
                 ],
               ],
             ),
@@ -515,7 +517,7 @@ class StudentQuizHistoryPage extends StatelessWidget {
                       height: 6,
                       decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle),
                     ),
-                    const SizedBox(width: 6),
+                    SizedBox(width: 6),
                     Text(
                       status,
                       style: TextStyle(color: statusColor, fontWeight: FontWeight.w600, fontSize: 12),
@@ -540,14 +542,14 @@ class StudentQuizHistoryPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: disabled ? const Color(0xfff8fafc) : Colors.white,
+        color: disabled ? AppColors.bg : AppColors.cardBg,
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: const Color(0xffe2e8f0)),
+        border: Border.all(color: AppColors.border),
       ),
       child: Text(
         text,
         style: TextStyle(
-          color: disabled ? const Color(0xffcbd5e1) : const Color(0xff334155),
+          color: disabled ? AppColors.textHint : AppColors.textGray,
           fontSize: 12,
           fontWeight: FontWeight.w500,
         ),

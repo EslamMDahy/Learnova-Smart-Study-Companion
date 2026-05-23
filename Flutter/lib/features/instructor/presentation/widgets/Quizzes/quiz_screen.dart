@@ -29,7 +29,7 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
   String _query = '';
   String _statusFilter = 'all';
   String _typeFilter = 'all';
-  List<ExamModel> _exams = const [];
+  List<ExamModel> _exams = [];
   ExamModel? _selectedExam;
   ExamDetailsModel? _selectedDetails;
   bool _detailsLoading = false;
@@ -63,7 +63,7 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
       setState(() {
         _loading = false;
         _error = 'Open a course first to view its quizzes.';
-        _exams = const [];
+        _exams = [];
       });
       return;
     }
@@ -107,6 +107,7 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     if (_selectedExam != null || _detailsLoading) {
       return _ExamAnalyticsPage(
         exam: _selectedDetails?.exam ?? _selectedExam,
@@ -132,7 +133,7 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
             Align(
               alignment: Alignment.topCenter,
               child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1180),
+                constraints: BoxConstraints(maxWidth: 1180),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -143,9 +144,9 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
                         message: 'Open the course Question Bank tab to create a quiz from saved questions.',
                       );
                     }),
-                    const SizedBox(height: 22),
+                    SizedBox(height: 22),
                     _StatsSection(exams: _exams),
-                    const SizedBox(height: 22),
+                    SizedBox(height: 22),
                     _FiltersBar(
                       controller: _searchController,
                       status: _statusFilter,
@@ -154,7 +155,7 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
                       onStatusChanged: (value) => setState(() => _statusFilter = value ?? 'all'),
                       onTypeChanged: (value) => setState(() => _typeFilter = value ?? 'all'),
                     ),
-                    const SizedBox(height: 14),
+                    SizedBox(height: 14),
                     _ExamTable(
                       loading: _loading,
                       error: _error,
@@ -162,13 +163,13 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
                       onRetry: _loadExams,
                       onOpen: _openExamDetails,
                     ),
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16),
                     Align(
                       alignment: Alignment.centerRight,
                       child: Text(
                         '${filtered.length} of ${_exams.length} quizzes',
-                        style: const TextStyle(
-                          color: Color(0xFF64748B),
+                        style: TextStyle(
+                          color: AppColors.textMuted,
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                         ),
@@ -232,6 +233,7 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -239,20 +241,20 @@ class _Header extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
+              Text(
                 'Quiz Management',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.6,
-                  color: Color(0xFF0F172A),
+                  color: AppColors.textTitle,
                 ),
               ),
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text(
                 'Manage created exams and quizzes for $courseTitle.',
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
+                style: TextStyle(
+                  color: AppColors.textMuted,
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                 ),
@@ -262,10 +264,10 @@ class _Header extends StatelessWidget {
         ),
         FilledButton.icon(
           onPressed: onCreate,
-          icon: const Icon(Icons.add_rounded, size: 18),
-          label: const Text('Create New Quiz'),
+          icon: Icon(Icons.add_rounded, size: 18),
+          label: Text('Create New Quiz'),
           style: FilledButton.styleFrom(
-            backgroundColor: const Color(0xFF1682F3),
+            backgroundColor: AppColors.primary,
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -282,16 +284,17 @@ class _StatsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final active = exams.where((exam) => exam.isPublished).length;
     final draft = exams.length - active;
     final totalQuestions = exams.fold<int>(0, (sum, exam) => sum + exam.totalQuestions);
     return Row(
       children: [
-        Expanded(child: _StatCard(title: 'Active Quizzes', value: '$active', subtitle: '${exams.length} total created', icon: Icons.assignment_rounded, color: const Color(0xFF1682F3))),
-        const SizedBox(width: 16),
-        Expanded(child: _StatCard(title: 'Draft Quizzes', value: '$draft', subtitle: 'not published yet', icon: Icons.edit_note_rounded, color: const Color(0xFFF59E0B))),
-        const SizedBox(width: 16),
-        Expanded(child: _StatCard(title: 'Bank Questions Used', value: '$totalQuestions', subtitle: 'questions across quizzes', icon: Icons.fact_check_rounded, color: const Color(0xFF22C55E))),
+        Expanded(child: _StatCard(title: 'Active Quizzes', value: '$active', subtitle: '${exams.length} total created', icon: Icons.assignment_rounded, color: AppColors.primary)),
+        SizedBox(width: 16),
+        Expanded(child: _StatCard(title: 'Draft Quizzes', value: '$draft', subtitle: 'not published yet', icon: Icons.edit_note_rounded, color: AppColors.warningText)),
+        SizedBox(width: 16),
+        Expanded(child: _StatCard(title: 'Bank Questions Used', value: '$totalQuestions', subtitle: 'questions across quizzes', icon: Icons.fact_check_rounded, color: AppColors.successDot)),
       ],
     );
   }
@@ -307,13 +310,14 @@ class _StatCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [BoxShadow(color: Color(0x080F172A), blurRadius: 18, offset: Offset(0, 8))],
+        border: Border.all(color: AppColors.border),
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 18, offset: Offset(0, 8))],
       ),
       child: Row(
         children: [
@@ -321,10 +325,10 @@ class _StatCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 8),
-                Text(value, style: const TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: Color(0xFF0F172A))),
-                const SizedBox(height: 6),
+                Text(title, style: TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w700)),
+                SizedBox(height: 8),
+                Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+                SizedBox(height: 6),
                 Text(subtitle, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
               ],
             ),
@@ -352,9 +356,10 @@ class _FiltersBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(16), border: Border.all(color: const Color(0xFFE2E8F0))),
+      decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
       child: Row(
         children: [
           Expanded(
@@ -365,25 +370,25 @@ class _FiltersBar extends StatelessWidget {
                 onChanged: onSearchChanged,
                 decoration: InputDecoration(
                   hintText: 'Search quizzes by title, description, or type...',
-                  hintStyle: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
-                  prefixIcon: const Icon(Icons.search_rounded, color: Color(0xFF64748B), size: 20),
+                  hintStyle: TextStyle(color: AppColors.textHint, fontSize: 14),
+                  prefixIcon: Icon(Icons.search_rounded, color: AppColors.textMuted, size: 20),
                   filled: true,
-                  fillColor: const Color(0xFFF8FAFC),
+                  fillColor: AppColors.surfaceBg,
                   contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFE2E8F0))),
-                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFF1682F3))),
+                  enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
+                  focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.primary)),
                 ),
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           _DropdownShell(
             width: 150,
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: status,
                 isExpanded: true,
-                items: const [
+                items: [
                   DropdownMenuItem(value: 'all', child: Text('All status')),
                   DropdownMenuItem(value: 'published', child: Text('Published')),
                   DropdownMenuItem(value: 'draft', child: Text('Draft')),
@@ -392,14 +397,14 @@ class _FiltersBar extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           _DropdownShell(
             width: 140,
             child: DropdownButtonHideUnderline(
               child: DropdownButton<String>(
                 value: type,
                 isExpanded: true,
-                items: const [
+                items: [
                   DropdownMenuItem(value: 'all', child: Text('All types')),
                   DropdownMenuItem(value: 'quiz', child: Text('Quiz')),
                   DropdownMenuItem(value: 'exam', child: Text('Exam')),
@@ -421,13 +426,14 @@ class _DropdownShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: width,
       height: 44,
       padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(12), border: Border.all(color: const Color(0xFFE2E8F0))),
+      decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
       child: DefaultTextStyle(
-        style: const TextStyle(fontSize: 13, color: Color(0xFF334155), fontWeight: FontWeight.w700),
+        style: TextStyle(fontSize: 13, color: AppColors.textGray, fontWeight: FontWeight.w700),
         child: child,
       ),
     );
@@ -444,23 +450,24 @@ class _ExamTable extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [BoxShadow(color: Color(0x060F172A), blurRadius: 20, offset: Offset(0, 10))],
+        border: Border.all(color: AppColors.border),
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 20, offset: Offset(0, 10))],
       ),
       clipBehavior: Clip.antiAlias,
       child: Column(
         children: [
-          const _ExamTableHeader(),
+          _ExamTableHeader(),
           if (loading)
-            const Padding(padding: EdgeInsets.symmetric(vertical: 44), child: CircularProgressIndicator())
+            Padding(padding: EdgeInsets.symmetric(vertical: 44), child: CircularProgressIndicator())
           else if (error != null)
             _TableMessage(icon: Icons.error_outline_rounded, title: 'Could not load quizzes', message: error!, actionLabel: 'Retry', onAction: onRetry)
           else if (exams.isEmpty)
-            const _TableMessage(icon: Icons.assignment_outlined, title: 'No quizzes found', message: 'Created exams will appear here after they are saved from the Question Bank.')
+            _TableMessage(icon: Icons.assignment_outlined, title: 'No quizzes found', message: 'Created exams will appear here after they are saved from the Question Bank.')
           else
             ...exams.map((exam) => _ExamRow(exam: exam, onTap: () => onOpen(exam))),
         ],
@@ -474,10 +481,11 @@ class _ExamTableHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
-      color: const Color(0xFFF8FAFC),
+      color: AppColors.surfaceBg,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-      child: const Row(
+      child: Row(
         children: [
           Expanded(flex: 5, child: _HeaderText('QUIZ TITLE')),
           Expanded(flex: 2, child: _HeaderText('STATUS')),
@@ -497,7 +505,8 @@ class _HeaderText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(text, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: Color(0xFF64748B), letterSpacing: 0.5));
+    Theme.of(context);
+    return Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.textMuted, letterSpacing: 0.5));
   }
 }
 
@@ -508,13 +517,14 @@ class _ExamRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final statusColor = exam.isPublished ? const Color(0xFF16A34A) : const Color(0xFF64748B);
+    Theme.of(context);
+    final statusColor = exam.isPublished ? AppColors.successText : AppColors.textMuted;
     final statusLabel = exam.isPublished ? 'Published' : 'Draft';
     return InkWell(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-        decoration: const BoxDecoration(border: Border(top: BorderSide(color: Color(0xFFF1F5F9)))),
+        decoration: BoxDecoration(border: Border(top: BorderSide(color: AppColors.headerBg))),
         child: Row(
           children: [
             Expanded(
@@ -524,17 +534,17 @@ class _ExamRow extends StatelessWidget {
                   Container(
                     width: 38,
                     height: 38,
-                    decoration: BoxDecoration(color: const Color(0xFFEFF6FF), borderRadius: BorderRadius.circular(10)),
-                    child: const Icon(Icons.assignment_outlined, color: Color(0xFF1682F3), size: 20),
+                    decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(10)),
+                    child: Icon(Icons.assignment_outlined, color: AppColors.primary, size: 20),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(exam.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: Color(0xFF0F172A))),
-                        const SizedBox(height: 4),
-                        Text(_subtitle(exam), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w600)),
+                        Text(exam.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textTitle)),
+                        SizedBox(height: 4),
+                        Text(_subtitle(exam), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w600)),
                       ],
                     ),
                   ),
@@ -542,10 +552,10 @@ class _ExamRow extends StatelessWidget {
               ),
             ),
             Expanded(flex: 2, child: Align(alignment: Alignment.centerLeft, child: _Badge(label: statusLabel, color: statusColor))),
-            Expanded(flex: 2, child: Text('${exam.totalQuestions} question${exam.totalQuestions == 1 ? '' : 's'}', style: const TextStyle(fontSize: 13, color: Color(0xFF475569), fontWeight: FontWeight.w700))),
-            Expanded(flex: 2, child: Text(exam.durationMinutes == null ? 'No limit' : '${exam.durationMinutes} min', style: const TextStyle(fontSize: 13, color: Color(0xFF475569), fontWeight: FontWeight.w700))),
-            Expanded(flex: 2, child: Text(_formatDate(exam.updatedAt), style: const TextStyle(fontSize: 13, color: Color(0xFF475569), fontWeight: FontWeight.w700))),
-            SizedBox(width: 82, child: TextButton(onPressed: onTap, child: const Text('View'))),
+            Expanded(flex: 2, child: Text('${exam.totalQuestions} question${exam.totalQuestions == 1 ? '' : 's'}', style: TextStyle(fontSize: 13, color: AppColors.textGray, fontWeight: FontWeight.w700))),
+            Expanded(flex: 2, child: Text(exam.durationMinutes == null ? 'No limit' : '${exam.durationMinutes} min', style: TextStyle(fontSize: 13, color: AppColors.textGray, fontWeight: FontWeight.w700))),
+            Expanded(flex: 2, child: Text(_formatDate(exam.updatedAt), style: TextStyle(fontSize: 13, color: AppColors.textGray, fontWeight: FontWeight.w700))),
+            SizedBox(width: 82, child: TextButton(onPressed: onTap, child: Text('View'))),
           ],
         ),
       ),
@@ -579,6 +589,7 @@ class _Badge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(999)),
@@ -597,17 +608,18 @@ class _TableMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 44),
       child: Column(
         children: [
-          Icon(icon, size: 34, color: const Color(0xFF94A3B8)),
-          const SizedBox(height: 12),
-          Text(title, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: Color(0xFF0F172A))),
-          const SizedBox(height: 6),
-          Text(message, textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF64748B), fontSize: 13)),
+          Icon(icon, size: 34, color: AppColors.textHint),
+          SizedBox(height: 12),
+          Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.textTitle)),
+          SizedBox(height: 6),
+          Text(message, textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
           if (actionLabel != null && onAction != null) ...[
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
           ],
         ],
@@ -636,6 +648,7 @@ class _ExamAnalyticsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final resolvedExam = details?.exam ?? exam;
     final questions = details?.questions ?? const <ExamQuestionDetail>[];
     final totalQuestions = questions.isNotEmpty
@@ -653,7 +666,7 @@ class _ExamAnalyticsPage extends StatelessWidget {
           Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1180),
+              constraints: BoxConstraints(maxWidth: 1180),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -662,13 +675,13 @@ class _ExamAnalyticsPage extends StatelessWidget {
                     questionsCount: totalQuestions,
                     onBack: onBack,
                   ),
-                  const SizedBox(height: 22),
+                  SizedBox(height: 22),
                   _ExamDetailsStats(
                     exam: resolvedExam,
                     questionsCount: totalQuestions,
                     totalPoints: totalPoints,
                   ),
-                  const SizedBox(height: 22),
+                  SizedBox(height: 22),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -680,7 +693,7 @@ class _ExamAnalyticsPage extends StatelessWidget {
                               loading: loading,
                               hasSubmissions: false,
                             ),
-                            const SizedBox(height: 18),
+                            SizedBox(height: 18),
                             _QuestionBreakdownCard(
                               loading: loading,
                               error: error,
@@ -690,8 +703,8 @@ class _ExamAnalyticsPage extends StatelessWidget {
                           ],
                         ),
                       ),
-                      const SizedBox(width: 18),
-                      const SizedBox(
+                      SizedBox(width: 18),
+                      SizedBox(
                         width: 300,
                         child: _StudentResultsCard(),
                       ),
@@ -720,6 +733,7 @@ class _ExamDetailsHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final title = exam?.title.trim().isNotEmpty == true
         ? exam!.title
         : 'Exam details';
@@ -736,18 +750,18 @@ class _ExamDetailsHeader extends StatelessWidget {
                 title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                  color: Color(0xFF0F172A),
+                style: TextStyle(
+                  color: AppColors.textTitle,
                   fontSize: 28,
                   fontWeight: FontWeight.w900,
                   letterSpacing: -0.6,
                 ),
               ),
-              const SizedBox(height: 6),
+              SizedBox(height: 6),
               Text(
                 'Updated $updated • $questionsCount question${questionsCount == 1 ? '' : 's'}',
-                style: const TextStyle(
-                  color: Color(0xFF64748B),
+                style: TextStyle(
+                  color: AppColors.textMuted,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -757,23 +771,23 @@ class _ExamDetailsHeader extends StatelessWidget {
         ),
         OutlinedButton.icon(
           onPressed: onBack,
-          icon: const Icon(Icons.arrow_back_rounded, size: 18),
-          label: const Text('Back to quizzes'),
+          icon: Icon(Icons.arrow_back_rounded, size: 18),
+          label: Text('Back to quizzes'),
           style: OutlinedButton.styleFrom(
-            foregroundColor: const Color(0xFF334155),
-            side: const BorderSide(color: Color(0xFFE2E8F0)),
+            foregroundColor: AppColors.textGray,
+            side: BorderSide(color: AppColors.border),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         FilledButton.icon(
           onPressed: null,
-          icon: const Icon(Icons.rocket_launch_outlined, size: 18),
-          label: const Text('Release Grades'),
+          icon: Icon(Icons.rocket_launch_outlined, size: 18),
+          label: Text('Release Grades'),
           style: FilledButton.styleFrom(
-            disabledBackgroundColor: const Color(0xFFE2E8F0),
-            disabledForegroundColor: const Color(0xFF94A3B8),
+            disabledBackgroundColor: AppColors.border,
+            disabledForegroundColor: AppColors.textHint,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
@@ -796,6 +810,7 @@ class _ExamDetailsStats extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       children: [
         Expanded(
@@ -804,20 +819,20 @@ class _ExamDetailsStats extends StatelessWidget {
             value: '$questionsCount',
             subtitle: 'saved in this quiz',
             icon: Icons.quiz_outlined,
-            color: const Color(0xFF1682F3),
+            color: AppColors.primary,
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: 16),
         Expanded(
           child: _MetricCard(
             title: 'Total Points',
             value: _points(totalPoints),
             subtitle: 'from selected questions',
             icon: Icons.stacked_line_chart_rounded,
-            color: const Color(0xFF22C55E),
+            color: AppColors.successDot,
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: 16),
         Expanded(
           child: _MetricCard(
             title: 'Time Limit',
@@ -826,10 +841,10 @@ class _ExamDetailsStats extends StatelessWidget {
                 : '${exam!.durationMinutes}m',
             subtitle: 'student attempt time',
             icon: Icons.timer_outlined,
-            color: const Color(0xFFF59E0B),
+            color: AppColors.warningText,
           ),
         ),
-        const SizedBox(width: 16),
+        SizedBox(width: 16),
         Expanded(
           child: _MetricCard(
             title: 'Status',
@@ -837,8 +852,8 @@ class _ExamDetailsStats extends StatelessWidget {
             subtitle: exam?.isPublished == true ? 'visible to students' : 'not visible yet',
             icon: Icons.verified_outlined,
             color: exam?.isPublished == true
-                ? const Color(0xFF22C55E)
-                : const Color(0xFF64748B),
+                ? AppColors.successDot
+                : AppColors.textMuted,
           ),
         ),
       ],
@@ -867,16 +882,17 @@ class _MetricCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       height: 118,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x060F172A),
+            color: AppColors.shadowThin,
             blurRadius: 20,
             offset: Offset(0, 10),
           ),
@@ -890,25 +906,25 @@ class _MetricCard extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    color: Color(0xFF64748B),
+                  style: TextStyle(
+                    color: AppColors.textMuted,
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
-                const Spacer(),
+                Spacer(),
                 Text(
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF0F172A),
+                  style: TextStyle(
+                    color: AppColors.textTitle,
                     fontSize: 25,
                     fontWeight: FontWeight.w900,
                     letterSpacing: -0.5,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   subtitle,
                   maxLines: 1,
@@ -948,20 +964,21 @@ class _ScoreDistributionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _PanelCard(
       title: 'Score Distribution',
-      trailing: const _TinyLegend(label: 'Students'),
+      trailing: _TinyLegend(label: 'Students'),
       child: SizedBox(
         height: 165,
         child: Center(
           child: loading
-              ? const CircularProgressIndicator()
+              ? CircularProgressIndicator()
               : hasSubmissions
-                  ? const Text('Distribution will appear here.')
-                  : const Text(
+                  ? Text('Distribution will appear here.')
+                  : Text(
                       'No student submissions yet.',
                       style: TextStyle(
-                        color: Color(0xFF64748B),
+                        color: AppColors.textMuted,
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
                       ),
@@ -987,9 +1004,10 @@ class _QuestionBreakdownCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     Widget body;
     if (loading) {
-      body = const Padding(
+      body = Padding(
         padding: EdgeInsets.symmetric(vertical: 42),
         child: Center(child: CircularProgressIndicator()),
       );
@@ -1002,7 +1020,7 @@ class _QuestionBreakdownCard extends StatelessWidget {
         onAction: onRetry,
       );
     } else if (questions.isEmpty) {
-      body = const _TableMessage(
+      body = _TableMessage(
         icon: Icons.quiz_outlined,
         title: 'No questions attached',
         message: 'This quiz was created but no questions were returned by the backend.',
@@ -1025,10 +1043,10 @@ class _QuestionBreakdownCard extends StatelessWidget {
       title: 'Question Breakdown',
       trailing: Row(
         mainAxisSize: MainAxisSize.min,
-        children: const [
-          Icon(Icons.filter_list_rounded, size: 18, color: Color(0xFF64748B)),
+        children: [
+          Icon(Icons.filter_list_rounded, size: 18, color: AppColors.textMuted),
           SizedBox(width: 12),
-          Icon(Icons.download_outlined, size: 18, color: Color(0xFF64748B)),
+          Icon(Icons.download_outlined, size: 18, color: AppColors.textMuted),
         ],
       ),
       child: body,
@@ -1041,11 +1059,12 @@ class _QuestionBreakdownHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       height: 42,
-      color: const Color(0xFFF8FAFC),
+      color: AppColors.surfaceBg,
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: const Row(
+      child: Row(
         children: [
           SizedBox(width: 48, child: _HeaderText('#')),
           Expanded(flex: 5, child: _HeaderText('QUESTION')),
@@ -1069,11 +1088,12 @@ class _QuestionBreakdownRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final rate = question.successRate;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: AppColors.headerBg)),
       ),
       child: Row(
         children: [
@@ -1081,8 +1101,8 @@ class _QuestionBreakdownRow extends StatelessWidget {
             width: 48,
             child: Text(
               index.toString().padLeft(2, '0'),
-              style: const TextStyle(
-                color: Color(0xFF64748B),
+              style: TextStyle(
+                color: AppColors.textMuted,
                 fontSize: 12,
                 fontWeight: FontWeight.w800,
               ),
@@ -1094,8 +1114,8 @@ class _QuestionBreakdownRow extends StatelessWidget {
               question.text,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Color(0xFF0F172A),
+              style: TextStyle(
+                color: AppColors.textTitle,
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
                 height: 1.35,
@@ -1106,8 +1126,8 @@ class _QuestionBreakdownRow extends StatelessWidget {
             flex: 2,
             child: Text(
               question.typeLabel,
-              style: const TextStyle(
-                color: Color(0xFF475569),
+              style: TextStyle(
+                color: AppColors.textGray,
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
@@ -1125,7 +1145,7 @@ class _QuestionBreakdownRow extends StatelessWidget {
             child: Text(
               rate == null ? '-' : '${rate.toStringAsFixed(0)}%',
               style: TextStyle(
-                color: rate == null ? const Color(0xFF94A3B8) : const Color(0xFF16A34A),
+                color: rate == null ? AppColors.textHint : AppColors.successText,
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
               ),
@@ -1142,27 +1162,28 @@ class _StudentResultsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _PanelCard(
       title: 'Student Results',
-      trailing: const Text(
+      trailing: Text(
         'TOP 5',
         style: TextStyle(
-          color: Color(0xFF94A3B8),
+          color: AppColors.textHint,
           fontSize: 10,
           fontWeight: FontWeight.w900,
           letterSpacing: 0.6,
         ),
       ),
-      child: const Padding(
+      child: Padding(
         padding: EdgeInsets.symmetric(horizontal: 18, vertical: 48),
         child: Column(
           children: [
-            Icon(Icons.people_alt_outlined, color: Color(0xFF94A3B8), size: 34),
+            Icon(Icons.people_alt_outlined, color: AppColors.textHint, size: 34),
             SizedBox(height: 12),
             Text(
               'No submissions yet',
               style: TextStyle(
-                color: Color(0xFF0F172A),
+                color: AppColors.textTitle,
                 fontSize: 15,
                 fontWeight: FontWeight.w900,
               ),
@@ -1172,7 +1193,7 @@ class _StudentResultsCard extends StatelessWidget {
               'Student scores will appear here after learners attempt this quiz.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Color(0xFF64748B),
+                color: AppColors.textMuted,
                 fontSize: 12,
                 height: 1.4,
                 fontWeight: FontWeight.w600,
@@ -1198,14 +1219,15 @@ class _PanelCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
-        boxShadow: const [
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x060F172A),
+            color: AppColors.shadowThin,
             blurRadius: 20,
             offset: Offset(0, 10),
           ),
@@ -1221,8 +1243,8 @@ class _PanelCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     title,
-                    style: const TextStyle(
-                      color: Color(0xFF0F172A),
+                    style: TextStyle(
+                      color: AppColors.textTitle,
                       fontSize: 15,
                       fontWeight: FontWeight.w900,
                     ),
@@ -1232,7 +1254,7 @@ class _PanelCard extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFE2E8F0)),
+          Divider(height: 1, color: AppColors.border),
           child,
         ],
       ),
@@ -1247,21 +1269,22 @@ class _TinyLegend extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       children: [
         Container(
           width: 7,
           height: 7,
-          decoration: const BoxDecoration(
-            color: Color(0xFF1682F3),
+          decoration: BoxDecoration(
+            color: AppColors.primary,
             shape: BoxShape.circle,
           ),
         ),
-        const SizedBox(width: 6),
+        SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(
-            color: Color(0xFF64748B),
+          style: TextStyle(
+            color: AppColors.textMuted,
             fontSize: 11,
             fontWeight: FontWeight.w700,
           ),
@@ -1278,12 +1301,13 @@ class _DifficultyPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final normalized = label.toLowerCase();
     final color = normalized == 'easy'
-        ? const Color(0xFF16A34A)
+        ? AppColors.successText
         : normalized == 'hard'
-            ? const Color(0xFFEF4444)
-            : const Color(0xFFF97316);
+            ? AppColors.errorDot
+            : Color(0xFFF97316);
     return _Badge(label: label, color: color);
   }
 }
@@ -1300,11 +1324,12 @@ class _ExamDetailsDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
+        constraints: BoxConstraints(maxWidth: 640),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -1313,43 +1338,43 @@ class _ExamDetailsDialog extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Expanded(child: Text(exam.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: Color(0xFF0F172A)))),
-                  IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded)),
+                  Expanded(child: Text(exam.title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.textTitle))),
+                  IconButton(onPressed: () => Navigator.of(context).pop(), icon: Icon(Icons.close_rounded)),
                 ],
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Wrap(
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _Badge(label: exam.isPublished ? 'Published' : 'Draft', color: exam.isPublished ? const Color(0xFF16A34A) : const Color(0xFF64748B)),
-                  _Badge(label: _ExamRow._titleCase(exam.examType), color: const Color(0xFF1682F3)),
+                  _Badge(label: exam.isPublished ? 'Published' : 'Draft', color: exam.isPublished ? AppColors.successText : AppColors.textMuted),
+                  _Badge(label: _ExamRow._titleCase(exam.examType), color: AppColors.primary),
                 ],
               ),
               if ((exam.description ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 18),
-                const Text('Description', style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF334155))),
-                const SizedBox(height: 6),
-                Text(exam.description!, style: const TextStyle(color: Color(0xFF475569), height: 1.45)),
+                SizedBox(height: 18),
+                Text('Description', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textGray)),
+                SizedBox(height: 6),
+                Text(exam.description!, style: TextStyle(color: AppColors.textGray, height: 1.45)),
               ],
-              const SizedBox(height: 20),
+              SizedBox(height: 20),
               Row(
                 children: [
                   Expanded(child: _DetailTile(label: 'Questions', value: '$questionsCount')),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(child: _DetailTile(label: 'Total Points', value: _points(exam.totalScore))),
                 ],
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: 12),
               Row(
                 children: [
                   Expanded(child: _DetailTile(label: 'Time Limit', value: exam.durationMinutes == null ? 'No limit' : '${exam.durationMinutes} min')),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(child: _DetailTile(label: 'Attempts', value: '${exam.maxAttempts}')),
                 ],
               ),
-              const SizedBox(height: 20),
-              Align(alignment: Alignment.centerRight, child: FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Done'))),
+              SizedBox(height: 20),
+              Align(alignment: Alignment.centerRight, child: FilledButton(onPressed: () => Navigator.of(context).pop(), child: Text('Done'))),
             ],
           ),
         ),
@@ -1367,15 +1392,16 @@ class _DetailTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: const Color(0xFFF8FAFC), borderRadius: BorderRadius.circular(14), border: Border.all(color: const Color(0xFFE2E8F0))),
+      decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: const TextStyle(color: Color(0xFF64748B), fontSize: 12, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text(value, style: const TextStyle(color: Color(0xFF0F172A), fontSize: 16, fontWeight: FontWeight.w900)),
+          Text(label, style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w800)),
+          SizedBox(height: 6),
+          Text(value, style: TextStyle(color: AppColors.textTitle, fontSize: 16, fontWeight: FontWeight.w900)),
         ],
       ),
     );

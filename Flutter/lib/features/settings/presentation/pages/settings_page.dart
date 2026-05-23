@@ -127,7 +127,7 @@ Future<void> _scrollTo(GlobalKey key) async {
   if (ctx == null) return;
   await Scrollable.ensureVisible(
     ctx,
-    duration: const Duration(milliseconds: 450),
+    duration: Duration(milliseconds: 450),
     curve: Curves.easeInOut,
     alignment: 0.02, // small top padding
   );
@@ -202,9 +202,8 @@ void _onNavSelect(int i) {
 
   String? _validatePhone(String? v) {
     final s = (v ?? '').trim();
-    if (s.isEmpty) return 'Phone number is required';
+    if (s.isEmpty) return null;
 
-    
     final ok = RegExp(r'^[0-9+\-\s()]{7,20}$').hasMatch(s);
     if (!ok) return 'Enter a valid phone number';
     return null;
@@ -266,11 +265,11 @@ void _onNavSelect(int i) {
 
     final first = firstName.text.trim();
     final last = lastName.text.trim();
-    if (first.isEmpty || last.isEmpty) {
+    if ('$first $last'.trim().isEmpty) {
       _toast(
         context,
         title: 'Validation',
-        message: 'First name and last name are required.',
+        message: 'Name is required.',
         type: AppToastType.warning,
         icon: Icons.warning_amber_rounded,
       );
@@ -285,17 +284,32 @@ void _onNavSelect(int i) {
   // Avatar Upload
   // =========================
   Future<void> _pickAndUploadAvatar() async {
-    final picked = await pickSingleImageFile();
+    final picked = await pickSingleImageFile(
+      accept: ['image/png', 'image/jpeg'],
+    );
     if (picked == null || picked.bytes.isEmpty) return;
 
     final bytes = picked.bytes;
-    final mime = picked.mimeType?.toLowerCase() ?? '';
-    final isImage = mime.startsWith('image/');
-    if (!isImage) {
+    var contentType = (picked.mimeType ?? '').trim().toLowerCase();
+    final fileName = (picked.name ?? '').trim().toLowerCase();
+
+    if (contentType.isEmpty) {
+      if (fileName.endsWith('.png')) {
+        contentType = 'image/png';
+      } else if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+        contentType = 'image/jpeg';
+      }
+    }
+    if (contentType == 'image/jpg') contentType = 'image/jpeg';
+
+    final isAllowedImage =
+        contentType == 'image/png' || contentType == 'image/jpeg';
+    if (!isAllowedImage) {
       _toast(
         context,
         title: 'Invalid file',
-        message: 'Please choose a valid image file.',
+        message: 'Please choose a PNG or JPG image.',
+        type: AppToastType.warning,
         icon: Icons.warning_amber_rounded,
       );
       return;
@@ -306,6 +320,7 @@ void _onNavSelect(int i) {
         context,
         title: 'Image too large',
         message: 'Maximum avatar size is 5 MB.',
+        type: AppToastType.warning,
         icon: Icons.warning_amber_rounded,
       );
       return;
@@ -313,7 +328,7 @@ void _onNavSelect(int i) {
 
     final ok = await ref.read(settingsControllerProvider.notifier).uploadAvatar(
           bytes: bytes,
-          contentType: mime.isEmpty ? 'image/png' : mime,
+          contentType: contentType,
         );
 
     if (!mounted) return;
@@ -384,18 +399,18 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
   final res = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: const Text('Discard changes?'),
-      content: const Text(
+      title: Text('Discard changes?'),
+      content: Text(
         'You have unsaved changes. If you leave now, your changes will be lost.',
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(false),
-          child: const Text('Stay'),
+          child: Text('Stay'),
         ),
         ElevatedButton(
           onPressed: () => Navigator.of(ctx).pop(true),
-          child: const Text('Discard'),
+          child: Text('Discard'),
         ),
       ],
     ),
@@ -405,6 +420,7 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final st = ref.watch(settingsControllerProvider);
     final isFirstLoad = st.profile == null || st.preferences == null;
     if (st.loading && isFirstLoad) {
@@ -413,8 +429,8 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1200),
-              child: const Padding(
+              constraints: BoxConstraints(maxWidth: 1200),
+              child: Padding(
                 padding: AppSpacing.page,
                 child: _SettingsSkeleton(),
               ),
@@ -494,12 +510,13 @@ return PopScope(
   },
   child: AbsorbPointer(
     absorbing: isBusy,
-    child: Scaffold(
-      backgroundColor: AppColors.pageBg,
-      body: SizedBox.expand(
+    child: Container(
+      color: AppColors.pageBg,
+      width: double.infinity,
+      height: double.infinity,
       child: Center(
         child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1200),
+          constraints: BoxConstraints(maxWidth: 1200),
           child: Padding(
             padding: AppSpacing.page,
             child: Column(
@@ -509,7 +526,7 @@ return PopScope(
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
-                    const Expanded(
+                    Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -522,7 +539,7 @@ return PopScope(
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
+                    SizedBox(width: 16),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -546,12 +563,12 @@ return PopScope(
                                 icon: Icons.info_outline_rounded,
                               );
                             },
-                            backgroundColor: Colors.white,
+                            backgroundColor: AppColors.cardBg,
                             foregroundColor: AppColors.title,
                             borderColor: AppColors.borderSoft,
                           ),
                         ),
-                        const SizedBox(width: 10),
+                        SizedBox(width: 10),
                         SizedBox(
                           width: 160,
                           child: AppPrimaryLoadingButton(
@@ -595,7 +612,7 @@ return PopScope(
                   ],
                 ),
 
-                const SizedBox(height: 24),
+                SizedBox(height: 24),
 
                 // Main (scrollable content). Sidebar stays sticky on wide screens.
                 Expanded(
@@ -616,7 +633,7 @@ return PopScope(
                             uploadingAvatar: st.uploadingAvatar,
                             onUploadAvatar: () => _pickAndUploadAvatar(),
                           ),
-                          const SizedBox(height: 16),
+                          SizedBox(height: 16),
                           _NavCard(
                             selectedIndex: _sectionIndex,
                             onSelect: (i) => _onNavSelect(i),
@@ -627,15 +644,15 @@ return PopScope(
                       final right = Column(
                         children: [
                           _buildPersonalInfoCard(),
-                          const SizedBox(height: 16),
+                          SizedBox(height: 16),
                           _buildSecurityCard(st),
-                          const SizedBox(height: 16),
+                          SizedBox(height: 16),
                           _buildPreferencesCard(),
-                          const SizedBox(height: 16),
+                          SizedBox(height: 16),
                           _buildNotificationsCard(),
-                          const SizedBox(height: 16),
+                          SizedBox(height: 16),
                           _buildDangerZone(st),
-                          const SizedBox(height: 24),
+                          SizedBox(height: 24),
                         ],
                       );
 
@@ -645,7 +662,7 @@ return PopScope(
                           child: Column(
                             children: [
                               left,
-                              const SizedBox(height: 16),
+                              SizedBox(height: 16),
                               right,
                             ],
                           ),
@@ -681,7 +698,6 @@ return PopScope(
       ),
     ),
   ),
-)
 );
   }
 

@@ -128,7 +128,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
       visibilityLevel: (isPublic ? CourseVisibility.public : CourseVisibility.private).backendValue,
       requiresEnrollmentApproval: !isPublic,
       learningOutcomes: _outcomes.map((o) => '${o.code}: ${o.description}').toList(),
-      tags: const [],
+      tags: [],
       category: null,
       status: status,
       courseCode: _codeCtrl.text.trim().isEmpty ? null : _codeCtrl.text.trim(),
@@ -144,6 +144,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final size = MediaQuery.of(context).size;
     final maxW = size.width < 800 ? size.width * 0.96 : 740.0;
     final maxH = size.height * 0.92;
@@ -158,7 +159,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
             decoration: BoxDecoration(
               color: AppColors.pageBg,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(color: Color(0x22000000), blurRadius: 40, offset: Offset(0, 16)),
               ],
             ),
@@ -172,9 +173,9 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
                     child: Column(
                       children: [
                         _buildCourseDetailsCard(),
-                        const SizedBox(height: 16),
+                        SizedBox(height: 16),
                         _buildBottomRow(),
-                        const SizedBox(height: 20),
+                        SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -192,33 +193,33 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 18, 16, 16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border(bottom: BorderSide(color: Color(0xFFF0F2F4))),
+        border: Border(bottom: BorderSide(color: AppColors.headerBg)),
       ),
       child: Row(
         children: [
           Container(
             width: 38, height: 38,
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              border: Border.all(color: const Color(0xFFDBEAFE)),
+              color: AppColors.primarySoft,
+              border: Border.all(color: AppColors.badgeBlueBg),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.add_box_outlined, size: 18, color: Color(0xFF137FEC)),
+            child: Icon(Icons.add_box_outlined, size: 18, color: AppColors.primary),
           ),
-          const SizedBox(width: 12),
-          const Expanded(
+          SizedBox(width: 12),
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Create New Course',
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
-                        color: Color(0xFF111418))),
+                        color: AppColors.textTitle)),
                 SizedBox(height: 1),
                 Text('Fill in the details to set up a new learning module.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF617589))),
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
               ],
             ),
           ),
@@ -241,7 +242,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
         children: [
           // Course Title
           _buildFieldLabel('Course Title', required: true),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           _TitledInputWithError(
             controller: _titleCtrl,
             hint: 'e.g. Introduction to Artificial Intelligence',
@@ -252,7 +253,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
               _validateTitle();
             },
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
 
           // Code + Term row
           Row(
@@ -263,7 +264,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildFieldLabel('Course Code', optional: true),
-                    const SizedBox(height: 6),
+                    SizedBox(height: 6),
                     _TitledInputWithError(
                       controller: _codeCtrl,
                       hint: 'e.g. CS-101',
@@ -277,13 +278,13 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
                   ],
                 ),
               ),
-              const SizedBox(width: 14),
+              SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildFieldLabel('Academic Term'),
-                    const SizedBox(height: 6),
+                    SizedBox(height: 6),
                     // Use the shared FigmaUmDropdown40 which is already pixel-perfect
                     FigmaUmDropdown40(
                       width: double.infinity,
@@ -296,30 +297,30 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
 
           // Description
           _buildFieldLabel('Course Description'),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           _DescriptionField(controller: _descCtrl),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
 
           // AI tip
           Container(
             padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFDBEAFE)),
+              border: Border.all(color: AppColors.badgeBlueBg),
             ),
-            child: const Row(
+            child: Row(
               children: [
-                Icon(Icons.auto_awesome_rounded, size: 14, color: Color(0xFF137FEC)),
+                Icon(Icons.auto_awesome_rounded, size: 14, color: AppColors.primary),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'AI Tip: A detailed description helps generate better quiz questions.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF137FEC),
+                    style: TextStyle(fontSize: 12, color: AppColors.primary,
                         fontWeight: FontWeight.w500),
                   ),
                 ),
@@ -340,11 +341,11 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text(
+          Text(
             'Define what students will achieve. Topics will be linked to these outcomes.',
-            style: TextStyle(fontSize: 13, color: Color(0xFF617589), height: 1.5),
+            style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           LearningOutcomesSection(
             initialOutcomes: _outcomes,
             onChanged: (list) => setState(() => _outcomes = list),
@@ -371,7 +372,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
             ),
           ),
         ),
-        const SizedBox(width: 14),
+        SizedBox(width: 14),
         SizedBox(
           width: 210,
           child: _SectionCard(
@@ -388,16 +389,16 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
   Widget _buildFooter() {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 14, 24, 18),
-      decoration: const BoxDecoration(
-        color: Colors.white,
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-        border: Border(top: BorderSide(color: Color(0xFFF0F2F4))),
+        border: Border(top: BorderSide(color: AppColors.headerBg)),
       ),
       child: Row(
         children: [
-          const Spacer(),
+          Spacer(),
           _OutlineBtn(label: 'Cancel', onTap: () => Navigator.of(context).pop()),
-          const SizedBox(width: 10),
+          SizedBox(width: 10),
           _PrimaryBtn(label: '+ Create Course', onTap: _canSubmit ? _submit : null),
         ],
       ),
@@ -411,18 +412,18 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
         Text(label,
             style: AppText.label.copyWith(fontSize: 13, fontWeight: FontWeight.w600)),
         if (required)
-          const Text(' *',
-              style: TextStyle(fontSize: 13, color: Color(0xFFEF4444), fontWeight: FontWeight.w600)),
+          Text(' *',
+              style: TextStyle(fontSize: 13, color: AppColors.errorDot, fontWeight: FontWeight.w600)),
         if (optional) ...[
-          const SizedBox(width: 6),
+          SizedBox(width: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(4),
             ),
-            child: const Text('Optional',
-                style: TextStyle(fontSize: 10.5, color: Color(0xFF137FEC),
+            child: Text('Optional',
+                style: TextStyle(fontSize: 10.5, color: AppColors.primary,
                     fontWeight: FontWeight.w600)),
           ),
         ],
@@ -447,10 +448,11 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
@@ -463,34 +465,34 @@ class _SectionCard extends StatelessWidget {
               Container(
                 width: 32, height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  border: Border.all(color: const Color(0xFFDBEAFE)),
+                  color: AppColors.primarySoft,
+                  border: Border.all(color: AppColors.badgeBlueBg),
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: Icon(icon, size: 15, color: const Color(0xFF137FEC)),
+                child: Icon(icon, size: 15, color: AppColors.primary),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Text(title,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
-                      color: Color(0xFF111418))),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                      color: AppColors.textTitle)),
               if (badge != null) ...[
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF137FEC),
+                    color: AppColors.primary,
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: Text(badge!,
-                      style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
                           color: Colors.white)),
                 ),
               ],
             ],
           ),
-          const SizedBox(height: 14),
-          Container(height: 1, color: const Color(0xFFF0F2F4)),
-          const SizedBox(height: 16),
+          SizedBox(height: 14),
+          Container(height: 1, color: AppColors.headerBg),
+          SizedBox(height: 16),
           child,
         ],
       ),
@@ -541,9 +543,10 @@ class _TitledInputWithErrorState extends State<_TitledInputWithError> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final hasErr = (widget.error ?? '').isNotEmpty;
     final borderColor = hasErr
-        ? const Color(0xFFEF4444)
+        ? AppColors.errorDot
         : _focused
             ? AppColors.primary
             : AppColors.borderSoft;
@@ -556,7 +559,7 @@ class _TitledInputWithErrorState extends State<_TitledInputWithError> {
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: hasErr ? const Color(0xFFFEF2F2) : Colors.white,
+            color: hasErr ? AppColors.dangerBg : AppColors.cardBg,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: borderColor, width: borderWidth),
           ),
@@ -565,11 +568,11 @@ class _TitledInputWithErrorState extends State<_TitledInputWithError> {
               if (widget.prefixIcon != null) ...[
                 Icon(widget.prefixIcon, size: 16,
                     color: hasErr
-                        ? const Color(0xFFEF4444)
+                        ? AppColors.errorDot
                         : _focused
                             ? AppColors.primary
                             : AppColors.muted),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
               ],
               Expanded(
                 child: TextFormField(
@@ -594,13 +597,13 @@ class _TitledInputWithErrorState extends State<_TitledInputWithError> {
           ),
         ),
         if (hasErr) ...[
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Row(
             children: [
-              const Icon(Icons.error_outline_rounded, size: 12, color: Color(0xFFEF4444)),
-              const SizedBox(width: 4),
+              Icon(Icons.error_outline_rounded, size: 12, color: AppColors.errorDot),
+              SizedBox(width: 4),
               Text(widget.error!,
-                  style: const TextStyle(fontSize: 11.5, color: Color(0xFFEF4444),
+                  style: TextStyle(fontSize: 11.5, color: AppColors.errorDot,
                       fontWeight: FontWeight.w500)),
             ],
           ),
@@ -638,8 +641,9 @@ class _DescriptionFieldState extends State<_DescriptionField> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
+      duration: Duration(milliseconds: 150),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
@@ -656,7 +660,7 @@ class _DescriptionFieldState extends State<_DescriptionField> {
               height: 38,
               color: AppColors.surfaceBg,
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: const Row(
+              child: Row(
                 children: [
                   _TbBtn(icon: Icons.format_bold_rounded),
                   _TbBtn(icon: Icons.format_italic_rounded),
@@ -665,7 +669,7 @@ class _DescriptionFieldState extends State<_DescriptionField> {
                 ],
               ),
             ),
-            Container(height: 1, color: const Color(0xFFF0F2F4)),
+            Container(height: 1, color: AppColors.headerBg),
             // Text area
             SizedBox(
               height: 110,
@@ -710,7 +714,7 @@ class _TbBtnState extends State<_TbBtn> {
     onEnter: (_) => setState(() => _h = true),
     onExit: (_) => setState(() => _h = false),
     child: AnimatedContainer(
-      duration: const Duration(milliseconds: 80),
+      duration: Duration(milliseconds: 80),
       width: 32, height: 32,
       decoration: BoxDecoration(
         color: _h ? AppColors.border : Colors.transparent,
@@ -737,13 +741,14 @@ class _ConfigSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Visibility Status',
+        Text('Visibility Status',
             style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600,
-                color: Color(0xFF617589), letterSpacing: 0.2)),
-        const SizedBox(height: 8),
+                color: AppColors.textMuted, letterSpacing: 0.2)),
+        SizedBox(height: 8),
         Row(children: [
           Expanded(child: _OptionTile(
             title: 'Save as Draft',
@@ -751,7 +756,7 @@ class _ConfigSection extends StatelessWidget {
             selected: publish == _PublishChoice.draft,
             onTap: () => onPublishChanged(_PublishChoice.draft),
           )),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(child: _OptionTile(
             title: 'Publish Now',
             sub: 'Visible to enrolled students',
@@ -759,7 +764,7 @@ class _ConfigSection extends StatelessWidget {
             onTap: () => onPublishChanged(_PublishChoice.published),
           )),
         ]),
-        const SizedBox(height: 10),
+        SizedBox(height: 10),
         Row(children: [
           Expanded(child: _OptionTile(
             title: 'Set as Private',
@@ -767,7 +772,7 @@ class _ConfigSection extends StatelessWidget {
             selected: visibility == _VisibilityChoice.privateCourse,
             onTap: () => onVisibilityChanged(_VisibilityChoice.privateCourse),
           )),
-          const SizedBox(width: 8),
+          SizedBox(width: 8),
           Expanded(child: _OptionTile(
             title: 'Set as Public',
             sub: 'For Public Student',
@@ -776,7 +781,7 @@ class _ConfigSection extends StatelessWidget {
           )),
         ]),
         if (visibility == _VisibilityChoice.privateCourse) ...[
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Container(
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
@@ -784,11 +789,11 @@ class _ConfigSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(9),
               border: Border.all(color: AppColors.border),
             ),
-            child: const Row(children: [
-              Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF137FEC)),
+            child: Row(children: [
+              Icon(Icons.info_outline_rounded, size: 14, color: AppColors.primary),
               SizedBox(width: 8),
               Expanded(child: Text('You can invite students after creating the course.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF111418)))),
+                  style: TextStyle(fontSize: 12, color: AppColors.textTitle))),
             ]),
           ),
         ],
@@ -816,8 +821,9 @@ class _OptionTileState extends State<_OptionTile> {
 
   @override
   Widget build(BuildContext context) {
-    const blue  = Color(0xFF137FEC);
-    const blueSoft = Color(0xFFEFF6FF);
+    Theme.of(context);
+    final blue = AppColors.primary;
+    final blueSoft = AppColors.primarySoft;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -826,10 +832,10 @@ class _OptionTileState extends State<_OptionTile> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 110),
+          duration: Duration(milliseconds: 110),
           padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
           decoration: BoxDecoration(
-            color: widget.selected ? blueSoft : _h ? AppColors.pageBg : Colors.white,
+            color: widget.selected ? blueSoft : _h ? AppColors.pageBg : AppColors.cardBg,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: widget.selected ? blue : AppColors.border,
@@ -852,17 +858,17 @@ class _OptionTileState extends State<_OptionTile> {
                         color: widget.selected ? blue : AppColors.text,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       widget.sub,
-                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF617589)),
+                      style: TextStyle(fontSize: 10.5, color: AppColors.textMuted),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               // Radio dot (right) — matches Figma exactly
               Container(
                 width: 18, height: 18,
@@ -872,13 +878,13 @@ class _OptionTileState extends State<_OptionTile> {
                     color: widget.selected ? blue : AppColors.border,
                     width: 2,
                   ),
-                  color: Colors.white,
+                  color: AppColors.cardBg,
                 ),
                 child: widget.selected
                     ? Center(
                         child: Container(
                           width: 8, height: 8,
-                          decoration: const BoxDecoration(
+                          decoration: BoxDecoration(
                             color: blue, shape: BoxShape.circle),
                         ),
                       )
@@ -903,19 +909,20 @@ class _CoverUploadState extends State<_CoverUpload> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _h = true),
       onExit: (_) => setState(() => _h = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
+        duration: Duration(milliseconds: 150),
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 28),
         decoration: BoxDecoration(
-          color: _h ? const Color(0xFFEFF6FF) : const Color(0xFFFAFBFC),
+          color: _h ? AppColors.primarySoft : AppColors.hoverBg,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: _h ? const Color(0xFF137FEC) : AppColors.border,
+            color: _h ? AppColors.primary : AppColors.border,
             width: _h ? 1.5 : 1,
           ),
         ),
@@ -925,13 +932,13 @@ class _CoverUploadState extends State<_CoverUpload> {
     Container(
       width: 46, height: 63,
       decoration: BoxDecoration(
-        color: _h ? const Color(0xFFEFF6FF) : AppColors.headerBg,
+        color: _h ? AppColors.primarySoft : AppColors.headerBg,
         borderRadius: BorderRadius.circular(12),
       ),
       child: Icon(Icons.add_photo_alternate_outlined, size: 22,
-          color: _h ? const Color(0xFF137FEC) : AppColors.muted),
+          color: _h ? AppColors.primary : AppColors.muted),
     ),
-    const SizedBox(height: 12),
+    SizedBox(height: 12),
     
     // 2. جعل النصوص تحت بعضها وفي المنتصف
     Text(
@@ -939,26 +946,26 @@ class _CoverUploadState extends State<_CoverUpload> {
       style: TextStyle(
         fontSize: 13, 
         fontWeight: FontWeight.w700,
-        color: _h ? const Color(0xFF137FEC) : AppColors.muted,
+        color: _h ? AppColors.primary : AppColors.muted,
         fontFamily: 'Inter'
       ),
     ),
-    const SizedBox(height: 4), // مسافة بسيطة بين السطرين
-    const Text(
+    SizedBox(height: 4), // مسافة بسيطة بين السطرين
+    Text(
       'or drag and drop',
       style: TextStyle(
         fontSize: 12, 
-        color: Color(0xFF9CA3AF), 
+        color: AppColors.textHint, 
         fontFamily: 'Inter'
       ),
     ),
     
-    const SizedBox(height: 8),
+    SizedBox(height: 8),
     
-    const Text(
+    Text(
       'PNG, JPG, GIF up to 10MB',
       textAlign: TextAlign.center, // تأكيد التوسط
-      style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF)),
+      style: TextStyle(fontSize: 11, color: AppColors.textHint),
     ),
   ],
 ),
@@ -986,7 +993,7 @@ class _HoverIconBtnState extends State<_HoverIconBtn> {
     child: GestureDetector(
       onTap: widget.onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
+        duration: Duration(milliseconds: 100),
         width: 34, height: 34,
         decoration: BoxDecoration(
           color: _h ? AppColors.headerBg : Colors.transparent,
@@ -1011,6 +1018,7 @@ class _PrimaryBtnState extends State<_PrimaryBtn> {
   bool _h = false;
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final enabled = widget.onTap != null;
     return MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : MouseCursor.defer,
@@ -1019,13 +1027,13 @@ class _PrimaryBtnState extends State<_PrimaryBtn> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 110),
+          duration: Duration(milliseconds: 110),
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           decoration: BoxDecoration(
             color: !enabled
                 ? AppColors.border
-                : _h ? const Color(0xFF0E6FD4) : AppColors.primary,
+                : _h ? Color(0xFF0E6FD4) : AppColors.primary,
             borderRadius: BorderRadius.circular(8),
           ),
           child: Center(
@@ -1058,17 +1066,17 @@ class _OutlineBtnState extends State<_OutlineBtn> {
     child: GestureDetector(
       onTap: widget.onTap,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 110),
+        duration: Duration(milliseconds: 110),
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 18),
         decoration: BoxDecoration(
-          color: _h ? AppColors.headerBg : Colors.white,
+          color: _h ? AppColors.headerBg : AppColors.cardBg,
           border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Center(
           child: Text(widget.label,
-              style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600,
+              style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600,
                   color: AppColors.text)),
         ),
       ),

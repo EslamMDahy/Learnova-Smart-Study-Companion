@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learnova/core/routing/routes.dart';
+import 'package:learnova/core/ui/toast.dart';
 import '../../data/courses_models.dart';
 import '../../data/course_vocabulary.dart';
 import 'package:learnova/shared/widgets/app_ui_components.dart';
@@ -10,12 +11,22 @@ import 'invite_students_dialog.dart';
 import '../controllers/selected_course_provider.dart';
 import '../course_route_identity.dart';
 
+typedef CourseUpdateAction = Future<MyCourseItem> Function(
+  MyCourseItem course,
+  CourseUpdateRequest payload,
+);
+typedef CourseArchiveAction = Future<MyCourseItem> Function(MyCourseItem course);
+typedef CourseDeleteAction = Future<void> Function(MyCourseItem course);
+
 class InstructorCourseContent extends StatefulWidget {
   final VoidCallback? onCreateNewCourse;
   final VoidCallback? onRefresh;
   final bool loading;
   final String? errorText;
   final List<MyCourseItem> courses;
+  final CourseUpdateAction? onUpdateCourse;
+  final CourseArchiveAction? onArchiveCourse;
+  final CourseDeleteAction? onDeleteCourse;
 
   const InstructorCourseContent({
     super.key,
@@ -24,6 +35,9 @@ class InstructorCourseContent extends StatefulWidget {
     this.loading = false,
     this.errorText,
     this.courses = const [],
+    this.onUpdateCourse,
+    this.onArchiveCourse,
+    this.onDeleteCourse,
   });
 
   @override
@@ -41,7 +55,7 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
   String selectedType = 'All Types';
 
   // ---- Caches (performance)
-  List<MyCourseItem> _cachedFiltered = const [];
+  List<MyCourseItem> _cachedFiltered = [];
   String _cacheKey = '';
 
   int _totalCoursesCached = 0;
@@ -126,7 +140,7 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
 
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(const Duration(milliseconds: 280), () {
+    _searchDebounce = Timer(Duration(milliseconds: 280), () {
       if (!mounted) return;
       setState(() {
         _searchText = value;
@@ -196,20 +210,20 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const SizedBox(height: 6),
-                      const _Breadcrumb(),
-                      const SizedBox(height: 14),
+                      SizedBox(height: 6),
+                      _Breadcrumb(),
+                      SizedBox(height: 14),
                       _HeaderRow(
                         onCreateNewCourse: widget.onCreateNewCourse,
                         onRefresh: widget.onRefresh,
                       ),
-                      const SizedBox(height: 18),
+                      SizedBox(height: 18),
                       _StatsRow(
                         totalCourses: _totalCoursesCached,
                         activeStudents: _activeStudentsTotalCached,
                         pendingInvites: _pendingInvitesTotalCached,
                       ),
-                      const SizedBox(height: 16),
+                      SizedBox(height: 16),
                       _CoursesFiltersBar(
                         controller: _search,
                         isNarrow: isNarrow,
@@ -225,7 +239,7 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
                         onMoreFilters: () {},
                         onRefresh: widget.onRefresh ?? () {},
                       ),
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12),
                       _ActiveFiltersChips(
                         searchText: _searchText,
                         selectedSemester: selectedSemester,
@@ -257,9 +271,9 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
                           message: widget.errorText!.trim(),
                           onRetry: widget.onRefresh,
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: 12),
                       ],
-                      const SizedBox(height: 18),
+                      SizedBox(height: 18),
                       _CoursesGrid(
                         columns: columns,
                         courses: courses,
@@ -268,8 +282,11 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
                         hasActiveFilters: hasActiveFilters,
                         onClearFilters: _clearAll,
                         onCreateFirstCourse: widget.onCreateNewCourse,
+                        onUpdateCourse: widget.onUpdateCourse,
+                        onArchiveCourse: widget.onArchiveCourse,
+                        onDeleteCourse: widget.onDeleteCourse,
                       ),
-                      const SizedBox(height: 24),
+                      SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -323,7 +340,7 @@ class _CoursesFiltersBar extends StatelessWidget {
     final semesterDrop = FigmaUmDropdown40(
       width: isNarrow ? 170 : 158,
       value: selectedSemester,
-      items: const [
+      items: [
         'All Semesters',
         'Fall 2023',
         'Spring 2024',
@@ -336,14 +353,14 @@ class _CoursesFiltersBar extends StatelessWidget {
     final statusDrop = FigmaUmDropdown40(
       width: isNarrow ? 158 : 146,
       value: selectedStatus,
-      items: const ['All Statuses', 'active', 'draft', 'archived'],
+      items: ['All Statuses', 'active', 'draft', 'archived'],
       onChanged: onStatusChanged,
     );
 
     final typeDrop = FigmaUmDropdown40(
       width: isNarrow ? 140 : 128,
       value: selectedType,
-      items: const ['All Types', 'lecture', 'seminar', 'lab'],
+      items: ['All Types', 'lecture', 'seminar', 'lab'],
       onChanged: onTypeChanged,
     );
 
@@ -354,9 +371,9 @@ class _CoursesFiltersBar extends StatelessWidget {
       decoration: BoxDecoration(
         color:        Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border:       Border.all(color: const Color(0xFFE5E7EB)),
+        border:       Border.all(color: AppColors.borderGray),
         boxShadow: [
-          const BoxShadow(
+          BoxShadow(
               color: Color(0x08000000),
               blurRadius: 8,
               offset: Offset(0, 2)),
@@ -367,23 +384,23 @@ class _CoursesFiltersBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 search,
-                const SizedBox(height: 12),
+                SizedBox(height: 12),
                 Row(children: [
                   semesterDrop,
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   statusDrop,
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   typeDrop,
                 ]),
               ],
             )
           : Row(children: [
               Expanded(child: search),
-              const SizedBox(width: 12),
+              SizedBox(width: 12),
               semesterDrop,
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               statusDrop,
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               typeDrop,
             ]),
     );
@@ -429,12 +446,12 @@ class _ActiveFiltersChips extends StatelessWidget {
     Widget chip(String label, VoidCallback onDeleted) {
       return InputChip(
         label: Text(label,
-            style: const TextStyle(
+            style: TextStyle(
                 fontWeight: FontWeight.w800, fontSize: 12)),
         onDeleted:       onDeleted,
-        deleteIcon:      const Icon(Icons.close_rounded, size: 16),
-        backgroundColor: const Color(0xFFF1F5F9),
-        side:  const BorderSide(color: Color(0xFFE2E8F0)),
+        deleteIcon:      Icon(Icons.close_rounded, size: 16),
+        backgroundColor: AppColors.headerBg,
+        side:  BorderSide(color: AppColors.border),
         shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999)),
       );
@@ -457,8 +474,8 @@ class _ActiveFiltersChips extends StatelessWidget {
             chip('Type: $selectedType', onClearType),
           TextButton.icon(
             onPressed: onClearAll,
-            icon:  const Icon(Icons.restart_alt_rounded, size: 18),
-            label: const Text('Clear all',
+            icon:  Icon(Icons.restart_alt_rounded, size: 18),
+            label: Text('Clear all',
                 style: TextStyle(fontWeight: FontWeight.w900)),
             style: TextButton.styleFrom(
                 foregroundColor: _CourseTokens.blue),
@@ -480,16 +497,16 @@ double _clamp(double v, double min, double max) {
 // ==================== Design Tokens ====================
 
 class _CourseTokens {
-  static const pageBg  = Color(0xFFF6F7F8);
-  static const cardBg  = Colors.white;
-  static const border  = Color(0xFFE5E7EB);
-  static const divider = Color(0xFFF0F2F4);
+  static Color get pageBg => AppColors.pageBg;
+  static Color get cardBg => AppColors.cardBg;
+  static Color get border => AppColors.borderGray;
+  static Color get divider => AppColors.headerBg;
 
-  static const textPrimary = Color(0xFF111418);
-  static const textMuted   = Color(0xFF617589);
-  static const textHint    = Color(0xFF94A3B8);
+  static Color get textPrimary => AppColors.textTitle;
+  static Color get textMuted => AppColors.textMuted;
+  static Color get textHint => AppColors.textHint;
 
-  static const blue = Color(0xFF137FEC);
+  static Color get blue => AppColors.primary;
 
   static const radiusCard       = 12.0;
   static const statCardHeight   = 88.0;
@@ -509,7 +526,7 @@ class _Breadcrumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const Row(
+    return Row(
       children: [
         Icon(Icons.home_rounded, size: 14, color: _CourseTokens.textHint),
         SizedBox(width: 8),
@@ -545,7 +562,7 @@ class _HeaderRow extends StatelessWidget {
     return LayoutBuilder(builder: (context, c) {
       final compact = c.maxWidth < 820;
 
-      const left = Column(
+      final left = Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('My Courses',
@@ -571,15 +588,15 @@ class _HeaderRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             left,
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             Align(alignment: Alignment.centerLeft, child: btn),
           ],
         );
       }
 
       return Row(children: [
-        const Expanded(child: left),
-        const SizedBox(width: 12),
+        Expanded(child: left),
+        SizedBox(width: 12),
         btn,
       ]);
     });
@@ -603,15 +620,15 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
       onEnter: (_) => setState(() => hover = true),
       onExit:  (_) => setState(() => hover = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 140),
+        duration: Duration(milliseconds: 140),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
-          boxShadow: hover ? _CourseTokens.hoverShadow : const [],
+          boxShadow: hover ? _CourseTokens.hoverShadow : [],
         ),
         child: ElevatedButton.icon(
           onPressed: widget.onPressed,
-          icon:  const Icon(Icons.add, size: 18, color: Colors.white),
-          label: const Text('Create New Course',
+          icon:  Icon(Icons.add, size: 18, color: Colors.white),
+          label: Text('Create New Course',
               style: TextStyle(
                   height: 1.0,
                   leadingDistribution: TextLeadingDistribution.even,
@@ -657,22 +674,22 @@ class _StatsRow extends StatelessWidget {
           title:     'TOTAL COURSES',
           value:     totalCourses.toString(),
           icon:      Icons.folder_outlined,
-          iconBg:    const Color(0xFFEAF2FF),
-          iconColor: const Color(0xFF137FEC),
+          iconBg:    Color(0xFFEAF2FF),
+          iconColor: AppColors.primary,
         ),
         _MiniStatCard(
           title:     'ACTIVE STUDENTS',
           value:     activeStudents.toString(),
           icon:      Icons.people_outline_rounded,
-          iconBg:    const Color(0xFFE9FBF1),
-          iconColor: const Color(0xFF16A34A),
+          iconBg:    Color(0xFFE9FBF1),
+          iconColor: AppColors.successText,
         ),
         _MiniStatCard(
           title:     'PENDING INVITES',
           value:     pendingInvites.toString(),
           icon:      Icons.mail_outline_rounded,
-          iconBg:    const Color(0xFFFFF4DB),
-          iconColor: const Color(0xFFF59E0B),
+          iconBg:    Color(0xFFFFF4DB),
+          iconColor: Color(0xFFF59E0B),
         ),
       ];
 
@@ -682,12 +699,12 @@ class _StatsRow extends StatelessWidget {
               child: SizedBox(
                   height: _CourseTokens.statCardHeight,
                   child: cards[0])),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           Expanded(
               child: SizedBox(
                   height: _CourseTokens.statCardHeight,
                   child: cards[1])),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           Expanded(
               child: SizedBox(
                   height: _CourseTokens.statCardHeight,
@@ -734,14 +751,14 @@ class _MiniStatCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color:         _CourseTokens.textHint,
                       fontSize:      10.4,
                       fontWeight:    FontWeight.w800,
                       letterSpacing: 0.35)),
-              const SizedBox(height: 8),
+              SizedBox(height: 8),
               Text(value,
-                  style: const TextStyle(
+                  style: TextStyle(
                       color:      _CourseTokens.textPrimary,
                       fontSize:   24,
                       fontWeight: FontWeight.w900,
@@ -774,6 +791,9 @@ class _CoursesGrid extends StatelessWidget {
   final bool hasActiveFilters;
   final VoidCallback? onClearFilters;
   final VoidCallback? onCreateFirstCourse;
+  final CourseUpdateAction? onUpdateCourse;
+  final CourseArchiveAction? onArchiveCourse;
+  final CourseDeleteAction? onDeleteCourse;
 
   const _CoursesGrid({
     required this.columns,
@@ -783,12 +803,15 @@ class _CoursesGrid extends StatelessWidget {
     required this.hasActiveFilters,
     this.onClearFilters,
     this.onCreateFirstCourse,
+    this.onUpdateCourse,
+    this.onArchiveCourse,
+    this.onDeleteCourse,
   });
 
   @override
   Widget build(BuildContext context) {
     if (loading && courses.isEmpty) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.only(top: 16),
         child:   _CoursesGridSkeleton(),
       );
@@ -814,7 +837,12 @@ class _CoursesGrid extends StatelessWidget {
         children: courses.map((course) {
           return SizedBox(
             width: columnWidth,
-            child: _ApiCourseCard(course: course),
+            child: _ApiCourseCard(
+              course: course,
+              onUpdateCourse: onUpdateCourse,
+              onArchiveCourse: onArchiveCourse,
+              onDeleteCourse: onDeleteCourse,
+            ),
           );
         }).toList(),
       );
@@ -844,7 +872,7 @@ class _CoursesGridSkeleton extends StatelessWidget {
           return SizedBox(
             width:  cardW,
             height: _CourseTokens.courseCardHeight,
-            child:  const _SkeletonCard(),
+            child:  _SkeletonCard(),
           );
         }),
       );
@@ -860,42 +888,42 @@ class _NoResultsState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: BoxConstraints(maxWidth: 520),
         padding:     const EdgeInsets.all(22),
         decoration: BoxDecoration(
           color:        Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border:       Border.all(color: const Color(0xFFE2E8F0)),
+          border:       Border.all(color: AppColors.border),
           boxShadow: [
-            const BoxShadow(
+            BoxShadow(
                 color:      Color(0x0D000000),
                 blurRadius: 2,
                 offset:     Offset(0, 1)),
           ],
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Icon(Icons.search_off_rounded,
-              size: 34, color: Color(0xFF137FEC)),
-          const SizedBox(height: 10),
-          const Text('No results match your filters',
+          Icon(Icons.search_off_rounded,
+              size: 34, color: AppColors.primary),
+          SizedBox(height: 10),
+          Text('No results match your filters',
               style: TextStyle(
                   fontSize:   18,
                   fontWeight: FontWeight.w900,
-                  color:      Color(0xFF0F172A)),
+                  color:      AppColors.textTitle),
               textAlign: TextAlign.center),
-          const SizedBox(height: 8),
-          const Text(
+          SizedBox(height: 8),
+          Text(
               'Try clearing filters or searching with a different keyword.',
-              style:     TextStyle(color: Color(0xFF64748B)),
+              style:     TextStyle(color: AppColors.textMuted),
               textAlign: TextAlign.center),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           if (onClear != null)
             ElevatedButton.icon(
               onPressed: onClear,
-              icon:  const Icon(Icons.filter_alt_off_rounded, size: 18),
-              label: const Text('Clear filters'),
+              icon:  Icon(Icons.filter_alt_off_rounded, size: 18),
+              label: Text('Clear filters'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF137FEC),
+                backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12)),
@@ -915,7 +943,7 @@ class _CoursesEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 520),
+        constraints: BoxConstraints(maxWidth: 520),
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -923,7 +951,7 @@ class _CoursesEmptyState extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border:       Border.all(color: _CourseTokens.border),
             boxShadow: [
-              const BoxShadow(
+              BoxShadow(
                   color:      Color(0x0D000000),
                   blurRadius: 2,
                   offset:     Offset(0, 1)),
@@ -934,20 +962,20 @@ class _CoursesEmptyState extends StatelessWidget {
               width:  54,
               height: 54,
               decoration: BoxDecoration(
-                color:        const Color(0xFFEAF2FF),
+                color:        Color(0xFFEAF2FF),
                 borderRadius: BorderRadius.circular(16),
               ),
-              child: const Icon(Icons.folder_open_rounded,
+              child: Icon(Icons.folder_open_rounded,
                   color: _CourseTokens.blue, size: 28),
             ),
-            const SizedBox(height: 12),
-            const Text('No courses yet',
+            SizedBox(height: 12),
+            Text('No courses yet',
                 style: TextStyle(
                     fontSize:   16,
                     fontWeight: FontWeight.w900,
                     color:      _CourseTokens.textPrimary)),
-            const SizedBox(height: 6),
-            const Text(
+            SizedBox(height: 6),
+            Text(
                 'Create your first course to start uploading materials, generating AI quizzes, and inviting students.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
@@ -955,14 +983,14 @@ class _CoursesEmptyState extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                     color:      _CourseTokens.textMuted,
                     height:     1.35)),
-            const SizedBox(height: 14),
+            SizedBox(height: 14),
             SizedBox(
               height: 40,
               child: ElevatedButton.icon(
                 onPressed: onCreate,
-                icon:  const Icon(Icons.add_rounded,
+                icon:  Icon(Icons.add_rounded,
                     size: 18, color: Colors.white),
-                label: const Text('Create course',
+                label: Text('Create course',
                     style: TextStyle(
                         fontWeight: FontWeight.w900,
                         color:      Colors.white)),
@@ -1000,7 +1028,7 @@ class _SkeletonCardState extends State<_SkeletonCard>
     super.initState();
     _c = AnimationController(
         vsync:    this,
-        duration: const Duration(milliseconds: 1100))
+        duration: Duration(milliseconds: 1100))
       ..repeat(reverse: true);
   }
 
@@ -1016,8 +1044,8 @@ class _SkeletonCardState extends State<_SkeletonCard>
       animation: _c,
       builder: (context, _) {
         final color = Color.lerp(
-            const Color(0xFFE5E7EB),
-            const Color(0xFFF1F5F9),
+            AppColors.borderGray,
+            AppColors.headerBg,
             _c.value)!;
 
         return Container(
@@ -1047,14 +1075,14 @@ class _SkeletonCardState extends State<_SkeletonCard>
                         decoration: BoxDecoration(
                             color: color,
                             borderRadius: BorderRadius.circular(6))),
-                    const SizedBox(height: 10),
+                    SizedBox(height: 10),
                     Container(
                         height: 14,
                         width:  160,
                         decoration: BoxDecoration(
                             color: color,
                             borderRadius: BorderRadius.circular(6))),
-                    const SizedBox(height: 18),
+                    SizedBox(height: 18),
                     Row(children: [
                       Container(
                           height: 12,
@@ -1062,7 +1090,7 @@ class _SkeletonCardState extends State<_SkeletonCard>
                           decoration: BoxDecoration(
                               color: color,
                               borderRadius: BorderRadius.circular(6))),
-                      const SizedBox(width: 12),
+                      SizedBox(width: 12),
                       Container(
                           height: 12,
                           width:  90,
@@ -1070,9 +1098,9 @@ class _SkeletonCardState extends State<_SkeletonCard>
                               color: color,
                               borderRadius: BorderRadius.circular(6))),
                     ]),
-                    const Spacer(),
+                    Spacer(),
                     Container(height: 1, color: _CourseTokens.divider),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Container(
                         height: 12,
                         width:  140,
@@ -1094,7 +1122,16 @@ class _SkeletonCardState extends State<_SkeletonCard>
 
 class _ApiCourseCard extends StatefulWidget {
   final MyCourseItem course;
-  const _ApiCourseCard({required this.course});
+  final CourseUpdateAction? onUpdateCourse;
+  final CourseArchiveAction? onArchiveCourse;
+  final CourseDeleteAction? onDeleteCourse;
+
+  const _ApiCourseCard({
+    required this.course,
+    this.onUpdateCourse,
+    this.onArchiveCourse,
+    this.onDeleteCourse,
+  });
 
   @override
   State<_ApiCourseCard> createState() => _ApiCourseCardState();
@@ -1138,59 +1175,195 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
   int _students(MyCourseItem c) => c.enrollmentCount ?? 0;
   int _modules(MyCourseItem c)  => 0;
 
-    Future<void> _showCourseMenuFromKey(
-  BuildContext context,
-  MyCourseItem c,
-  GlobalKey anchorKey,
-) async {
-  final slug = buildCourseRouteSlug(c);
+  Future<void> _showCourseMenuFromKey(
+    BuildContext context,
+    MyCourseItem c,
+    GlobalKey anchorKey,
+  ) async {
+    final slug = buildCourseRouteSlug(c);
 
-  final selected = await showFigmaUmMenu<String>(
-    context: context,
-    anchorKey: anchorKey,
-    entries: [
-      const FigmaUmMenuEntry.item(
-        value: 'materials',
-        label: 'View materials',
-        icon: Icons.folder_open_rounded,
-      ),
-      FigmaUmMenuEntry.item(
-        value: 'invite',
-        label: 'Invite students',
-        icon: Icons.person_add_alt_1_rounded,
-        enabled: c.visibility == CourseVisibility.private,
-      ),
-      const FigmaUmMenuEntry.divider(),
-      const FigmaUmMenuEntry.item(
-        value: 'edit',
-        label: 'Edit course info (coming soon)',
-        icon: Icons.edit_rounded,
-        enabled: false,
-      ),
-      const FigmaUmMenuEntry.item(
-        value: 'archive',
-        label: 'Archive course (coming soon)',
-        icon: Icons.archive_rounded,
-        enabled: false,
-      ),
-    ],
-  );
-
-  if (!mounted || selected == null) return;
-
-  if (selected == 'materials') {
-    SelectedCourseCache.set(c);
-    context.go(Routes.courseMaterials(slug)); // ✅ navigate directly to Materials tab
-    return;
-  }
-
-  if (selected == 'invite') {
-    await showDialog<bool>(
+    final selected = await showFigmaUmMenu<String>(
       context: context,
-      builder: (_) => InviteStudentsDialog(courseId: c.id),
+      anchorKey: anchorKey,
+      minWidth: 210,
+      entries: const [
+        FigmaUmMenuEntry.item(
+          value: 'materials',
+          label: 'View materials',
+          icon: Icons.folder_open_rounded,
+        ),
+        FigmaUmMenuEntry.item(
+          value: 'invite',
+          label: 'Invite students',
+          icon: Icons.person_add_alt_1_rounded,
+        ),
+        FigmaUmMenuEntry.item(
+          value: 'edit',
+          label: 'Edit course info',
+          icon: Icons.edit_rounded,
+        ),
+        FigmaUmMenuEntry.item(
+          value: 'archive',
+          label: 'Archive course',
+          icon: Icons.archive_rounded,
+        ),
+        FigmaUmMenuEntry.divider(),
+        FigmaUmMenuEntry.item(
+          value: 'delete',
+          label: 'Delete course',
+          icon: Icons.delete_outline_rounded,
+        ),
+      ],
     );
+
+    if (!mounted || selected == null) return;
+
+    switch (selected) {
+      case 'materials':
+        SelectedCourseCache.set(c);
+        context.go(Routes.courseMaterials(slug));
+        return;
+      case 'invite':
+        await showDialog<bool>(
+          context: context,
+          builder: (_) => InviteStudentsDialog(courseId: c.id),
+        );
+        return;
+      case 'edit':
+        await _editCourse(c);
+        return;
+      case 'archive':
+        await _archiveCourse(c);
+        return;
+      case 'delete':
+        await _deleteCourse(c);
+        return;
+    }
   }
-}
+
+  Future<void> _editCourse(MyCourseItem course) async {
+    final action = widget.onUpdateCourse;
+    if (action == null) {
+      AppToast.warning(
+        context,
+        title: 'Unavailable',
+        message: 'Course editing is not connected yet.',
+      );
+      return;
+    }
+
+    final payload = await showDialog<CourseUpdateRequest>(
+      context: context,
+      builder: (_) => _EditCourseDialog(course: course),
+    );
+
+    if (!mounted || payload == null || payload.isEmpty) return;
+
+    try {
+      final updated = await action(course, payload);
+      SelectedCourseCache.set(updated);
+      if (!mounted) return;
+      AppToast.success(
+        context,
+        title: 'Course updated',
+        message: 'The course information was saved.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        title: 'Update failed',
+        message: 'The course could not be updated.',
+      );
+    }
+  }
+
+  Future<void> _archiveCourse(MyCourseItem course) async {
+    final action = widget.onArchiveCourse;
+    if (action == null) {
+      AppToast.warning(
+        context,
+        title: 'Unavailable',
+        message: 'Course archiving is not connected yet.',
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _CourseActionConfirmDialog(
+        icon: Icons.archive_rounded,
+        title: 'Archive course?',
+        message:
+            '“${course.safeTitle}” will be moved to archived courses. You can keep its existing content, but it will no longer appear as an active course.',
+        confirmLabel: 'Archive course',
+      ),
+    );
+
+    if (!mounted || confirmed != true) return;
+
+    try {
+      final updated = await action(course);
+      SelectedCourseCache.set(updated);
+      if (!mounted) return;
+      AppToast.success(
+        context,
+        title: 'Course archived',
+        message: 'The course was archived successfully.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        title: 'Archive failed',
+        message: 'The course could not be archived.',
+      );
+    }
+  }
+
+  Future<void> _deleteCourse(MyCourseItem course) async {
+    final action = widget.onDeleteCourse;
+    if (action == null) {
+      AppToast.warning(
+        context,
+        title: 'Unavailable',
+        message: 'Course deletion is not connected yet.',
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _CourseActionConfirmDialog(
+        icon: Icons.delete_outline_rounded,
+        title: 'Delete course?',
+        message:
+            'This will permanently delete “${course.safeTitle}” and remove it from My Courses. This action cannot be undone.',
+        confirmLabel: 'Delete course',
+        destructive: true,
+      ),
+    );
+
+    if (!mounted || confirmed != true) return;
+
+    try {
+      await action(course);
+      if (!mounted) return;
+      AppToast.success(
+        context,
+        title: 'Course deleted',
+        message: 'The course was deleted successfully.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        title: 'Delete failed',
+        message: 'The course could not be deleted.',
+      );
+    }
+  }
+
   @override
     Widget build(BuildContext context) {
     // HTML-matched card layout (hero gradient + code badge + status pill + stats + footer)
@@ -1201,15 +1374,15 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
     final isArchived = lifecycleStatus == CourseLifecycleStatus.archived;
     final statusLabel = lifecycleStatus.label;
     final statusBg = isActive
-        ? const Color(0xE616A34A)
+        ? Color(0xE616A34A)
         : (isDraft
-            ? const Color(0xE5F59E0B)
-            : const Color(0xBF64748B));
+            ? Color(0xE5F59E0B)
+            : Color(0xBF64748B));
     final heroGradient = isDraft
-        ? const LinearGradient(colors: [Color(0xFF0F172A), Color(0xFF1E293B)])
+        ? LinearGradient(colors: [AppColors.textTitle, Color(0xFF1E293B)])
         : (isArchived
-            ? const LinearGradient(colors: [Color(0xFF9CA3AF), Color(0xFF6B7280)])
-            : const LinearGradient(colors: [Color(0xFF134E4A), Color(0xFF0891B2)]));
+            ? LinearGradient(colors: [AppColors.textHint, AppColors.textGray500])
+            : LinearGradient(colors: [Color(0xFF134E4A), Color(0xFF0891B2)]));
     final enrollCount = widget.course.enrollmentCount ?? 0;
     final modulesCount = widget.course.moduleCount ?? 0;
     final code = (widget.course.courseCode?.isNotEmpty ?? false) ? widget.course.courseCode! : '—';
@@ -1221,24 +1394,24 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
     onEnter: (_) => setState(() => hover = true),
     onExit: (_) => setState(() => hover = false),
     child: AnimatedContainer(
-      duration: const Duration(milliseconds: 150),
+      duration: Duration(milliseconds: 150),
       curve: Curves.easeOut,
       transform: hover ? (Matrix4.identity()..translate(0.0, -1.0)) : Matrix4.identity(),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: hover ? const Color(0xFFBFDBFE) : AppColors.border,
+          color: hover ? AppColors.badgeBlueBorder : AppColors.border,
           width: hover ? 1.5 : 1.0,
         ),
         boxShadow: [
           if (hover)
-            const BoxShadow(color: Color(0x14137FEC), blurRadius: 28, offset: Offset(0, 10))
+            BoxShadow(color: Color(0x14137FEC), blurRadius: 28, offset: Offset(0, 10))
           else
-            const BoxShadow(color: Color(0x0C000000), blurRadius: 10, offset: Offset(0, 3)),
+            BoxShadow(color: Color(0x0C000000), blurRadius: 10, offset: Offset(0, 3)),
         ],
       ),
-      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           final slug = buildCourseRouteSlug(widget.course);
@@ -1278,12 +1451,12 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: const Color(0xE6FFFFFF),
+                          color: Color(0xE6FFFFFF),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
                           code,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 11.5,
                             fontWeight: FontWeight.w700,
                             color: AppColors.text,
@@ -1308,10 +1481,10 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
                               size: 12,
                               color: Colors.white,
                             ),
-                            const SizedBox(width: 4),
+                            SizedBox(width: 4),
                             Text(
                               statusLabel,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
@@ -1335,44 +1508,44 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
                       widget.course.title,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14.5,
                         fontWeight: FontWeight.w800,
                         letterSpacing: -0.2,
                         color: AppColors.textTitle,
                       ),
                     ),
-                    const SizedBox(height: 4),
+                    SizedBox(height: 4),
                     Text(
                       meta,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 11.5,
                         fontWeight: FontWeight.w600,
                         color: AppColors.muted,
                       ),
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Row(
                       children: [
                         _CourseStat(icon: Icons.groups_rounded, label: '$enrollCount Students'),
-                        const SizedBox(width: 14),
+                        SizedBox(width: 14),
                         _CourseStat(icon: Icons.grid_view_rounded, label: '$modulesCount Modules'),
                       ],
                     ),
-                    const SizedBox(height: 12),
+                    SizedBox(height: 12),
                     Container(height: 1, color: AppColors.divider),
-                    const SizedBox(height: 10),
+                    SizedBox(height: 10),
                     Row(
                       children: [
                         // Avatar stack (mocked, but matches HTML look)
-                        const _AvatarStack(),
-                        const Spacer(),
+                        _AvatarStack(),
+                        Spacer(),
                         Row(
                           children: [
                             _IconBtnSm(icon: Icons.schedule_rounded, onTap: () {}),
-                            const SizedBox(width: 4),
+                            SizedBox(width: 4),
                             _IconBtnSm(
                               key: _moreKey,
                               icon: Icons.more_horiz_rounded,
@@ -1395,6 +1568,524 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
 
 }
 
+
+class _EditCourseDialog extends StatefulWidget {
+  final MyCourseItem course;
+
+  const _EditCourseDialog({required this.course});
+
+  @override
+  State<_EditCourseDialog> createState() => _EditCourseDialogState();
+}
+
+class _EditCourseDialogState extends State<_EditCourseDialog> {
+  late final TextEditingController _titleCtrl;
+  late final TextEditingController _codeCtrl;
+  late final TextEditingController _categoryCtrl;
+
+  late String _visibility;
+  late String _status;
+  bool _approvalRequired = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _titleCtrl = TextEditingController(text: widget.course.safeTitle);
+    _codeCtrl = TextEditingController(text: widget.course.courseCode ?? '');
+    _categoryCtrl = TextEditingController(text: widget.course.category ?? '');
+    _visibility = widget.course.visibility.backendValue;
+    _status = widget.course.lifecycleStatus == CourseLifecycleStatus.active
+        ? CourseLifecycleStatus.published.backendValue
+        : widget.course.lifecycleStatus.backendValue;
+    _approvalRequired = widget.course.isPrivate;
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    _codeCtrl.dispose();
+    _categoryCtrl.dispose();
+    super.dispose();
+  }
+
+  bool get _isPublic => _visibility == CourseVisibility.public.backendValue;
+
+  void _submit() {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) {
+      AppToast.error(
+        context,
+        title: 'Validation error',
+        message: 'Course title is required.',
+      );
+      return;
+    }
+
+    Navigator.of(context).pop(
+      CourseUpdateRequest(
+        title: title,
+        courseCode: _codeCtrl.text.trim(),
+        category: _categoryCtrl.text.trim(),
+        isPublic: _isPublic,
+        visibilityLevel: _visibility,
+        requiresEnrollmentApproval: _approvalRequired,
+        status: _status,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.border),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x26000000),
+                blurRadius: 32,
+                offset: Offset(0, 16),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 20, 16, 16),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.primarySoft,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(Icons.edit_rounded,
+                          color: AppColors.primary, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Edit course info',
+                            style: TextStyle(
+                              color: AppColors.textTitle,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            'Update the course name, code, visibility, and status.',
+                            style: TextStyle(
+                              color: AppColors.textMuted,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(Icons.close_rounded, color: AppColors.muted),
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: AppColors.divider),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(22, 18, 22, 8),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _EditCourseLabel('Course title'),
+                      const SizedBox(height: 6),
+                      _EditCourseTextField(
+                        controller: _titleCtrl,
+                        hint: 'Course title',
+                        icon: Icons.school_outlined,
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _EditCourseLabel('Course code'),
+                                const SizedBox(height: 6),
+                                _EditCourseTextField(
+                                  controller: _codeCtrl,
+                                  hint: 'Optional code',
+                                  icon: Icons.tag_rounded,
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _EditCourseLabel('Category'),
+                                const SizedBox(height: 6),
+                                _EditCourseTextField(
+                                  controller: _categoryCtrl,
+                                  hint: 'General',
+                                  icon: Icons.category_outlined,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _EditCourseDropdown(
+                              label: 'Visibility',
+                              value: _visibility,
+                              items: const [
+                                'private',
+                                'public',
+                                'unlisted',
+                              ],
+                              onChanged: (value) {
+                                setState(() {
+                                  _visibility = value;
+                                  _approvalRequired = value != 'public';
+                                });
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: _EditCourseDropdown(
+                              label: 'Status',
+                              value: _status,
+                              items: const [
+                                'draft',
+                                'published',
+                                'archived',
+                              ],
+                              onChanged: (value) =>
+                                  setState(() => _status = value),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 10),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.surfaceBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    'Require enrollment approval',
+                                    style: TextStyle(
+                                      color: AppColors.textTitle,
+                                      fontSize: 12.5,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Useful for private or controlled courses.',
+                                    style: TextStyle(
+                                      color: AppColors.textMuted,
+                                      fontSize: 11.5,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Switch(
+                              value: _approvalRequired,
+                              onChanged: (value) => setState(
+                                  () => _approvalRequired = value),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 14, 22, 20),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    OutlinedButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('Cancel'),
+                    ),
+                    const SizedBox(width: 10),
+                    FilledButton.icon(
+                      onPressed: _submit,
+                      icon: const Icon(Icons.save_rounded, size: 18),
+                      label: const Text('Save changes'),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EditCourseLabel extends StatelessWidget {
+  final String text;
+
+  const _EditCourseLabel(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text,
+      style: TextStyle(
+        color: AppColors.textTitle,
+        fontSize: 12,
+        fontWeight: FontWeight.w800,
+      ),
+    );
+  }
+}
+
+class _EditCourseTextField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  final IconData icon;
+
+  const _EditCourseTextField({
+    required this.controller,
+    required this.hint,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w700),
+      decoration: InputDecoration(
+        hintText: hint,
+        prefixIcon: Icon(icon, size: 18, color: AppColors.muted),
+        filled: true,
+        fillColor: AppColors.surfaceBg,
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppColors.border),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppColors.border),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppColors.primary, width: 1.4),
+        ),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
+      ),
+    );
+  }
+}
+
+class _EditCourseDropdown extends StatelessWidget {
+  final String label;
+  final String value;
+  final List<String> items;
+  final ValueChanged<String> onChanged;
+
+  const _EditCourseDropdown({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _EditCourseLabel(label),
+        const SizedBox(height: 6),
+        DropdownButtonFormField<String>(
+          value: value,
+          dropdownColor: AppColors.cardBg,
+          iconEnabledColor: AppColors.muted,
+          style: TextStyle(
+            color: AppColors.textTitle,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: AppColors.surfaceBg,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.border),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.primary, width: 1.4),
+            ),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+          items: items
+              .map(
+                (item) => DropdownMenuItem<String>(
+                  value: item,
+                  child: Text(item[0].toUpperCase() + item.substring(1)),
+                ),
+              )
+              .toList(),
+          onChanged: (value) {
+            if (value != null) onChanged(value);
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _CourseActionConfirmDialog extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final String confirmLabel;
+  final bool destructive;
+
+  const _CourseActionConfirmDialog({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.confirmLabel,
+    this.destructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = destructive ? AppColors.dangerText : AppColors.primary;
+    final accentBg = destructive ? AppColors.dangerBg : AppColors.primarySoft;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.border),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x26000000),
+                blurRadius: 32,
+                offset: Offset(0, 16),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 42,
+                    height: 42,
+                    decoration: BoxDecoration(
+                      color: accentBg,
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: Icon(icon, color: accent, size: 21),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: TextStyle(
+                        color: AppColors.textTitle,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Text(
+                message,
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 13,
+                  height: 1.45,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 22),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: const Text('Cancel'),
+                  ),
+                  const SizedBox(width: 10),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).pop(true),
+                    style: destructive
+                        ? FilledButton.styleFrom(backgroundColor: accent)
+                        : null,
+                    child: Text(confirmLabel),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _CourseStat extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1407,10 +2098,10 @@ class _CourseStat extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 16, color: AppColors.muted),
-        const SizedBox(width: 6),
+        SizedBox(width: 6),
         Text(
           label,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w700,
             color: AppColors.muted,
@@ -1426,13 +2117,13 @@ class _AvatarStack extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const SizedBox(
+    return SizedBox(
       height: 26,
       width: 56,
       child: Stack(
         children: [
-          _AvatarDot(left: 0,  bg: Color(0xFFE2E8F0)),
-          _AvatarDot(left: 16, bg: Color(0xFFDBEAFE)),
+          _AvatarDot(left: 0,  bg: AppColors.border),
+          _AvatarDot(left: 16, bg: AppColors.badgeBlueBg),
           _AvatarDot(left: 32, bg: Color(0xFFE9FBF1)),
         ],
       ),
@@ -1458,7 +2149,7 @@ class _AvatarDot extends StatelessWidget {
           color: bg,
           border: Border.all(color: Colors.white, width: 2),
         ),
-        child: const Icon(Icons.person, size: 14, color: Color(0xFF64748B)),
+        child: Icon(Icons.person, size: 14, color: AppColors.textMuted),
       ),
     );
   }
@@ -1482,15 +2173,15 @@ class _IconBtnSmState extends State<_IconBtnSm> {
     return MouseRegion(
       onEnter: (_) => setState(() => hover = true),
       onExit: (_) => setState(() => hover = false),
-      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(10),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 120),
+          duration: Duration(milliseconds: 120),
           width: 30,
           height: 30,
           decoration: BoxDecoration(
-            color: hover ? const Color(0xFFF1F5F9) : Colors.transparent,
+            color: hover ? AppColors.headerBg : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(widget.icon, size: 18, color: AppColors.muted),
@@ -1523,10 +2214,10 @@ class _ApiHero extends StatelessWidget {
             : 'Archived';
 
     final statusColor = status == _CourseStatus.active
-        ? const Color(0xFF16A34A)
+        ? AppColors.successText
         : status == _CourseStatus.draft
-            ? const Color(0xFFF59E0B)
-            : const Color(0xFF64748B);
+            ? Color(0xFFF59E0B)
+            : AppColors.textMuted;
 
     return Stack(
       children: [
@@ -1535,9 +2226,9 @@ class _ApiHero extends StatelessWidget {
             fit:             BoxFit.cover,
             gaplessPlayback: true,
             errorBuilder:    (_, __, ___) =>
-                Container(color: const Color(0xFFEFF2F6)))
+                Container(color: Color(0xFFEFF2F6)))
       else
-        Container(color: const Color(0xFFEFF2F6)),
+        Container(color: Color(0xFFEFF2F6)),
 
       const Positioned.fill(
         child: DecoratedBox(
@@ -1561,7 +2252,7 @@ class _ApiHero extends StatelessWidget {
                   horizontal: 8, vertical: 4.5),
               color: Colors.white.withValues(alpha: 0.90),
               child: Text(code,
-                  style: const TextStyle(
+                  style: TextStyle(
                       fontFamily:  'Inter',
                       fontWeight:  FontWeight.w700,
                       fontSize:    12,
@@ -1591,9 +2282,9 @@ class _ApiHero extends StatelessWidget {
                   size:  14,
                   color: Colors.white,
                 ),
-                const SizedBox(width: 4),
+                SizedBox(width: 4),
                 Text(statusLabel,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontFamily:  'Inter',
                         fontWeight:  FontWeight.w700,
                         fontSize:    12,
@@ -1650,47 +2341,47 @@ class _ApiBody extends StatelessWidget {
           Text(title,
               maxLines:  2,
               overflow:  TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                   fontFamily:  'Inter',
                   fontWeight:  FontWeight.w700,
                   fontSize:    18,
                   height:      1.2,
                   color:       _CourseTokens.textPrimary)),
-          const SizedBox(height: 4),
+          SizedBox(height: 4),
           Text(meta.isEmpty ? '—' : meta,
               maxLines:  1,
               overflow:  TextOverflow.ellipsis,
-              style: const TextStyle(
+              style: TextStyle(
                   fontFamily:  'Inter',
                   fontWeight:  FontWeight.w400,
                   fontSize:    14,
                   color:       _CourseTokens.textMuted)),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Row(children: [
-            const Icon(Icons.people_outline,
+            Icon(Icons.people_outline,
                 size: 18, color: _CourseTokens.textMuted),
-            const SizedBox(width: 6),
+            SizedBox(width: 6),
             Text('$students Students',
-                style: const TextStyle(
+                style: TextStyle(
                     fontFamily:  'Inter',
                     fontWeight:  FontWeight.w400,
                     fontSize:    14,
                     color:       _CourseTokens.textMuted)),
-            const SizedBox(width: 14),
-            const Icon(Icons.menu_book_outlined,
+            SizedBox(width: 14),
+            Icon(Icons.menu_book_outlined,
                 size: 18, color: _CourseTokens.textMuted),
-            const SizedBox(width: 6),
+            SizedBox(width: 6),
             Text('$modules Modules',
-                style: const TextStyle(
+                style: TextStyle(
                     fontFamily:  'Inter',
                     fontWeight:  FontWeight.w400,
                     fontSize:    14,
                     color:       _CourseTokens.textMuted)),
           ]),
-          const Spacer(),
-          const Divider(
+          Spacer(),
+          Divider(
               height: 1, thickness: 1, color: _CourseTokens.divider),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           SizedBox(
             height: 34,
             child: Row(children: [
@@ -1705,7 +2396,7 @@ class _ApiBody extends StatelessWidget {
               ),
               _IconActionButton(
                   icon: Icons.work_outline_rounded, onTap: onWorkTap),
-              const SizedBox(width: 6),
+              SizedBox(width: 6),
               _IconActionButton(
                   key:  moreKey,
                   icon: Icons.more_vert_rounded,
@@ -1727,19 +2418,19 @@ class _PeopleFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      const _AvatarStackSmall(),
+      _AvatarStackSmall(),
       if (memberCountText.trim().isNotEmpty) ...[
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         Container(
           padding: const EdgeInsets.symmetric(
               horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color:        const Color(0xFFF0F2F4),
+            color:        AppColors.headerBg,
             borderRadius: BorderRadius.circular(999),
             border:       Border.all(color: _CourseTokens.border),
           ),
           child: Text(memberCountText,
-              style: const TextStyle(
+              style: TextStyle(
                   fontFamily:  'Inter',
                   fontWeight:  FontWeight.w600,
                   fontSize:    12,
@@ -1759,7 +2450,7 @@ class _NoteFooter extends StatelessWidget {
     return Text(text,
         maxLines:  1,
         overflow:  TextOverflow.ellipsis,
-        style: const TextStyle(
+        style: TextStyle(
             fontFamily:  'Inter',
             fontWeight:  FontWeight.w500,
             fontSize:    12,
@@ -1775,8 +2466,8 @@ class _AvatarStackSmall extends StatelessWidget {
     return SizedBox(
       height: 28, width: 52,
       child: Stack(children: [
-        _a(0,  const Color(0xFFE2E8F0)),
-        _a(16, const Color(0xFFDBEAFE)),
+        _a(0,  AppColors.border),
+        _a(16, AppColors.badgeBlueBg),
       ]),
     );
   }
@@ -1791,8 +2482,8 @@ class _AvatarStackSmall extends StatelessWidget {
           border: Border.all(color: Colors.white, width: 2),
           color:  bg,
         ),
-        child: const Icon(Icons.person,
-            size: 14, color: Color(0xFF64748B)),
+        child: Icon(Icons.person,
+            size: 14, color: AppColors.textMuted),
       ),
     );
   }
@@ -1824,18 +2515,18 @@ class _IconActionButtonState extends State<_IconActionButton> {
     return MouseRegion(
       onEnter: (_) => setState(() => hover = true),
       onExit:  (_) => setState(() => hover = false),
-      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
         onTap: widget.onTap,
         onTapDown: widget.onTapDown == null
             ? null
             : (d) => widget.onTapDown!(d.globalPosition),
         borderRadius: BorderRadius.circular(10),
         child: AnimatedContainer(
-          duration: const Duration(milliseconds: 140),
+          duration: Duration(milliseconds: 140),
           width:  34, height: 34,
           decoration: BoxDecoration(
             color: hover
-                ? const Color(0xFFF1F5F9)
+                ? AppColors.headerBg
                 : Colors.transparent,
             borderRadius: BorderRadius.circular(10),
           ),
@@ -1883,29 +2574,29 @@ class _InlineErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color:        const Color(0xFFFFFBEB),
+        color:        Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(14),
-        border:       Border.all(color: const Color(0xFFFDE68A)),
+        border:       Border.all(color: Color(0xFFFDE68A)),
       ),
       child: Row(children: [
-        const Icon(Icons.warning_rounded, color: Color(0xFFB45309)),
-        const SizedBox(width: 10),
+        Icon(Icons.warning_rounded, color: Color(0xFFB45309)),
+        SizedBox(width: 10),
         Expanded(
           child: Text(message,
-              style: const TextStyle(
+              style: TextStyle(
                   color:      Color(0xFF92400E),
                   fontWeight: FontWeight.w700),
               maxLines:  2,
               overflow:  TextOverflow.ellipsis),
         ),
-        const SizedBox(width: 10),
+        SizedBox(width: 10),
         if (onRetry != null)
           TextButton.icon(
             onPressed: onRetry,
-            icon:  const Icon(Icons.refresh_rounded, size: 18),
-            label: const Text('Retry'),
+            icon:  Icon(Icons.refresh_rounded, size: 18),
+            label: Text('Retry'),
             style: TextButton.styleFrom(
-                foregroundColor: const Color(0xFF92400E)),
+                foregroundColor: Color(0xFF92400E)),
           ),
       ]),
     );
@@ -1923,13 +2614,13 @@ class _MenuItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(children: [
-      Icon(icon, size: 18, color: const Color(0xFF334155)),
-      const SizedBox(width: 10),
+      Icon(icon, size: 18, color: Color(0xFF334155)),
+      SizedBox(width: 10),
       Text(text,
-          style: const TextStyle(
+          style: TextStyle(
               fontWeight: FontWeight.w700,
               fontSize:   13.5,
-              color:      Color(0xFF0F172A))),
+              color:      AppColors.textTitle)),
     ]);
   }
 }

@@ -33,6 +33,7 @@ class _MaterialPanelWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final mappedOutcomeIds = _mappedOutcomeIds(topics);
     final readyTopics = topics
         .where((t) => t.readiness == TopicReadiness.ready || t.isReviewed)
@@ -121,9 +122,10 @@ class _PdfReviewerWorkspaceState extends State<_PdfReviewerWorkspace> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final pdfPreviewActive = widget.previewInteractive && !_reviewerDialogOpen;
     return Container(
-      color: const Color(0xFFF3F6FA),
+      color: AppColors.pageBg,
       child: LayoutBuilder(
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 1120;
@@ -147,7 +149,7 @@ class _PdfReviewerWorkspaceState extends State<_PdfReviewerWorkspace> {
                   urlLoading: widget.urlLoading,
                   onRefreshUrl: widget.onRefreshUrl,
                 ),
-                const SizedBox(height: 18),
+                SizedBox(height: 18),
                 if (compact)
                   Column(
                     children: [
@@ -159,7 +161,7 @@ class _PdfReviewerWorkspaceState extends State<_PdfReviewerWorkspace> {
                         previewInteractive: pdfPreviewActive,
                         height: stageHeight,
                       ),
-                      const SizedBox(height: 18),
+                      SizedBox(height: 18),
                       _ReviewerSidePanel(
                         material: widget.material,
                         topics: widget.topics,
@@ -187,7 +189,7 @@ class _PdfReviewerWorkspaceState extends State<_PdfReviewerWorkspace> {
                           height: stageHeight,
                         ),
                       ),
-                      const SizedBox(width: 18),
+                      SizedBox(width: 18),
                       SizedBox(
                         width: 430,
                         child: _ReviewerSidePanel(
@@ -238,6 +240,7 @@ class _ReviewerShellHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final status = _materialStatusLabel(material);
     final statusColor = _materialStatusColor(material);
     final fileName = (material.fileName ?? '').trim();
@@ -249,12 +252,12 @@ class _ReviewerShellHeader extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE6EBF2)),
-        boxShadow: const [
+        border: Border.all(color: AppColors.borderGray),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0D0F172A),
+            color: AppColors.shadowSoft,
             blurRadius: 28,
             offset: Offset(0, 14),
           ),
@@ -266,13 +269,13 @@ class _ReviewerShellHeader extends StatelessWidget {
             width: 58,
             height: 58,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
+              gradient: LinearGradient(
                 colors: [Color(0xFF147EF5), Color(0xFF5B8CFF)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               borderRadius: BorderRadius.circular(18),
-              boxShadow: const [
+              boxShadow: [
                 BoxShadow(
                   color: Color(0x33147EF5),
                   blurRadius: 18,
@@ -280,9 +283,9 @@ class _ReviewerShellHeader extends StatelessWidget {
                 ),
               ],
             ),
-            child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 28),
+            child: Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 28),
           ),
-          const SizedBox(width: 16),
+          SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -292,9 +295,9 @@ class _ReviewerShellHeader extends StatelessWidget {
                     _TinyBadge(
                       label: 'PDF Reviewer',
                       color: AppColors.primary,
-                      background: const Color(0xFFEAF3FF),
+                      background: AppColors.infoBg,
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8),
                     _TinyBadge(
                       label: status,
                       color: statusColor,
@@ -302,12 +305,12 @@ class _ReviewerShellHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 9),
+                SizedBox(height: 9),
                 Text(
                   material.displayTitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 24,
                     height: 1.1,
                     letterSpacing: -0.4,
@@ -315,17 +318,17 @@ class _ReviewerShellHeader extends StatelessWidget {
                     color: AppColors.textTitle,
                   ),
                 ),
-                const SizedBox(height: 5),
+                SizedBox(height: 5),
                 Text(
                   subtitle,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 13, color: AppColors.textMuted),
+                  style: TextStyle(fontSize: 13, color: AppColors.textMuted),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 14),
+          SizedBox(width: 14),
           Wrap(
             spacing: 10,
             runSpacing: 10,
@@ -389,14 +392,15 @@ class _DocumentStage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: const Color(0xFF0B1220),
+        color: AppColors.documentStageBg,
         borderRadius: BorderRadius.circular(26),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x26111827),
+            color: AppColors.shadowSoft,
             blurRadius: 30,
             offset: Offset(0, 18),
           ),
@@ -409,9 +413,9 @@ class _DocumentStage extends StatelessWidget {
             Container(
               height: 58,
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: const BoxDecoration(
+              decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [Color(0xFF101827), Color(0xFF151F32)],
+                  colors: [AppColors.documentStageHeaderStart, AppColors.documentStageHeaderEnd],
                   begin: Alignment.centerLeft,
                   end: Alignment.centerRight,
                 ),
@@ -424,21 +428,21 @@ class _DocumentStage extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.08),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white.withOpacity(0.10)),
+                      border: Border.all(color: AppColors.cardBg.withOpacity(0.10)),
                     ),
-                    child: const Icon(Icons.auto_stories_rounded, color: Colors.white, size: 18),
+                    child: Icon(Icons.auto_stories_rounded, color: Colors.white, size: 18),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'Document canvas',
                           style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
                         ),
-                        const SizedBox(height: 2),
+                        SizedBox(height: 2),
                         Text(
                           _documentMetaLine(material),
                           maxLines: 1,
@@ -448,22 +452,22 @@ class _DocumentStage extends StatelessWidget {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   _DarkToolbarChip(icon: Icons.remove_red_eye_outlined, label: previewInteractive ? 'Live preview' : 'Dialog mode'),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   _DarkToolbarChip(icon: Icons.lock_outline_rounded, label: 'Source file'),
                 ],
               ),
             ),
             Expanded(
               child: Container(
-                color: const Color(0xFF111827),
+                color: AppColors.textTitle,
                 padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                 child: Container(
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1F2937),
+                    color: AppColors.text,
                     borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: Colors.white.withOpacity(0.08)),
+                    border: Border.all(color: AppColors.cardBg.withOpacity(0.08)),
                   ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(17),
@@ -514,6 +518,7 @@ class _ReviewerSidePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       children: [
         _ReviewerActionsPanel(
@@ -521,14 +526,14 @@ class _ReviewerSidePanel extends StatelessWidget {
           onCreateTopicManual: onCreateTopicManual,
           onReviewerDialogOpenChanged: onReviewerDialogOpenChanged,
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _CoveragePanel(
           topics: topics,
           readyTopics: readyTopics,
           outcomes: outcomes,
           mappedOutcomeIds: mappedOutcomeIds,
         ),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         _TopicRoadmapPanel(
           topics: topics,
           topicsLoading: topicsLoading,
@@ -567,7 +572,7 @@ class _ReviewerActionsPanel extends StatelessWidget {
     try {
       await showDialog<void>(
         context: context,
-        barrierColor: const Color(0xAA0F172A),
+        barrierColor: AppColors.overlayStrong,
         builder: (dialogContext) {
           return _CaptureTopicDialog(
             outcomes: outcomes,
@@ -582,6 +587,7 @@ class _ReviewerActionsPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _PremiumPanel(
       padding: const EdgeInsets.all(16),
       child: Column(
@@ -590,8 +596,8 @@ class _ReviewerActionsPanel extends StatelessWidget {
           Row(
             children: [
               _SoftIcon(icon: Icons.edit_note_rounded, color: AppColors.primary),
-              const SizedBox(width: 12),
-              const Expanded(
+              SizedBox(width: 12),
+              Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -609,32 +615,32 @@ class _ReviewerActionsPanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             height: 50,
             child: ElevatedButton.icon(
               onPressed: () => _openCaptureTopicDialog(context),
-              icon: const Icon(Icons.add_rounded, size: 20),
-              label: const Text('Capture topic from PDF'),
+              icon: Icon(Icons.add_rounded, size: 20),
+              label: Text('Capture topic from PDF'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900),
+                textStyle: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900),
               ),
             ),
           ),
-          const SizedBox(height: 11),
+          SizedBox(height: 11),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.surfaceBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE7EDF5)),
+              border: Border.all(color: AppColors.borderGray),
             ),
-            child: const Row(
+            child: Row(
               children: [
                 Icon(Icons.info_outline_rounded, size: 17, color: AppColors.textMuted),
                 SizedBox(width: 9),
@@ -668,6 +674,7 @@ class _CaptureTopicDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final maxDialogHeight = MediaQuery.of(context).size.height - 56;
 
     return Dialog(
@@ -690,7 +697,7 @@ class _CaptureTopicDialog extends StatelessWidget {
               top: 14,
               right: 14,
               child: Material(
-                color: const Color(0xFFF8FAFC),
+                color: AppColors.surfaceBg,
                 borderRadius: BorderRadius.circular(13),
                 child: InkWell(
                   onTap: () => Navigator.of(context).pop(),
@@ -701,9 +708,9 @@ class _CaptureTopicDialog extends StatelessWidget {
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(13),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    child: const Icon(Icons.close_rounded, size: 19, color: AppColors.textMuted),
+                    child: Icon(Icons.close_rounded, size: 19, color: AppColors.textMuted),
                   ),
                 ),
               ),
@@ -784,6 +791,7 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return _PremiumPanel(
       padding: EdgeInsets.zero,
       child: Column(
@@ -791,14 +799,14 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
         children: [
           Container(
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-            decoration: const BoxDecoration(
-              border: Border(bottom: BorderSide(color: Color(0xFFE8EDF4))),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.borderGray)),
             ),
             child: Row(
               children: [
                 _SoftIcon(icon: Icons.add_task_rounded, color: AppColors.primary),
-                const SizedBox(width: 12),
-                const Expanded(
+                SizedBox(width: 12),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -831,7 +839,7 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                   errorText: _submitted && _titleCtrl.text.trim().isEmpty ? 'Topic name is required' : null,
                   onSubmitted: (_) => _submit(),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 _CleanTextField(
                   controller: _pageCtrl,
                   enabled: !_saving,
@@ -840,7 +848,7 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                   icon: Icons.bookmark_border_rounded,
                   onSubmitted: (_) => _submit(),
                 ),
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 _CleanTextField(
                   controller: _noteCtrl,
                   enabled: !_saving,
@@ -851,12 +859,12 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                   maxLines: 4,
                 ),
                 if (widget.outcomes.isNotEmpty) ...[
-                  const SizedBox(height: 16),
+                  SizedBox(height: 16),
                   Row(
                     children: [
-                      const Icon(Icons.flag_outlined, size: 16, color: AppColors.textMuted),
-                      const SizedBox(width: 7),
-                      const Expanded(
+                      Icon(Icons.flag_outlined, size: 16, color: AppColors.textMuted),
+                      SizedBox(width: 7),
+                      Expanded(
                         child: Text(
                           'Map learning outcomes',
                           style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textMuted),
@@ -865,13 +873,13 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                       if (_selectedOutcomeIds.isNotEmpty)
                         Text(
                           '${_selectedOutcomeIds.length} selected',
-                          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary),
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary),
                         ),
                     ],
                   ),
-                  const SizedBox(height: 9),
+                  SizedBox(height: 9),
                   ConstrainedBox(
-                    constraints: const BoxConstraints(maxHeight: 210),
+                    constraints: BoxConstraints(maxHeight: 210),
                     child: SingleChildScrollView(
                       child: Column(
                         children: [
@@ -889,26 +897,26 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                                 });
                               },
                             ),
-                            if (outcome != widget.outcomes.last) const SizedBox(height: 8),
+                            if (outcome != widget.outcomes.last) SizedBox(height: 8),
                           ],
                         ],
                       ),
                     ),
                   ),
                 ],
-                const SizedBox(height: 16),
+                SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   height: 46,
                   child: ElevatedButton.icon(
                     onPressed: _saving ? null : _submit,
                     icon: _saving
-                        ? const SizedBox(
+                        ? SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : const Icon(Icons.add_rounded, size: 19),
+                        : Icon(Icons.add_rounded, size: 19),
                     label: Text(_saving ? 'Saving topic...' : 'Save topic to this PDF'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
@@ -916,7 +924,7 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                       disabledBackgroundColor: AppColors.primary.withOpacity(0.55),
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900),
+                      textStyle: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900),
                     ),
                   ),
                 ),
@@ -944,6 +952,7 @@ class _CoveragePanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final topicProgress = topics.isEmpty ? 0.0 : readyTopics / topics.length;
     final outcomeProgress = outcomes.isEmpty ? 0.0 : mappedOutcomeIds.length / outcomes.length;
 
@@ -953,9 +962,9 @@ class _CoveragePanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              _SoftIcon(icon: Icons.insights_rounded, color: const Color(0xFF7C3AED)),
-              const SizedBox(width: 12),
-              const Expanded(
+              _SoftIcon(icon: Icons.insights_rounded, color: AppColors.purpleText),
+              SizedBox(width: 12),
+              Expanded(
                 child: Text(
                   'Review coverage',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textTitle),
@@ -963,36 +972,36 @@ class _CoveragePanel extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           _ProgressInsightRow(
             label: 'Topics reviewed',
             value: topics.isEmpty ? '0' : '$readyTopics/${topics.length}',
             progress: topicProgress,
             color: AppColors.primary,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           _ProgressInsightRow(
             label: 'Outcomes mapped',
             value: outcomes.isEmpty ? '—' : '${mappedOutcomeIds.length}/${outcomes.length}',
             progress: outcomeProgress,
-            color: const Color(0xFF7C3AED),
+            color: AppColors.purpleText,
           ),
-          const SizedBox(height: 14),
+          SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
+              color: AppColors.surfaceBg,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE7EDF5)),
+              border: Border.all(color: AppColors.borderGray),
             ),
             child: Row(
               children: [
-                const Icon(Icons.tips_and_updates_outlined, size: 18, color: Color(0xFFD97706)),
-                const SizedBox(width: 10),
+                Icon(Icons.tips_and_updates_outlined, size: 18, color: AppColors.warningText),
+                SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     _coverageHint,
-                    style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.4),
+                    style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.4),
                   ),
                 ),
               ],
@@ -1025,6 +1034,7 @@ class _TopicRoadmapPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final parentTopics = topics.where((t) => t.parentTopicId == null).toList()
       ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
     final childrenByParent = <int, List<TopicItem>>{};
@@ -1043,9 +1053,9 @@ class _TopicRoadmapPanel extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
             child: Row(
               children: [
-                _SoftIcon(icon: Icons.route_rounded, color: const Color(0xFF0F766E)),
-                const SizedBox(width: 12),
-                const Expanded(
+                _SoftIcon(icon: Icons.route_rounded, color: Color(0xFF0F766E)),
+                SizedBox(width: 12),
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1065,17 +1075,17 @@ class _TopicRoadmapPanel extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1, color: Color(0xFFE8EDF4)),
+          Divider(height: 1, color: AppColors.borderGray),
           if (topicsLoading)
-            const SizedBox(
+            SizedBox(
               height: 190,
               child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
             )
           else if (topics.isEmpty)
-            const _EmptyTopicMap()
+            _EmptyTopicMap()
           else
             ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 420),
+              constraints: BoxConstraints(maxHeight: 420),
               child: ListView.builder(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
                 shrinkWrap: true,
@@ -1116,9 +1126,10 @@ class _RoadmapTopicTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final ready = topic.readiness == TopicReadiness.ready || topic.isReviewed;
     return Material(
-      color: const Color(0xFFF8FAFC),
+      color: AppColors.surfaceBg,
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         onTap: () => onTopicTap(topic),
@@ -1127,7 +1138,7 @@ class _RoadmapTopicTile extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(13, 12, 12, 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: const Color(0xFFE6EBF2)),
+            border: Border.all(color: AppColors.borderGray),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1139,45 +1150,45 @@ class _RoadmapTopicTile extends StatelessWidget {
                     height: 30,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: AppColors.cardBg,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: const Color(0xFFE2E8F0)),
+                      border: Border.all(color: AppColors.border),
                     ),
                     child: Text(
                       '${index + 1}',
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary),
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary),
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       topic.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: AppColors.textTitle),
+                      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: AppColors.textTitle),
                     ),
                   ),
-                  const SizedBox(width: 8),
+                  SizedBox(width: 8),
                   _TinyBadge(
                     label: ready ? 'Ready' : 'Draft',
                     color: ready ? _K.green : _K.amber,
                     background: ready ? _K.greenSoft : _K.amberSoft,
                   ),
-                  const SizedBox(width: 4),
-                  const Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
+                  SizedBox(width: 4),
+                  Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
                 ],
               ),
               if ((topic.description ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 8),
+                SizedBox(height: 8),
                 Text(
                   topic.description!.trim(),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(fontSize: 12.2, color: AppColors.textMuted, height: 1.35),
+                  style: TextStyle(fontSize: 12.2, color: AppColors.textMuted, height: 1.35),
                 ),
               ],
               if (children.isNotEmpty) ...[
-                const SizedBox(height: 10),
+                SizedBox(height: 10),
                 Wrap(
                   spacing: 7,
                   runSpacing: 7,
@@ -1189,22 +1200,22 @@ class _RoadmapTopicTile extends StatelessWidget {
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: AppColors.cardBg,
                             borderRadius: BorderRadius.circular(999),
-                            border: Border.all(color: const Color(0xFFE2E8F0)),
+                            border: Border.all(color: AppColors.border),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.subdirectory_arrow_right_rounded, size: 13, color: AppColors.textMuted),
-                              const SizedBox(width: 5),
+                              Icon(Icons.subdirectory_arrow_right_rounded, size: 13, color: AppColors.textMuted),
+                              SizedBox(width: 5),
                               ConstrainedBox(
-                                constraints: const BoxConstraints(maxWidth: 170),
+                                constraints: BoxConstraints(maxWidth: 170),
                                 child: Text(
                                   child.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textTitle),
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textTitle),
                                 ),
                               ),
                             ],
@@ -1247,34 +1258,35 @@ class _CleanTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return TextField(
       controller: controller,
       enabled: enabled,
       minLines: minLines,
       maxLines: maxLines,
       onSubmitted: onSubmitted,
-      style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle),
+      style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
         errorText: errorText,
         prefixIcon: Icon(icon, size: 18, color: AppColors.textMuted),
         filled: true,
-        fillColor: const Color(0xFFF8FAFC),
+        fillColor: AppColors.surfaceBg,
         contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        labelStyle: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textMuted),
-        hintStyle: const TextStyle(fontSize: 13, color: AppColors.textHint),
+        labelStyle: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textMuted),
+        hintStyle: TextStyle(fontSize: 13, color: AppColors.textHint),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: const BorderSide(color: Color(0xFFE4EAF2)),
+          borderSide: BorderSide(color: AppColors.borderGray),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: const BorderSide(color: Color(0xFFE4EAF2)),
+          borderSide: BorderSide(color: AppColors.borderGray),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
+          borderSide: BorderSide(color: AppColors.primary, width: 1.4),
         ),
       ),
     );
@@ -1296,8 +1308,9 @@ class _OutcomeSelectTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Material(
-      color: selected ? const Color(0xFFEAF3FF) : const Color(0xFFF8FAFC),
+      color: selected ? AppColors.infoBg : AppColors.surfaceBg,
       borderRadius: BorderRadius.circular(15),
       child: InkWell(
         onTap: enabled ? onTap : null,
@@ -1306,36 +1319,36 @@ class _OutcomeSelectTile extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(11, 10, 10, 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: selected ? AppColors.primary.withOpacity(0.40) : const Color(0xFFE4EAF2)),
+            border: Border.all(color: selected ? AppColors.primary.withOpacity(0.40) : AppColors.borderGray),
           ),
           child: Row(
             children: [
               AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
+                duration: Duration(milliseconds: 160),
                 width: 22,
                 height: 22,
                 decoration: BoxDecoration(
-                  color: selected ? AppColors.primary : Colors.white,
+                  color: selected ? AppColors.primary : AppColors.cardBg,
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: selected ? AppColors.primary : const Color(0xFFCBD5E1)),
+                  border: Border.all(color: selected ? AppColors.primary : AppColors.borderSoft),
                 ),
-                child: selected ? const Icon(Icons.check_rounded, size: 15, color: Colors.white) : null,
+                child: selected ? Icon(Icons.check_rounded, size: 15, color: Colors.white) : null,
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       outcome.code.isNotEmpty ? outcome.code : 'LO',
-                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: AppColors.primary),
+                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: AppColors.primary),
                     ),
-                    const SizedBox(height: 2),
+                    SizedBox(height: 2),
                     Text(
                       outcome.title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textTitle, height: 1.25),
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textTitle, height: 1.25),
                     ),
                   ],
                 ),
@@ -1363,24 +1376,25 @@ class _ProgressInsightRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
             Expanded(
-              child: Text(label, style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textMuted)),
+              child: Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textMuted)),
             ),
-            Text(value, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+            Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
           ],
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
           child: LinearProgressIndicator(
             minHeight: 8,
             value: progress.clamp(0.0, 1.0).toDouble(),
-            backgroundColor: const Color(0xFFE8EEF6),
+            backgroundColor: AppColors.borderSoft,
             valueColor: AlwaysStoppedAnimation<Color>(color),
           ),
         ),
@@ -1400,16 +1414,17 @@ class _PremiumPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: padding,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE6EBF2)),
-        boxShadow: const [
+        border: Border.all(color: AppColors.borderGray),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0A0F172A),
+            color: AppColors.shadowSoft,
             blurRadius: 24,
             offset: Offset(0, 12),
           ),
@@ -1435,26 +1450,27 @@ class _ReviewerStatPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: 112,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFF8FAFC),
+        color: AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: const Color(0xFFE6EBF2)),
+        border: Border.all(color: AppColors.borderGray),
       ),
       child: Row(
         children: [
           Icon(icon, size: 18, color: AppColors.primary),
-          const SizedBox(width: 9),
+          SizedBox(width: 9),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: AppColors.textMuted)),
-                const SizedBox(height: 2),
-                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
-                Text(helper, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
+                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: AppColors.textMuted)),
+                SizedBox(height: 2),
+                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+                Text(helper, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
               ],
             ),
           ),
@@ -1477,6 +1493,7 @@ class _TinyBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
@@ -1500,15 +1517,16 @@ class _CountBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF3FF),
+        color: AppColors.infoBg,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         value,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary),
+        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary),
       ),
     );
   }
@@ -1522,6 +1540,7 @@ class _SoftIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: 38,
       height: 38,
@@ -1542,18 +1561,19 @@ class _DarkToolbarChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.07),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
+        border: Border.all(color: AppColors.cardBg.withOpacity(0.10)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: Colors.white.withOpacity(0.76)),
-          const SizedBox(width: 6),
+          SizedBox(width: 6),
           Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.76))),
         ],
       ),
@@ -1576,10 +1596,11 @@ class _HeaderIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: const Color(0xFFF8FAFC),
+        color: AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(16),
         child: InkWell(
           onTap: onTap,
@@ -1590,10 +1611,10 @@ class _HeaderIconButton extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFFE6EBF2)),
+              border: Border.all(color: AppColors.borderGray),
             ),
             child: loading
-                ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2))
+                ? SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2))
                 : Icon(icon, size: 19, color: AppColors.textMuted),
           ),
         ),
@@ -1616,19 +1637,20 @@ class _OpenDocumentButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return SizedBox(
       height: 46,
       child: ElevatedButton.icon(
         onPressed: _open,
-        icon: const Icon(Icons.open_in_new_rounded, size: 16),
-        label: const Text('Open PDF'),
+        icon: Icon(Icons.open_in_new_rounded, size: 16),
+        label: Text('Open PDF'),
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFF111827),
+          backgroundColor: AppColors.textTitle,
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 15),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+          textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
         ),
       ),
     );
@@ -1640,6 +1662,7 @@ class _EmptyTopicMap extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(22, 26, 22, 28),
       child: Column(
@@ -1648,18 +1671,18 @@ class _EmptyTopicMap extends StatelessWidget {
             width: 60,
             height: 60,
             decoration: BoxDecoration(
-              color: const Color(0xFFEAF3FF),
+              color: AppColors.infoBg,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: const Icon(Icons.route_outlined, color: AppColors.primary, size: 28),
+            child: Icon(Icons.route_outlined, color: AppColors.primary, size: 28),
           ),
-          const SizedBox(height: 13),
-          const Text(
+          SizedBox(height: 13),
+          Text(
             'No topic map yet',
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textTitle),
           ),
-          const SizedBox(height: 6),
-          const Text(
+          SizedBox(height: 6),
+          Text(
             'Capture topics while reading the PDF. They will appear here as a clean review map.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.45),
@@ -1718,9 +1741,10 @@ class _FilePreviewWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (loading) return const _LoaderW(label: 'Loading preview…');
+    Theme.of(context);
+    if (loading) return _LoaderW(label: 'Loading preview…');
     if (material.isProcessing && material.status != 'uploaded') {
-      return const _PlaceholderW(icon: Icons.hourglass_top_rounded,
+      return _PlaceholderW(icon: Icons.hourglass_top_rounded,
         iconColor: _K.amber, iconBg: _K.amberSoft, title: 'Processing…',
         sub: 'Your file is being processed. Preview will be available shortly.');
     }
@@ -1790,6 +1814,7 @@ class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     if (!widget.interactive) {
       return _PlaceholderW(
         icon: Icons.picture_as_pdf_rounded,
@@ -1814,17 +1839,17 @@ class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
 }
 
 class _ImagePreviewWidget extends StatelessWidget {
-  final String url; const _ImagePreviewWidget({required this.url});
+  final String url; _ImagePreviewWidget({required this.url});
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
-    child: Container(decoration: BoxDecoration(color: Colors.white,
+    child: Container(decoration: BoxDecoration(color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div)),
       child: ClipRRect(borderRadius: BorderRadius.circular(13), child: Stack(children: [
-        Container(color: const Color(0xFFF8F9FB)),
+        Container(color: AppColors.surfaceBg),
         Center(child: Image.network(url, fit: BoxFit.contain,
             errorBuilder: (_, __, ___) => _FallbackWidget(url: url, material: null),
             loadingBuilder: (_, child, p) => p == null ? child :
-                const Center(child: CircularProgressIndicator(strokeWidth: 2)))),
+                Center(child: CircularProgressIndicator(strokeWidth: 2)))),
         Positioned(top: 12, right: 12, child: _OBtn(url: url)),
       ]))));
 }
@@ -1839,33 +1864,33 @@ class _VideoPreviewWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _MetaStripW(material: material), const SizedBox(height: 14),
+      _MetaStripW(material: material), SizedBox(height: 14),
       Expanded(child: Container(
-        decoration: BoxDecoration(color: const Color(0xFF0D1117),
+        decoration: BoxDecoration(color: AppColors.documentCanvasBg,
             borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div)),
         child: ClipRRect(borderRadius: BorderRadius.circular(13),
             child: Stack(alignment: Alignment.center, children: [
-          Container(decoration: const BoxDecoration(gradient: RadialGradient(
-              colors: [Color(0xFF1A2332), Color(0xFF0D1117)]))),
+          Container(decoration: BoxDecoration(gradient: RadialGradient(
+              colors: [AppColors.documentCanvasRadial, AppColors.documentCanvasBg]))),
           Column(mainAxisSize: MainAxisSize.min, children: [
             Container(width: 80, height: 80,
                 decoration: BoxDecoration(color: Colors.white.withOpacity(0.1),
-                    shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.2))),
-                child: const Icon(Icons.play_arrow_rounded, size: 44, color: Colors.white)),
-            const SizedBox(height: 16),
-            Text(material.displayTitle, style: const TextStyle(fontSize: 16,
+                    shape: BoxShape.circle, border: Border.all(color: AppColors.cardBg.withOpacity(0.2))),
+                child: Icon(Icons.play_arrow_rounded, size: 44, color: Colors.white)),
+            SizedBox(height: 16),
+            Text(material.displayTitle, style: TextStyle(fontSize: 16,
                 fontWeight: FontWeight.w700, color: Colors.white)),
             if (material.durationSeconds != null) ...[
-              const SizedBox(height: 4),
+              SizedBox(height: 4),
               Text(_fmt(material.durationSeconds!),
                   style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.55))),
             ],
-            const SizedBox(height: 22),
+            SizedBox(height: 22),
             ElevatedButton.icon(onPressed: () {},
-                icon: const Icon(Icons.open_in_new_rounded, size: 14),
-                label: const Text('Open Video'),
+                icon: Icon(Icons.open_in_new_rounded, size: 14),
+                label: Text('Open Video'),
                 style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.15),
+                    backgroundColor: AppColors.cardBg.withOpacity(0.15),
                     foregroundColor: Colors.white, elevation: 0,
                     side: BorderSide(color: Colors.white.withOpacity(0.25)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)))),
@@ -1880,43 +1905,43 @@ class _AudioPreviewWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
     child: Container(padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
+      decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(14),
           border: Border.all(color: _K.div)),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Container(width: 80, height: 80, decoration: BoxDecoration(
             color: _K.greenSoft, borderRadius: BorderRadius.circular(22)),
-            child: const Icon(Icons.headphones_rounded, size: 40, color: _K.green)),
-        const SizedBox(height: 18),
-        Text(material.displayTitle, textAlign: TextAlign.center, style: const TextStyle(
+            child: Icon(Icons.headphones_rounded, size: 40, color: _K.green)),
+        SizedBox(height: 18),
+        Text(material.displayTitle, textAlign: TextAlign.center, style: TextStyle(
             fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
         if (material.durationSeconds != null) ...[
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text('Duration: ${material.durationSeconds! ~/ 60}m ${material.durationSeconds! % 60}s',
-              style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
         ],
-        const SizedBox(height: 24),
+        SizedBox(height: 24),
         _OBtn(url: url, big: true),
       ])));
 }
 
 class _LinkPreviewWidget extends StatelessWidget {
-  final String url; const _LinkPreviewWidget({required this.url});
+  final String url; _LinkPreviewWidget({required this.url});
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
     child: Container(padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
+      decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(14),
           border: Border.all(color: _K.div)),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Container(width: 72, height: 72, decoration: BoxDecoration(
             color: _K.blueSoft, borderRadius: BorderRadius.circular(18)),
-            child: const Icon(Icons.link_rounded, size: 34, color: AppColors.primary)),
-        const SizedBox(height: 16),
-        const Text('External Link', style: TextStyle(fontSize: 17,
+            child: Icon(Icons.link_rounded, size: 34, color: AppColors.primary)),
+        SizedBox(height: 16),
+        Text('External Link', style: TextStyle(fontSize: 17,
             fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-        const SizedBox(height: 8),
+        SizedBox(height: 8),
         Text(url, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
-        const SizedBox(height: 20), _OBtn(url: url, big: true),
+            style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
+        SizedBox(height: 20), _OBtn(url: url, big: true),
       ])));
 }
 
@@ -1931,11 +1956,11 @@ class _FallbackWidget extends StatelessWidget {
 }
 
 class _LoaderW extends StatelessWidget {
-  final String label; const _LoaderW({required this.label});
+  final String label; _LoaderW({required this.label});
   @override
   Widget build(BuildContext context) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-    const CircularProgressIndicator(strokeWidth: 2), const SizedBox(height: 12),
-    Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textMuted))]));
+    CircularProgressIndicator(strokeWidth: 2), SizedBox(height: 12),
+    Text(label, style: TextStyle(fontSize: 13, color: AppColors.textMuted))]));
 }
 
 class _PlaceholderW extends StatelessWidget {
@@ -1949,21 +1974,21 @@ class _PlaceholderW extends StatelessWidget {
       Container(width: 70, height: 70,
           decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(18)),
           child: Icon(icon, size: 32, color: iconColor)),
-      const SizedBox(height: 16),
-      Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-      const SizedBox(height: 6),
-      Text(sub, style: const TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
+      SizedBox(height: 16),
+      Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+      SizedBox(height: 6),
+      Text(sub, style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
           textAlign: TextAlign.center),
       if (actionLabel != null && onAction != null) ...[
-        const SizedBox(height: 20),
+        SizedBox(height: 20),
         ElevatedButton.icon(onPressed: onAction,
-            icon: const Icon(Icons.open_in_new_rounded, size: 14), label: Text(actionLabel!)),
+            icon: Icon(Icons.open_in_new_rounded, size: 14), label: Text(actionLabel!)),
       ],
     ])));
 }
 
 class _MetaStripW extends StatelessWidget {
-  final MaterialItem material; const _MetaStripW({required this.material});
+  final MaterialItem material; _MetaStripW({required this.material});
   static String _fmt(int b) {
     if (b < 1024) return '$b B';
     if (b < 1024 * 1024) return '${(b / 1024).toStringAsFixed(1)} KB';
@@ -1971,6 +1996,7 @@ class _MetaStripW extends StatelessWidget {
   }
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final items = <(IconData, String)>[];
     if (material.fileSize != null) items.add((Icons.storage_rounded, _fmt(material.fileSize!)));
     if (material.pageCount != null) items.add((Icons.menu_book_rounded, '${material.pageCount} pages'));
@@ -1981,14 +2007,14 @@ class _MetaStripW extends StatelessWidget {
     if (items.isEmpty) return const SizedBox.shrink();
     return Wrap(spacing: 14, runSpacing: 5, children: items.map((it) =>
         Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(it.$1, size: 12, color: AppColors.textHint), const SizedBox(width: 4),
-          Text(it.$2, style: const TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
+          Icon(it.$1, size: 12, color: AppColors.textHint), SizedBox(width: 4),
+          Text(it.$2, style: TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
         ])).toList());
   }
 }
 
 class _OBtn extends StatelessWidget {
-  final String url; final bool big; const _OBtn({required this.url, this.big = false});
+  final String url; final bool big; _OBtn({required this.url, this.big = false});
 
   Future<void> _open() async {
     final uri = Uri.tryParse(url);
@@ -1999,16 +2025,17 @@ class _OBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     if (big) {
       return ElevatedButton.icon(onPressed: _open,
-        icon: const Icon(Icons.open_in_new_rounded, size: 14), label: const Text('Open'),
+        icon: Icon(Icons.open_in_new_rounded, size: 14), label: Text('Open'),
         style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary,
             foregroundColor: Colors.white, elevation: 0,
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))));
     }
     return Material(color: AppColors.primary, borderRadius: BorderRadius.circular(7),
-        child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), onTap: _open, borderRadius: BorderRadius.circular(7),
-            child: const Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), onTap: _open, borderRadius: BorderRadius.circular(7),
+            child: Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.open_in_new_rounded, size: 12, color: Colors.white),
                   SizedBox(width: 5),

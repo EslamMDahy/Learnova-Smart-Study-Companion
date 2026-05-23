@@ -89,6 +89,7 @@ class _GenerateQuestionsDialogState
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final state = ref.watch(courseDetailsControllerProvider(widget.courseId));
     final modules = state.modules;
     final allMaterials = _flattenMaterials(state);
@@ -147,14 +148,14 @@ class _GenerateQuestionsDialogState
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
               child: Column(
                 children: [
-                  const _InfoBanner(
+                  _InfoBanner(
                     icon: Icons.info_outline_rounded,
                     title: 'Selection is ready, backend generation is not',
                     message:
                         'The current backend ZIP does not include AI question-generation endpoints. '
                         'This dialog now supports correct scope selection so the frontend flow is ready once that endpoint exists.',
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TabBar(
@@ -162,7 +163,7 @@ class _GenerateQuestionsDialogState
                       labelColor: AppColors.primary,
                       unselectedLabelColor: AppColors.textMuted,
                       indicatorColor: AppColors.primary,
-                      tabs: const [
+                      tabs: [
                         Tab(text: 'Topics'),
                         Tab(text: 'Materials'),
                         Tab(text: 'Settings'),
@@ -172,7 +173,7 @@ class _GenerateQuestionsDialogState
                 ],
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: 8),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -259,7 +260,7 @@ class _GenerateQuestionsDialogState
                       '${_selectedTopicIds.length} topic(s) and ${_selectedMaterialIds.length} material(s) selected. '
                       'Types: ${typeLabels.join(', ')} • Difficulty: $_difficulty • Count: $_count. '
                       'No request was sent because the current backend bundle does not expose the generation endpoint yet.',
-                  duration: const Duration(seconds: 5),
+                  duration: Duration(seconds: 5),
                 );
               },
             ),
@@ -342,9 +343,10 @@ class _Header extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 14, 8, 10),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(bottom: BorderSide(color: AppColors.border)),
       ),
       child: Row(
@@ -355,16 +357,16 @@ class _Header extends StatelessWidget {
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textTitle,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textMuted,
                   ),
@@ -375,7 +377,7 @@ class _Header extends StatelessWidget {
           IconButton(
             tooltip: 'Close',
             onPressed: onClose,
-            icon: const Icon(Icons.close_rounded),
+            icon: Icon(Icons.close_rounded),
           ),
         ],
       ),
@@ -396,35 +398,36 @@ class _InfoBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFFBEB),
+        color: AppColors.warningSoftBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFFDE68A)),
+        border: Border.all(color: AppColors.warningBorder),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, size: 18, color: const Color(0xFFB45309)),
-          const SizedBox(width: 10),
+          Icon(icon, size: 18, color: AppColors.warningText),
+          SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textTitle,
                   ),
                 ),
-                const SizedBox(height: 4),
+                SizedBox(height: 4),
                 Text(
                   message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textMuted,
                     height: 1.35,
@@ -460,6 +463,7 @@ class _TopicsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Column(
@@ -469,16 +473,16 @@ class _TopicsTab extends StatelessWidget {
             value: query,
             onChanged: onQueryChanged,
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           _SelectBar(
             selectedCount: selectedIds.length,
             onSelectAll: items.isEmpty ? null : onSelectAll,
             onClear: selectedIds.isEmpty ? null : onClear,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Expanded(
             child: items.isEmpty
-                ? const _EmptyPanel(
+                ? _EmptyPanel(
                     icon: Icons.topic_outlined,
                     title: 'No topics found',
                     subtitle:
@@ -487,7 +491,7 @@ class _TopicsTab extends StatelessWidget {
                 : ListView.separated(
                     itemCount: items.length,
                     separatorBuilder: (_, __) =>
-                        const Divider(height: 1, color: AppColors.border),
+                        Divider(height: 1, color: AppColors.border),
                     itemBuilder: (_, i) {
                       final item = items[i];
                       final topic = item.topic;
@@ -501,7 +505,7 @@ class _TopicsTab extends StatelessWidget {
                           topic.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textTitle,
@@ -511,7 +515,7 @@ class _TopicsTab extends StatelessWidget {
                           '${item.module.title} • ${item.material.displayTitle} • ${topic.readiness.label}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textMuted,
                           ),
@@ -555,6 +559,7 @@ class _MaterialsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: Column(
@@ -568,23 +573,23 @@ class _MaterialsTab extends StatelessWidget {
                   onChanged: onQueryChanged,
                 ),
               ),
-              const SizedBox(width: 10),
+              SizedBox(width: 10),
               _TypeFilter(
                 value: typeFilter,
                 onChanged: onTypeChanged,
               ),
             ],
           ),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           _SelectBar(
             selectedCount: selectedIds.length,
             onSelectAll: materials.isEmpty ? null : onSelectAll,
             onClear: selectedIds.isEmpty ? null : onClear,
           ),
-          const SizedBox(height: 12),
+          SizedBox(height: 12),
           Expanded(
             child: materials.isEmpty
-                ? const _EmptyPanel(
+                ? _EmptyPanel(
                     icon: Icons.folder_open_outlined,
                     title: 'No materials found',
                     subtitle:
@@ -593,7 +598,7 @@ class _MaterialsTab extends StatelessWidget {
                 : ListView.separated(
                     itemCount: materials.length,
                     separatorBuilder: (_, __) =>
-                        const Divider(height: 1, color: AppColors.border),
+                        Divider(height: 1, color: AppColors.border),
                     itemBuilder: (_, i) {
                       final m = materials[i];
                       final selected = selectedIds.contains(m.id);
@@ -606,7 +611,7 @@ class _MaterialsTab extends StatelessWidget {
                           m.displayTitle,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 13.5,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textTitle,
@@ -616,7 +621,7 @@ class _MaterialsTab extends StatelessWidget {
                           '${resolveModuleTitle(m.moduleId)} • ${m.type.toUpperCase()} • ${_fmtSize(m.fileSize)}',
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             color: AppColors.textMuted,
                           ),
@@ -651,10 +656,11 @@ class _TypeFilter extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return DropdownButton<String>(
       value: value,
       underline: const SizedBox.shrink(),
-      items: const [
+      items: [
         DropdownMenuItem(value: 'all', child: Text('All')),
         DropdownMenuItem(value: 'pdf', child: Text('PDF')),
         DropdownMenuItem(value: 'video', child: Text('Video')),
@@ -686,11 +692,12 @@ class _SettingsTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
       child: ListView(
         children: [
-          const Text(
+          Text(
             'Question types',
             style: TextStyle(
               fontSize: 13,
@@ -698,7 +705,7 @@ class _SettingsTab extends StatelessWidget {
               color: AppColors.textTitle,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
@@ -720,8 +727,8 @@ class _SettingsTab extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          const Text(
+          SizedBox(height: 18),
+          Text(
             'Difficulty',
             style: TextStyle(
               fontSize: 13,
@@ -729,7 +736,7 @@ class _SettingsTab extends StatelessWidget {
               color: AppColors.textTitle,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Wrap(
             spacing: 8,
             children: [
@@ -755,8 +762,8 @@ class _SettingsTab extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 18),
-          const Text(
+          SizedBox(height: 18),
+          Text(
             'Count',
             style: TextStyle(
               fontSize: 13,
@@ -764,16 +771,16 @@ class _SettingsTab extends StatelessWidget {
               color: AppColors.textTitle,
             ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Row(
             children: [
               IconButton(
                 onPressed: count <= 1 ? null : () => onCountChanged(count - 1),
-                icon: const Icon(Icons.remove_circle_outline_rounded),
+                icon: Icon(Icons.remove_circle_outline_rounded),
               ),
               Text(
                 '$count',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w800,
                   color: AppColors.textTitle,
@@ -781,12 +788,12 @@ class _SettingsTab extends StatelessWidget {
               ),
               IconButton(
                 onPressed: count >= 100 ? null : () => onCountChanged(count + 1),
-                icon: const Icon(Icons.add_circle_outline_rounded),
+                icon: Icon(Icons.add_circle_outline_rounded),
               ),
             ],
           ),
-          const SizedBox(height: 10),
-          const Text(
+          SizedBox(height: 10),
+          Text(
             'These settings will be forwarded once the backend generation endpoint is available.',
             style: TextStyle(
               fontSize: 12.5,
@@ -813,13 +820,14 @@ class _ChipToggle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+    Theme.of(context);
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: selected ? const Color(0xFFDBEAFE) : Colors.white,
+          color: selected ? AppColors.badgeBlueBg : AppColors.cardBg,
           borderRadius: BorderRadius.circular(999),
           border: Border.all(
             color: selected ? AppColors.primary : AppColors.border,
@@ -853,6 +861,7 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return TextField(
       enabled: enabled,
       onChanged: onChanged,
@@ -860,18 +869,18 @@ class _SearchField extends StatelessWidget {
         ..selection = TextSelection.collapsed(offset: value.length),
       decoration: InputDecoration(
         hintText: hint,
-        prefixIcon: const Icon(Icons.search_rounded, size: 18),
+        prefixIcon: Icon(Icons.search_rounded, size: 18),
         isDense: true,
         filled: true,
-        fillColor: Colors.white,
+        fillColor: AppColors.cardBg,
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.border),
+          borderSide: BorderSide(color: AppColors.border),
         ),
       ),
     );
@@ -891,25 +900,26 @@ class _SelectBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Row(
       children: [
         Text(
           'Selected: $selectedCount',
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 12.5,
             fontWeight: FontWeight.w700,
             color: AppColors.textTitle,
           ),
         ),
-        const Spacer(),
+        Spacer(),
         TextButton(
           onPressed: onSelectAll,
-          child: const Text('Select all'),
+          child: Text('Select all'),
         ),
-        const SizedBox(width: 8),
+        SizedBox(width: 8),
         TextButton(
           onPressed: onClear,
-          child: const Text('Clear'),
+          child: Text('Clear'),
         ),
       ],
     );
@@ -929,10 +939,11 @@ class _EmptyPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
@@ -941,21 +952,21 @@ class _EmptyPanel extends StatelessWidget {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(icon, size: 34, color: AppColors.primary),
-          const SizedBox(height: 10),
+          SizedBox(height: 10),
           Text(
             title,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 14.5,
               fontWeight: FontWeight.w800,
               color: AppColors.textTitle,
             ),
           ),
-          const SizedBox(height: 6),
+          SizedBox(height: 6),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12.5,
               color: AppColors.textMuted,
               height: 1.35,
@@ -988,9 +999,10 @@ class _Footer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       child: Column(
@@ -1005,24 +1017,24 @@ class _Footer extends StatelessWidget {
                     color: AppColors.primary,
                   ),
                 ),
-                const SizedBox(width: 10),
+                SizedBox(width: 10),
                 Text(
                   progressLabel ?? 'Generating…',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textMuted,
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            SizedBox(height: 10),
           ],
           Row(
             children: [
               Expanded(
                 child: Text(
                   summary,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 12.5,
                     color: AppColors.textMuted,
                   ),
@@ -1030,12 +1042,12 @@ class _Footer extends StatelessWidget {
               ),
               TextButton(
                 onPressed: submitting ? null : onCancel,
-                child: const Text('Cancel'),
+                child: Text('Cancel'),
               ),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               ElevatedButton(
                 onPressed: canSubmit ? onSubmit : null,
-                child: const Text('Generate'),
+                child: Text('Generate'),
               ),
             ],
           ),

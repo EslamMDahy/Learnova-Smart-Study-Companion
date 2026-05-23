@@ -83,6 +83,7 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final accepted = _invites.where((i) => i.status == 'accepted').length;
     final pending  = _invites.where((i) => i.status == 'pending').length;
     final shown    = _filtered;
@@ -92,29 +93,29 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
       child: Column(children: [
         // ── Toolbar ───────────────────────────────────────────────────────
         Container(
-          color: Colors.white,
+          color: AppColors.cardBg,
           padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
               border: Border(bottom: BorderSide(color: AppColors.border))),
           child: Row(children: [
             // Stat pills
             _StatPill('${_invites.length}', 'Total', AppColors.primary),
-            const SizedBox(width: 8),
-            _StatPill('$accepted', 'Accepted Invites', const Color(0xFF16A34A)),
-            const SizedBox(width: 8),
-            _StatPill('$pending', 'Pending', const Color(0xFFD97706)),
-            const Spacer(),
+            SizedBox(width: 8),
+            _StatPill('$accepted', 'Accepted Invites', AppColors.successText),
+            SizedBox(width: 8),
+            _StatPill('$pending', 'Pending', AppColors.warningText),
+            Spacer(),
             // Search
             SizedBox(
               width: 210,
               height: 34,
               child: TextField(
                 onChanged: (v) => setState(() => _search = v),
-                style: const TextStyle(fontSize: 13),
+                style: TextStyle(fontSize: 13),
                 decoration: InputDecoration(
                   hintText: 'Search by email...',
-                  hintStyle: const TextStyle(fontSize: 13),
-                  prefixIcon: const Icon(Icons.search_rounded,
+                  hintStyle: TextStyle(fontSize: 13),
+                  prefixIcon: Icon(Icons.search_rounded,
                       size: 15, color: AppColors.textHint),
                   contentPadding: const EdgeInsets.symmetric(vertical: 8),
                   filled: true,
@@ -122,29 +123,29 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
                   enabledBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
                       borderSide:
-                          const BorderSide(color: AppColors.border)),
+                          BorderSide(color: AppColors.border)),
                   focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
-                      borderSide: const BorderSide(
+                      borderSide: BorderSide(
                           color: AppColors.primary, width: 1.5)),
                 ),
               ),
             ),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             // Filter chips
             _FilterBtn('All',      'all',      _filter, (v) => setState(() => _filter = v)),
-            const SizedBox(width: 6),
+            SizedBox(width: 6),
             _FilterBtn('Accepted', 'accepted', _filter, (v) => setState(() => _filter = v)),
-            const SizedBox(width: 6),
+            SizedBox(width: 6),
             _FilterBtn('Pending',  'pending',  _filter, (v) => setState(() => _filter = v)),
-            const SizedBox(width: 8),
+            SizedBox(width: 8),
             // Refresh
             Tooltip(
               message: 'Refresh',
-              child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+              child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
                 onTap: _load,
                 borderRadius: BorderRadius.circular(6),
-                child: const Padding(
+                child: Padding(
                   padding: EdgeInsets.all(7),
                   child: Icon(Icons.refresh_rounded,
                       size: 17, color: AppColors.textMuted),
@@ -157,7 +158,7 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
         // ── Content ───────────────────────────────────────────────────────
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator())
+              ? Center(child: CircularProgressIndicator())
               : _error != null
                   ? _ErrorView(error: _error!, onRetry: _load)
                   : shown.isEmpty
@@ -166,7 +167,7 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
                           padding: const EdgeInsets.all(16),
                           itemCount: shown.length,
                           separatorBuilder: (_, __) =>
-                              const SizedBox(height: 8),
+                              SizedBox(height: 8),
                           itemBuilder: (_, i) =>
                               _InviteCard(invite: shown[i]),
                         ),
@@ -179,24 +180,24 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
     final isFiltered = _filter != 'all' || _search.isNotEmpty;
     return Center(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.people_outline_rounded,
+        Icon(Icons.people_outline_rounded,
             size: 42, color: AppColors.primary),
-        const SizedBox(height: 12),
+        SizedBox(height: 12),
         Text(
           isFiltered ? 'No matching students' : 'No invitations yet',
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w800,
               color: AppColors.textTitle),
         ),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         Text(
           isFiltered
               ? 'Try adjusting your filters.'
               : widget.course.isPrivate
                   ? 'Invite students via the course settings to get started.'
                   : 'This is a public course. Students can join without invitations.',
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 13, color: AppColors.textMuted, height: 1.5),
           textAlign: TextAlign.center,
         ),
@@ -245,12 +246,13 @@ class _InviteCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final isAccepted = invite.status == 'accepted';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
       ),
@@ -258,8 +260,8 @@ class _InviteCard extends StatelessWidget {
         CircleAvatar(
           radius: 18,
           backgroundColor: isAccepted
-              ? const Color(0xFFDBEAFE)
-              : const Color(0xFFF1F5F9),
+              ? AppColors.badgeBlueBg
+              : AppColors.headerBg,
           child: Text(
             invite.email.isNotEmpty
                 ? invite.email[0].toUpperCase()
@@ -272,22 +274,22 @@ class _InviteCard extends StatelessWidget {
                     : AppColors.textMuted),
           ),
         ),
-        const SizedBox(width: 12),
+        SizedBox(width: 12),
         Expanded(
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
             Text(invite.email,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textTitle)),
-            const SizedBox(height: 3),
+            SizedBox(height: 3),
             Text(
               isAccepted && invite.acceptedAt != null
                   ? 'Accepted ${_fmt(invite.acceptedAt!)}'
                   : 'Invited ${_fmt(invite.createdAt)}',
-              style: const TextStyle(
+              style: TextStyle(
                   fontSize: 11.5, color: AppColors.textMuted),
             ),
           ]),
@@ -307,23 +309,24 @@ class _StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     Color bg, fg;
     String label;
     switch (status.toLowerCase()) {
       case 'accepted':
-        bg = const Color(0xFFDCFCE7); fg = const Color(0xFF16A34A);
+        bg = AppColors.successBg; fg = AppColors.successText;
         label = 'Accepted'; break;
       case 'pending':
-        bg = const Color(0xFFFEF3C7); fg = const Color(0xFFD97706);
+        bg = AppColors.warningSoftBg; fg = AppColors.warningText;
         label = 'Pending'; break;
       case 'revoked':
         bg = AppColors.dangerBg; fg = AppColors.dangerText;
         label = 'Revoked'; break;
       case 'expired':
-        bg = const Color(0xFFF1F5F9); fg = AppColors.textMuted;
+        bg = AppColors.headerBg; fg = AppColors.textMuted;
         label = 'Expired'; break;
       default:
-        bg = const Color(0xFFF1F5F9); fg = AppColors.textMuted;
+        bg = AppColors.headerBg; fg = AppColors.textMuted;
         label = status;
     }
     return Container(
@@ -345,6 +348,7 @@ class _StatPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -357,7 +361,7 @@ class _StatPill extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w800,
                 color: color)),
-        const SizedBox(width: 5),
+        SizedBox(width: 5),
         Text(label,
             style: TextStyle(
                 fontSize: 12,
@@ -377,13 +381,14 @@ class _FilterBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final active = value == current;
     return GestureDetector(
       onTap: () => onTap(value),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? const Color(0xFFEFF6FF) : Colors.white,
+          color: active ? AppColors.primarySoft : AppColors.cardBg,
           border: Border.all(
               color: active ? AppColors.primary : AppColors.border),
           borderRadius: BorderRadius.circular(6),
@@ -407,23 +412,24 @@ class _ErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Center(
       child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.error_outline, size: 36, color: AppColors.dangerText),
-        const SizedBox(height: 12),
-        const Text('Failed to load students',
+        Icon(Icons.error_outline, size: 36, color: AppColors.dangerText),
+        SizedBox(height: 12),
+        Text('Failed to load students',
             style: TextStyle(
                 fontWeight: FontWeight.w700, fontSize: 15)),
-        const SizedBox(height: 6),
+        SizedBox(height: 6),
         Text(error,
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 12, color: AppColors.textMuted)),
-        const SizedBox(height: 14),
+        SizedBox(height: 14),
         ElevatedButton.icon(
           onPressed: onRetry,
-          icon: const Icon(Icons.refresh),
-          label: const Text('Retry'),
+          icon: Icon(Icons.refresh),
+          label: Text('Retry'),
         ),
       ]),
     );

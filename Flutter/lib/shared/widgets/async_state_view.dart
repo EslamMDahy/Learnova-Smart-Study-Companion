@@ -31,8 +31,9 @@ class AsyncStateView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     if (loading) {
-      return const Padding(
+      return Padding(
         padding: EdgeInsets.all(24),
         child: _LoadingSkeleton(),
       );
@@ -71,6 +72,7 @@ class _EmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -88,29 +90,29 @@ class _EmptyCard extends StatelessWidget {
               color: AppColors.headerBg,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.inbox_outlined, color: Color(0xFF475569)),
+            child: Icon(Icons.inbox_outlined, color: AppColors.textGray),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.textTitle,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(
                   message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     height: 1.35,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF475569),
+                    color: AppColors.textGray,
                   ),
                 ),
               ],
@@ -130,6 +132,7 @@ class _ErrorCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final hasRetry = onRetry != null;
     return Container(
       padding: const EdgeInsets.all(18),
@@ -145,41 +148,41 @@ class _ErrorCard extends StatelessWidget {
             width: 38,
             height: 38,
             decoration: BoxDecoration(
-              color: const Color(0xFFFEE2E2),
+              color: AppColors.dangerBorder,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.error_outline, color: Color(0xFF991B1B)),
+            child: Icon(Icons.error_outline, color: AppColors.dangerTitle),
           ),
-          const SizedBox(width: 12),
+          SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'Something went wrong',
                   style: TextStyle(
                     fontSize: 14,
                     fontWeight: FontWeight.w900,
-                    color: Color(0xFF0F172A),
+                    color: AppColors.textTitle,
                   ),
                 ),
-                const SizedBox(height: 6),
+                SizedBox(height: 6),
                 Text(
                   message,
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 13,
                     height: 1.35,
                     fontWeight: FontWeight.w700,
-                    color: Color(0xFF475569),
+                    color: AppColors.textGray,
                   ),
                 ),
                 if (hasRetry) ...[
-                  const SizedBox(height: 10),
+                  SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton(
                       onPressed: onRetry,
-                      child: const Text('Retry'),
+                      child: Text('Retry'),
                     ),
                   ),
                 ],
@@ -198,10 +201,11 @@ class _LoadingSkeleton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     // Shimmer animations can be surprisingly expensive on Flutter Web.
     // Keep skeleton static (web-friendly) and let pages feel snappy.
-    const base = Color(0xFFE5E7EB);
-    const hi = Color(0xFFF1F5F9);
+    final base = AppColors.borderGray;
+    final hi = AppColors.headerBg;
 
     // On mobile/desktop you can still get a subtle pulse without a ticker.
     // On web: lock to a single color to avoid jank.
@@ -232,20 +236,20 @@ class _LoadingSkeleton extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   bar(w: 180, h: 14),
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8),
                   bar(w: 260),
                 ],
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
+        SizedBox(height: 16),
 
         // Rows skeleton (table-like)
         ...List.generate(6, (i) {
@@ -268,7 +272,7 @@ class _LoadingSkeleton extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  SizedBox(width: 14),
                   Container(
                     width: 34,
                     height: 34,
@@ -277,20 +281,20 @@ class _LoadingSkeleton extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         bar(w: 220),
-                        const SizedBox(height: 8),
+                        SizedBox(height: 8),
                         bar(w: 160, h: 11),
                       ],
                     ),
                   ),
-                  const SizedBox(width: 12),
+                  SizedBox(width: 12),
                   bar(w: 88, h: 22),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10),
                   bar(w: 64, h: 22),
                 ],
               ),

@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:learnova/shared/widgets/design_tokens.dart';
 
 class ForgetPasswordLeftPanel extends StatelessWidget {
   const ForgetPasswordLeftPanel({super.key});
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final dpr = MediaQuery.of(context).devicePixelRatio;
     final w = MediaQuery.sizeOf(context).width;
     final bgCacheWidth = (w * dpr).clamp(800.0, 2000.0).round();
@@ -37,8 +39,8 @@ class ForgetPasswordLeftPanel extends StatelessWidget {
             Row(
               children: [
                 Image.asset('assets/logo.webp', height: 40, cacheWidth: (40 * MediaQuery.of(context).devicePixelRatio).round()),
-                const SizedBox(width: 10),
-                const Text(
+                SizedBox(width: 10),
+                Text(
                   'Learnova',
                   style: TextStyle(
                     color: Colors.white,
@@ -49,10 +51,10 @@ class ForgetPasswordLeftPanel extends StatelessWidget {
               ],
             ),
 
-            const SizedBox(height: 40),
+            SizedBox(height: 40),
 
             /// Title
-            const Text(
+            Text(
               'Unlock your academic\npotential with AI-driven\nassessments.',
               style: TextStyle(
                 color: Colors.white,
@@ -62,17 +64,17 @@ class ForgetPasswordLeftPanel extends StatelessWidget {
                 shadows: [
                   Shadow(
                     blurRadius: 10,
-                    color: Colors.black54,
+                    color: AppColors.textMuted,
                     offset: Offset(0, 4),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 20),
+            SizedBox(height: 20),
 
             /// Subtitle
-            const Text(
+            Text(
               'Join thousands of students and instructors enhancing\ntheir learning experience.',
               style: TextStyle(
                 color: Colors.white70,
@@ -81,14 +83,14 @@ class ForgetPasswordLeftPanel extends StatelessWidget {
                 shadows: [
                   Shadow(
                     blurRadius: 8,
-                    color: Colors.black45,
+                    color: AppColors.textHint,
                     offset: Offset(0, 3),
                   ),
                 ],
               ),
             ),
 
-            const SizedBox(height: 60),
+            SizedBox(height: 60),
           ],
         ),
       ),
