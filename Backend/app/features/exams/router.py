@@ -14,7 +14,9 @@ from .schemas import (ExamCreateRequest,
                       ExamRemoveQuestionResponse,
                       ExamListResponse,
                       ExamDetailsResponse,
-                      ExamPublishResponse)
+                      ExamPublishResponse,
+                      ExamQuestionReorderRequest,
+                      ExamQuestionReorderResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}/exams", tags=["Exams"],)
@@ -46,6 +48,20 @@ def add_questions_to_exam_endpoint(
         db=db,
         current_user=current_user,)
 
+@router.patch("/{exam_id}/questions/reorder", response_model=ExamQuestionReorderResponse,)
+def reorder_exam_questions_endpoint(
+    course_id: int,
+    exam_id: int,
+    payload: ExamQuestionReorderRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.reorder_exam_questions(
+        course_id=course_id,
+        exam_id=exam_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
+
 @router.delete("/{exam_id}/questions/{exam_question_id}", response_model=ExamRemoveQuestionResponse, status_code=status.HTTP_200_OK)
 def remove_question_from_exam_endpoint(
     course_id: int,
@@ -57,6 +73,18 @@ def remove_question_from_exam_endpoint(
         course_id=course_id,
         exam_id=exam_id,
         exam_question_id=exam_question_id,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/{exam_id}/publish", response_model=ExamPublishResponse,)
+def publish_exam_endpoint(
+    course_id: int,
+    exam_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.publish_exam(
+        course_id=course_id,
+        exam_id=exam_id,
         db=db,
         current_user=current_user,)
 
@@ -82,14 +110,3 @@ def get_exam_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.post("/{exam_id}/publish", response_model=ExamPublishResponse,)
-def publish_exam_endpoint(
-    course_id: int,
-    exam_id: int,
-    db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),):
-    return service.publish_exam(
-        course_id=course_id,
-        exam_id=exam_id,
-        db=db,
-        current_user=current_user,)

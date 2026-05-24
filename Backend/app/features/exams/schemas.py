@@ -166,6 +166,20 @@ class ExamDetailsResponse(BaseModel):
     questions: List[ExamQuestionDetailResponse]
 
 
+class ExamQuestionReorderRequest(BaseModel):
+    exam_question_ids: List[int] = Field(..., min_length=1)
+
+    model_config = ConfigDict(extra="forbid")
+
+class ExamQuestionReorderResponse(BaseModel):
+    exam_id: int
+    course_id: int
+    exam_question_ids: List[int]
+    message: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ExamPublishResponse(BaseModel):
     exam_id: int
     course_id: int

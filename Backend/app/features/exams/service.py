@@ -484,6 +484,174 @@ def add_questions_to_exam(*, course_id: int, exam_id: int, payload: ExamAddQuest
 
 
 
+def reorder_exam_questions(*, course_id: int, exam_id: int, payload, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can reorder exam questions")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not exam_id or exam_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    exam_question_ids = getattr(payload, "exam_question_ids", None)
+    if not isinstance(exam_question_ids, list) or not exam_question_ids:
+        raise HTTPException(status_code=400, detail="exam_question_ids must be a non-empty list")
+
+    try:
+        exam_question_ids = [int(eqid) for eqid in exam_question_ids]
+    except Exception:
+        raise HTTPException(status_code=400, detail="exam_question_ids must contain valid integers")
+
+    if any(eqid <= 0 for eqid in exam_question_ids):
+        raise HTTPException(status_code=400, detail="exam_question_ids must contain positive integers only")
+
+    if len(exam_question_ids) != len(set(exam_question_ids)):
+        raise HTTPException(status_code=400, detail="exam_question_ids must not contain duplicates")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only reorder exam questions for your own course",
+            )
+
+        # =========================
+        # 3) Validate exam belongs to course
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT id, course_id, created_by, is_published
+                FROM exams
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {
+                "exam_id": exam_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=404, detail="Exam not found")
+
+        if int(exam_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only reorder questions for your own exam",
+            )
+
+        if exam_row["is_published"]:
+            raise HTTPException(status_code=403, detail="Cannot reorder questions in a published exam")
+
+        # =========================
+        # 4) Fetch all exam questions
+        # =========================
+        db_exam_question_rows = db.execute(
+            text("""
+                SELECT id
+                FROM exam_questions
+                WHERE exam_id = :exam_id
+                ORDER BY order_index ASC, id ASC
+            """),
+            {"exam_id": exam_id},
+        ).mappings().all()
+
+        db_exam_question_ids = [int(row["id"]) for row in db_exam_question_rows]
+
+        if not db_exam_question_ids:
+            raise HTTPException(status_code=404, detail="No questions found for this exam")
+
+        if set(exam_question_ids) != set(db_exam_question_ids):
+            raise HTTPException(
+                status_code=400,
+                detail="exam_question_ids must include all exam questions exactly once",
+            )
+
+        # =========================
+        # 5) Reorder with two-phase update
+        #    to avoid unique conflict on (exam_id, order_index)
+        # =========================
+        # phase 1: move to temporary negative order values
+        for idx, exam_question_id in enumerate(exam_question_ids):
+            db.execute(
+                text("""
+                    UPDATE exam_questions
+                    SET order_index = :temp_order_index
+                    WHERE id = :exam_question_id
+                      AND exam_id = :exam_id
+                """),
+                {
+                    "temp_order_index": -(idx + 1),
+                    "exam_question_id": exam_question_id,
+                    "exam_id": exam_id,
+                },
+            )
+
+        # phase 2: assign final order values
+        for idx, exam_question_id in enumerate(exam_question_ids):
+            db.execute(
+                text("""
+                    UPDATE exam_questions
+                    SET order_index = :final_order_index
+                    WHERE id = :exam_question_id
+                      AND exam_id = :exam_id
+                """),
+                {
+                    "final_order_index": idx + 1,
+                    "exam_question_id": exam_question_id,
+                    "exam_id": exam_id,
+                },
+            )
+
+        db.commit()
+
+        return {
+            "exam_id": exam_id,
+            "course_id": course_id,
+            "exam_question_ids": exam_question_ids,
+            "message": "Exam questions reordered successfully",
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while reordering exam questions") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
 def remove_question_from_exam(*, course_id: int, exam_id: int, exam_question_id: int, db: Session, current_user: dict,):
     # =========================
     # 1) Authorization
@@ -585,7 +753,10 @@ def remove_question_from_exam(*, course_id: int, exam_id: int, exam_question_id:
                 WHERE id = :exam_question_id
                     AND exam_id = :exam_id
             """),
-            {"exam_question_id": exam_question_id},
+            {
+                "exam_question_id": exam_question_id,
+                "exam_id": exam_id,
+            },
         )
 
         # =========================
@@ -645,6 +816,244 @@ def remove_question_from_exam(*, course_id: int, exam_id: int, exam_question_id:
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(status_code=409, detail="Conflict while removing exam question") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def publish_exam(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can publish exams")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not exam_id or exam_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only publish exams for your own course",
+            )
+
+        # =========================
+        # 3) Validate exam belongs to course
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT
+                    id,
+                    course_id,
+                    created_by,
+                    is_published
+                FROM exams
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {
+                "exam_id": exam_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=404, detail="Exam not found")
+
+        if int(exam_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only publish your own exam",
+            )
+
+        if bool(exam_row["is_published"]):
+            raise HTTPException(status_code=409, detail="Exam is already published")
+
+        # =========================
+        # 4) Validate exam has questions
+        # =========================
+        exam_question_rows = db.execute(
+            text("""
+                SELECT
+                    eq.id,
+                    eq.question_id
+                FROM exam_questions eq
+                WHERE eq.exam_id = :exam_id
+                ORDER BY eq.order_index ASC, eq.id ASC
+            """),
+            {"exam_id": exam_id},
+        ).mappings().all()
+
+        if not exam_question_rows:
+            raise HTTPException(status_code=400, detail="Cannot publish exam without questions")
+
+        question_ids = [int(row["question_id"]) for row in exam_question_rows]
+
+        # =========================
+        # 5) Validate questions still belong to course
+        # =========================
+        question_rows = db.execute(
+            text("""
+                SELECT id
+                FROM questions
+                WHERE course_id = :course_id
+                  AND id = ANY(:question_ids)
+            """),
+            {
+                "course_id": course_id,
+                "question_ids": question_ids,
+            },
+        ).mappings().all()
+
+        found_question_ids = {int(row["id"]) for row in question_rows}
+        missing_question_ids = set(question_ids) - found_question_ids
+
+        if missing_question_ids:
+            raise HTTPException(
+                status_code=400,
+                detail={
+                    "message": "Some exam questions were not found or do not belong to this course",
+                    "question_ids": sorted(missing_question_ids),
+                },
+            )
+
+        # =========================
+        # 6) Store final question snapshots
+        # =========================
+        snapshot_rows = db.execute(
+            text("""
+                UPDATE exam_questions eq
+                SET
+                    snapshot_topic_id = q.topic_id,
+                    snapshot_question_text = q.question_text,
+                    snapshot_explanation = q.explanation,
+                    snapshot_options = q.options,
+                    snapshot_type = q.type::text,
+                    snapshot_difficulty = q.difficulty::text,
+                    snapshot_expected_answer = q.expected_answer,
+                    snapshot_grading_rubric = q.grading_rubric,
+                    snapshot_max_score = q.max_score,
+                    snapshot_auto_gradable = q.auto_gradable,
+                    snapshot_tags = q.tags,
+                    snapshot_source_question_updated_at = q.updated_at,
+                    snapshot_created_at = NOW()
+                FROM questions q
+                WHERE eq.exam_id = :exam_id
+                    AND eq.question_id = q.id
+                    AND q.course_id = :course_id
+                RETURNING eq.id
+            """),
+            {
+                "exam_id": exam_id,
+                "course_id": course_id,
+            },
+        ).mappings().all()
+
+        if len(snapshot_rows) != len(question_ids):
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to create question snapshots",
+            )
+
+        # =========================
+        # 7) Recalculate exam totals
+        # =========================
+        totals_row = db.execute(
+            text("""
+                SELECT
+                    COUNT(*) AS total_questions,
+                    COALESCE(SUM(points), 0) AS total_score
+                FROM exam_questions
+                WHERE exam_id = :exam_id
+            """),
+            {"exam_id": exam_id},
+        ).mappings().first()
+
+        if not totals_row:
+            raise HTTPException(status_code=500, detail="Failed to calculate exam totals")
+
+        total_questions = int(totals_row["total_questions"] or 0)
+        total_score = float(totals_row["total_score"] or 0)
+
+        # =========================
+        # 8) Publish exam
+        # =========================
+        publish_row = db.execute(
+            text("""
+                UPDATE exams
+                SET
+                    total_questions = :total_questions,
+                    total_score = :total_score,
+                    is_published = TRUE,
+                    updated_at = NOW()
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                  AND is_published = FALSE
+                RETURNING
+                    id,
+                    course_id,
+                    is_published,
+                    total_questions,
+                    total_score
+            """),
+            {
+                "exam_id": exam_id,
+                "course_id": course_id,
+                "total_questions": total_questions,
+                "total_score": total_score,
+            },
+        ).mappings().first()
+
+        if not publish_row:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Exam could not be published")
+
+        db.commit()
+
+        return {
+            "exam_id": int(publish_row["id"]),
+            "course_id": int(publish_row["course_id"]),
+            "is_published": bool(publish_row["is_published"]),
+            "total_questions": int(publish_row["total_questions"]),
+            "total_score": float(publish_row["total_score"]),
+            "message": "Exam published successfully",
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while publishing exam") from e
 
     except SQLAlchemyError as e:
         db.rollback()
@@ -922,239 +1331,3 @@ def get_exam(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
 
 
 
-def publish_exam(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
-    # =========================
-    # 1) Authorization
-    # =========================
-    role = (current_user.get("system_role") or "").strip().lower()
-    if role != "instructor":
-        raise HTTPException(status_code=403, detail="Only instructors can publish exams")
-
-    instructor_id = current_user.get("id")
-    if not instructor_id:
-        raise HTTPException(status_code=401, detail="Unauthorized")
-
-    if not course_id or course_id <= 0:
-        raise HTTPException(status_code=422, detail="Invalid course_id")
-
-    if not exam_id or exam_id <= 0:
-        raise HTTPException(status_code=422, detail="Invalid exam_id")
-
-    try:
-        # =========================
-        # 2) Validate course exists + ownership
-        # =========================
-        course_row = db.execute(
-            text("""
-                SELECT id, created_by
-                FROM courses
-                WHERE id = :course_id
-                LIMIT 1
-            """),
-            {"course_id": course_id},
-        ).mappings().first()
-
-        if not course_row:
-            raise HTTPException(status_code=404, detail="Course not found")
-
-        if int(course_row["created_by"]) != int(instructor_id):
-            raise HTTPException(
-                status_code=403,
-                detail="You can only publish exams for your own course",
-            )
-
-        # =========================
-        # 3) Validate exam belongs to course
-        # =========================
-        exam_row = db.execute(
-            text("""
-                SELECT
-                    id,
-                    course_id,
-                    created_by,
-                    is_published
-                FROM exams
-                WHERE id = :exam_id
-                  AND course_id = :course_id
-                LIMIT 1
-            """),
-            {
-                "exam_id": exam_id,
-                "course_id": course_id,
-            },
-        ).mappings().first()
-
-        if not exam_row:
-            raise HTTPException(status_code=404, detail="Exam not found")
-
-        if int(exam_row["created_by"]) != int(instructor_id):
-            raise HTTPException(
-                status_code=403,
-                detail="You can only publish your own exam",
-            )
-
-        if bool(exam_row["is_published"]):
-            raise HTTPException(status_code=409, detail="Exam is already published")
-
-        # =========================
-        # 4) Validate exam has questions
-        # =========================
-        exam_question_rows = db.execute(
-            text("""
-                SELECT
-                    eq.id,
-                    eq.question_id
-                FROM exam_questions eq
-                WHERE eq.exam_id = :exam_id
-                ORDER BY eq.order_index ASC, eq.id ASC
-            """),
-            {"exam_id": exam_id},
-        ).mappings().all()
-
-        if not exam_question_rows:
-            raise HTTPException(status_code=400, detail="Cannot publish exam without questions")
-
-        question_ids = [int(row["question_id"]) for row in exam_question_rows]
-
-        # =========================
-        # 5) Validate questions still belong to course
-        # =========================
-        question_rows = db.execute(
-            text("""
-                SELECT id
-                FROM questions
-                WHERE course_id = :course_id
-                  AND id = ANY(:question_ids)
-            """),
-            {
-                "course_id": course_id,
-                "question_ids": question_ids,
-            },
-        ).mappings().all()
-
-        found_question_ids = {int(row["id"]) for row in question_rows}
-        missing_question_ids = set(question_ids) - found_question_ids
-
-        if missing_question_ids:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    "message": "Some exam questions were not found or do not belong to this course",
-                    "question_ids": sorted(missing_question_ids),
-                },
-            )
-
-        # =========================
-        # 6) Store final question snapshots
-        # =========================
-        snapshot_rows = db.execute(
-            text("""
-                UPDATE exam_questions eq
-                SET
-                    snapshot_topic_id = q.topic_id,
-                    snapshot_question_text = q.question_text,
-                    snapshot_explanation = q.explanation,
-                    snapshot_options = q.options,
-                    snapshot_type = q.type::text,
-                    snapshot_difficulty = q.difficulty::text,
-                    snapshot_expected_answer = q.expected_answer,
-                    snapshot_grading_rubric = q.grading_rubric,
-                    snapshot_max_score = q.max_score,
-                    snapshot_auto_gradable = q.auto_gradable,
-                    snapshot_tags = q.tags,
-                    snapshot_source_question_updated_at = q.updated_at,
-                    snapshot_created_at = NOW()
-                FROM questions q
-                WHERE eq.exam_id = :exam_id
-                    AND eq.question_id = q.id
-                    AND q.course_id = :course_id
-                RETURNING eq.id
-            """),
-            {
-                "exam_id": exam_id,
-                "course_id": course_id,
-            },
-        ).mappings().all()
-
-        if len(snapshot_rows) != len(question_ids):
-            raise HTTPException(
-                status_code=500,
-                detail="Failed to create question snapshots",
-            )
-
-        # =========================
-        # 7) Recalculate exam totals
-        # =========================
-        totals_row = db.execute(
-            text("""
-                SELECT
-                    COUNT(*) AS total_questions,
-                    COALESCE(SUM(points), 0) AS total_score
-                FROM exam_questions
-                WHERE exam_id = :exam_id
-            """),
-            {"exam_id": exam_id},
-        ).mappings().first()
-
-        if not totals_row:
-            raise HTTPException(status_code=500, detail="Failed to calculate exam totals")
-
-        total_questions = int(totals_row["total_questions"] or 0)
-        total_score = float(totals_row["total_score"] or 0)
-
-        # =========================
-        # 8) Publish exam
-        # =========================
-        publish_row = db.execute(
-            text("""
-                UPDATE exams
-                SET
-                    total_questions = :total_questions,
-                    total_score = :total_score,
-                    is_published = TRUE,
-                    updated_at = NOW()
-                WHERE id = :exam_id
-                  AND course_id = :course_id
-                  AND is_published = FALSE
-                RETURNING
-                    id,
-                    course_id,
-                    is_published,
-                    total_questions,
-                    total_score
-            """),
-            {
-                "exam_id": exam_id,
-                "course_id": course_id,
-                "total_questions": total_questions,
-                "total_score": total_score,
-            },
-        ).mappings().first()
-
-        if not publish_row:
-            db.rollback()
-            raise HTTPException(status_code=409, detail="Exam could not be published")
-
-        db.commit()
-
-        return {
-            "exam_id": int(publish_row["id"]),
-            "course_id": int(publish_row["course_id"]),
-            "is_published": bool(publish_row["is_published"]),
-            "total_questions": int(publish_row["total_questions"]),
-            "total_score": float(publish_row["total_score"]),
-            "message": "Exam published successfully",
-        }
-
-    except HTTPException:
-        db.rollback()
-        raise
-
-    except IntegrityError as e:
-        db.rollback()
-        raise HTTPException(status_code=409, detail="Conflict while publishing exam") from e
-
-    except SQLAlchemyError as e:
-        db.rollback()
-        raise HTTPException(status_code=500, detail="Database error") from e
- 
