@@ -8,6 +8,7 @@ from app.core.deps import get_current_user
 
 from . import service
 from .schemas import (ExamCreateRequest,
+                      ExamUpdateRequest,
                       ExamResponse,
                       ExamAddQuestionsRequest,
                       ExamAddQuestionsResponse,
@@ -30,6 +31,20 @@ def create_exam_endpoint(
     current_user: dict = Depends(get_current_user),):
     return service.create_exam(
         course_id=course_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
+
+@router.patch("/{exam_id}", response_model=ExamResponse,)
+def update_exam_endpoint(
+    course_id: int,
+    exam_id: int,
+    payload: ExamUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.update_exam(
+        course_id=course_id,
+        exam_id=exam_id,
         payload=payload,
         db=db,
         current_user=current_user,)

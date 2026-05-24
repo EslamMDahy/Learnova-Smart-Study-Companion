@@ -6,7 +6,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from .schemas import (ExamCreateRequest,
-                     ExamAddQuestionsRequest)
+                      ExamUpdateRequest,
+                      ExamAddQuestionsRequest)
 
 
 ALLOWED_EXAM_TYPES = {"quiz", "midterm", "final", "practice"}
@@ -201,7 +202,243 @@ def create_exam(*, course_id: int, payload: ExamCreateRequest, db: Session, curr
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
-    
+
+
+
+def update_exam(*, course_id: int, exam_id: int, payload: ExamUpdateRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can update exams")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not exam_id or exam_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only update exams for your own course",
+            )
+
+        # =========================
+        # 3) Validate exam belongs to course
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT
+                    id,
+                    course_id,
+                    created_by,
+                    is_published,
+                    available_from,
+                    available_to
+                FROM exams
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                LIMIT 1
+                FOR UPDATE
+            """),
+            {
+                "exam_id": exam_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=404, detail="Exam not found")
+
+        if int(exam_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only update your own exam",
+            )
+
+        if bool(exam_row["is_published"]):
+            raise HTTPException(status_code=403, detail="Cannot update a published exam")
+
+        # =========================
+        # 4) Build dynamic update fields
+        # =========================
+        update_fields = {}
+
+        if payload.title is not None:
+            title = payload.title.strip()
+            if not title:
+                raise HTTPException(status_code=422, detail="Invalid exam_title")
+            update_fields["title"] = title
+
+        if payload.description is not None:
+            update_fields["description"] = payload.description.strip()
+
+        if payload.instructions is not None:
+            update_fields["instructions"] = payload.instructions.strip()
+
+        if payload.exam_type is not None and payload.exam_type.strip() != "":
+            exam_type = payload.exam_type.strip().lower()
+            if exam_type not in ALLOWED_EXAM_TYPES:
+                raise HTTPException(status_code=422, detail="Invalid exam_type")
+            update_fields["exam_type"] = exam_type
+
+        if payload.duration_minutes is not None:
+            if payload.duration_minutes <= 0:
+                raise HTTPException(status_code=422, detail="Invalid duration_minutes")
+            update_fields["duration_minutes"] = payload.duration_minutes
+
+        if payload.max_attempts is not None:
+            if payload.max_attempts <= 0:
+                raise HTTPException(status_code=422, detail="Invalid max_attempts")
+            update_fields["max_attempts"] = payload.max_attempts
+
+        if payload.passing_score is not None:
+            if payload.passing_score < 0:
+                raise HTTPException(status_code=422, detail="Invalid passing_score")
+            update_fields["passing_score"] = payload.passing_score
+
+        if payload.shuffle_questions is not None:
+            update_fields["shuffle_questions"] = payload.shuffle_questions
+
+        if payload.shuffle_options is not None:
+            update_fields["shuffle_options"] = payload.shuffle_options
+
+        if payload.available_from is not None:
+            update_fields["available_from"] = payload.available_from
+
+        if payload.available_to is not None:
+            update_fields["available_to"] = payload.available_to
+
+        if payload.access_code is not None:
+            update_fields["access_code"] = payload.access_code.strip()
+
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No updatable fields provided")
+
+        # =========================
+        # 5) Validate availability window
+        # =========================
+        final_available_from = update_fields.get("available_from", exam_row["available_from"])
+        final_available_to = update_fields.get("available_to", exam_row["available_to"])
+
+        if final_available_from and final_available_to:
+            if final_available_to <= final_available_from:
+                raise HTTPException(
+                    status_code=400,
+                    detail="available_to must be after available_from",
+                )
+
+        # =========================
+        # 6) Update exam
+        # =========================
+        set_clauses = []
+        params = {
+            "exam_id": exam_id,
+            "course_id": course_id,
+        }
+
+        for col in [
+            "title",
+            "description",
+            "instructions",
+            "exam_type",
+            "duration_minutes",
+            "max_attempts",
+            "passing_score",
+            "shuffle_questions",
+            "shuffle_options",
+            "available_from",
+            "available_to",
+            "access_code",
+        ]:
+            if col in update_fields:
+                set_clauses.append(f"{col} = :{col}")
+                params[col] = update_fields[col]
+
+        set_clauses.append("updated_at = NOW()")
+
+        updated_row = db.execute(
+            text(f"""
+                UPDATE exams
+                SET {", ".join(set_clauses)}
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                  AND is_published = FALSE
+                RETURNING
+                    id,
+                    course_id,
+                    title,
+                    description,
+                    instructions,
+                    exam_type,
+                    duration_minutes,
+                    max_attempts,
+                    passing_score,
+                    total_questions,
+                    total_score,
+                    is_published,
+                    is_auto_generated,
+                    shuffle_questions,
+                    shuffle_options,
+                    available_from,
+                    available_to,
+                    enable_proctoring,
+                    prevent_copy_paste,
+                    prevent_tab_switch,
+                    require_webcam,
+                    require_microphone,
+                    access_code,
+                    ip_restrictions,
+                    created_by,
+                    created_at,
+                    updated_at
+            """),
+            params,
+        ).mappings().first()
+
+        if not updated_row:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Exam could not be updated")
+
+        db.commit()
+
+        return dict(updated_row)
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while updating exam") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
 
 
 def add_questions_to_exam(*, course_id: int, exam_id: int, payload: ExamAddQuestionsRequest, db: Session, current_user: dict,):

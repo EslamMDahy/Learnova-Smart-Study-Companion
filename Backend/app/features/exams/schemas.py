@@ -20,6 +20,24 @@ class ExamCreateRequest(BaseModel):
     available_to: Optional[datetime] = None
     access_code: Optional[str] = Field(default=None, max_length=50)
 
+
+class ExamUpdateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = None
+    instructions: Optional[str] = None
+    exam_type: Optional[str] = None
+    duration_minutes: Optional[int] = Field(default=None, gt=0)
+    max_attempts: Optional[int] = Field(default=None, gt=0)
+    passing_score: Optional[float] = Field(default=None, ge=0)
+    shuffle_questions: Optional[bool] = None
+    shuffle_options: Optional[bool] = None
+    available_from: Optional[datetime] = None
+    available_to: Optional[datetime] = None
+    access_code: Optional[str] = Field(default=None, max_length=50)
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ExamResponse(BaseModel):
     id: int
     course_id: int
