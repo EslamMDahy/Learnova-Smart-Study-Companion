@@ -1,13 +1,19 @@
 from __future__ import annotations
 
 from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from io import BytesIO
 
 from .schemas import (ExamCreateRequest,
                       ExamUpdateRequest,
                       ExamAddQuestionsRequest)
+
+from .helpers import (build_exam_export_context,
+                      render_exam_pdf_html,
+                      convert_html_to_pdf,)
 
 
 ALLOWED_EXAM_TYPES = {"quiz", "midterm", "final", "practice"}
@@ -1568,3 +1574,230 @@ def get_exam(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
 
 
 
+def export_exam_pdf(*, course_id: int, exam_id: int, include_learnova_logo: bool,
+                    include_exam_metadata: bool,include_instructions: bool, include_points: bool,
+                    include_student_info_fields: bool, include_answer_space: bool, shuffle_questions: bool | None,
+                    shuffle_options: bool | None, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can export exams")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not exam_id or exam_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only export exams for your own course",
+            )
+
+        # =========================
+        # 3) Fetch exam
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT
+                    id,
+                    course_id,
+                    title,
+                    description,
+                    instructions,
+                    exam_type,
+                    duration_minutes,
+                    max_attempts,
+                    passing_score,
+                    total_questions,
+                    total_score,
+                    is_published,
+                    is_auto_generated,
+                    shuffle_questions,
+                    shuffle_options,
+                    available_from,
+                    available_to,
+                    created_by,
+                    created_at,
+                    updated_at
+                FROM exams
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {
+                "exam_id": exam_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=404, detail="Exam not found")
+
+        if int(exam_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only export your own exam",
+            )
+
+        is_published = bool(exam_row["is_published"])
+
+        # =========================
+        # 4) Fetch exam questions
+        # =========================
+        if is_published:
+            question_rows = db.execute(
+                text("""
+                    SELECT
+                        eq.id AS exam_question_id,
+                        eq.question_id,
+                        eq.section_id,
+                        eq.order_index,
+                        eq.points,
+                        eq.custom_points,
+                        eq.custom_instructions,
+
+                        eq.snapshot_topic_id AS topic_id,
+                        eq.snapshot_question_text AS question_text,
+                        eq.snapshot_explanation AS explanation,
+                        eq.snapshot_options AS options,
+                        eq.snapshot_type AS type,
+                        eq.snapshot_difficulty AS difficulty,
+                        eq.snapshot_expected_answer AS expected_answer,
+                        eq.snapshot_grading_rubric AS grading_rubric,
+                        eq.snapshot_max_score AS max_score,
+                        eq.snapshot_auto_gradable AS auto_gradable,
+                        eq.snapshot_tags AS tags
+                    FROM exam_questions eq
+                    WHERE eq.exam_id = :exam_id
+                    ORDER BY eq.order_index ASC, eq.id ASC
+                """),
+                {"exam_id": exam_id},
+            ).mappings().all()
+
+        else:
+            question_rows = db.execute(
+                text("""
+                    SELECT
+                        eq.id AS exam_question_id,
+                        eq.question_id,
+                        eq.section_id,
+                        eq.order_index,
+                        eq.points,
+                        eq.custom_points,
+                        eq.custom_instructions,
+
+                        q.topic_id,
+                        q.question_text,
+                        q.explanation,
+                        q.options,
+                        q.type,
+                        q.difficulty,
+                        q.expected_answer,
+                        q.grading_rubric,
+                        q.max_score,
+                        q.auto_gradable,
+                        q.tags
+                    FROM exam_questions eq
+                    JOIN questions q
+                      ON q.id = eq.question_id
+                    WHERE eq.exam_id = :exam_id
+                      AND q.course_id = :course_id
+                    ORDER BY eq.order_index ASC, eq.id ASC
+                """),
+                {
+                    "exam_id": exam_id,
+                    "course_id": course_id,
+                },
+            ).mappings().all()
+
+        if not question_rows:
+            raise HTTPException(status_code=400, detail="Cannot export exam without questions")
+
+        # =========================
+        # 5) Build export context
+        # =========================
+        effective_shuffle_questions = (
+            bool(exam_row["shuffle_questions"])
+            if shuffle_questions is None
+            else shuffle_questions
+        )
+
+        effective_shuffle_options = (
+            bool(exam_row["shuffle_options"])
+            if shuffle_options is None
+            else shuffle_options
+        )
+
+        export_context = build_exam_export_context(
+            exam_row=dict(exam_row),
+            question_rows=[dict(row) for row in question_rows],
+            include_learnova_logo=include_learnova_logo,
+            include_exam_metadata=include_exam_metadata,
+            include_instructions=include_instructions,
+            include_points=include_points,
+            include_student_info_fields=include_student_info_fields,
+            include_answer_space=include_answer_space,
+            effective_shuffle_questions=effective_shuffle_questions,
+            effective_shuffle_options=effective_shuffle_options,
+        )
+
+        # =========================
+        # 6) Render PDF
+        # =========================
+        try:
+            html_content = render_exam_pdf_html(export_context)
+            pdf_bytes = convert_html_to_pdf(html_content)
+
+        except Exception as e:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to generate PDF export",
+            ) from e
+
+        if not pdf_bytes:
+            raise HTTPException(status_code=500, detail="Failed to generate PDF export")
+
+        # =========================
+        # 7) Return PDF response
+        # =========================
+        exam_type = str(exam_row["exam_type"]).strip().lower()
+        filename = f"learnova-{exam_type}-exam-{exam_id}.pdf"
+
+        return StreamingResponse(
+            BytesIO(pdf_bytes),
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'attachment; filename="{filename}"'
+            },
+        )
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e

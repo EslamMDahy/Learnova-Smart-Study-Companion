@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
+from typing import Optional
 
 from app.db.session import get_db
 from app.core.deps import get_current_user
@@ -122,6 +123,34 @@ def get_exam_endpoint(
     return service.get_exam(
         course_id=course_id,
         exam_id=exam_id,
+        db=db,
+        current_user=current_user,)
+
+@router.get("/{exam_id}/export/pdf",)
+def export_exam_pdf_endpoint(
+    course_id: int,
+    exam_id: int,
+    include_learnova_logo: bool = True,
+    include_exam_metadata: bool = True,
+    include_instructions: bool = True,
+    include_points: bool = True,
+    include_student_info_fields: bool = True,
+    include_answer_space: bool = True,
+    shuffle_questions: Optional[bool] = None,
+    shuffle_options: Optional[bool] = None,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.export_exam_pdf(
+        course_id=course_id,
+        exam_id=exam_id,
+        include_learnova_logo=include_learnova_logo,
+        include_exam_metadata=include_exam_metadata,
+        include_instructions=include_instructions,
+        include_points=include_points,
+        include_student_info_fields=include_student_info_fields,
+        include_answer_space=include_answer_space,
+        shuffle_questions=shuffle_questions,
+        shuffle_options=shuffle_options,
         db=db,
         current_user=current_user,)
 
