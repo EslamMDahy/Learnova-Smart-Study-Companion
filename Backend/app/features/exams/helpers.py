@@ -283,11 +283,8 @@ def render_exam_pdf_html(context: dict):
 
             section_description_html = ""
             if display.get("include_section_descriptions") and section.get("description"):
-                section_description_html = f"""
-                <div class="exam-section-description">
-                    {html.escape(str(section.get("description") or ""))}
-                </div>
-                """
+                section_description_text = html.escape(str(section.get("description") or ""))
+                section_description_html = f'<div class="exam-section-description">{section_description_text}</div>'
 
             section_questions = section.get("questions") or []
 
@@ -505,9 +502,8 @@ def render_exam_pdf_html(context: dict):
                 width: 100%;
                 font-weight: bold;
                 font-size: 13px;
-                border-bottom: 2px solid #111111;
-                padding-bottom: 4px;
-                margin-bottom: 5px;
+                padding-bottom: 0px;
+                margin-bottom: 0px;
             }}
 
             .exam-section-main {{
@@ -527,13 +523,13 @@ def render_exam_pdf_html(context: dict):
             .exam-section-description {{
                 font-size: 11px;
                 font-style: italic;
-                margin: 4px 0 7px;
+                margin: 0 0 6px;
                 white-space: pre-line;
             }}
 
             .exam-section-questions {{
-                margin-left: 8mm;
-                padding-left: 3mm;
+                margin-left: 4mm;
+                padding-left: 1mm;
             }}
 
             .question-wrapper {{
