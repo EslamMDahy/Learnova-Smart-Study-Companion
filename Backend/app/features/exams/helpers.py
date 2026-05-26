@@ -10,40 +10,90 @@ from app.core.config import settings
 from .handler import render_question_handler
 
 
-def build_exam_export_context(*, exam_row: dict, course_row: dict, question_rows: list[dict],
-                              include_learnova_logo: bool, include_course_title: bool, 
-                              include_course_code: bool, include_exam_metadata: bool,
-                              include_instructions: bool, include_points: bool,
-                              include_student_info_fields: bool, include_answer_space: bool,
-                              effective_shuffle_questions: bool, effective_shuffle_options: bool,) -> dict:
+def build_exam_export_context(*, exam_row: dict, course_row: dict, section_rows: list[dict], question_rows: list[dict],
+                              include_learnova_logo: bool, include_course_title: bool, include_course_code: bool, include_exam_metadata: bool,
+                              include_instructions: bool, include_section_descriptions: bool, include_points: bool, include_student_info_fields: bool,
+                              include_answer_space: bool, effective_shuffle_questions: bool, effective_shuffle_options: bool,) -> dict:
     # =========================
-    # 1) Prepare questions copy
+    # 1) Prepare sections
     # =========================
-    questions = [dict(row) for row in question_rows]
+    sections = []
+    section_map = {}
 
-    if effective_shuffle_questions:
-        random.shuffle(questions)
+    for section in section_rows:
+        section_id = int(section["section_id"])
 
-    # =========================
-    # 2) Normalize questions
-    # =========================
-    normalized_questions = []
+        section_data = {
+            "id": section_id,
+            "title": section.get("title"),
+            "description": section.get("description"),
+            "question_type": section.get("question_type"),
+            "question_type_label": _format_question_type_label(
+                question_type=section.get("question_type"),
+            ),
+            "order_index": section.get("order_index"),
+            "total_questions": 0,
+            "total_score": 0,
+            "questions": [],
+        }
 
-    for index, question in enumerate(questions, start=1):
-        options = question.get("options")
-
-        if effective_shuffle_options and isinstance(options, list):
-            options = list(options)
-            random.shuffle(options)
-
-        normalized_questions.append({
-            **question,
-            "question_number": index,
-            "options": options,
-        })
+        sections.append(section_data)
+        section_map[section_id] = section_data
 
     # =========================
-    # 3) Build export context
+    # 2) Attach questions to sections
+    # =========================
+    for row in question_rows:
+        question = dict(row)
+        section_id = question.get("section_id")
+
+        if section_id is None:
+            continue
+
+        section = section_map.get(int(section_id))
+        if not section:
+            continue
+
+        section["questions"].append(question)
+
+    # =========================
+    # 3) Normalize questions inside each section
+    # =========================
+    flat_questions = []
+
+    for section in sections:
+        questions = list(section["questions"])
+
+        if effective_shuffle_questions:
+            random.shuffle(questions)
+
+        normalized_questions = []
+
+        for index, question in enumerate(questions, start=1):
+            options = question.get("options")
+
+            if effective_shuffle_options and isinstance(options, list):
+                options = list(options)
+                random.shuffle(options)
+
+            normalized_question = {
+                **question,
+                "question_number": index,
+                "options": options,
+            }
+
+            normalized_questions.append(normalized_question)
+            flat_questions.append(normalized_question)
+
+        section["questions"] = normalized_questions
+        section["total_questions"] = len(normalized_questions)
+        section["total_score"] = sum(
+            float(question.get("points") or question.get("max_score") or 0)
+            for question in normalized_questions
+        )
+
+    # =========================
+    # 4) Build export context
     # =========================
     return {
         "exam": {
@@ -53,7 +103,7 @@ def build_exam_export_context(*, exam_row: dict, course_row: dict, question_rows
             "instructions": exam_row.get("instructions"),
             "exam_type": exam_row.get("exam_type"),
             "duration_minutes": exam_row.get("duration_minutes"),
-            "total_questions": len(normalized_questions),
+            "total_questions": len(flat_questions),
             "total_score": exam_row.get("total_score"),
         },
         "course": {
@@ -66,11 +116,15 @@ def build_exam_export_context(*, exam_row: dict, course_row: dict, question_rows
             "include_course_code": include_course_code,
             "include_exam_metadata": include_exam_metadata,
             "include_instructions": include_instructions,
+            "include_section_descriptions": include_section_descriptions,
             "include_points": include_points,
             "include_student_info_fields": include_student_info_fields,
             "include_answer_space": include_answer_space,
+            "shuffle_questions": effective_shuffle_questions,
+            "shuffle_options": effective_shuffle_options,
         },
-        "questions": normalized_questions,
+        "sections": sections,
+        "questions": flat_questions,
     }
 
 
@@ -82,7 +136,8 @@ def render_exam_pdf_html(context: dict):
     exam = context["exam"]
     course = context.get("course") or {}
     display = context["display"]
-    questions = context["questions"]
+    sections = context.get("sections") or []
+    questions = context.get("questions") or []
 
     title = html.escape(str(exam.get("title") or "Exam"))
     exam_type = html.escape(str(exam.get("exam_type") or "exam"))
@@ -178,16 +233,105 @@ def render_exam_pdf_html(context: dict):
         """
 
     # =========================
-    # 3) Render questions
+    # 3) Render questions / sections
     # =========================
-    questions_html = "\n".join(
-        f"""
-        <section class="question-wrapper">
-            {render_question_handler(question=question, context=context)}
-        </section>
-        """
-        for question in questions
-    )
+    questions_html = ""
+
+    if sections:
+        rendered_sections = []
+
+        question_type_labels = {
+            "multiple_choice": "Multiple Choice",
+            "multi_select": "Multiple Select",
+            "true_false": "True / False",
+            "short_answer": "Short Answer",
+            "essay": "Essay",
+        }
+
+        for section in sections:
+            section_title = html.escape(str(section.get("title") or "Question"))
+            raw_question_type = str(section.get("question_type") or "").strip().lower()
+            question_type_label = html.escape(
+                str(
+                    section.get("question_type_label")
+                    or question_type_labels.get(
+                        raw_question_type,
+                        raw_question_type.replace("_", " ").title() or "Questions",
+                    )
+                )
+            )
+
+            section_score = section.get("total_score")
+
+            if section_score is None:
+                formatted_section_score = "0"
+            else:
+                try:
+                    numeric_section_score = float(section_score)
+                    if numeric_section_score.is_integer():
+                        formatted_section_score = str(int(numeric_section_score))
+                    else:
+                        formatted_section_score = str(numeric_section_score)
+                except (TypeError, ValueError):
+                    formatted_section_score = html.escape(str(section_score))
+
+            section_score_label = (
+                "mark"
+                if formatted_section_score == "1"
+                else "marks"
+            )
+
+            section_description_html = ""
+            if display.get("include_section_descriptions") and section.get("description"):
+                section_description_html = f"""
+                <div class="exam-section-description">
+                    {html.escape(str(section.get("description") or ""))}
+                </div>
+                """
+
+            section_questions = section.get("questions") or []
+
+            section_questions_html = "\n".join(
+                f"""
+                <section class="question-wrapper">
+                    {render_question_handler(question=question, context=context)}
+                </section>
+                """
+                for question in section_questions
+            )
+
+            rendered_sections.append(
+                f"""
+                <section class="exam-section">
+                    <div class="exam-section-title-row">
+                        <span class="exam-section-main">
+                            {section_title}: {question_type_label}
+                        </span>
+                        <span class="exam-section-score">
+                            ({formatted_section_score} {section_score_label})
+                        </span>
+                    </div>
+
+                    {section_description_html}
+
+                    <div class="exam-section-questions">
+                        {section_questions_html}
+                    </div>
+                </section>
+                """
+            )
+
+        questions_html = "\n".join(rendered_sections)
+
+    else:
+        questions_html = "\n".join(
+            f"""
+            <section class="question-wrapper">
+                {render_question_handler(question=question, context=context)}
+            </section>
+            """
+            for question in questions
+        )
 
     # =========================
     # 4) Return full HTML document
@@ -342,11 +486,65 @@ def render_exam_pdf_html(context: dict):
                 margin-top: 0;
             }}
 
+            .exam-section {{
+                margin-top: 12px;
+                page-break-inside: avoid;
+                break-inside: avoid;
+            }}
+
+            .exam-section:first-child {{
+                margin-top: 0;
+            }}
+
+            .exam-section + .exam-section {{
+                margin-top: 16px;
+            }}
+
+            .exam-section-title-row {{
+                display: table;
+                width: 100%;
+                font-weight: bold;
+                font-size: 13px;
+                border-bottom: 2px solid #111111;
+                padding-bottom: 4px;
+                margin-bottom: 5px;
+            }}
+
+            .exam-section-main {{
+                display: table-cell;
+                vertical-align: top;
+                padding-right: 10px;
+            }}
+
+            .exam-section-score {{
+                display: table-cell;
+                vertical-align: top;
+                width: 75px;
+                text-align: right;
+                white-space: nowrap;
+            }}
+
+            .exam-section-description {{
+                font-size: 11px;
+                font-style: italic;
+                margin: 4px 0 7px;
+                white-space: pre-line;
+            }}
+
+            .exam-section-questions {{
+                margin-left: 8mm;
+                padding-left: 3mm;
+            }}
+
             .question-wrapper {{
-                padding: 8px 0 9px;
+                padding: 7px 0 8px;
                 border-bottom: 1px solid #777777;
                 page-break-inside: avoid;
                 break-inside: avoid;
+            }}
+
+            .exam-section-questions .question-wrapper:first-child {{
+                padding-top: 4px;
             }}
 
             .question-block {{
@@ -453,9 +651,25 @@ def render_exam_pdf_html(context: dict):
     """
 
 
-
 def convert_html_to_pdf(html_content: str):
     # =========================
     # 1) Convert HTML to PDF bytes
     # =========================
     return HTML(string=html_content).write_pdf()
+
+
+def _format_question_type_label(*, question_type):
+    # =========================
+    # 1) Format section question type for exam paper display
+    # =========================
+    normalized_type = str(question_type or "").strip().lower()
+
+    labels = {
+        "multiple_choice": "Multiple Choice",
+        "multi_select": "Multiple Select",
+        "true_false": "True / False",
+        "short_answer": "Short Answer",
+        "essay": "Essay",
+    }
+
+    return labels.get(normalized_type, normalized_type.replace("_", " ").title())

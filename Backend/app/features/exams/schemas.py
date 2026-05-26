@@ -68,6 +68,67 @@ class ExamResponse(BaseModel):
     updated_at: datetime
 
 
+class ExamSectionCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    description: Optional[str] = None
+    question_type: str
+    time_limit_minutes: Optional[int] = Field(default=None, gt=0)
+    must_complete: bool = True
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamSectionUpdateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = None
+    question_type: Optional[str] = None
+    time_limit_minutes: Optional[int] = Field(default=None, gt=0)
+    must_complete: Optional[bool] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamSectionResponse(BaseModel):
+    id: int
+    exam_id: int
+    title: str
+    description: Optional[str]
+    question_type: str
+    order_index: int
+    question_count: int
+    section_score: float
+    time_limit_minutes: Optional[int]
+    must_complete: bool
+    created_at: datetime
+    updated_at: datetime
+    questions: List[ExamQuestionDetailResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamSectionReorderRequest(BaseModel):
+    section_ids: List[int] = Field(..., min_length=1)
+
+    model_config = ConfigDict(extra="forbid")
+
+class ExamSectionReorderResponse(BaseModel):
+    exam_id: int
+    course_id: int
+    section_ids: List[int]
+    message: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamSectionDeleteResponse(BaseModel):
+    exam_id: int
+    course_id: int
+    deleted_section_id: int
+    message: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class ExamAddQuestionsRequest(BaseModel):
     question_ids: List[int] = Field(..., min_length=1)
 
@@ -84,9 +145,12 @@ class ExamQuestionItemResponse(BaseModel):
 class ExamAddQuestionsResponse(BaseModel):
     exam_id: int
     course_id: int
+    section_id: int
     added_count: int
-    total_questions: int
-    total_score: float
+    section_question_count: int
+    section_score: float
+    exam_total_questions: int
+    exam_total_score: float
     questions: List[ExamQuestionItemResponse]
 
 
@@ -132,7 +196,7 @@ class ExamListResponse(BaseModel):
 class ExamQuestionDetailResponse(BaseModel):
     exam_question_id: int
     question_id: int
-    section_id: Optional[int]
+    section_id: int
     order_index: int
     points: float
     custom_points: Optional[float]
@@ -144,13 +208,15 @@ class ExamQuestionDetailResponse(BaseModel):
     options: Optional[Any]
     type: str
     difficulty: str
-    source: str
-    approval_status: str
+    source: Optional[str]
+    approval_status: Optional[str]
     expected_answer: Optional[Any]
     grading_rubric: Optional[Any]
     max_score: float
     auto_gradable: bool
     tags: Optional[Any]
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ExamDetailsResponse(BaseModel):
@@ -181,7 +247,9 @@ class ExamDetailsResponse(BaseModel):
     created_by: int
     created_at: datetime
     updated_at: datetime
-    questions: List[ExamQuestionDetailResponse]
+    sections: List[ExamSectionResponse]
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ExamQuestionReorderRequest(BaseModel):

@@ -11,6 +11,12 @@ from . import service
 from .schemas import (ExamCreateRequest,
                       ExamUpdateRequest,
                       ExamResponse,
+                      ExamSectionCreateRequest,
+                      ExamSectionUpdateRequest,
+                      ExamSectionResponse,
+                      ExamSectionDeleteResponse,
+                      ExamSectionReorderRequest,
+                      ExamSectionReorderResponse,
                       ExamAddQuestionsRequest,
                       ExamAddQuestionsResponse,
                       ExamRemoveQuestionResponse,
@@ -50,16 +56,76 @@ def update_exam_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.post("/{exam_id}/questions",  response_model=ExamAddQuestionsResponse, status_code=status.HTTP_201_CREATED,)
+@router.post("/{exam_id}/sections", response_model=ExamSectionResponse, status_code=status.HTTP_201_CREATED,)
+def add_section_to_exam_endpoint(
+    course_id: int,
+    exam_id: int,
+    payload: ExamSectionCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.add_section_to_exam(
+        course_id=course_id,
+        exam_id=exam_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
+
+@router.patch("/{exam_id}/sections/{section_id}", response_model=ExamSectionResponse,)
+def update_exam_section_endpoint(
+    course_id: int,
+    exam_id: int,
+    section_id: int,
+    payload: ExamSectionUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.update_exam_section(
+        course_id=course_id,
+        exam_id=exam_id,
+        section_id=section_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
+
+# @router.patch("/{exam_id}/sections/reorder", response_model=ExamSectionReorderResponse,)
+# def reorder_exam_sections_endpoint(
+#     course_id: int,
+#     exam_id: int,
+#     payload: ExamSectionReorderRequest,
+#     db: Session = Depends(get_db),
+#     current_user: dict = Depends(get_current_user),):
+#     return service.reorder_exam_sections(
+#         course_id=course_id,
+#         exam_id=exam_id,
+#         payload=payload,
+#         db=db,
+#         current_user=current_user,)
+
+@router.delete("/{exam_id}/sections/{section_id}", response_model=ExamSectionDeleteResponse,)
+def delete_exam_section_endpoint(
+    course_id: int,
+    exam_id: int,
+    section_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.delete_exam_section(
+        course_id=course_id,
+        exam_id=exam_id,
+        section_id=section_id,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/{exam_id}/sections/{section_id}/questions",  response_model=ExamAddQuestionsResponse, status_code=status.HTTP_201_CREATED,)
 def add_questions_to_exam_endpoint(
     course_id: int,
     exam_id: int,
+    section_id: int,
     payload: ExamAddQuestionsRequest,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):
-    return service.add_questions_to_exam(
+    return service.add_questions_to_exam_section(
         course_id=course_id,
         exam_id=exam_id,
+        section_id=section_id,
         payload=payload,
         db=db,
         current_user=current_user,)
@@ -135,6 +201,7 @@ def export_exam_pdf_endpoint(
     include_course_code: bool = False,
     include_exam_metadata: bool = True,
     include_instructions: bool = True,
+    include_section_descriptions: bool = True,
     include_points: bool = True,
     include_student_info_fields: bool = True,
     include_answer_space: bool = True,
@@ -150,6 +217,7 @@ def export_exam_pdf_endpoint(
         include_course_code=include_course_code,
         include_exam_metadata=include_exam_metadata,
         include_instructions=include_instructions,
+        include_section_descriptions=include_section_descriptions,
         include_points=include_points,
         include_student_info_fields=include_student_info_fields,
         include_answer_space=include_answer_space,

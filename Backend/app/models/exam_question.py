@@ -29,9 +29,10 @@ class ExamQuestion(Base):
         nullable=False
     )
 
-    section_id: Mapped[int | None] = mapped_column(
-        ForeignKey("exam_sections.id", ondelete="SET NULL"),
-        nullable=True
+    section_id: Mapped[int] = mapped_column(
+        ForeignKey("exam_sections.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True
     )
 
     question_id: Mapped[int] = mapped_column(
@@ -133,10 +134,10 @@ class ExamQuestion(Base):
             "question_id",
             unique=True
         ),
-        # unique ordering inside exam
+        # unique ordering inside section
         Index(
-            "uq_exam_questions_exam_order",
-            "exam_id",
+            "uq_exam_questions_section_order",
+            "section_id",
             "order_index",
             unique=True
         ),
