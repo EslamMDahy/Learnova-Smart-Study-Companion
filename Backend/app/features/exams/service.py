@@ -1575,6 +1575,7 @@ def get_exam(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
 
 
 def export_exam_pdf(*, course_id: int, exam_id: int, include_learnova_logo: bool,
+                    include_course_title: bool, include_course_code: bool,
                     include_exam_metadata: bool,include_instructions: bool, include_points: bool,
                     include_student_info_fields: bool, include_answer_space: bool, shuffle_questions: bool | None,
                     shuffle_options: bool | None, db: Session, current_user: dict,):
@@ -1601,7 +1602,7 @@ def export_exam_pdf(*, course_id: int, exam_id: int, include_learnova_logo: bool
         # =========================
         course_row = db.execute(
             text("""
-                SELECT id, created_by
+                SELECT id, created_by, title, course_code
                 FROM courses
                 WHERE id = :course_id
                 LIMIT 1
@@ -1755,8 +1756,11 @@ def export_exam_pdf(*, course_id: int, exam_id: int, include_learnova_logo: bool
 
         export_context = build_exam_export_context(
             exam_row=dict(exam_row),
+            course_row=dict(course_row),
             question_rows=[dict(row) for row in question_rows],
             include_learnova_logo=include_learnova_logo,
+            include_course_title=include_course_title,
+            include_course_code=include_course_code,
             include_exam_metadata=include_exam_metadata,
             include_instructions=include_instructions,
             include_points=include_points,
