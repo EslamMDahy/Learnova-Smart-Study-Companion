@@ -14,9 +14,9 @@ from .schemas import (ExamCreateRequest,
                       ExamSectionCreateRequest,
                       ExamSectionUpdateRequest,
                       ExamSectionResponse,
-                      ExamSectionDeleteResponse,
                       ExamSectionReorderRequest,
                       ExamSectionReorderResponse,
+                      ExamSectionDeleteResponse,
                       ExamAddQuestionsRequest,
                       ExamAddQuestionsResponse,
                       ExamRemoveQuestionResponse,
@@ -70,6 +70,20 @@ def add_section_to_exam_endpoint(
         db=db,
         current_user=current_user,)
 
+@router.patch("/{exam_id}/sections/reorder", response_model=ExamSectionReorderResponse,)
+def reorder_exam_sections_endpoint(
+    course_id: int,
+    exam_id: int,
+    payload: ExamSectionReorderRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.reorder_exam_sections(
+        course_id=course_id,
+        exam_id=exam_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
+
 @router.patch("/{exam_id}/sections/{section_id}", response_model=ExamSectionResponse,)
 def update_exam_section_endpoint(
     course_id: int,
@@ -85,20 +99,6 @@ def update_exam_section_endpoint(
         payload=payload,
         db=db,
         current_user=current_user,)
-
-# @router.patch("/{exam_id}/sections/reorder", response_model=ExamSectionReorderResponse,)
-# def reorder_exam_sections_endpoint(
-#     course_id: int,
-#     exam_id: int,
-#     payload: ExamSectionReorderRequest,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),):
-#     return service.reorder_exam_sections(
-#         course_id=course_id,
-#         exam_id=exam_id,
-#         payload=payload,
-#         db=db,
-#         current_user=current_user,)
 
 @router.delete("/{exam_id}/sections/{section_id}", response_model=ExamSectionDeleteResponse,)
 def delete_exam_section_endpoint(
@@ -130,30 +130,34 @@ def add_questions_to_exam_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.patch("/{exam_id}/questions/reorder", response_model=ExamQuestionReorderResponse,)
+@router.patch("/{exam_id}/sections/{section_id}/questions/reorder", response_model=ExamQuestionReorderResponse,)
 def reorder_exam_questions_endpoint(
     course_id: int,
     exam_id: int,
+    section_id: int,
     payload: ExamQuestionReorderRequest,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):
     return service.reorder_exam_questions(
         course_id=course_id,
         exam_id=exam_id,
+        section_id=section_id,
         payload=payload,
         db=db,
         current_user=current_user,)
 
-@router.delete("/{exam_id}/questions/{exam_question_id}", response_model=ExamRemoveQuestionResponse, status_code=status.HTTP_200_OK)
+@router.delete("/{exam_id}/sections/{section_id}questions/{exam_question_id}", response_model=ExamRemoveQuestionResponse, status_code=status.HTTP_200_OK)
 def remove_question_from_exam_endpoint(
     course_id: int,
     exam_id: int,
+    section_id: int,
     exam_question_id: int,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):
     return service.remove_question_from_exam(
         course_id=course_id,
         exam_id=exam_id,
+        section_id=section_id,
         exam_question_id=exam_question_id,
         db=db,
         current_user=current_user,)

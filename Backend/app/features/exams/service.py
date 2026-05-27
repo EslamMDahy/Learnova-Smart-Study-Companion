@@ -11,6 +11,7 @@ from .schemas import (ExamCreateRequest,
                       ExamUpdateRequest,
                       ExamSectionCreateRequest,
                       ExamSectionUpdateRequest,
+                      ExamSectionReorderRequest,
                       ExamAddQuestionsRequest)
 
 from .helpers import (build_exam_export_context,
@@ -626,6 +627,172 @@ def add_section_to_exam(*, course_id: int, exam_id: int, payload: ExamSectionCre
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(status_code=409, detail="Conflict while adding section to exam") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def reorder_exam_sections(*, course_id: int, exam_id: int, payload: ExamSectionReorderRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can reorder exam sections")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not exam_id or exam_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    section_ids = payload.section_ids
+
+    if not section_ids:
+        raise HTTPException(status_code=422, detail="section_ids is required")
+
+    if any((not sid or sid <= 0) for sid in section_ids):
+        raise HTTPException(status_code=422, detail="Invalid section_id in section_ids")
+
+    if len(section_ids) != len(set(section_ids)):
+        raise HTTPException(status_code=400, detail="Duplicate section_ids are not allowed")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only reorder sections for your own course",
+            )
+
+        # =========================
+        # 3) Validate exam belongs to course
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT id, course_id, created_by, is_published
+                FROM exams
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {
+                "exam_id": exam_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=404, detail="Exam not found")
+
+        if int(exam_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only reorder sections in your own exam",
+            )
+
+        if exam_row["is_published"]:
+            raise HTTPException(status_code=403, detail="Cannot reorder sections in a published exam")
+
+        # =========================
+        # 4) Fetch all exam sections
+        # =========================
+        section_rows = db.execute(
+            text("""
+                SELECT id
+                FROM exam_sections
+                WHERE exam_id = :exam_id
+                ORDER BY order_index ASC, id ASC
+            """),
+            {"exam_id": exam_id},
+        ).mappings().all()
+
+        db_section_ids = [int(row["id"]) for row in section_rows]
+
+        if not db_section_ids:
+            raise HTTPException(status_code=404, detail="No sections found for this exam")
+
+        if set(section_ids) != set(db_section_ids):
+            raise HTTPException(
+                status_code=400,
+                detail="section_ids must include all exam sections exactly once",
+            )
+
+        # =========================
+        # 5) Reorder with two-phase update
+        #    to avoid unique conflict on (exam_id, order_index)
+        # =========================
+        for index, section_id in enumerate(section_ids):
+            db.execute(
+                text("""
+                    UPDATE exam_sections
+                    SET
+                        order_index = :temp_order_index,
+                        updated_at = NOW()
+                    WHERE id = :section_id
+                      AND exam_id = :exam_id
+                """),
+                {
+                    "section_id": section_id,
+                    "exam_id": exam_id,
+                    "temp_order_index": -(index + 1),
+                },
+            )
+
+        for index, section_id in enumerate(section_ids):
+            db.execute(
+                text("""
+                    UPDATE exam_sections
+                    SET
+                        order_index = :order_index,
+                        updated_at = NOW()
+                    WHERE id = :section_id
+                      AND exam_id = :exam_id
+                """),
+                {
+                    "section_id": section_id,
+                    "exam_id": exam_id,
+                    "order_index": index + 1,
+                },
+            )
+
+        db.commit()
+
+        return {
+            "exam_id": exam_id,
+            "course_id": course_id,
+            "section_ids": section_ids,
+            "message": "Exam sections reordered successfully",
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while reordering exam sections") from e
 
     except SQLAlchemyError as e:
         db.rollback()
@@ -1378,7 +1545,7 @@ def add_questions_to_exam_section(*, course_id: int, exam_id: int, section_id: i
 
 
 
-def reorder_exam_questions(*, course_id: int, exam_id: int, payload, db: Session, current_user: dict,):
+def reorder_exam_questions(*, course_id: int, exam_id: int, section_id: int, payload, db: Session, current_user: dict,):
     # =========================
     # 1) Authorization
     # =========================
@@ -1395,6 +1562,9 @@ def reorder_exam_questions(*, course_id: int, exam_id: int, payload, db: Session
 
     if not exam_id or exam_id <= 0:
         raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    if not section_id or section_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid section_id")
 
     exam_question_ids = getattr(payload, "exam_question_ids", None)
     if not isinstance(exam_question_ids, list) or not exam_question_ids:
@@ -1464,34 +1634,57 @@ def reorder_exam_questions(*, course_id: int, exam_id: int, payload, db: Session
             raise HTTPException(status_code=403, detail="Cannot reorder questions in a published exam")
 
         # =========================
-        # 4) Fetch all exam questions
+        # 4) Validate section belongs to exam
+        # =========================
+        section_row = db.execute(
+            text("""
+                SELECT id
+                FROM exam_sections
+                WHERE id = :section_id
+                  AND exam_id = :exam_id
+                LIMIT 1
+            """),
+            {
+                "section_id": section_id,
+                "exam_id": exam_id,
+            },
+        ).mappings().first()
+
+        if not section_row:
+            raise HTTPException(status_code=404, detail="Exam section not found")
+
+        # =========================
+        # 5) Fetch all section questions
         # =========================
         db_exam_question_rows = db.execute(
             text("""
                 SELECT id
                 FROM exam_questions
                 WHERE exam_id = :exam_id
+                  AND section_id = :section_id
                 ORDER BY order_index ASC, id ASC
             """),
-            {"exam_id": exam_id},
+            {
+                "exam_id": exam_id,
+                "section_id": section_id,
+            },
         ).mappings().all()
 
         db_exam_question_ids = [int(row["id"]) for row in db_exam_question_rows]
 
         if not db_exam_question_ids:
-            raise HTTPException(status_code=404, detail="No questions found for this exam")
+            raise HTTPException(status_code=404, detail="No questions found for this exam section")
 
         if set(exam_question_ids) != set(db_exam_question_ids):
             raise HTTPException(
                 status_code=400,
-                detail="exam_question_ids must include all exam questions exactly once",
+                detail="exam_question_ids must include all section questions exactly once",
             )
 
         # =========================
-        # 5) Reorder with two-phase update
-        #    to avoid unique conflict on (exam_id, order_index)
+        # 6) Reorder with two-phase update
+        #    to avoid unique conflict on (section_id, order_index)
         # =========================
-        # phase 1: move to temporary negative order values
         for idx, exam_question_id in enumerate(exam_question_ids):
             db.execute(
                 text("""
@@ -1499,15 +1692,16 @@ def reorder_exam_questions(*, course_id: int, exam_id: int, payload, db: Session
                     SET order_index = :temp_order_index
                     WHERE id = :exam_question_id
                       AND exam_id = :exam_id
+                      AND section_id = :section_id
                 """),
                 {
                     "temp_order_index": -(idx + 1),
                     "exam_question_id": exam_question_id,
                     "exam_id": exam_id,
+                    "section_id": section_id,
                 },
             )
 
-        # phase 2: assign final order values
         for idx, exam_question_id in enumerate(exam_question_ids):
             db.execute(
                 text("""
@@ -1515,11 +1709,13 @@ def reorder_exam_questions(*, course_id: int, exam_id: int, payload, db: Session
                     SET order_index = :final_order_index
                     WHERE id = :exam_question_id
                       AND exam_id = :exam_id
+                      AND section_id = :section_id
                 """),
                 {
                     "final_order_index": idx + 1,
                     "exam_question_id": exam_question_id,
                     "exam_id": exam_id,
+                    "section_id": section_id,
                 },
             )
 
@@ -1528,6 +1724,7 @@ def reorder_exam_questions(*, course_id: int, exam_id: int, payload, db: Session
         return {
             "exam_id": exam_id,
             "course_id": course_id,
+            "section_id": section_id,
             "exam_question_ids": exam_question_ids,
             "message": "Exam questions reordered successfully",
         }
@@ -1546,7 +1743,7 @@ def reorder_exam_questions(*, course_id: int, exam_id: int, payload, db: Session
 
 
 
-def remove_question_from_exam(*, course_id: int, exam_id: int, exam_question_id: int, db: Session, current_user: dict,):
+def remove_question_from_exam(*, course_id: int, exam_id: int, section_id: int, exam_question_id: int, db: Session, current_user: dict,):
     # =========================
     # 1) Authorization
     # =========================
@@ -1563,6 +1760,9 @@ def remove_question_from_exam(*, course_id: int, exam_id: int, exam_question_id:
 
     if not exam_id or exam_id <= 0:
         raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    if not section_id or section_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid section_id")
 
     if not exam_question_id or exam_question_id <= 0:
         raise HTTPException(status_code=422, detail="Invalid exam_question_id")
@@ -1620,7 +1820,27 @@ def remove_question_from_exam(*, course_id: int, exam_id: int, exam_question_id:
             raise HTTPException(status_code=403, detail="Cannot remove questions from a published exam")
 
         # =========================
-        # 4) Validate exam_question exists in this exam
+        # 4) Validate section belongs to exam
+        # =========================
+        section_row = db.execute(
+            text("""
+                SELECT id
+                FROM exam_sections
+                WHERE id = :section_id
+                  AND exam_id = :exam_id
+                LIMIT 1
+            """),
+            {
+                "section_id": section_id,
+                "exam_id": exam_id,
+            },
+        ).mappings().first()
+
+        if not section_row:
+            raise HTTPException(status_code=404, detail="Exam section not found")
+
+        # =========================
+        # 5) Validate exam_question exists in this section
         # =========================
         exam_question_row = db.execute(
             text("""
@@ -1628,33 +1848,76 @@ def remove_question_from_exam(*, course_id: int, exam_id: int, exam_question_id:
                 FROM exam_questions
                 WHERE id = :exam_question_id
                   AND exam_id = :exam_id
+                  AND section_id = :section_id
             """),
             {
                 "exam_question_id": exam_question_id,
                 "exam_id": exam_id,
+                "section_id": section_id,
             },
         ).mappings().first()
 
         if not exam_question_row:
-            raise HTTPException(status_code=404, detail="Exam question not found in this exam")
+            raise HTTPException(status_code=404, detail="Exam question not found in this section")
 
         # =========================
-        # 5) Delete exam_question
+        # 6) Delete exam_question
         # =========================
         db.execute(
             text("""
                 DELETE FROM exam_questions
                 WHERE id = :exam_question_id
-                    AND exam_id = :exam_id
+                  AND exam_id = :exam_id
+                  AND section_id = :section_id
             """),
             {
                 "exam_question_id": exam_question_id,
                 "exam_id": exam_id,
+                "section_id": section_id,
             },
         )
 
         # =========================
-        # 6) Recalculate exam totals
+        # 7) Recalculate section totals
+        # =========================
+        section_totals_row = db.execute(
+            text("""
+                SELECT
+                    COUNT(*) AS question_count,
+                    COALESCE(SUM(points), 0) AS section_score
+                FROM exam_questions
+                WHERE section_id = :section_id
+            """),
+            {"section_id": section_id},
+        ).mappings().first()
+
+        if not section_totals_row:
+            section_question_count = 0
+            section_score = 0.0
+        else:
+            section_question_count = int(section_totals_row.get("question_count", 0))
+            section_score = float(section_totals_row.get("section_score", 0))
+
+        db.execute(
+            text("""
+                UPDATE exam_sections
+                SET
+                    question_count = :question_count,
+                    section_score = :section_score,
+                    updated_at = NOW()
+                WHERE id = :section_id
+                  AND exam_id = :exam_id
+            """),
+            {
+                "section_id": section_id,
+                "exam_id": exam_id,
+                "question_count": section_question_count,
+                "section_score": section_score,
+            },
+        )
+
+        # =========================
+        # 8) Recalculate exam totals
         # =========================
         totals_row = db.execute(
             text("""
@@ -1697,7 +1960,10 @@ def remove_question_from_exam(*, course_id: int, exam_id: int, exam_question_id:
         return {
             "exam_id": exam_id,
             "course_id": course_id,
+            "section_id": section_id,
             "removed_exam_question_id": exam_question_id,
+            "section_question_count": section_question_count,
+            "section_score": section_score,
             "total_questions": total_questions,
             "total_score": total_score,
             "message": "Question removed from exam successfully",
