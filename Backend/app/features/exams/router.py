@@ -230,19 +230,19 @@ def create_exam_template_endpoint(
         current_user=current_user,)
 
 
-# @router.patch("/templates/{template_id}", response_model=ExamTemplateDetailsResponse,)
-# def update_exam_template_endpoint(
-#     course_id: int,
-#     template_id: int,
-#     payload: ExamTemplateUpdateRequest,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),):
-#     return service.update_exam_template(
-#         course_id=course_id,
-#         template_id=template_id,
-#         payload=payload,
-#         db=db,
-#         current_user=current_user,)
+@router.patch("/templates/{template_id}", response_model=ExamTemplateDetailsResponse,)
+def update_exam_template_endpoint(
+    course_id: int,
+    template_id: int,
+    payload: ExamTemplateUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.update_exam_template(
+        course_id=course_id,
+        template_id=template_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
 
 
 # @router.delete("/templates/{template_id}", response_model=ExamTemplateDeleteResponse,)
