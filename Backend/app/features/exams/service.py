@@ -2879,3 +2879,205 @@ def export_exam_pdf(*, course_id: int, exam_id: int, include_learnova_logo: bool
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def list_exam_templates(*, course_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can view exam templates")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only view exam templates for your own course",
+            )
+
+        # =========================
+        # 3) Fetch exam templates
+        # =========================
+        template_rows = db.execute(
+            text("""
+                SELECT
+                    et.id,
+                    et.name,
+                    et.exam_type,
+                    et.is_default,
+                    et.duration_minutes,
+                    et.total_questions,
+                    et.total_score,
+                    COUNT(ets.id)::int AS sections_count
+                FROM exam_templates et
+                LEFT JOIN exam_template_sections ets
+                    ON ets.template_id = et.id
+                WHERE et.course_id = :course_id
+                GROUP BY
+                    et.id,
+                    et.name,
+                    et.exam_type,
+                    et.is_default,
+                    et.duration_minutes,
+                    et.total_questions,
+                    et.total_score,
+                    et.created_at
+                ORDER BY et.is_default DESC, et.created_at ASC, et.id ASC
+            """),
+            {"course_id": course_id},
+        ).mappings().all()
+
+        templates = [dict(row) for row in template_rows]
+
+        return {
+            "course_id": course_id,
+            "total": len(templates),
+            "templates": templates,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def get_exam_template(*, course_id: int, template_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can view exam templates")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not template_id or template_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid template_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only view exam templates for your own course",
+            )
+
+        # =========================
+        # 3) Fetch exam template
+        # =========================
+        template_row = db.execute(
+            text("""
+                SELECT
+                    id,
+                    course_id,
+                    name,
+                    exam_type,
+                    is_default,
+                    duration_minutes,
+                    max_attempts,
+                    passing_score,
+                    shuffle_questions,
+                    shuffle_options,
+                    total_questions,
+                    total_score,
+                    created_at,
+                    updated_at
+                FROM exam_templates
+                WHERE id = :template_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {
+                "template_id": template_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not template_row:
+            raise HTTPException(status_code=404, detail="Exam template not found")
+
+        # =========================
+        # 4) Fetch exam template sections
+        # =========================
+        section_rows = db.execute(
+            text("""
+                SELECT
+                    id,
+                    template_id,
+                    title,
+                    question_type,
+                    question_count,
+                    points_per_question,
+                    section_score,
+                    order_index,
+                    created_at,
+                    updated_at
+                FROM exam_template_sections
+                WHERE template_id = :template_id
+                ORDER BY order_index ASC, id ASC
+            """),
+            {"template_id": template_id},
+        ).mappings().all()
+
+        sections = [dict(row) for row in section_rows]
+
+        template_data = dict(template_row)
+        template_data["sections"] = sections
+
+        return template_data
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+

@@ -193,6 +193,117 @@ def list_exams_endpoint(
         db=db,
         current_user=current_user,)
 
+@router.get("/templates", response_model=ExamTemplateListResponse,)
+def list_exam_templates_endpoint(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.list_exam_templates(
+        course_id=course_id,
+        db=db,
+        current_user=current_user,)
+
+
+@router.get("/templates/{template_id}", response_model=ExamTemplateDetailsResponse,)
+def get_exam_template_endpoint(
+    course_id: int,
+    template_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.get_exam_template(
+        course_id=course_id,
+        template_id=template_id,
+        db=db,
+        current_user=current_user,)
+
+
+# @router.post("/templates", response_model=ExamTemplateDetailsResponse, status_code=status.HTTP_201_CREATED,)
+# def create_exam_template_endpoint(
+#     course_id: int,
+#     payload: ExamTemplateCreateRequest,
+#     db: Session = Depends(get_db),
+#     current_user: dict = Depends(get_current_user),):
+#     return service.create_exam_template(
+#         course_id=course_id,
+#         payload=payload,
+#         db=db,
+#         current_user=current_user,)
+
+
+# @router.patch("/templates/{template_id}", response_model=ExamTemplateDetailsResponse,)
+# def update_exam_template_endpoint(
+#     course_id: int,
+#     template_id: int,
+#     payload: ExamTemplateUpdateRequest,
+#     db: Session = Depends(get_db),
+#     current_user: dict = Depends(get_current_user),):
+#     return service.update_exam_template(
+#         course_id=course_id,
+#         template_id=template_id,
+#         payload=payload,
+#         db=db,
+#         current_user=current_user,)
+
+
+# @router.delete("/templates/{template_id}", response_model=ExamTemplateDeleteResponse,)
+# def delete_exam_template_endpoint(
+#     course_id: int,
+#     template_id: int,
+#     db: Session = Depends(get_db),
+#     current_user: dict = Depends(get_current_user),):
+#     return service.delete_exam_template(
+#         course_id=course_id,
+#         template_id=template_id,
+#         db=db,
+#         current_user=current_user,)
+
+
+# @router.post("/templates/{template_id}/sections", response_model=ExamTemplateSectionResponse, status_code=status.HTTP_201_CREATED,)
+# def create_exam_template_section_endpoint(
+#     course_id: int,
+#     template_id: int,
+#     payload: ExamTemplateSectionCreateRequest,
+#     db: Session = Depends(get_db),
+#     current_user: dict = Depends(get_current_user),):
+#     return service.create_exam_template_section(
+#         course_id=course_id,
+#         template_id=template_id,
+#         payload=payload,
+#         db=db,
+#         current_user=current_user,)
+
+
+# @router.patch("/templates/{template_id}/sections/{section_id}", response_model=ExamTemplateSectionResponse,)
+# def update_exam_template_section_endpoint(
+#     course_id: int,
+#     template_id: int,
+#     section_id: int,
+#     payload: ExamTemplateSectionUpdateRequest,
+#     db: Session = Depends(get_db),
+#     current_user: dict = Depends(get_current_user),):
+#     return service.update_exam_template_section(
+#         course_id=course_id,
+#         template_id=template_id,
+#         section_id=section_id,
+#         payload=payload,
+#         db=db,
+#         current_user=current_user,)
+
+
+# @router.delete("/templates/{template_id}/sections/{section_id}", response_model=ExamTemplateSectionDeleteResponse,)
+# def delete_exam_template_section_endpoint(
+#     course_id: int,
+#     template_id: int,
+#     section_id: int,
+#     db: Session = Depends(get_db),
+#     current_user: dict = Depends(get_current_user),):
+#     return service.delete_exam_template_section(
+#         course_id=course_id,
+#         template_id=template_id,
+#         section_id=section_id,
+#         db=db,
+#         current_user=current_user,)
+
 @router.get("/{exam_id}", response_model=ExamDetailsResponse,)
 def get_exam_endpoint(
     course_id: int,
