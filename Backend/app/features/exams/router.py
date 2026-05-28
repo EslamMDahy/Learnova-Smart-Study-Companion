@@ -272,23 +272,21 @@ def create_exam_template_section_endpoint(
         db=db,
         current_user=current_user,)
 
-
-# @router.patch("/templates/{template_id}/sections/{section_id}", response_model=ExamTemplateSectionResponse,)
-# def update_exam_template_section_endpoint(
-#     course_id: int,
-#     template_id: int,
-#     section_id: int,
-#     payload: ExamTemplateSectionUpdateRequest,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),):
-#     return service.update_exam_template_section(
-#         course_id=course_id,
-#         template_id=template_id,
-#         section_id=section_id,
-#         payload=payload,
-#         db=db,
-#         current_user=current_user,)
-
+@router.patch("/templates/{template_id}/sections/{section_id}", response_model=ExamTemplateSectionResponse,)
+def update_exam_template_section_endpoint(
+    course_id: int,
+    template_id: int,
+    section_id: int,
+    payload: ExamTemplateSectionUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.update_exam_template_section(
+        course_id=course_id,
+        template_id=template_id,
+        section_id=section_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
 
 @router.delete("/templates/{template_id}/sections/{section_id}", response_model=ExamTemplateSectionDeleteResponse,)
 def delete_exam_template_section_endpoint(

@@ -15,7 +15,8 @@ from .schemas import (ExamCreateRequest,
                       ExamAddQuestionsRequest,
                       ExamTemplateCreateRequest,
                       ExamTemplateUpdateRequest,
-                      ExamTemplateSectionCreateRequest)
+                      ExamTemplateSectionCreateRequest,
+                      ExamTemplateSectionUpdateRequest)
 
 from .helpers import (build_exam_export_context,
                       render_exam_pdf_html,
@@ -3789,6 +3790,240 @@ def create_exam_template_section(*, course_id: int, template_id: int, payload: E
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(status_code=409, detail="Conflict while creating exam template section") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def update_exam_template_section(*, course_id: int, template_id: int, section_id: int, payload: ExamTemplateSectionUpdateRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can update exam template sections")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not template_id or template_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid template_id")
+
+    if not section_id or section_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid section_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only update sections in templates for your own course",
+            )
+
+        # =========================
+        # 3) Validate template belongs to course
+        # =========================
+        template_row = db.execute(
+            text("""
+                SELECT id, course_id
+                FROM exam_templates
+                WHERE id = :template_id
+                  AND course_id = :course_id
+                LIMIT 1
+                FOR UPDATE
+            """),
+            {
+                "template_id": template_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not template_row:
+            raise HTTPException(status_code=404, detail="Exam template not found")
+
+        # =========================
+        # 4) Validate section belongs to template
+        # =========================
+        section_row = db.execute(
+            text("""
+                SELECT
+                    id,
+                    template_id,
+                    title,
+                    question_type,
+                    question_count,
+                    points_per_question,
+                    section_score,
+                    order_index,
+                    created_at,
+                    updated_at
+                FROM exam_template_sections
+                WHERE id = :section_id
+                  AND template_id = :template_id
+                LIMIT 1
+                FOR UPDATE
+            """),
+            {
+                "section_id": section_id,
+                "template_id": template_id,
+            },
+        ).mappings().first()
+
+        if not section_row:
+            raise HTTPException(status_code=404, detail="Exam template section not found")
+
+        # =========================
+        # 5) Build dynamic update fields
+        # =========================
+        update_fields = {}
+
+        if payload.title is not None:
+            title = payload.title.strip()
+            if not title:
+                raise HTTPException(status_code=422, detail="Invalid section_title")
+            update_fields["title"] = title
+
+        if payload.question_type is not None:
+            question_type = payload.question_type.strip().lower()
+            if not question_type:
+                raise HTTPException(status_code=422, detail="Invalid question_type")
+            update_fields["question_type"] = question_type
+
+        if payload.question_count is not None:
+            if payload.question_count <= 0:
+                raise HTTPException(status_code=422, detail="Invalid question_count")
+            update_fields["question_count"] = payload.question_count
+
+        if payload.points_per_question is not None:
+            if payload.points_per_question <= 0:
+                raise HTTPException(status_code=422, detail="Invalid points_per_question")
+            update_fields["points_per_question"] = payload.points_per_question
+
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No updatable fields provided")
+
+        final_question_count = update_fields.get("question_count", section_row["question_count"])
+        final_points_per_question = update_fields.get("points_per_question", section_row["points_per_question"])
+        update_fields["section_score"] = float(final_question_count) * float(final_points_per_question)
+
+        # =========================
+        # 6) Update exam template section
+        # =========================
+        set_clauses = []
+        params = {
+            "section_id": section_id,
+            "template_id": template_id,
+        }
+
+        for col in [
+            "title",
+            "question_type",
+            "question_count",
+            "points_per_question",
+            "section_score",
+        ]:
+            if col in update_fields:
+                set_clauses.append(f"{col} = :{col}")
+                params[col] = update_fields[col]
+
+        set_clauses.append("updated_at = NOW()")
+
+        updated_row = db.execute(
+            text(f"""
+                UPDATE exam_template_sections
+                SET {", ".join(set_clauses)}
+                WHERE id = :section_id
+                  AND template_id = :template_id
+                RETURNING
+                    id,
+                    template_id,
+                    title,
+                    question_type,
+                    question_count,
+                    points_per_question,
+                    section_score,
+                    order_index,
+                    created_at,
+                    updated_at
+            """),
+            params,
+        ).mappings().first()
+
+        if not updated_row:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Exam template section could not be updated")
+
+        # =========================
+        # 7) Recalculate template totals
+        # =========================
+        totals_row = db.execute(
+            text("""
+                SELECT
+                    COALESCE(SUM(question_count), 0) AS total_questions,
+                    COALESCE(SUM(section_score), 0) AS total_score
+                FROM exam_template_sections
+                WHERE template_id = :template_id
+            """),
+            {"template_id": template_id},
+        ).mappings().first()
+
+        if not totals_row:
+            total_questions = 0
+            total_score = 0.0
+        else:
+            total_questions = int(totals_row.get("total_questions", 0))
+            total_score = float(totals_row.get("total_score", 0))
+
+        db.execute(
+            text("""
+                UPDATE exam_templates
+                SET
+                    total_questions = :total_questions,
+                    total_score = :total_score,
+                    updated_at = NOW()
+                WHERE id = :template_id
+                  AND course_id = :course_id
+            """),
+            {
+                "template_id": template_id,
+                "course_id": course_id,
+                "total_questions": total_questions,
+                "total_score": total_score,
+            },
+        )
+
+        db.commit()
+
+        return dict(updated_row)
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while updating exam template section") from e
 
     except SQLAlchemyError as e:
         db.rollback()
