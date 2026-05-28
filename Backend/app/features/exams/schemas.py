@@ -300,3 +300,120 @@ class ExamPublishResponse(BaseModel):
     message: str
 
     model_config = ConfigDict(extra="forbid")
+
+
+class ExamTemplateListItemResponse(BaseModel):
+    id: int
+    name: str
+    exam_type: str
+    is_default: bool
+    duration_minutes: Optional[int]
+    total_questions: int
+    total_score: float
+    sections_count: int
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamTemplateListResponse(BaseModel):
+    course_id: int
+    total: int
+    templates: List[ExamTemplateListItemResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamTemplateSectionResponse(BaseModel):
+    id: int
+    template_id: int
+    title: str
+    question_type: str
+    question_count: int
+    points_per_question: float
+    section_score: float
+    order_index: int
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamTemplateDetailsResponse(BaseModel):
+    id: int
+    course_id: int
+    name: str
+    exam_type: str
+    is_default: bool
+    duration_minutes: Optional[int]
+    max_attempts: int
+    passing_score: Optional[float]
+    shuffle_questions: bool
+    shuffle_options: bool
+    total_questions: int
+    total_score: float
+    created_at: datetime
+    updated_at: datetime
+    sections: List[ExamTemplateSectionResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamTemplateCreateRequest(BaseModel):
+    name: str = Field(..., min_length=1, max_length=255)
+    exam_type: str = Field(..., min_length=1, max_length=100)
+    duration_minutes: Optional[int] = Field(default=None, gt=0)
+    max_attempts: int = Field(default=1, ge=0)
+    passing_score: Optional[float] = Field(default=None, ge=0)
+    shuffle_questions: bool = True
+    shuffle_options: bool = True
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamTemplateUpdateRequest(BaseModel):
+    name: Optional[str] = Field(default=None, max_length=255)
+    exam_type: Optional[str] = Field(default=None, max_length=100)
+    duration_minutes: Optional[int] = Field(default=None, gt=0)
+    max_attempts: Optional[int] = Field(default=None, ge=0)
+    passing_score: Optional[float] = Field(default=None, ge=0)
+    shuffle_questions: Optional[bool] = None
+    shuffle_options: Optional[bool] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamTemplateDeleteResponse(BaseModel):
+    course_id: int
+    deleted_template_id: int
+    message: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamTemplateSectionCreateRequest(BaseModel):
+    title: str = Field(..., min_length=1, max_length=255)
+    question_type: str = Field(..., min_length=1, max_length=100)
+    question_count: int = Field(..., gt=0)
+    points_per_question: float = Field(..., gt=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamTemplateSectionUpdateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=255)
+    question_type: Optional[str] = Field(default=None, max_length=100)
+    question_count: Optional[int] = Field(default=None, gt=0)
+    points_per_question: Optional[float] = Field(default=None, gt=0)
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class ExamTemplateSectionDeleteResponse(BaseModel):
+    course_id: int
+    template_id: int
+    deleted_section_id: int
+    total_questions: int
+    total_score: float
+    message: str
+
+    model_config = ConfigDict(extra="forbid")

@@ -24,7 +24,16 @@ from .schemas import (ExamCreateRequest,
                       ExamDetailsResponse,
                       ExamPublishResponse,
                       ExamQuestionReorderRequest,
-                      ExamQuestionReorderResponse)
+                      ExamQuestionReorderResponse,
+                      ExamTemplateCreateRequest,
+                      ExamTemplateUpdateRequest,
+                      ExamTemplateListResponse,
+                      ExamTemplateDetailsResponse,
+                      ExamTemplateDeleteResponse,
+                      ExamTemplateSectionCreateRequest,
+                      ExamTemplateSectionUpdateRequest,
+                      ExamTemplateSectionResponse,
+                      ExamTemplateSectionDeleteResponse,)
 
 
 router = APIRouter(prefix="/courses/{course_id}/exams", tags=["Exams"],)
@@ -146,7 +155,7 @@ def reorder_exam_questions_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.delete("/{exam_id}/sections/{section_id}questions/{exam_question_id}", response_model=ExamRemoveQuestionResponse, status_code=status.HTTP_200_OK)
+@router.delete("/{exam_id}/sections/{section_id}/questions/{exam_question_id}", response_model=ExamRemoveQuestionResponse, status_code=status.HTTP_200_OK)
 def remove_question_from_exam_endpoint(
     course_id: int,
     exam_id: int,
