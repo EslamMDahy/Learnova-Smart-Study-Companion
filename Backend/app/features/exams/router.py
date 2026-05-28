@@ -258,19 +258,19 @@ def delete_exam_template_endpoint(
         current_user=current_user,)
 
 
-# @router.post("/templates/{template_id}/sections", response_model=ExamTemplateSectionResponse, status_code=status.HTTP_201_CREATED,)
-# def create_exam_template_section_endpoint(
-#     course_id: int,
-#     template_id: int,
-#     payload: ExamTemplateSectionCreateRequest,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),):
-#     return service.create_exam_template_section(
-#         course_id=course_id,
-#         template_id=template_id,
-#         payload=payload,
-#         db=db,
-#         current_user=current_user,)
+@router.post("/templates/{template_id}/sections", response_model=ExamTemplateSectionResponse, status_code=status.HTTP_201_CREATED,)
+def create_exam_template_section_endpoint(
+    course_id: int,
+    template_id: int,
+    payload: ExamTemplateSectionCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.create_exam_template_section(
+        course_id=course_id,
+        template_id=template_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
 
 
 # @router.patch("/templates/{template_id}/sections/{section_id}", response_model=ExamTemplateSectionResponse,)

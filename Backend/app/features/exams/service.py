@@ -14,7 +14,8 @@ from .schemas import (ExamCreateRequest,
                       ExamSectionReorderRequest,
                       ExamAddQuestionsRequest,
                       ExamTemplateCreateRequest,
-                      ExamTemplateUpdateRequest)
+                      ExamTemplateUpdateRequest,
+                      ExamTemplateSectionCreateRequest)
 
 from .helpers import (build_exam_export_context,
                       render_exam_pdf_html,
@@ -3585,6 +3586,209 @@ def delete_exam_template(*, course_id: int, template_id: int, db: Session, curre
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(status_code=409, detail="Conflict while deleting exam template") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def create_exam_template_section(*, course_id: int, template_id: int, payload: ExamTemplateSectionCreateRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can create exam template sections")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not template_id or template_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid template_id")
+
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="Section title is required")
+
+    question_type = payload.question_type.strip().lower()
+    if not question_type:
+        raise HTTPException(status_code=422, detail="question_type is required")
+
+    if payload.question_count <= 0:
+        raise HTTPException(status_code=422, detail="Invalid question_count")
+
+    if payload.points_per_question <= 0:
+        raise HTTPException(status_code=422, detail="Invalid points_per_question")
+
+    section_score = float(payload.question_count) * float(payload.points_per_question)
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only create sections in templates for your own course",
+            )
+
+        # =========================
+        # 3) Validate template belongs to course
+        # =========================
+        template_row = db.execute(
+            text("""
+                SELECT id, course_id
+                FROM exam_templates
+                WHERE id = :template_id
+                  AND course_id = :course_id
+                LIMIT 1
+                FOR UPDATE
+            """),
+            {
+                "template_id": template_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not template_row:
+            raise HTTPException(status_code=404, detail="Exam template not found")
+
+        # =========================
+        # 4) Calculate next order index
+        # =========================
+        order_row = db.execute(
+            text("""
+                SELECT COALESCE(MAX(order_index), 0) + 1 AS next_order_index
+                FROM exam_template_sections
+                WHERE template_id = :template_id
+            """),
+            {"template_id": template_id},
+        ).mappings().first()
+
+        order_index = int(order_row["next_order_index"]) if order_row else 1
+
+        # =========================
+        # 5) Insert exam template section
+        # =========================
+        section_row = db.execute(
+            text("""
+                INSERT INTO exam_template_sections (
+                    template_id,
+                    title,
+                    question_type,
+                    question_count,
+                    points_per_question,
+                    section_score,
+                    order_index,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    :template_id,
+                    :title,
+                    :question_type,
+                    :question_count,
+                    :points_per_question,
+                    :section_score,
+                    :order_index,
+                    NOW(),
+                    NOW()
+                )
+                RETURNING
+                    id,
+                    template_id,
+                    title,
+                    question_type,
+                    question_count,
+                    points_per_question,
+                    section_score,
+                    order_index,
+                    created_at,
+                    updated_at
+            """),
+            {
+                "template_id": template_id,
+                "title": title,
+                "question_type": question_type,
+                "question_count": payload.question_count,
+                "points_per_question": payload.points_per_question,
+                "section_score": section_score,
+                "order_index": order_index,
+            },
+        ).mappings().first()
+
+        if not section_row:
+            db.rollback()
+            raise HTTPException(status_code=503, detail="Failed to create exam template section")
+
+        # =========================
+        # 6) Recalculate template totals
+        # =========================
+        totals_row = db.execute(
+            text("""
+                SELECT
+                    COALESCE(SUM(question_count), 0) AS total_questions,
+                    COALESCE(SUM(section_score), 0) AS total_score
+                FROM exam_template_sections
+                WHERE template_id = :template_id
+            """),
+            {"template_id": template_id},
+        ).mappings().first()
+
+        if not totals_row:
+            total_questions = 0
+            total_score = 0.0
+        else:
+            total_questions = int(totals_row.get("total_questions", 0))
+            total_score = float(totals_row.get("total_score", 0))
+
+        db.execute(
+            text("""
+                UPDATE exam_templates
+                SET
+                    total_questions = :total_questions,
+                    total_score = :total_score,
+                    updated_at = NOW()
+                WHERE id = :template_id
+                  AND course_id = :course_id
+            """),
+            {
+                "template_id": template_id,
+                "course_id": course_id,
+                "total_questions": total_questions,
+                "total_score": total_score,
+            },
+        )
+
+        db.commit()
+
+        return dict(section_row)
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while creating exam template section") from e
 
     except SQLAlchemyError as e:
         db.rollback()
