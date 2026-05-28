@@ -3489,3 +3489,167 @@ def update_exam_template(*, course_id: int, template_id: int, payload: ExamTempl
 
 
 
+def delete_exam_template_section(*, course_id: int, template_id: int, section_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can delete exam template sections")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not template_id or template_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid template_id")
+
+    if not section_id or section_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid section_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only delete sections from templates in your own course",
+            )
+
+        # =========================
+        # 3) Validate template belongs to course
+        # =========================
+        template_row = db.execute(
+            text("""
+                SELECT id, course_id
+                FROM exam_templates
+                WHERE id = :template_id
+                  AND course_id = :course_id
+                LIMIT 1
+                FOR UPDATE
+            """),
+            {
+                "template_id": template_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not template_row:
+            raise HTTPException(status_code=404, detail="Exam template not found")
+
+        # =========================
+        # 4) Validate section belongs to template
+        # =========================
+        section_row = db.execute(
+            text("""
+                SELECT id
+                FROM exam_template_sections
+                WHERE id = :section_id
+                  AND template_id = :template_id
+                LIMIT 1
+            """),
+            {
+                "section_id": section_id,
+                "template_id": template_id,
+            },
+        ).mappings().first()
+
+        if not section_row:
+            raise HTTPException(status_code=404, detail="Exam template section not found")
+
+        # =========================
+        # 5) Delete exam template section
+        # =========================
+        db.execute(
+            text("""
+                DELETE FROM exam_template_sections
+                WHERE id = :section_id
+                  AND template_id = :template_id
+            """),
+            {
+                "section_id": section_id,
+                "template_id": template_id,
+            },
+        )
+
+        # =========================
+        # 6) Recalculate template totals
+        # =========================
+        totals_row = db.execute(
+            text("""
+                SELECT
+                    COALESCE(SUM(question_count), 0) AS total_questions,
+                    COALESCE(SUM(section_score), 0) AS total_score
+                FROM exam_template_sections
+                WHERE template_id = :template_id
+            """),
+            {"template_id": template_id},
+        ).mappings().first()
+
+        if not totals_row:
+            total_questions = 0
+            total_score = 0.0
+        else:
+            total_questions = int(totals_row.get("total_questions", 0))
+            total_score = float(totals_row.get("total_score", 0))
+
+        db.execute(
+            text("""
+                UPDATE exam_templates
+                SET
+                    total_questions = :total_questions,
+                    total_score = :total_score,
+                    updated_at = NOW()
+                WHERE id = :template_id
+                  AND course_id = :course_id
+            """),
+            {
+                "template_id": template_id,
+                "course_id": course_id,
+                "total_questions": total_questions,
+                "total_score": total_score,
+            },
+        )
+
+        db.commit()
+
+        return {
+            "course_id": course_id,
+            "template_id": template_id,
+            "deleted_section_id": section_id,
+            "total_questions": total_questions,
+            "total_score": total_score,
+            "message": "Exam template section deleted successfully",
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while deleting exam template section") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
