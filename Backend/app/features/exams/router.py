@@ -217,17 +217,17 @@ def get_exam_template_endpoint(
         current_user=current_user,)
 
 
-# @router.post("/templates", response_model=ExamTemplateDetailsResponse, status_code=status.HTTP_201_CREATED,)
-# def create_exam_template_endpoint(
-#     course_id: int,
-#     payload: ExamTemplateCreateRequest,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),):
-#     return service.create_exam_template(
-#         course_id=course_id,
-#         payload=payload,
-#         db=db,
-#         current_user=current_user,)
+@router.post("/templates", response_model=ExamTemplateDetailsResponse, status_code=status.HTTP_201_CREATED,)
+def create_exam_template_endpoint(
+    course_id: int,
+    payload: ExamTemplateCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.create_exam_template(
+        course_id=course_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
 
 
 # @router.patch("/templates/{template_id}", response_model=ExamTemplateDetailsResponse,)

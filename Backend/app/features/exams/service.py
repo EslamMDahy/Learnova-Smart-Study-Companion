@@ -12,7 +12,8 @@ from .schemas import (ExamCreateRequest,
                       ExamSectionCreateRequest,
                       ExamSectionUpdateRequest,
                       ExamSectionReorderRequest,
-                      ExamAddQuestionsRequest)
+                      ExamAddQuestionsRequest,
+                      ExamTemplateCreateRequest)
 
 from .helpers import (build_exam_export_context,
                       render_exam_pdf_html,
@@ -3079,5 +3080,173 @@ def get_exam_template(*, course_id: int, template_id: int, db: Session, current_
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail="Database error") from e
 
+
+
+def create_exam_template(*, course_id: int, payload: ExamTemplateCreateRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can create exam templates")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=422, detail="Template name is required")
+
+    exam_type = payload.exam_type.strip().lower()
+    if not exam_type:
+        raise HTTPException(status_code=422, detail="exam_type is required")
+
+    # =========================
+    # 2) Validate template input
+    # =========================
+    if payload.duration_minutes is not None and payload.duration_minutes <= 0:
+        raise HTTPException(status_code=422, detail="duration_minutes must be greater than 0")
+
+    if payload.max_attempts < 0:
+        raise HTTPException(status_code=422, detail="max_attempts must be greater than or equal to 0")
+
+    if payload.passing_score is not None and payload.passing_score < 0:
+        raise HTTPException(status_code=422, detail="passing_score must be greater than or equal to 0")
+
+    try:
+        # =========================
+        # 3) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only create exam templates for your own course",
+            )
+
+        # =========================
+        # 4) Validate template name uniqueness
+        # =========================
+        existing_template_row = db.execute(
+            text("""
+                SELECT id
+                FROM exam_templates
+                WHERE course_id = :course_id
+                  AND LOWER(name) = LOWER(:name)
+                LIMIT 1
+            """),
+            {
+                "course_id": course_id,
+                "name": name,
+            },
+        ).mappings().first()
+
+        if existing_template_row:
+            raise HTTPException(
+                status_code=409,
+                detail="Exam template name already exists in this course",
+            )
+
+        # =========================
+        # 5) Insert exam template metadata
+        # =========================
+        template_row = db.execute(
+            text("""
+                INSERT INTO exam_templates (
+                    course_id,
+                    name,
+                    exam_type,
+                    is_default,
+                    duration_minutes,
+                    max_attempts,
+                    passing_score,
+                    shuffle_questions,
+                    shuffle_options,
+                    total_questions,
+                    total_score,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    :course_id,
+                    :name,
+                    :exam_type,
+                    FALSE,
+                    :duration_minutes,
+                    :max_attempts,
+                    :passing_score,
+                    :shuffle_questions,
+                    :shuffle_options,
+                    0,
+                    0,
+                    NOW(),
+                    NOW()
+                )
+                RETURNING
+                    id,
+                    course_id,
+                    name,
+                    exam_type,
+                    is_default,
+                    duration_minutes,
+                    max_attempts,
+                    passing_score,
+                    shuffle_questions,
+                    shuffle_options,
+                    total_questions,
+                    total_score,
+                    created_at,
+                    updated_at
+            """),
+            {
+                "course_id": course_id,
+                "name": name,
+                "exam_type": exam_type,
+                "duration_minutes": payload.duration_minutes,
+                "max_attempts": payload.max_attempts,
+                "passing_score": payload.passing_score,
+                "shuffle_questions": payload.shuffle_questions,
+                "shuffle_options": payload.shuffle_options,
+            },
+        ).mappings().first()
+
+        if not template_row:
+            db.rollback()
+            raise HTTPException(status_code=503, detail="Failed to create exam template")
+
+        db.commit()
+
+        template_data = dict(template_row)
+        template_data["sections"] = []
+
+        return template_data
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while creating exam template") from e
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
 
 
