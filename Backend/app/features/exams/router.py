@@ -245,17 +245,17 @@ def update_exam_template_endpoint(
         current_user=current_user,)
 
 
-# @router.delete("/templates/{template_id}", response_model=ExamTemplateDeleteResponse,)
-# def delete_exam_template_endpoint(
-#     course_id: int,
-#     template_id: int,
-#     db: Session = Depends(get_db),
-#     current_user: dict = Depends(get_current_user),):
-#     return service.delete_exam_template(
-#         course_id=course_id,
-#         template_id=template_id,
-#         db=db,
-#         current_user=current_user,)
+@router.delete("/templates/{template_id}", response_model=ExamTemplateDeleteResponse,)
+def delete_exam_template_endpoint(
+    course_id: int,
+    template_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.delete_exam_template(
+        course_id=course_id,
+        template_id=template_id,
+        db=db,
+        current_user=current_user,)
 
 
 # @router.post("/templates/{template_id}/sections", response_model=ExamTemplateSectionResponse, status_code=status.HTTP_201_CREATED,)

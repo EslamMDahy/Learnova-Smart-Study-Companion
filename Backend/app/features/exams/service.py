@@ -3489,6 +3489,109 @@ def update_exam_template(*, course_id: int, template_id: int, payload: ExamTempl
 
 
 
+def delete_exam_template(*, course_id: int, template_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can delete exam templates")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not template_id or template_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid template_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only delete exam templates from your own course",
+            )
+
+        # =========================
+        # 3) Validate template belongs to course
+        # =========================
+        template_row = db.execute(
+            text("""
+                SELECT id, course_id, is_default
+                FROM exam_templates
+                WHERE id = :template_id
+                  AND course_id = :course_id
+                LIMIT 1
+                FOR UPDATE
+            """),
+            {
+                "template_id": template_id,
+                "course_id": course_id,
+            },
+        ).mappings().first()
+
+        if not template_row:
+            raise HTTPException(status_code=404, detail="Exam template not found")
+
+        if bool(template_row["is_default"]):
+            raise HTTPException(status_code=403, detail="Default exam templates cannot be deleted")
+
+        # =========================
+        # 4) Delete custom exam template
+        # =========================
+        db.execute(
+            text("""
+                DELETE FROM exam_templates
+                WHERE id = :template_id
+                  AND course_id = :course_id
+                  AND is_default = FALSE
+            """),
+            {
+                "template_id": template_id,
+                "course_id": course_id,
+            },
+        )
+
+        db.commit()
+
+        return {
+            "course_id": course_id,
+            "deleted_template_id": template_id,
+            "message": "Exam template deleted successfully",
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while deleting exam template") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
 def delete_exam_template_section(*, course_id: int, template_id: int, section_id: int, db: Session, current_user: dict,):
     # =========================
     # 1) Authorization
