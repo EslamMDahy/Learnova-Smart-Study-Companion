@@ -33,7 +33,9 @@ from .schemas import (ExamCreateRequest,
                       ExamTemplateSectionCreateRequest,
                       ExamTemplateSectionUpdateRequest,
                       ExamTemplateSectionResponse,
-                      ExamTemplateSectionDeleteResponse,)
+                      ExamTemplateSectionDeleteResponse,
+                      GenerateExamFromTemplateRequest,
+                      GenerateExamFromTemplateResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}/exams", tags=["Exams"],)
@@ -203,7 +205,6 @@ def list_exam_templates_endpoint(
         db=db,
         current_user=current_user,)
 
-
 @router.get("/templates/{template_id}", response_model=ExamTemplateDetailsResponse,)
 def get_exam_template_endpoint(
     course_id: int,
@@ -216,7 +217,6 @@ def get_exam_template_endpoint(
         db=db,
         current_user=current_user,)
 
-
 @router.post("/templates", response_model=ExamTemplateDetailsResponse, status_code=status.HTTP_201_CREATED,)
 def create_exam_template_endpoint(
     course_id: int,
@@ -228,7 +228,6 @@ def create_exam_template_endpoint(
         payload=payload,
         db=db,
         current_user=current_user,)
-
 
 @router.patch("/templates/{template_id}", response_model=ExamTemplateDetailsResponse,)
 def update_exam_template_endpoint(
@@ -244,7 +243,6 @@ def update_exam_template_endpoint(
         db=db,
         current_user=current_user,)
 
-
 @router.delete("/templates/{template_id}", response_model=ExamTemplateDeleteResponse,)
 def delete_exam_template_endpoint(
     course_id: int,
@@ -256,7 +254,6 @@ def delete_exam_template_endpoint(
         template_id=template_id,
         db=db,
         current_user=current_user,)
-
 
 @router.post("/templates/{template_id}/sections", response_model=ExamTemplateSectionResponse, status_code=status.HTTP_201_CREATED,)
 def create_exam_template_section_endpoint(
@@ -299,6 +296,20 @@ def delete_exam_template_section_endpoint(
         course_id=course_id,
         template_id=template_id,
         section_id=section_id,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/templates/{template_id}/generate-exam", response_model=GenerateExamFromTemplateResponse, status_code=status.HTTP_201_CREATED)
+def generate_exam_from_template_endpoint(
+    course_id: int,
+    template_id: int,
+    payload: GenerateExamFromTemplateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.generate_exam_from_template(
+        course_id=course_id,
+        template_id=template_id,
+        payload=payload,
         db=db,
         current_user=current_user,)
 

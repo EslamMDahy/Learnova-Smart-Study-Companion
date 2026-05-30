@@ -16,7 +16,8 @@ from .schemas import (ExamCreateRequest,
                       ExamTemplateCreateRequest,
                       ExamTemplateUpdateRequest,
                       ExamTemplateSectionCreateRequest,
-                      ExamTemplateSectionUpdateRequest)
+                      ExamTemplateSectionUpdateRequest,
+                      GenerateExamFromTemplateRequest)
 
 from .helpers import (build_exam_export_context,
                       render_exam_pdf_html,
@@ -4193,5 +4194,381 @@ def delete_exam_template_section(*, course_id: int, template_id: int, section_id
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
 
+
+
+def generate_exam_from_template(
+    *,
+    course_id: int,
+    template_id: int,
+    payload: GenerateExamFromTemplateRequest,
+    db: Session,
+    current_user: dict,
+):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(
+            status_code=403,
+            detail="Only instructors can generate exams from templates",
+        )
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not template_id or template_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid template_id")
+
+    title = payload.title.strip() if payload.title else None
+    if not title:
+        raise HTTPException(status_code=422, detail="Exam title is required")
+
+    try:
+        # =========================
+        # 2) Validate course + ownership
+        # =========================
+        course_row = db.execute(
+            text("SELECT id, created_by FROM courses WHERE id = :course_id LIMIT 1"),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only generate exams for your own course",
+            )
+
+        # =========================
+        # 3) Validate template + sections
+        # =========================
+        template_row = db.execute(
+            text("""
+                SELECT id, name, exam_type, duration_minutes, max_attempts,
+                       shuffle_questions, shuffle_options
+                FROM exam_templates
+                WHERE id = :template_id AND course_id = :course_id
+                LIMIT 1
+            """),
+            {"template_id": template_id, "course_id": course_id},
+        ).mappings().first()
+
+        if not template_row:
+            raise HTTPException(status_code=404, detail="Exam template not found")
+
+        section_rows = db.execute(
+            text("""
+                SELECT id, title, question_type, question_count,
+                       points_per_question, order_index
+                FROM exam_template_sections
+                WHERE template_id = :template_id
+                ORDER BY order_index ASC
+            """),
+            {"template_id": template_id},
+        ).mappings().all()
+
+        if not section_rows:
+            raise HTTPException(status_code=400, detail="Template has no sections")
+
+        # =========================
+        # 4) Validate difficulty distribution
+        # =========================
+        if payload.section_difficulty_distribution is None:
+            raise HTTPException(
+                status_code=422,
+                detail="section_difficulty_distribution is required",
+            )
+
+        for section in section_rows:
+            key = str(section["order_index"])
+            if key not in payload.section_difficulty_distribution:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Missing difficulty distribution for section with order_index={section['order_index']}",
+                )
+            dist = payload.section_difficulty_distribution[key]
+            total_percent = sum(dist.values())
+            if not (99 <= total_percent <= 101):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Difficulty percentages for section order_index={section['order_index']} must sum to 100 (got {total_percent})",
+                )
+
+        # =========================
+        # 5) Create exam row
+        # =========================
+        exam_row = db.execute(
+            text("""
+                INSERT INTO exams (
+                    course_id, title, exam_type, duration_minutes, max_attempts,
+                    shuffle_questions, shuffle_options, total_questions, total_score,
+                    is_published, is_auto_generated, enable_proctoring, prevent_copy_paste,
+                    prevent_tab_switch, require_webcam, require_microphone,
+                    created_by, created_at, updated_at
+                ) VALUES (
+                    :course_id, :title, :exam_type, :duration_minutes, :max_attempts,
+                    :shuffle_questions, :shuffle_options, 0, 0,
+                    FALSE, TRUE, FALSE, FALSE,
+                    FALSE, FALSE, FALSE,
+                    :created_by, NOW(), NOW()
+                )
+                RETURNING id, created_at, updated_at
+            """),
+            {
+                "course_id": course_id,
+                "title": title,
+                "exam_type": template_row["exam_type"],
+                "duration_minutes": template_row["duration_minutes"],
+                "max_attempts": template_row["max_attempts"],
+                "shuffle_questions": template_row["shuffle_questions"],
+                "shuffle_options": template_row["shuffle_options"],
+                "created_by": instructor_id,
+            }
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=503, detail="Failed to create exam")
+
+        exam_id = int(exam_row["id"])
+        exam_created_at = exam_row["created_at"]
+        exam_updated_at = exam_row["updated_at"]
+
+        actual_total_questions = 0
+        actual_total_score = 0.0
+        generated_sections = []
+
+        # =========================
+        # 6) Per-section: pick questions + insert section + insert exam_questions
+        # =========================
+        for section in section_rows:
+            key = str(section["order_index"])
+            difficulty_dist = payload.section_difficulty_distribution[key]
+            needed = int(section["question_count"])
+
+            # توزيع النسب مع تصحيح rounding error في آخر level
+            counts: dict[str, int] = {}
+            assigned = 0
+            levels = list(difficulty_dist.keys())
+            for i, level in enumerate(levels):
+                if i < len(levels) - 1:
+                    c = round(needed * difficulty_dist[level] / 100)
+                else:
+                    c = needed - assigned
+                counts[level] = max(c, 0)
+                assigned += counts[level]
+
+            # جلب الأسئلة لكل difficulty
+            section_questions: list[dict] = []
+            seen_question_ids: set[int] = set()
+
+            for level, count in counts.items():
+                if count <= 0:
+                    continue
+
+                params = {
+                    "course_id": course_id,
+                    "question_type": section["question_type"],
+                    "difficulty": level,
+                    "excluded": list(seen_question_ids) if seen_question_ids else [-1],
+                    "lim": count,
+                }
+
+                if payload.topic_ids:
+                    params["topic_ids"] = payload.topic_ids
+                    rows = db.execute(
+                        text("""
+                            SELECT id, type, difficulty, question_text,
+                                   topic_id, course_id,
+                                   explanation, options, expected_answer,
+                                   max_score, auto_gradable, tags,
+                                   updated_at
+                            FROM questions
+                            WHERE course_id  = :course_id
+                              AND topic_id   = ANY(:topic_ids)
+                              AND type       = :question_type
+                              AND difficulty = :difficulty
+                              AND id != ALL(:excluded)
+                            ORDER BY RANDOM()
+                            LIMIT :lim
+                        """),
+                        params,
+                    ).mappings().all()
+                else:
+                    rows = db.execute(
+                        text("""
+                            SELECT id, type, difficulty, content,
+                                   topic_id, course_id, points,
+                                   explanation, options, expected_answer,
+                                   max_score, auto_gradable, tags,
+                                   updated_at
+                            FROM questions
+                            WHERE course_id  = :course_id
+                              AND type       = :question_type
+                              AND difficulty = :difficulty
+                              AND id != ALL(:excluded)
+                            ORDER BY RANDOM()
+                            LIMIT :lim
+                        """),
+                        params,
+                    ).mappings().all()
+
+                for r in rows:
+                    q = dict(r)
+                    qid = int(q["id"])
+                    if qid not in seen_question_ids:
+                        seen_question_ids.add(qid)
+                        section_questions.append(q)
+
+            # ---- Insert exam_section ----
+            # الجدول مفيش فيه points_per_question — بنحسب section_score من template
+            actual_section_count = len(section_questions)
+            points_per_q = float(section["points_per_question"])
+            section_score = points_per_q * actual_section_count
+
+            exam_section_row = db.execute(
+                text("""
+                    INSERT INTO exam_sections (
+                        exam_id, title, question_type, question_count,
+                        section_score, order_index,
+                        must_complete, created_at, updated_at
+                    )
+                    VALUES (
+                        :exam_id, :title, :question_type, :question_count,
+                        :section_score, :order_index,
+                        TRUE, NOW(), NOW()
+                    )
+                    RETURNING id
+                """),
+                {
+                    "exam_id": exam_id,
+                    "title": section["title"],
+                    "question_type": section["question_type"],
+                    "question_count": actual_section_count,
+                    "section_score": section_score,
+                    "order_index": section["order_index"],
+                },
+            ).mappings().first()
+
+            if not exam_section_row:
+                raise HTTPException(
+                    status_code=503,
+                    detail=f"Failed to create exam section (order_index={section['order_index']})",
+                )
+
+            exam_section_id = int(exam_section_row["id"])
+
+            # ---- Insert exam_questions مع snapshot data ----
+            for q_order, question in enumerate(section_questions, start=1):
+                db.execute(
+                    text("""
+                        INSERT INTO exam_questions (
+                            exam_id, section_id, question_id,
+                            points, order_index
+                        )
+                        VALUES (
+                            :exam_id, :section_id, :question_id,
+                            :points, :order_index
+                        )
+                    """),
+                    {
+                        "exam_id": exam_id,
+                        "section_id": exam_section_id,        # ✅ الاسم الصح
+                        "question_id": question["id"],
+                        "points": points_per_q,
+                        "order_index": q_order,
+                    },
+                )
+
+            # تجميع الـ response
+            generated_sections.append(
+                {
+                    "id": exam_section_id,
+                    "template_section_id": section["id"],
+                    "title": section["title"],
+                    "question_type": section["question_type"],
+                    "question_count": actual_section_count,
+                    "points_per_question": points_per_q,
+                    "section_score": section_score,
+                    "order_index": section["order_index"],
+                    "time_limit_minutes": None,
+                    "must_complete": True,
+                    "questions": [
+                        {
+                            "question_id": q["id"],
+                            "topic_id": q.get("topic_id"),
+                            "question_text": q.get("question_text"),
+                            "type": q.get("type"),
+                            "difficulty": q.get("difficulty"),
+                            "explanation": q.get("explanation"),
+                            "options": q.get("options"),
+                            "expected_answer": q.get("expected_answer"),
+                            "max_score": q.get("max_score"),
+                            "auto_gradable": q.get("auto_gradable"),
+                            "tags": q.get("tags"),
+                        }
+                        for q in section_questions
+                    ],
+                }
+            )
+
+            actual_total_questions += actual_section_count
+            actual_total_score += section_score
+
+        # =========================
+        # 7) Update exam totals
+        # =========================
+        updated_row = db.execute(
+            text("""
+                UPDATE exams
+                SET total_questions = :total_questions,
+                    total_score     = :total_score,
+                    updated_at      = NOW()
+                WHERE id = :exam_id
+                RETURNING updated_at
+            """),
+            {
+                "exam_id": exam_id,
+                "total_questions": actual_total_questions,
+                "total_score": actual_total_score,
+            },
+        ).mappings().first()
+
+        exam_updated_at = updated_row["updated_at"] if updated_row else exam_updated_at
+
+        db.commit()
+
+        # =========================
+        # 8) Response
+        # =========================
+        return {
+            "id": exam_id,
+            "course_id": course_id,
+            "title": title,
+            "exam_type": template_row["exam_type"],
+            "is_published": False,
+            "duration_minutes": template_row["duration_minutes"],
+            "max_attempts": template_row["max_attempts"],
+            "shuffle_questions": template_row["shuffle_questions"],
+            "shuffle_options": template_row["shuffle_options"],
+            "total_questions": actual_total_questions,
+            "total_score": actual_total_score,
+            "created_at": exam_created_at,
+            "updated_at": exam_updated_at,
+            "sections": generated_sections,
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except SQLAlchemyError as e:
+        db.rollback()
+        print(e)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
