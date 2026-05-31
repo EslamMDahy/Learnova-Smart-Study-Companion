@@ -1201,7 +1201,7 @@ def generate_questions_for_topics(*, course_id: int, payload: QuestionGeneration
         send_ai_request(
             db,
             operation_type="question_generation",
-            endpoint_path="api/v1/courses/{course_id}/questions/generate", # !!!!!!UPDATE THIS AFTER GETING THE REAL ENDPOINT!!!!!!
+            endpoint_path="api/v1/courses/questions/generate", # !!!!!!UPDATE THIS AFTER GETING THE REAL ENDPOINT!!!!!!
             course_id=course_id,
             primary_entity_type="course",
             primary_entity_id=course_id,
