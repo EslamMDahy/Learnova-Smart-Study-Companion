@@ -292,7 +292,7 @@ def _validate_request_log_context(*, request_log: dict, course_id: int, material
 
 
 
-    if request_log_primary_entity_type != "course":
+    if request_log_primary_entity_type != "material":
         print("\n========== PRIMARY ENTITY TYPE VALIDATION FAILED ==========")
         print(f"REQUEST LOG PRIMARY_ENTITY_TYPE = {request_log_primary_entity_type}")
         print("EXPECTED = material")
