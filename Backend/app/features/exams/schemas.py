@@ -417,3 +417,63 @@ class ExamTemplateSectionDeleteResponse(BaseModel):
     message: str
 
     model_config = ConfigDict(extra="forbid")
+
+
+class GenerateExamFromTemplateRequest(BaseModel):
+    title: str
+    topic_ids: Optional[List[int]] = None
+    section_difficulty_distribution: Optional[dict] = None
+    # override_settings: Optional[dict] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class GeneratedExamQuestionItemResponse(BaseModel):
+    question_id: int
+    topic_id: int
+    question_text: str
+    type: str
+    difficulty: str
+    explanation: Optional[str]
+    options: Optional[Any]
+    expected_answer: Optional[Any]
+    max_score: float
+    auto_gradable: bool
+    tags: Optional[Any]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class GeneratedExamSectionResponse(BaseModel):
+    id: int
+    template_section_id: int
+    title: str
+    question_type: str
+    question_count: int
+    points_per_question: float
+    section_score: float
+    order_index: int
+    time_limit_minutes: Optional[int]
+    must_complete: bool
+    questions: List[GeneratedExamQuestionItemResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class GenerateExamFromTemplateResponse(BaseModel):
+    id: int
+    course_id: int
+    title: str
+    exam_type: str
+    is_published: bool
+    duration_minutes: Optional[int]
+    max_attempts: int
+    shuffle_questions: bool
+    shuffle_options: bool
+    total_questions: int
+    total_score: float
+    created_at: datetime
+    updated_at: datetime
+    sections: List[GeneratedExamSectionResponse]
+
+    model_config = ConfigDict(extra="forbid")
