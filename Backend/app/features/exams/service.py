@@ -4196,14 +4196,7 @@ def delete_exam_template_section(*, course_id: int, template_id: int, section_id
 
 
 
-def generate_exam_from_template(
-    *,
-    course_id: int,
-    template_id: int,
-    payload: GenerateExamFromTemplateRequest,
-    db: Session,
-    current_user: dict,
-):
+def generate_exam_from_template(*, course_id: int, template_id: int, payload: GenerateExamFromTemplateRequest, db: Session, current_user: dict,):
     # =========================
     # 1) Authorization
     # =========================
