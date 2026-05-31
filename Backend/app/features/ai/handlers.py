@@ -160,10 +160,9 @@ def handle_question_generation(*, db: Session, verified_callback: VerifiedAICall
     # =========================
     # 1) Verify request_log context
     # =========================
-    _validate_question_request_log_context(
+    _validate_question_generation_request_log_context(
         request_log=request_log,
         course_id=course_id,
-        primary_entity_id=course_id,  # placeholder, material_id not relevant here
     )
 
     print("\n========== AFTER _validate_request_log_context ==========\n")
@@ -316,52 +315,33 @@ def _validate_request_log_context(*, request_log: dict, course_id: int, material
         )
 
 
-def _validate_question_request_log_context(*, request_log: dict, course_id: int, primary_entity_id: int,) -> None:
+def _validate_question_generation_request_log_context(
+    *,
+    request_log: dict,
+    course_id: int,
+) -> None:
     request_log_course_id = request_log.get("course_id")
-    request_log_primary_entity_type = (request_log.get("primary_entity_type") or "").strip().lower()
+    request_log_primary_entity_type = (
+        request_log.get("primary_entity_type") or ""
+    ).strip().lower()
     request_log_primary_entity_id = request_log.get("primary_entity_id")
 
-    print("\n========== _validate_request_log_context ==========")
-    print(f"course_id = {course_id}")
-    print(f"primary_entity_id = {primary_entity_id}")
-    print(f"request_log_course_id = {request_log_course_id}")
-    print(f"request_log_primary_entity_type = {request_log_primary_entity_type}")
-    print(f"request_log_primary_entity_id = {request_log_primary_entity_id}")
-    print("==================================================\n")
-
-
     if request_log_course_id is None or int(request_log_course_id) != int(course_id):
-        print("\n========== COURSE ID VALIDATION FAILED ==========")
-        print(f"CALLBACK COURSE_ID = {course_id}")
-        print(f"REQUEST LOG COURSE_ID = {request_log_course_id}")
-        print("================================================\n")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Callback course_id does not match AI request log",
         )
 
-
-
-    if request_log_primary_entity_type != "material":
-        print("\n========== PRIMARY ENTITY TYPE VALIDATION FAILED ==========")
-        print(f"REQUEST LOG PRIMARY_ENTITY_TYPE = {request_log_primary_entity_type}")
-        print("EXPECTED = material")
-        print("=========================================================\n")
+    if request_log_primary_entity_type != "course":
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="AI request log primary_entity_type must be 'material'",
+            detail="AI request log primary_entity_type must be 'course'",
         )
 
-
-
-    if request_log_primary_entity_id is None or int(request_log_primary_entity_id) != int(primary_entity_id):
-        print("\n========== MATERIAL ID VALIDATION FAILED ==========")
-        print(f"primary_entity_id ARGUMENT = {primary_entity_id}")
-        print(f"REQUEST LOG PRIMARY_ENTITY_ID = {request_log_primary_entity_id}")
-        print("==================================================\n")
+    if request_log_primary_entity_id is None or int(request_log_primary_entity_id) != int(course_id):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Callback material_id does not match AI request log",
+            detail="Callback course_id does not match AI request log primary_entity_id",
         )
 
 
