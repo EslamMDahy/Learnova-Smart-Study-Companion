@@ -21,7 +21,7 @@ from .handlers import (handle_content_structure_generation,
 
 _HANDLER_REGISTRY = {
     "content_structure_generation": handle_content_structure_generation,
-    "handle_question_generation": handle_question_generation,
+    "question_generation": handle_question_generation,
 }
 
 
