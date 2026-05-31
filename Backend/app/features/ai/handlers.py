@@ -120,6 +120,10 @@ def handle_question_generation(*, db: Session, verified_callback: VerifiedAICall
     payload = verified_callback.payload
     body = _extract_callback_body(payload)
 
+    print("\n========== ENTERED handle_question_generation ==========")
+    print(f"PAYLOAD KEYS: {list(payload.keys())}")
+    print("=====================================================\n")
+
     callback_status = _extract_required_str(
         payload,
         "status",
@@ -138,11 +142,20 @@ def handle_question_generation(*, db: Session, verified_callback: VerifiedAICall
         "Missing or invalid course_id in callback payload",
     )
 
+    print(f"\nCOURSE_ID = {course_id}\n")
+
     questions = _extract_required_list(
         body,
         "questions",
         "Missing questions list in callback body",
     )
+
+    print(f"\nQUESTIONS COUNT = {len(questions)}\n")
+
+
+    print("\n========== BEFORE _validate_request_log_context ==========")
+    print(f"REQUEST LOG = {request_log}")
+    print("========================================================\n")
 
     # =========================
     # 1) Verify request_log context
@@ -153,6 +166,11 @@ def handle_question_generation(*, db: Session, verified_callback: VerifiedAICall
         material_id=course_id,  # placeholder, material_id not relevant here
     )
 
+    print("\n========== AFTER _validate_request_log_context ==========\n")
+
+
+    print("\n========== BEFORE validate_and_prepare_ai_generated_questions ==========\n")
+
     # =========================
     # 2) Validate + normalize all questions
     # =========================
@@ -161,6 +179,11 @@ def handle_question_generation(*, db: Session, verified_callback: VerifiedAICall
         questions=questions,
         db=db,
     )
+
+    print(f"\nPREPARED QUESTIONS COUNT = {len(prepared_questions)}\n")
+
+
+    print("\n========== BEFORE insert_ai_generated_questions ==========\n")
 
     # =========================
     # 3) Insert questions into DB
@@ -171,6 +194,11 @@ def handle_question_generation(*, db: Session, verified_callback: VerifiedAICall
         db=db,
         created_by=request_log.get("created_by"),
     )
+
+    print(f"\nINSERT RESULT = {insert_result}\n")
+
+
+    print("\n========== QUESTION GENERATION COMPLETED ==========\n")
 
     # =========================
     # 4) Return summary
