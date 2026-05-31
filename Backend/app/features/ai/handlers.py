@@ -160,10 +160,10 @@ def handle_question_generation(*, db: Session, verified_callback: VerifiedAICall
     # =========================
     # 1) Verify request_log context
     # =========================
-    _validate_request_log_context(
+    _validate_question_request_log_context(
         request_log=request_log,
         course_id=course_id,
-        material_id=course_id,  # placeholder, material_id not relevant here
+        primary_entity_id=course_id,  # placeholder, material_id not relevant here
     )
 
     print("\n========== AFTER _validate_request_log_context ==========\n")
