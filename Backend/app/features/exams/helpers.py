@@ -206,7 +206,7 @@ def render_exam_pdf_html(context: dict):
     student_info_html = ""
     if display.get("include_student_info_fields"):
         student_info_html = """
-        <div class="student-column">
+        <div class="student-fields">
             <div class="student-line">
                 <span class="label">Student Name:</span>
                 <span class="blank-line"></span>
@@ -389,20 +389,20 @@ def render_exam_pdf_html(context: dict):
             .header-cell {{
                 display: table-cell;
                 vertical-align: top;
-                padding-right: 10px;
+                padding-right: 6px;
             }}
 
             .logo-cell {{
-                width: 65px;
+                width: 10%;
             }}
 
             .course-column {{
-                width: 29%;
-                padding-left: 18px;
+                width: 36%;
+                padding-left: 0;
             }}
 
             .stats-cell {{
-                width: 29%;
+                width: 27%;
             }}
 
             .stats-column {{
@@ -410,8 +410,12 @@ def render_exam_pdf_html(context: dict):
             }}
 
             .student-column {{
-                width: 34%;
+                width: 27%;
                 padding-right: 0;
+            }}
+
+            .student-fields {{
+                width: 100%;
             }}
 
             .brand-logo img {{
@@ -423,7 +427,9 @@ def render_exam_pdf_html(context: dict):
 
             .info-line {{
                 margin-bottom: 3px;
-                white-space: nowrap;
+                white-space: normal;
+                overflow-wrap: break-word;
+                word-break: normal;
             }}
 
             .label {{
@@ -435,6 +441,8 @@ def render_exam_pdf_html(context: dict):
                 font-weight: bold;
                 font-size: 12px;
                 line-height: 1.25;
+                white-space: normal;
+                overflow-wrap: break-word;
             }}
 
             .student-line {{
@@ -485,8 +493,6 @@ def render_exam_pdf_html(context: dict):
 
             .exam-section {{
                 margin-top: 12px;
-                page-break-inside: avoid;
-                break-inside: avoid;
             }}
 
             .exam-section:first-child {{
@@ -533,7 +539,7 @@ def render_exam_pdf_html(context: dict):
             }}
 
             .question-wrapper {{
-                padding: 7px 0 8px;
+                padding: 6px 0 7px;
                 border-bottom: 1px solid #777777;
                 page-break-inside: avoid;
                 break-inside: avoid;
