@@ -35,13 +35,19 @@ from .schemas import (ExamCreateRequest,
                       ExamTemplateSectionResponse,
                       ExamTemplateSectionDeleteResponse,
                       GenerateExamFromTemplateRequest,
-                      GenerateExamFromTemplateResponse)
+                      GenerateExamFromTemplateResponse,
+                      StudentSubmitAnswerRequest,
+                      StudentSubmitExamRequest,
+                      StudentAttemptExamResponse,
+                      StudentSubmitAnswerResponse,
+                      StudentExamListResponse,
+                      StudentSubmitExamResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}/exams", tags=["Exams"],)
 
 
-@router.post("", response_model=ExamResponse, status_code=status.HTTP_201_CREATED,)
+@router.post("/instructor", response_model=ExamResponse, status_code=status.HTTP_201_CREATED,)
 def create_exam_endpoint(
     course_id: int,
     payload: ExamCreateRequest,
@@ -53,7 +59,7 @@ def create_exam_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.patch("/{exam_id}", response_model=ExamResponse,)
+@router.patch("/instructor/{exam_id}", response_model=ExamResponse,)
 def update_exam_endpoint(
     course_id: int,
     exam_id: int,
@@ -67,7 +73,7 @@ def update_exam_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.post("/{exam_id}/sections", response_model=ExamSectionResponse, status_code=status.HTTP_201_CREATED,)
+@router.post("/instructor/{exam_id}/sections", response_model=ExamSectionResponse, status_code=status.HTTP_201_CREATED,)
 def add_section_to_exam_endpoint(
     course_id: int,
     exam_id: int,
@@ -81,7 +87,7 @@ def add_section_to_exam_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.patch("/{exam_id}/sections/reorder", response_model=ExamSectionReorderResponse,)
+@router.patch("/instructor/{exam_id}/sections/reorder", response_model=ExamSectionReorderResponse,)
 def reorder_exam_sections_endpoint(
     course_id: int,
     exam_id: int,
@@ -95,7 +101,7 @@ def reorder_exam_sections_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.patch("/{exam_id}/sections/{section_id}", response_model=ExamSectionResponse,)
+@router.patch("/instructor/{exam_id}/sections/{section_id}", response_model=ExamSectionResponse,)
 def update_exam_section_endpoint(
     course_id: int,
     exam_id: int,
@@ -111,7 +117,7 @@ def update_exam_section_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.delete("/{exam_id}/sections/{section_id}", response_model=ExamSectionDeleteResponse,)
+@router.delete("/instructor/{exam_id}/sections/{section_id}", response_model=ExamSectionDeleteResponse,)
 def delete_exam_section_endpoint(
     course_id: int,
     exam_id: int,
@@ -125,7 +131,7 @@ def delete_exam_section_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.post("/{exam_id}/sections/{section_id}/questions",  response_model=ExamAddQuestionsResponse, status_code=status.HTTP_201_CREATED,)
+@router.post("/instructor/{exam_id}/sections/{section_id}/questions",  response_model=ExamAddQuestionsResponse, status_code=status.HTTP_201_CREATED,)
 def add_questions_to_exam_endpoint(
     course_id: int,
     exam_id: int,
@@ -141,7 +147,7 @@ def add_questions_to_exam_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.patch("/{exam_id}/sections/{section_id}/questions/reorder", response_model=ExamQuestionReorderResponse,)
+@router.patch("/instructor/{exam_id}/sections/{section_id}/questions/reorder", response_model=ExamQuestionReorderResponse,)
 def reorder_exam_questions_endpoint(
     course_id: int,
     exam_id: int,
@@ -157,7 +163,7 @@ def reorder_exam_questions_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.delete("/{exam_id}/sections/{section_id}/questions/{exam_question_id}", response_model=ExamRemoveQuestionResponse, status_code=status.HTTP_200_OK)
+@router.delete("/instructor/{exam_id}/sections/{section_id}/questions/{exam_question_id}", response_model=ExamRemoveQuestionResponse, status_code=status.HTTP_200_OK)
 def remove_question_from_exam_endpoint(
     course_id: int,
     exam_id: int,
@@ -173,7 +179,7 @@ def remove_question_from_exam_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.post("/{exam_id}/publish", response_model=ExamPublishResponse,)
+@router.post("/instructor/{exam_id}/publish", response_model=ExamPublishResponse,)
 def publish_exam_endpoint(
     course_id: int,
     exam_id: int,
@@ -185,7 +191,7 @@ def publish_exam_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.get("", response_model=ExamListResponse,)
+@router.get("/instructor", response_model=ExamListResponse,)
 def list_exams_endpoint(
     course_id: int,
     db: Session = Depends(get_db),
@@ -195,7 +201,7 @@ def list_exams_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.get("/templates", response_model=ExamTemplateListResponse,)
+@router.get("/instructor/templates", response_model=ExamTemplateListResponse,)
 def list_exam_templates_endpoint(
     course_id: int,
     db: Session = Depends(get_db),
@@ -205,7 +211,7 @@ def list_exam_templates_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.get("/templates/{template_id}", response_model=ExamTemplateDetailsResponse,)
+@router.get("/instructor/templates/{template_id}", response_model=ExamTemplateDetailsResponse,)
 def get_exam_template_endpoint(
     course_id: int,
     template_id: int,
@@ -217,7 +223,7 @@ def get_exam_template_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.post("/templates", response_model=ExamTemplateDetailsResponse, status_code=status.HTTP_201_CREATED,)
+@router.post("/instructor/templates", response_model=ExamTemplateDetailsResponse, status_code=status.HTTP_201_CREATED,)
 def create_exam_template_endpoint(
     course_id: int,
     payload: ExamTemplateCreateRequest,
@@ -229,7 +235,7 @@ def create_exam_template_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.patch("/templates/{template_id}", response_model=ExamTemplateDetailsResponse,)
+@router.patch("/instructor/templates/{template_id}", response_model=ExamTemplateDetailsResponse,)
 def update_exam_template_endpoint(
     course_id: int,
     template_id: int,
@@ -243,7 +249,7 @@ def update_exam_template_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.delete("/templates/{template_id}", response_model=ExamTemplateDeleteResponse,)
+@router.delete("/instructor/templates/{template_id}", response_model=ExamTemplateDeleteResponse,)
 def delete_exam_template_endpoint(
     course_id: int,
     template_id: int,
@@ -255,7 +261,7 @@ def delete_exam_template_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.post("/templates/{template_id}/sections", response_model=ExamTemplateSectionResponse, status_code=status.HTTP_201_CREATED,)
+@router.post("/instructor/templates/{template_id}/sections", response_model=ExamTemplateSectionResponse, status_code=status.HTTP_201_CREATED,)
 def create_exam_template_section_endpoint(
     course_id: int,
     template_id: int,
@@ -269,7 +275,7 @@ def create_exam_template_section_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.patch("/templates/{template_id}/sections/{section_id}", response_model=ExamTemplateSectionResponse,)
+@router.patch("/instructor/templates/{template_id}/sections/{section_id}", response_model=ExamTemplateSectionResponse,)
 def update_exam_template_section_endpoint(
     course_id: int,
     template_id: int,
@@ -285,7 +291,7 @@ def update_exam_template_section_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.delete("/templates/{template_id}/sections/{section_id}", response_model=ExamTemplateSectionDeleteResponse,)
+@router.delete("/instructor/templates/{template_id}/sections/{section_id}", response_model=ExamTemplateSectionDeleteResponse,)
 def delete_exam_template_section_endpoint(
     course_id: int,
     template_id: int,
@@ -299,7 +305,7 @@ def delete_exam_template_section_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.post("/templates/{template_id}/generate-exam", response_model=GenerateExamFromTemplateResponse, status_code=status.HTTP_201_CREATED)
+@router.post("/instructor/templates/{template_id}/generate-exam", response_model=GenerateExamFromTemplateResponse, status_code=status.HTTP_201_CREATED)
 def generate_exam_from_template_endpoint(
     course_id: int,
     template_id: int,
@@ -313,7 +319,7 @@ def generate_exam_from_template_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.get("/{exam_id}", response_model=ExamDetailsResponse,)
+@router.get("/instructor/{exam_id}", response_model=ExamDetailsResponse,)
 def get_exam_endpoint(
     course_id: int,
     exam_id: int,
@@ -325,7 +331,7 @@ def get_exam_endpoint(
         db=db,
         current_user=current_user,)
 
-@router.get("/{exam_id}/export/pdf",)
+@router.get("/instructor/{exam_id}/export/pdf",)
 def export_exam_pdf_endpoint(
     course_id: int,
     exam_id: int,
@@ -359,3 +365,56 @@ def export_exam_pdf_endpoint(
         db=db,
         current_user=current_user,)
 
+@router.get("/student/exams", response_model=StudentExamListResponse,)
+def list_student_exams_endpoint(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.list_student_exams(
+        course_id=course_id,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/student/exams/{exam_id}/attempt", response_model=StudentAttemptExamResponse, status_code=status.HTTP_201_CREATED,)
+def attempt_exam_endpoint(
+    course_id: int,
+    exam_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.attempt_exam(
+        course_id=course_id,
+        exam_id=exam_id,
+        db=db,
+        current_user=current_user,)
+
+@router.put("/student/exams/{exam_id}/attempts/{attempt_id}/answers", response_model=StudentSubmitAnswerResponse,)
+def submit_answer_endpoint(
+    course_id: int,
+    exam_id: int,
+    attempt_id: int,
+    payload: StudentSubmitAnswerRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.submit_answer(
+        course_id=course_id,
+        exam_id=exam_id,
+        attempt_id=attempt_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/student/exams/{exam_id}/attempts/{attempt_id}/submit", response_model=StudentSubmitExamResponse,)
+def submit_exam_endpoint(
+    course_id: int,
+    exam_id: int,
+    attempt_id: int,
+    payload: StudentSubmitExamRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.submit_exam(
+        course_id=course_id,
+        exam_id=exam_id,
+        attempt_id=attempt_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)

@@ -1,11 +1,15 @@
 from __future__ import annotations
+from datetime import datetime, timedelta, timezone
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import json
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from io import BytesIO
+import random
+import json as _json
 
 from .schemas import (ExamCreateRequest,
                       ExamUpdateRequest,
@@ -17,7 +21,9 @@ from .schemas import (ExamCreateRequest,
                       ExamTemplateUpdateRequest,
                       ExamTemplateSectionCreateRequest,
                       ExamTemplateSectionUpdateRequest,
-                      GenerateExamFromTemplateRequest)
+                      GenerateExamFromTemplateRequest,
+                      StudentSubmitAnswerRequest,
+                      StudentSubmitExamRequest)
 
 from .helpers import (build_exam_export_context,
                       render_exam_pdf_html,
@@ -4563,5 +4569,1068 @@ def generate_exam_from_template(*, course_id: int, template_id: int, payload: Ge
         db.rollback()
         print(e)
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+
+def list_student_exams(*, course_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "student":
+        raise HTTPException(status_code=403, detail="Only students can view available exams")
+
+    student_id = current_user.get("id")
+    if not student_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        # =========================
+        # 3) Validate student enrollment
+        # =========================
+        enrollment_row = db.execute(
+            text("""
+                SELECT id
+                FROM course_enrollments
+                WHERE course_id = :course_id
+                  AND student_id = :student_id
+                  AND status = 'active'
+                LIMIT 1
+            """),
+            {"course_id": course_id, "student_id": student_id},
+        ).mappings().first()
+
+        if not enrollment_row:
+            raise HTTPException(status_code=403, detail="You are not enrolled in this course")
+
+        # =========================
+        # 4) Fetch published exams
+        # =========================
+        exam_rows = db.execute(
+            text("""
+                SELECT
+                    id,
+                    course_id,
+                    title,
+                    description,
+                    exam_type,
+                    duration_minutes,
+                    max_attempts,
+                    passing_score,
+                    total_questions,
+                    total_score,
+                    available_from,
+                    available_to
+                FROM exams
+                WHERE course_id = :course_id
+                  AND is_published = TRUE
+                ORDER BY available_from ASC, id ASC
+            """),
+            {"course_id": course_id},
+        ).mappings().all()
+
+        # =========================
+        # 5) Calculate is_available
+        # =========================
+        now = datetime.now(timezone.utc)
+        exams = []
+        for row in exam_rows:
+            exam = dict(row)
+            exam["is_available"] = (
+                row["available_from"] <= now <= row["available_to"]
+            )
+            exams.append(exam)
+
+        return {
+            "course_id": course_id,
+            "total": len(exams),
+            "exams": exams,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "student":
+        raise HTTPException(status_code=403, detail="Only students can attempt exams")
+
+    student_id = current_user.get("id")
+    if not student_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not exam_id or exam_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        # =========================
+        # 3) Validate student enrollment
+        # =========================
+        enrollment_row = db.execute(
+            text("""
+                SELECT id
+                FROM course_enrollments
+                WHERE course_id = :course_id
+                  AND student_id = :student_id
+                  AND status = 'active'
+                LIMIT 1
+            """),
+            {"course_id": course_id, "student_id": student_id},
+        ).mappings().first()
+
+        if not enrollment_row:
+            raise HTTPException(status_code=403, detail="You are not enrolled in this course")
+
+        # =========================
+        # 4) Validate exam exists + published + availability
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT
+                    id,
+                    title,
+                    description,
+                    instructions,
+                    exam_type,
+                    duration_minutes,
+                    max_attempts,
+                    passing_score,
+                    total_questions,
+                    total_score,
+                    is_published,
+                    shuffle_questions,
+                    shuffle_options,
+                    available_from,
+                    available_to,
+                    enable_proctoring,
+                    prevent_copy_paste,
+                    prevent_tab_switch,
+                    require_webcam,
+                    require_microphone
+                FROM exams
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {"exam_id": exam_id, "course_id": course_id},
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=404, detail="Exam not found")
+
+        if not exam_row["is_published"]:
+            raise HTTPException(status_code=403, detail="Exam is not published")
+
+        now = datetime.now(timezone.utc)
+
+        if exam_row["available_from"] > now:
+            raise HTTPException(status_code=403, detail="Exam is not available yet")
+
+        if exam_row["available_to"] < now:
+            raise HTTPException(status_code=403, detail="Exam availability has ended")
+
+        # =========================
+        # 5) Check for existing in_progress attempt
+        # =========================
+        in_progress_attempt = db.execute(
+            text("""
+                SELECT id, attempt_number, started_at
+                FROM student_exam_attempts
+                WHERE exam_id = :exam_id
+                  AND student_id = :student_id
+                  AND status = 'in_progress'
+                LIMIT 1
+            """),
+            {"exam_id": exam_id, "student_id": student_id},
+        ).mappings().first()
+
+        if in_progress_attempt:
+            attempt_id = int(in_progress_attempt["id"])
+            attempt_number = int(in_progress_attempt["attempt_number"])
+            started_at = in_progress_attempt["started_at"]
+
+            expires_at = None
+            if exam_row["duration_minutes"]:
+                expires_at = started_at + timedelta(minutes=exam_row["duration_minutes"])
+
+            # جيب السيكشنز والاسئله بترتيب السيشن داتا
+            session_data_row = db.execute(
+                text("""
+                    SELECT session_data
+                    FROM student_exam_attempts
+                    WHERE id = :attempt_id
+                    LIMIT 1
+                """),
+                {"attempt_id": attempt_id},
+            ).mappings().first()
+
+            if not session_data_row:
+                raise HTTPException(status_code=404, detail="Attempt not found")
+            session_data = session_data_row["session_data"] or {}
+            question_order = session_data.get("question_order", {})
+
+            section_rows = db.execute(
+                text("""
+                    SELECT
+                        id,
+                        title,
+                        description,
+                        question_type,
+                        order_index,
+                        question_count,
+                        section_score,
+                        time_limit_minutes,
+                        must_complete
+                    FROM exam_sections
+                    WHERE exam_id = :exam_id
+                    ORDER BY order_index ASC, id ASC
+                """),
+                {"exam_id": exam_id},
+            ).mappings().all()
+
+            question_rows = db.execute(
+                text("""
+                    SELECT
+                        eq.id AS exam_question_id,
+                        eq.question_id,
+                        eq.section_id,
+                        eq.order_index,
+                        eq.points,
+                        eq.snapshot_question_text AS question_text,
+                        eq.snapshot_options AS options,
+                        eq.snapshot_type AS type,
+                        eq.snapshot_difficulty AS difficulty,
+                        eq.snapshot_auto_gradable AS auto_gradable
+                    FROM exam_questions eq
+                    WHERE eq.exam_id = :exam_id
+                    ORDER BY eq.section_id ASC, eq.order_index ASC, eq.id ASC
+                """),
+                {"exam_id": exam_id},
+            ).mappings().all()
+
+            questions_by_section_map: dict[int, dict] = {}
+            for row in question_rows:
+                q = dict(row)
+                sid = int(q["section_id"])
+                questions_by_section_map.setdefault(sid, {})
+                questions_by_section_map[sid][q["exam_question_id"]] = q
+
+            sections = []
+            for section_row in section_rows:
+                sid = int(section_row["id"])
+                ordered_ids = question_order.get(str(sid), [])
+                section_questions = []
+                for idx, qid in enumerate(ordered_ids, start=1):
+                    question = questions_by_section_map.get(sid, {}).get(qid)
+                    if question:
+                        question["order_index"] = idx
+                        section_questions.append(question)
+
+                sections.append({
+                    "id": sid,
+                    "title": section_row["title"],
+                    "description": section_row["description"],
+                    "question_type": section_row["question_type"],
+                    "order_index": section_row["order_index"],
+                    "question_count": section_row["question_count"],
+                    "section_score": section_row["section_score"],
+                    "time_limit_minutes": section_row["time_limit_minutes"],
+                    "must_complete": section_row["must_complete"],
+                    "questions": section_questions,
+                })            
+
+            return {
+                "exam_id": exam_id,
+                "attempt_id": attempt_id,
+                "attempt_number": attempt_number,
+                "status": "in_progress",
+                "started_at": started_at,
+                "expires_at": expires_at,
+                "title": exam_row["title"],
+                "description": exam_row["description"],
+                "instructions": exam_row["instructions"],
+                "exam_type": exam_row["exam_type"],
+                "duration_minutes": exam_row["duration_minutes"],
+                "total_questions": exam_row["total_questions"],
+                "total_score": exam_row["total_score"],
+                "shuffle_questions": exam_row["shuffle_questions"],
+                "shuffle_options": exam_row["shuffle_options"],
+                "enable_proctoring": exam_row["enable_proctoring"],
+                "prevent_copy_paste": exam_row["prevent_copy_paste"],
+                "prevent_tab_switch": exam_row["prevent_tab_switch"],
+                "require_webcam": exam_row["require_webcam"],
+                "require_microphone": exam_row["require_microphone"],
+                "sections": sections,
+            }
+
+        # =========================
+        # 6) Validate max_attempts
+        # =========================
+        attempts_count_row = db.execute(
+            text("""
+                SELECT COUNT(*) AS total
+                FROM student_exam_attempts
+                WHERE exam_id = :exam_id
+                  AND student_id = :student_id
+            """),
+            {"exam_id": exam_id, "student_id": student_id},
+        ).mappings().first()
+
+        if not attempts_count_row:
+            attempts_used = 0
+        else:
+            attempts_used = int(attempts_count_row["total"])
+
+        if attempts_used >= int(exam_row["max_attempts"]):
+            raise HTTPException(status_code=403, detail="You have reached the maximum number of attempts")
+
+        # =========================
+        # 7) Fetch sections + questions for shuffle
+        # =========================
+        section_rows = db.execute(
+            text("""
+                SELECT
+                    id,
+                    title,
+                    description,
+                    question_type,
+                    order_index,
+                    question_count,
+                    section_score,
+                    time_limit_minutes,
+                    must_complete
+                FROM exam_sections
+                WHERE exam_id = :exam_id
+                ORDER BY order_index ASC, id ASC
+            """),
+            {"exam_id": exam_id},
+        ).mappings().all()
+
+        question_rows = db.execute(
+            text("""
+                SELECT
+                    eq.id AS exam_question_id,
+                    eq.question_id,
+                    eq.section_id,
+                    eq.order_index,
+                    eq.points,
+                    eq.snapshot_question_text AS question_text,
+                    eq.snapshot_options AS options,
+                    eq.snapshot_type AS type,
+                    eq.snapshot_difficulty AS difficulty,
+                    eq.snapshot_auto_gradable AS auto_gradable
+                FROM exam_questions eq
+                WHERE eq.exam_id = :exam_id
+                ORDER BY eq.section_id ASC, eq.order_index ASC, eq.id ASC
+            """),
+            {"exam_id": exam_id},
+        ).mappings().all()
+
+        # =========================
+        # 8) Apply shuffle + build session_data
+        # =========================
+        shuffle_seed = random.randint(100000, 999999)
+        rng = random.Random(shuffle_seed)
+
+        questions_by_section: dict[int, list] = {}
+        for row in question_rows:
+            q = dict(row)
+            sid = int(q["section_id"])
+            questions_by_section.setdefault(sid, [])
+            questions_by_section[sid].append(q)
+
+        question_order: dict[str, list] = {}
+        sections = []
+
+        for section_row in section_rows:
+            sid = int(section_row["id"])
+            section_questions = questions_by_section.get(sid, [])
+
+            if exam_row["shuffle_questions"]:
+                rng.shuffle(section_questions)
+
+            if exam_row["shuffle_options"]:
+                for question in section_questions:
+                    if question.get("options"):
+                        options = list(question["options"])
+                        rng.shuffle(options)
+                        question["options"] = options
+
+            question_order[str(sid)] = [q["exam_question_id"] for q in section_questions]
+
+            for idx, question in enumerate(section_questions, start=1):
+                question["order_index"] = idx
+
+            sections.append({
+                "id": sid,
+                "title": section_row["title"],
+                "description": section_row["description"],
+                "question_type": section_row["question_type"],
+                "order_index": section_row["order_index"],
+                "question_count": section_row["question_count"],
+                "section_score": section_row["section_score"],
+                "time_limit_minutes": section_row["time_limit_minutes"],
+                "must_complete": section_row["must_complete"],
+                "questions": section_questions,
+            })
+
+        session_data = {
+            "shuffle_seed": shuffle_seed,
+            "question_order": question_order,
+        }
+
+        # =========================
+        # 9) Create attempt
+        # =========================
+        attempt_number = attempts_used + 1
+
+        attempt_row = db.execute(
+            text("""
+                INSERT INTO student_exam_attempts (
+                    student_id, exam_id, attempt_number, status,
+                    started_at, time_spent_seconds, session_data
+                )
+                VALUES (
+                    :student_id, :exam_id, :attempt_number, 'in_progress',
+                    NOW(), 0, :session_data
+                )
+                RETURNING id, started_at
+            """),
+            {
+                "student_id": student_id,
+                "exam_id": exam_id,
+                "attempt_number": attempt_number,
+                "session_data": json.dumps(session_data),
+            },
+        ).mappings().first()
+
+        if not attempt_row:
+            raise HTTPException(status_code=503, detail="Failed to create attempt")
+
+        attempt_id = int(attempt_row["id"])
+        started_at = attempt_row["started_at"]
+
+        expires_at = None
+        if exam_row["duration_minutes"]:
+            expires_at = started_at + timedelta(minutes=exam_row["duration_minutes"])
+
+        db.commit()
+
+        return {
+            "exam_id": exam_id,
+            "attempt_id": attempt_id,
+            "attempt_number": attempt_number,
+            "status": "in_progress",
+            "started_at": started_at,
+            "expires_at": expires_at,
+            "title": exam_row["title"],
+            "description": exam_row["description"],
+            "instructions": exam_row["instructions"],
+            "exam_type": exam_row["exam_type"],
+            "duration_minutes": exam_row["duration_minutes"],
+            "total_questions": exam_row["total_questions"],
+            "total_score": exam_row["total_score"],
+            "shuffle_questions": exam_row["shuffle_questions"],
+            "shuffle_options": exam_row["shuffle_options"],
+            "enable_proctoring": exam_row["enable_proctoring"],
+            "prevent_copy_paste": exam_row["prevent_copy_paste"],
+            "prevent_tab_switch": exam_row["prevent_tab_switch"],
+            "require_webcam": exam_row["require_webcam"],
+            "require_microphone": exam_row["require_microphone"],
+            "sections": sections,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def submit_answer(*, course_id: int, exam_id: int, attempt_id: int, payload: StudentSubmitAnswerRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "student":
+        raise HTTPException(status_code=403, detail="Only students can submit answers")
+
+    student_id = current_user.get("id")
+    if not student_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not exam_id or exam_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    if not attempt_id or attempt_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid attempt_id")
+
+    try:
+        # =========================
+        # 2) Validate attempt exists + ownership + status
+        # =========================
+        attempt_row = db.execute(
+            text("""
+                SELECT id, student_id, exam_id, status, started_at
+                FROM student_exam_attempts
+                WHERE id = :attempt_id
+                  AND exam_id = :exam_id
+                  AND student_id = :student_id
+                LIMIT 1
+            """),
+            {
+                "attempt_id": attempt_id,
+                "exam_id": exam_id,
+                "student_id": student_id,
+            },
+        ).mappings().first()
+
+        if not attempt_row:
+            raise HTTPException(status_code=404, detail="Attempt not found")
+
+        if attempt_row["status"] != "in_progress":
+            raise HTTPException(status_code=403, detail="Attempt is no longer active")
+
+        # =========================
+        # 3) Validate time limit
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT duration_minutes
+                FROM exams
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {"exam_id": exam_id, "course_id": course_id},
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=404, detail="Exam not found")
+
+        if exam_row["duration_minutes"]:
+            started_at = attempt_row["started_at"]
+            expires_at = started_at + timedelta(minutes=exam_row["duration_minutes"])
+            now = datetime.now(timezone.utc)
+            if now > expires_at:
+                raise HTTPException(status_code=403, detail="Exam time has expired")
+
+        # =========================
+        # 4) Validate exam_question belongs to exam
+        # =========================
+        exam_question_row = db.execute(
+            text("""
+                SELECT id
+                FROM exam_questions
+                WHERE id = :exam_question_id
+                  AND exam_id = :exam_id
+                LIMIT 1
+            """),
+            {
+                "exam_question_id": payload.exam_question_id,
+                "exam_id": exam_id,
+            },
+        ).mappings().first()
+
+        if not exam_question_row:
+            raise HTTPException(status_code=404, detail="Question not found in this exam")
+
+        # =========================
+        # 5) Upsert student answer
+        # =========================
+        db.execute(
+            text("""
+                INSERT INTO student_answers (
+                    attempt_id, exam_question_id,
+                    selected_option_index, selected_option_indices,
+                    answer_text, time_taken_seconds,
+                    auto_graded, created_at, updated_at
+                )
+                VALUES (
+                    :attempt_id, :exam_question_id,
+                    :selected_option_index, :selected_option_indices,
+                    :answer_text, :time_taken_seconds,
+                    FALSE, NOW(), NOW()
+                )
+                ON CONFLICT (attempt_id, exam_question_id)
+                DO UPDATE SET
+                    selected_option_index  = EXCLUDED.selected_option_index,
+                    selected_option_indices = EXCLUDED.selected_option_indices,
+                    answer_text            = EXCLUDED.answer_text,
+                    time_taken_seconds     = EXCLUDED.time_taken_seconds,
+                    updated_at             = NOW()
+            """),
+            {
+                "attempt_id": attempt_id,
+                "exam_question_id": payload.exam_question_id,
+                "selected_option_index": payload.selected_option_index,
+                "selected_option_indices": json.dumps(payload.selected_option_indices) if payload.selected_option_indices else None,
+                "answer_text": payload.answer_text,
+                "time_taken_seconds": payload.time_taken_seconds,
+            },
+        )
+
+        db.commit()
+
+        return {
+            "attempt_id": attempt_id,
+            "exam_question_id": payload.exam_question_id,
+            "saved": True,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: StudentSubmitExamRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "student":
+        raise HTTPException(status_code=403, detail="Only students can submit exams")
+
+    student_id = current_user.get("id")
+    if not student_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not exam_id or exam_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    if not attempt_id or attempt_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid attempt_id")
+
+    try:
+        # =========================
+        # 2) Validate attempt exists + ownership + status
+        # =========================
+        attempt_row = db.execute(
+            text("""
+                SELECT id, student_id, exam_id, status, started_at
+                FROM student_exam_attempts
+                WHERE id = :attempt_id
+                  AND exam_id = :exam_id
+                  AND student_id = :student_id
+                LIMIT 1
+            """),
+            {
+                "attempt_id": attempt_id,
+                "exam_id": exam_id,
+                "student_id": student_id,
+            },
+        ).mappings().first()
+
+        if not attempt_row:
+            raise HTTPException(status_code=404, detail="Attempt not found")
+
+        if attempt_row["status"] != "in_progress":
+            raise HTTPException(status_code=403, detail="Attempt is no longer active")
+
+        # =========================
+        # 3) Validate time limit
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT duration_minutes, total_questions, total_score, passing_score
+                FROM exams
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {"exam_id": exam_id, "course_id": course_id},
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=404, detail="Exam not found")
+
+        if exam_row["duration_minutes"]:
+            started_at = attempt_row["started_at"]
+            expires_at = started_at + timedelta(minutes=exam_row["duration_minutes"])
+            now = datetime.now(timezone.utc)
+            if now > expires_at:
+                raise HTTPException(status_code=403, detail="Exam time has expired")
+
+        # =========================
+        # 4) Upsert final answers from payload
+        # =========================
+        if payload.answers:
+            for answer in payload.answers:
+                exam_question_row = db.execute(
+                    text("""
+                        SELECT id
+                        FROM exam_questions
+                        WHERE id = :exam_question_id
+                          AND exam_id = :exam_id
+                        LIMIT 1
+                    """),
+                    {
+                        "exam_question_id": answer.exam_question_id,
+                        "exam_id": exam_id,
+                    },
+                ).mappings().first()
+
+                if not exam_question_row:
+                    continue
+
+                db.execute(
+                    text("""
+                        INSERT INTO student_answers (
+                            attempt_id, exam_question_id,
+                            selected_option_index, selected_option_indices,
+                            answer_text, time_taken_seconds,
+                            auto_graded, created_at, updated_at
+                        )
+                        VALUES (
+                            :attempt_id, :exam_question_id,
+                            :selected_option_index, :selected_option_indices,
+                            :answer_text, :time_taken_seconds,
+                            FALSE, NOW(), NOW()
+                        )
+                        ON CONFLICT (attempt_id, exam_question_id)
+                        DO UPDATE SET
+                            selected_option_index   = EXCLUDED.selected_option_index,
+                            selected_option_indices = EXCLUDED.selected_option_indices,
+                            answer_text             = EXCLUDED.answer_text,
+                            time_taken_seconds      = EXCLUDED.time_taken_seconds,
+                            updated_at              = NOW()
+                    """),
+                    {
+                        "attempt_id": attempt_id,
+                        "exam_question_id": answer.exam_question_id,
+                        "selected_option_index": answer.selected_option_index,
+                        "selected_option_indices": json.dumps(answer.selected_option_indices) if answer.selected_option_indices else None,
+                        "answer_text": answer.answer_text,
+                        "time_taken_seconds": answer.time_taken_seconds,
+                    },
+                )
+
+        # =========================
+        # 5) Fetch all exam questions + student answers for grading
+        # =========================
+        exam_question_rows = db.execute(
+            text("""
+                SELECT
+                    eq.id AS exam_question_id,
+                    eq.points,
+                    eq.snapshot_type AS type,
+                    eq.snapshot_expected_answer AS expected_answer,
+                    eq.snapshot_auto_gradable AS auto_gradable
+                FROM exam_questions eq
+                WHERE eq.exam_id = :exam_id
+            """),
+            {"exam_id": exam_id},
+        ).mappings().all()
+
+        student_answer_rows = db.execute(
+            text("""
+                SELECT
+                    exam_question_id,
+                    selected_option_index,
+                    selected_option_indices,
+                    answer_text
+                FROM student_answers
+                WHERE attempt_id = :attempt_id
+            """),
+            {"attempt_id": attempt_id},
+        ).mappings().all()
+
+        answers_by_question: dict[int, dict] = {}
+        for row in student_answer_rows:
+            answers_by_question[int(row["exam_question_id"])] = dict(row)
+
+        # =========================
+        # 6) Auto-grade
+        # =========================
+        auto_gradable_types = {"multiple_choice", "true_false", "multi_select"}
+        needs_manual_grading = False
+
+        total_score = 0.0
+        correct_count = 0
+        incorrect_count = 0
+        unanswered_count = 0
+
+        for eq in exam_question_rows:
+            qid = int(eq["exam_question_id"])
+            points = float(eq["points"])
+            q_type = eq["type"]
+            expected = eq["expected_answer"]
+            auto_gradable = eq["auto_gradable"]
+            student_answer = answers_by_question.get(qid)
+
+            if not student_answer:
+                unanswered_count += 1
+                db.execute(
+                    text("""
+                        UPDATE student_answers
+                        SET is_correct = FALSE,
+                            points_earned = 0,
+                            auto_graded = FALSE,
+                            updated_at = NOW()
+                        WHERE attempt_id = :attempt_id
+                          AND exam_question_id = :exam_question_id
+                    """),
+                    {"attempt_id": attempt_id, "exam_question_id": qid},
+                )
+                continue
+
+            if not auto_gradable or q_type not in auto_gradable_types:
+                needs_manual_grading = True
+                continue
+
+            is_correct = False
+
+            if q_type in {"multiple_choice", "true_false"}:
+                student_option = student_answer.get("selected_option_index")
+                if student_option is not None and expected is not None:
+                    is_correct = str(student_option) == str(expected).strip('"')
+
+            elif q_type == "multi_select":
+                student_indices = student_answer.get("selected_option_indices")
+                if student_indices is not None and expected is not None:
+                    if isinstance(student_indices, str):
+                        student_indices = _json.loads(student_indices)
+                    if isinstance(expected, str):
+                        expected = _json.loads(expected)
+                    is_correct = sorted(str(x) for x in student_indices) == sorted(str(x) for x in expected)
+
+            points_earned = points if is_correct else 0.0
+            total_score += points_earned
+
+            if is_correct:
+                correct_count += 1
+            else:
+                incorrect_count += 1
+
+            db.execute(
+                text("""
+                    UPDATE student_answers
+                    SET is_correct = :is_correct,
+                        points_earned = :points_earned,
+                        auto_graded = TRUE,
+                        updated_at = NOW()
+                    WHERE attempt_id = :attempt_id
+                      AND exam_question_id = :exam_question_id
+                """),
+                {
+                    "attempt_id": attempt_id,
+                    "exam_question_id": qid,
+                    "is_correct": is_correct,
+                    "points_earned": points_earned,
+                },
+            )
+
+        # =========================
+        # 7) Calculate final scores
+        # =========================
+        exam_total_score = float(exam_row["total_score"]) if exam_row["total_score"] else 1.0
+        percentage_score = round((total_score / exam_total_score) * 100, 2)
+
+        passing_score = exam_row["passing_score"]
+        is_passed = None
+        if passing_score is not None and not needs_manual_grading:
+            is_passed = percentage_score >= float(passing_score)
+
+        final_status = "submitted" if needs_manual_grading else "graded"
+        submitted_at = datetime.now(timezone.utc)
+
+        # =========================
+        # 8) Update attempt
+        # =========================
+        db.execute(
+            text("""
+                UPDATE student_exam_attempts
+                SET status             = :status,
+                    submitted_at       = :submitted_at,
+                    time_spent_seconds = :time_spent_seconds,
+                    total_score        = :total_score,
+                    percentage_score   = :percentage_score,
+                    is_passed          = :is_passed,
+                    correct_count      = :correct_count,
+                    incorrect_count    = :incorrect_count,
+                    unanswered_count   = :unanswered_count,
+                    updated_at         = NOW()
+                WHERE id = :attempt_id
+            """),
+            {
+                "attempt_id": attempt_id,
+                "status": final_status,
+                "submitted_at": submitted_at,
+                "time_spent_seconds": payload.time_spent_seconds or 0,
+                "total_score": total_score,
+                "percentage_score": percentage_score,
+                "is_passed": is_passed,
+                "correct_count": correct_count,
+                "incorrect_count": incorrect_count,
+                "unanswered_count": unanswered_count,
+            },
+        )
+
+        # =========================
+        # 9) Update student_question_progress
+        # =========================
+        for eq in exam_question_rows:
+            qid = int(eq["exam_question_id"])
+            q_type = eq["type"]
+            student_answer = answers_by_question.get(qid)
+
+            if not student_answer:
+                continue
+
+            if q_type not in auto_gradable_types:
+                continue
+
+            answer_record = db.execute(
+                text("""
+                    SELECT is_correct, time_taken_seconds
+                    FROM student_answers
+                    WHERE attempt_id = :attempt_id
+                      AND exam_question_id = :exam_question_id
+                    LIMIT 1
+                """),
+                {"attempt_id": attempt_id, "exam_question_id": qid},
+            ).mappings().first()
+
+            if not answer_record:
+                continue
+
+            is_correct = bool(answer_record["is_correct"])
+            time_taken = answer_record["time_taken_seconds"] or 0
+
+            question_id_row = db.execute(
+                text("""
+                    SELECT question_id
+                    FROM exam_questions
+                    WHERE id = :exam_question_id
+                    LIMIT 1
+                """),
+                {"exam_question_id": qid},
+            ).mappings().first()
+
+            if not question_id_row:
+                continue
+
+            real_question_id = int(question_id_row["question_id"])
+
+            db.execute(
+                text("""
+                    INSERT INTO student_question_progress (
+                        student_id, question_id,
+                        times_attempted, times_correct, times_wrong,
+                        average_time_seconds, mastery_level,
+                        last_attempted_at, last_correct_at
+                    )
+                    VALUES (
+                        :student_id, :question_id,
+                        1,
+                        :times_correct,
+                        :times_wrong,
+                        :average_time_seconds,
+                        'beginner',
+                        NOW(),
+                        :last_correct_at
+                    )
+                    ON CONFLICT (student_id, question_id)
+                    DO UPDATE SET
+                        times_attempted      = student_question_progress.times_attempted + 1,
+                        times_correct        = student_question_progress.times_correct + :times_correct,
+                        times_wrong          = student_question_progress.times_wrong + :times_wrong,
+                        average_time_seconds = (
+                            (student_question_progress.average_time_seconds * student_question_progress.times_attempted) + :average_time_seconds
+                        ) / (student_question_progress.times_attempted + 1),
+                        last_attempted_at    = NOW(),
+                        last_correct_at      = CASE WHEN :is_correct THEN NOW() ELSE student_question_progress.last_correct_at END,
+                """),
+                {
+                    "student_id": student_id,
+                    "question_id": real_question_id,
+                    "times_correct": 1 if is_correct else 0,
+                    "times_wrong": 0 if is_correct else 1,
+                    "average_time_seconds": float(time_taken),
+                    "last_correct_at": datetime.now(timezone.utc) if is_correct else None,
+                    "is_correct": is_correct,
+                },
+            )
+
+        db.commit()
+
+        return {
+            "attempt_id": attempt_id,
+            "exam_id": exam_id,
+            "status": final_status,
+            "total_score": total_score,
+            "percentage_score": percentage_score,
+            "is_passed": is_passed,
+            "correct_count": correct_count,
+            "incorrect_count": incorrect_count,
+            "unanswered_count": unanswered_count,
+            "submitted_at": submitted_at,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
 
 

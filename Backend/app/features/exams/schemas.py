@@ -477,3 +477,131 @@ class GenerateExamFromTemplateResponse(BaseModel):
     sections: List[GeneratedExamSectionResponse]
 
     model_config = ConfigDict(extra="forbid")
+
+
+class StudentExamListItemResponse(BaseModel):
+    id: int
+    course_id: int
+    title: str
+    description: Optional[str]
+    exam_type: str
+    duration_minutes: Optional[int]
+    max_attempts: int
+    passing_score: Optional[float]
+    total_questions: int
+    total_score: float
+    available_from: Optional[datetime]
+    available_to: Optional[datetime]
+    is_available: bool
+
+    model_config = ConfigDict(extra="forbid")
+
+class StudentExamListResponse(BaseModel):
+    course_id: int
+    total: int
+    exams: List[StudentExamListItemResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentExamQuestionOptionResponse(BaseModel):
+    id: str
+    text: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentExamQuestionResponse(BaseModel):
+    exam_question_id: int
+    question_id: int
+    order_index: int
+    points: float
+    question_text: str
+    type: str
+    difficulty: str
+    options: Optional[List[StudentExamQuestionOptionResponse]]
+    auto_gradable: bool
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentExamSectionResponse(BaseModel):
+    id: int
+    title: str
+    description: Optional[str]
+    question_type: str
+    order_index: int
+    question_count: int
+    section_score: float
+    time_limit_minutes: Optional[int]
+    must_complete: bool
+    questions: List[StudentExamQuestionResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentAttemptExamResponse(BaseModel):
+    exam_id: int
+    attempt_id: int
+    attempt_number: int
+    status: str
+    started_at: datetime
+    expires_at: Optional[datetime]
+    title: str
+    description: Optional[str]
+    instructions: Optional[str]
+    exam_type: str
+    duration_minutes: Optional[int]
+    total_questions: int
+    total_score: float
+    shuffle_questions: bool
+    shuffle_options: bool
+    enable_proctoring: bool
+    prevent_copy_paste: bool
+    prevent_tab_switch: bool
+    require_webcam: bool
+    require_microphone: bool
+    sections: List[StudentExamSectionResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentSubmitAnswerRequest(BaseModel):
+    exam_question_id: int
+    selected_option_index: Optional[int] = None
+    selected_option_indices: Optional[List[int]] = None
+    answer_text: Optional[str] = None
+    time_taken_seconds: Optional[int] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentSubmitAnswerResponse(BaseModel):
+    attempt_id: int
+    exam_question_id: int
+    saved: bool
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentSubmitExamRequest(BaseModel):
+    answers: Optional[List[StudentSubmitAnswerRequest]] = None
+    time_spent_seconds: Optional[int] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentSubmitExamResponse(BaseModel):
+    attempt_id: int
+    exam_id: int
+    status: str
+    total_score: Optional[float]
+    percentage_score: Optional[float]
+    is_passed: Optional[bool]
+    correct_count: Optional[int]
+    incorrect_count: Optional[int]
+    unanswered_count: Optional[int]
+    submitted_at: datetime
+
+    model_config = ConfigDict(extra="forbid")
+
