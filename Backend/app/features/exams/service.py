@@ -5506,8 +5506,7 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                     is_passed          = :is_passed,
                     correct_count      = :correct_count,
                     incorrect_count    = :incorrect_count,
-                    unanswered_count   = :unanswered_count,
-                    updated_at         = NOW()
+                    unanswered_count   = :unanswered_count
                 WHERE id = :attempt_id
             """),
             {
@@ -5597,7 +5596,7 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                             (student_question_progress.average_time_seconds * student_question_progress.times_attempted) + :average_time_seconds
                         ) / (student_question_progress.times_attempted + 1),
                         last_attempted_at    = NOW(),
-                        last_correct_at      = CASE WHEN :is_correct THEN NOW() ELSE student_question_progress.last_correct_at END,
+                        last_correct_at      = CASE WHEN :is_correct THEN NOW() ELSE student_question_progress.last_correct_at END
                 """),
                 {
                     "student_id": student_id,
