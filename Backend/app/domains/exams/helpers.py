@@ -9,6 +9,13 @@ from weasyprint import HTML
 from app.core.config import settings
 from .handler import render_question_handler
 
+from datetime import datetime, timezone
+from fastapi import HTTPException, status
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session
+
+
 
 def build_exam_export_context(*, exam_row: dict, course_row: dict, section_rows: list[dict], question_rows: list[dict],
                               include_learnova_logo: bool, include_course_title: bool, include_course_code: bool, include_exam_metadata: bool,
@@ -675,3 +682,271 @@ def _format_question_type_label(*, question_type):
     }
 
     return labels.get(normalized_type, normalized_type.replace("_", " ").title())
+
+
+
+
+def save_ai_exam_grading_results(*, db: Session, attempt_id: int, exam_id: int, results: list[dict],) -> dict:
+    try:
+        # =========================
+        # 1) Fetch attempt + student_id
+        # =========================
+        attempt_row = db.execute(
+            text("""
+                SELECT id, student_id, exam_id
+                FROM student_exam_attempts
+                WHERE id = :attempt_id
+                  AND exam_id = :exam_id
+                LIMIT 1
+            """),
+            {
+                "attempt_id": attempt_id,
+                "exam_id":    exam_id,
+            },
+        ).mappings().first()
+
+        if not attempt_row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Attempt not found",
+            )
+
+        student_id = int(attempt_row["student_id"])
+
+        # =========================
+        # 2) Fetch exam questions for points bounds + question_id
+        # =========================
+        result_question_ids = [int(item["exam_question_id"]) for item in results]
+
+        exam_question_rows = db.execute(
+            text("""
+                SELECT
+                    eq.id          AS exam_question_id,
+                    eq.points      AS max_score,
+                    eq.question_id
+                FROM exam_questions eq
+                WHERE eq.exam_id = :exam_id
+                  AND eq.id      = ANY(:question_ids)
+            """),
+            {
+                "exam_id":      exam_id,
+                "question_ids": result_question_ids,
+            },
+        ).mappings().all()
+
+        exam_questions_by_id: dict[int, dict] = {
+            int(row["exam_question_id"]): dict(row)
+            for row in exam_question_rows
+        }
+
+        # =========================
+        # 3) Fetch exam total_score + passing_score
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT total_score, passing_score
+                FROM exams
+                WHERE id = :exam_id
+                LIMIT 1
+            """),
+            {"exam_id": exam_id},
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Exam not found",
+            )
+
+        # =========================
+        # 4) Update student_answers for each result
+        # =========================
+        for item in results:
+            qid           = int(item["exam_question_id"])
+            points_earned = float(item["points_earned"])
+            feedback      = item.get("feedback")
+            is_correct    = points_earned > 0
+
+            eq_row = exam_questions_by_id.get(qid)
+            if not eq_row:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"exam_question_id {qid} does not belong to exam {exam_id}",
+                )
+
+            if points_earned > float(eq_row["max_score"]):
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"points_earned {points_earned} exceeds max_score {eq_row['max_score']} for exam_question_id {qid}",
+                )
+
+            db.execute(
+                text("""
+                    UPDATE student_answers
+                    SET is_correct       = :is_correct,
+                        points_earned    = :points_earned,
+                        auto_graded      = TRUE,
+                        teacher_feedback = :feedback,
+                        updated_at       = NOW()
+                    WHERE attempt_id       = :attempt_id
+                      AND exam_question_id = :exam_question_id
+                """),
+                {
+                    "attempt_id":       attempt_id,
+                    "exam_question_id": qid,
+                    "is_correct":       is_correct,
+                    "points_earned":    points_earned,
+                    "feedback":         feedback,
+                },
+            )
+
+        # =========================
+        # 5) Recalculate total score from all student_answers
+        # =========================
+        score_row = db.execute(
+            text("""
+                SELECT
+                    COALESCE(SUM(points_earned), 0)                                  AS total_score,
+                    COALESCE(SUM(CASE WHEN is_correct = TRUE  THEN 1 ELSE 0 END), 0) AS correct_count,
+                    COALESCE(SUM(CASE WHEN is_correct = FALSE THEN 1 ELSE 0 END), 0) AS incorrect_count,
+                    COALESCE(SUM(CASE WHEN is_correct IS NULL THEN 1 ELSE 0 END), 0) AS unanswered_count
+                FROM student_answers
+                WHERE attempt_id = :attempt_id
+            """),
+            {"attempt_id": attempt_id},
+        ).mappings().first()
+
+        if not score_row:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to calculate attempt scores",
+            )
+
+        exam_total_score = float(exam_row["total_score"]) if exam_row["total_score"] else 1.0
+        new_total_score  = float(score_row["total_score"])
+        percentage_score = round((new_total_score / exam_total_score) * 100, 2)
+
+        passing_score = exam_row["passing_score"]
+        is_passed     = None
+        if passing_score is not None:
+            is_passed = percentage_score >= float(passing_score)
+
+        # =========================
+        # 6) Update attempt to graded
+        # =========================
+        db.execute(
+            text("""
+                UPDATE student_exam_attempts
+                SET status           = 'graded',
+                    graded_at        = NOW(),
+                    total_score      = :total_score,
+                    percentage_score = :percentage_score,
+                    is_passed        = :is_passed,
+                    correct_count    = :correct_count,
+                    incorrect_count  = :incorrect_count,
+                    unanswered_count = :unanswered_count
+                WHERE id = :attempt_id
+            """),
+            {
+                "attempt_id":       attempt_id,
+                "total_score":      new_total_score,
+                "percentage_score": percentage_score,
+                "is_passed":        is_passed,
+                "correct_count":    int(score_row["correct_count"]),
+                "incorrect_count":  int(score_row["incorrect_count"]),
+                "unanswered_count": int(score_row["unanswered_count"]),
+            },
+        )
+
+        # =========================
+        # 7) Update student_question_progress
+        # =========================
+        for item in results:
+            qid    = int(item["exam_question_id"])
+            eq_row = exam_questions_by_id.get(qid)
+
+            if not eq_row:
+                continue
+
+            real_question_id = int(eq_row["question_id"])
+            is_correct       = float(item["points_earned"]) > 0
+
+            answer_row = db.execute(
+                text("""
+                    SELECT time_taken_seconds
+                    FROM student_answers
+                    WHERE attempt_id       = :attempt_id
+                      AND exam_question_id = :exam_question_id
+                    LIMIT 1
+                """),
+                {
+                    "attempt_id":       attempt_id,
+                    "exam_question_id": qid,
+                },
+            ).mappings().first()
+
+            if not answer_row:
+                continue
+
+            time_taken = float(answer_row["time_taken_seconds"] or 0)
+
+            db.execute(
+                text("""
+                    INSERT INTO student_question_progress (
+                        student_id, question_id,
+                        times_attempted, times_correct, times_wrong,
+                        average_time_seconds, mastery_level,
+                        last_attempted_at, last_correct_at
+                    )
+                    VALUES (
+                        :student_id, :question_id,
+                        1,
+                        :times_correct,
+                        :times_wrong,
+                        :average_time_seconds,
+                        'beginner',
+                        NOW(),
+                        :last_correct_at
+                    )
+                    ON CONFLICT (student_id, question_id)
+                    DO UPDATE SET
+                        times_attempted      = student_question_progress.times_attempted + 1,
+                        times_correct        = student_question_progress.times_correct + :times_correct,
+                        times_wrong          = student_question_progress.times_wrong + :times_wrong,
+                        average_time_seconds = (
+                            (student_question_progress.average_time_seconds * student_question_progress.times_attempted) + :average_time_seconds
+                        ) / (student_question_progress.times_attempted + 1),
+                        last_attempted_at    = NOW(),
+                        last_correct_at      = CASE WHEN :is_correct THEN NOW() ELSE student_question_progress.last_correct_at END
+                """),
+                {
+                    "student_id":           student_id,
+                    "question_id":          real_question_id,
+                    "times_correct":        1 if is_correct else 0,
+                    "times_wrong":          0 if is_correct else 1,
+                    "average_time_seconds": time_taken,
+                    "last_correct_at":      datetime.now(timezone.utc) if is_correct else None,
+                    "is_correct":           is_correct,
+                },
+            )
+
+        return {
+            "attempt_id":       attempt_id,
+            "exam_id":          exam_id,
+            "total_score":      new_total_score,
+            "percentage_score": percentage_score,
+            "is_passed":        is_passed,
+            "correct_count":    int(score_row["correct_count"]),
+            "incorrect_count":  int(score_row["incorrect_count"]),
+            "unanswered_count": int(score_row["unanswered_count"]),
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Database error while saving AI exam grading results",
+        ) from exc
+

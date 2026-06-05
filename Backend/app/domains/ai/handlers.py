@@ -8,6 +8,7 @@ from app.core.ai_service_integration.ai_callback_verifier import VerifiedAICallb
 from app.domains.topics.helpers import bulk_insert_ai_topics
 from app.domains.learningOutcomes.helpers import bulk_insert_ai_learning_outcomes
 from app.domains.questions.helpers import validate_and_prepare_ai_generated_questions, insert_ai_generated_questions
+from app.domains.exams.helpers import save_ai_exam_grading_results
 from app.domains.ai.helpers import (
     insert_topic_learning_outcome_relations,
     mark_material_ai_processing_completed,)
@@ -207,6 +208,148 @@ def handle_question_generation(*, db: Session, verified_callback: VerifiedAICall
         "inserted_count": insert_result["inserted_count"],
         "question_ids": insert_result["question_ids"],
     }
+
+
+
+def handle_exam_grading(*, db: Session, verified_callback: VerifiedAICallbackRequest, request_log: dict,) -> dict:
+    payload = verified_callback.payload
+    body    = _extract_callback_body(payload)
+
+    # =========================
+    # 1) Validate callback status
+    # =========================
+    callback_status = _extract_required_str(
+        payload,
+        "status",
+        "Missing status in callback payload",
+    ).lower()
+
+    if callback_status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="exam_grading callback status must be 'completed'",
+        )
+
+    # =========================
+    # 2) Validate course_id matches request log
+    # =========================
+    course_id = _extract_required_positive_int(
+        payload,
+        "course_id",
+        "Missing or invalid course_id in callback payload",
+    )
+
+    request_log_course_id = request_log.get("course_id")
+    if request_log_course_id is None or int(request_log_course_id) != course_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback course_id does not match AI request log",
+        )
+
+    # =========================
+    # 3) Validate primary entity in request log
+    # =========================
+    request_log_entity_type = (
+        request_log.get("primary_entity_type") or ""
+    ).strip().lower()
+
+    if request_log_entity_type != "attempt":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="AI request log primary_entity_type must be 'attempt'",
+        )
+
+    # =========================
+    # 4) Validate attempt_id + exam_id from body
+    # =========================
+    attempt_id = _extract_required_positive_int(
+        body,
+        "attempt_id",
+        "Missing or invalid attempt_id in callback body",
+    )
+
+    exam_id = _extract_required_positive_int(
+        body,
+        "exam_id",
+        "Missing or invalid exam_id in callback body",
+    )
+
+    request_log_entity_id = request_log.get("primary_entity_id")
+    if request_log_entity_id is None or int(request_log_entity_id) != attempt_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback attempt_id does not match AI request log",
+        )
+
+    # =========================
+    # 5) Validate results list
+    # =========================
+    results = _extract_required_list(
+        body,
+        "results",
+        "Missing results list in callback body",
+    )
+
+    if not results:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback results list must not be empty",
+        )
+
+    # =========================
+    # 6) Validate all sent question IDs are present in results
+    # =========================
+    request_payload        = request_log.get("request_payload") or {}
+    request_body           = request_payload.get("body") or {}
+    sent_questions         = request_body.get("questions") or []
+
+    sent_exam_question_ids: set[int] = {
+        int(q["exam_question_id"])
+        for q in sent_questions
+        if isinstance(q, dict) and q.get("exam_question_id")
+    }
+
+    returned_exam_question_ids: set[int] = set()
+    for item in results:
+        if not isinstance(item, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each result item must be an object",
+            )
+
+        result_qid = item.get("exam_question_id")
+        if not isinstance(result_qid, int) or result_qid <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each result must include a valid exam_question_id",
+            )
+
+        points_earned = item.get("points_earned")
+        if not isinstance(points_earned, (int, float)) or points_earned < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid points_earned for exam_question_id {result_qid}",
+            )
+
+        returned_exam_question_ids.add(result_qid)
+
+    missing_ids = sent_exam_question_ids - returned_exam_question_ids
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"AI response is missing results for exam_question_ids: {sorted(missing_ids)}",
+        )
+
+    # =========================
+    # 7) Save grading results
+    # =========================
+    return save_ai_exam_grading_results(
+        db=db,
+        attempt_id=attempt_id,
+        exam_id=exam_id,
+        results=results,
+    )
+
 
 
 

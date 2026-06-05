@@ -6,12 +6,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 
-def bulk_insert_ai_topics(
-    *,
-    db: Session,
-    material_id: int,
-    topics: list[dict],
-) -> dict[str, int]:
+def bulk_insert_ai_topics(*, db: Session, material_id: int, topics: list[dict],) -> dict[str, int]:
     if not isinstance(material_id, int) or material_id <= 0:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -168,3 +163,5 @@ def bulk_insert_ai_topics(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Database error while inserting AI topics",
         ) from exc
+    
+    
