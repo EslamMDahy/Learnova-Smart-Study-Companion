@@ -25,9 +25,11 @@ from .schemas import (ExamCreateRequest,
                       StudentSubmitAnswerRequest,
                       StudentSubmitExamRequest)
 
+from app.core.ai_service_integration.ai_transport import send_ai_request
 from .helpers import (build_exam_export_context,
                       render_exam_pdf_html,
                       convert_html_to_pdf,)
+
 
 
 ALLOWED_EXAM_TYPES = {"quiz", "midterm", "final", "practice"}
@@ -5432,7 +5434,7 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                 )
                 continue
 
-            if not auto_gradable or q_type not in auto_gradable_types:
+            if q_type in {"essay", "short_answer"}:
                 needs_manual_grading = True
                 continue
 
@@ -5611,17 +5613,78 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
 
         db.commit()
 
+        # =========================
+        # 10) Send AI grading request (if needed)
+        # =========================
+        if needs_manual_grading:
+            ai_question_rows = db.execute(
+                text("""
+                    SELECT
+                        eq.id              AS exam_question_id,
+                        eq.snapshot_question_text,
+                        eq.snapshot_type,
+                        eq.snapshot_expected_answer,
+                        eq.snapshot_grading_rubric,
+                        eq.points          AS max_score,
+                        sa.answer_text
+                    FROM exam_questions eq
+                    JOIN student_answers sa
+                      ON sa.exam_question_id = eq.id
+                     AND sa.attempt_id = :attempt_id
+                    WHERE eq.exam_id = :exam_id
+                      AND eq.snapshot_type IN ('essay', 'short_answer')
+                      AND eq.snapshot_auto_gradable = FALSE
+                """),
+                {
+                    "attempt_id": attempt_id,
+                    "exam_id": exam_id,
+                },
+            ).mappings().all()
+
+            if ai_question_rows:
+                ai_questions_body = [
+                    {
+                        "exam_question_id": int(row["exam_question_id"]),
+                        "question_text":    row["snapshot_question_text"],
+                        "type":             row["snapshot_type"],
+                        "expected_answer":  row["snapshot_expected_answer"],
+                        "grading_rubric":   row["snapshot_grading_rubric"],
+                        "max_score":        float(row["max_score"]),
+                        "student_answer":   row["answer_text"],
+                    }
+                    for row in ai_question_rows
+                ]
+
+                try:
+                    send_ai_request(
+                        db,
+                        operation_type="exam_grading",
+                        endpoint_path="/api/v1/courses/grading/evaluate",
+                        course_id=course_id,
+                        primary_entity_type="attempt",
+                        primary_entity_id=attempt_id,
+                        body={
+                            "attempt_id": attempt_id,
+                            "exam_id":    exam_id,
+                            "questions":  ai_questions_body,
+                        },
+                    )
+                    db.commit()
+
+                except Exception:
+                    db.rollback()
+
         return {
-            "attempt_id": attempt_id,
-            "exam_id": exam_id,
-            "status": final_status,
-            "total_score": total_score,
+            "attempt_id":      attempt_id,
+            "exam_id":         exam_id,
+            "status":          final_status,
+            "total_score":     total_score,
             "percentage_score": percentage_score,
-            "is_passed": is_passed,
-            "correct_count": correct_count,
+            "is_passed":       is_passed,
+            "correct_count":   correct_count,
             "incorrect_count": incorrect_count,
             "unanswered_count": unanswered_count,
-            "submitted_at": submitted_at,
+            "submitted_at":    submitted_at,
         }
 
     except HTTPException:
@@ -5630,6 +5693,9 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
 
 
 

@@ -5,10 +5,10 @@ from sqlalchemy.orm import Session
 
 from app.core.ai_service_integration.ai_callback_verifier import VerifiedAICallbackRequest
 
-from app.features.topics.helpers import bulk_insert_ai_topics
-from app.features.learningOutcomes.helpers import bulk_insert_ai_learning_outcomes
-from app.features.questions.helpers import validate_and_prepare_ai_generated_questions, insert_ai_generated_questions
-from app.features.ai.helpers import (
+from app.domains.topics.helpers import bulk_insert_ai_topics
+from app.domains.learningOutcomes.helpers import bulk_insert_ai_learning_outcomes
+from app.domains.questions.helpers import validate_and_prepare_ai_generated_questions, insert_ai_generated_questions
+from app.domains.ai.helpers import (
     insert_topic_learning_outcome_relations,
     mark_material_ai_processing_completed,)
 

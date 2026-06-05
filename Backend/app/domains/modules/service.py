@@ -11,7 +11,7 @@ from .schemas import (ModuleCreateRequest,
 
 from app.core.config import settings
 
-from app.features.materials.service import copy_material, _delete_material_internal
+from app.domains.materials.service import copy_material, _delete_material_internal
 
 
 

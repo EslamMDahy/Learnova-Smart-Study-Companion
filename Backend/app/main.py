@@ -5,17 +5,17 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.core.config import settings
-from app.features.auth.router                    import router as auth_router
-from app.features.courses.router                 import router as courses_router
-from app.features.learningOutcomes.router        import router as learningOutcomes_router
-from app.features.modules.router                 import router as modules_router
-from app.features.materials.router               import router as materials_router
-from app.features.topics.router                  import router as topics_router
-from app.features.questions.router               import router as questions_router
-from app.features.exams.router                   import router as exams_router
-from app.features.organizations.router           import router as organizations_router
-from app.features.settings.router                import router as settings_router
-from app.features.ai.router                      import router as ai_router
+from app.domains.auth.router                    import router as auth_router
+from app.domains.courses.router                 import router as courses_router
+from app.domains.learningOutcomes.router        import router as learningOutcomes_router
+from app.domains.modules.router                 import router as modules_router
+from app.domains.materials.router               import router as materials_router
+from app.domains.topics.router                  import router as topics_router
+from app.domains.questions.router               import router as questions_router
+from app.domains.exams.router                   import router as exams_router
+from app.domains.organizations.router           import router as organizations_router
+from app.domains.settings.router                import router as settings_router
+from app.domains.ai.router                      import router as ai_router
 
 app = FastAPI()
 
