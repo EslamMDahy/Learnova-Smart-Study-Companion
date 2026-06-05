@@ -33,7 +33,7 @@ class AsyncStateView extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     if (loading) {
-      return Padding(
+      return const Padding(
         padding: EdgeInsets.all(24),
         child: _LoadingSkeleton(),
       );
@@ -92,7 +92,7 @@ class _EmptyCard extends StatelessWidget {
             ),
             child: Icon(Icons.inbox_outlined, color: AppColors.textGray),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -105,7 +105,7 @@ class _EmptyCard extends StatelessWidget {
                     color: AppColors.textTitle,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
                   message,
                   style: TextStyle(
@@ -153,7 +153,7 @@ class _ErrorCard extends StatelessWidget {
             ),
             child: Icon(Icons.error_outline, color: AppColors.dangerTitle),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -166,7 +166,7 @@ class _ErrorCard extends StatelessWidget {
                     color: AppColors.textTitle,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
                   message,
                   style: TextStyle(
@@ -177,12 +177,12 @@ class _ErrorCard extends StatelessWidget {
                   ),
                 ),
                 if (hasRetry) ...[
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton(
                       onPressed: onRetry,
-                      child: Text('Retry'),
+                      child: const Text('Retry'),
                     ),
                   ),
                 ],
@@ -236,20 +236,20 @@ class _LoadingSkeleton extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   bar(w: 180, h: 14),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   bar(w: 260),
                 ],
               ),
             ),
           ],
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
 
         // Rows skeleton (table-like)
         ...List.generate(6, (i) {
@@ -272,7 +272,7 @@ class _LoadingSkeleton extends StatelessWidget {
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
-                  SizedBox(width: 14),
+                  const SizedBox(width: 14),
                   Container(
                     width: 34,
                     height: 34,
@@ -281,20 +281,20 @@ class _LoadingSkeleton extends StatelessWidget {
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         bar(w: 220),
-                        SizedBox(height: 8),
+                        const SizedBox(height: 8),
                         bar(w: 160, h: 11),
                       ],
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   bar(w: 88, h: 22),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   bar(w: 64, h: 22),
                 ],
               ),

@@ -1,6 +1,7 @@
 part of 'materials_tab.dart';
 
 class _SidebarWidget extends StatelessWidget {
+  final double             width;
   final CourseDetailsState state;
   final Set<int>           expanded;
   final _Ctx?              active;
@@ -27,6 +28,7 @@ class _SidebarWidget extends StatelessWidget {
   final void Function(TopicItem topic) onToggleTopicExpanded;
 
   const _SidebarWidget({
+    this.width = 268,
     required this.state,
     required this.expanded,
     required this.active,
@@ -55,10 +57,9 @@ class _SidebarWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     return Container(
-      width: 268,
-      decoration: BoxDecoration(
+      width: width,
+      decoration: const BoxDecoration(
         color: _K.sidebar,
         border: Border(right: BorderSide(color: _K.div)),
       ),
@@ -69,12 +70,12 @@ class _SidebarWidget extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 14),
             decoration: BoxDecoration(
               color: AppColors.cardBg,
-              border: Border(bottom: BorderSide(color: _K.div)),
+              border: const Border(bottom: BorderSide(color: _K.div)),
             ),
             child: Row(
               children: [
                 Icon(Icons.folder_open_rounded, size: 14, color: AppColors.textHint),
-                SizedBox(width: 7),
+                const SizedBox(width: 7),
                 Expanded(
                   child: Text(
                     'STRUCTURE',
@@ -91,7 +92,7 @@ class _SidebarWidget extends StatelessWidget {
                     hoverColor: Colors.transparent,
                     splashColor: Colors.transparent,
                     highlightColor: Colors.transparent,
-                    overlayColor: WidgetStatePropertyAll(Colors.transparent),
+                    overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                     onTap: onClearSelection,
                     borderRadius: BorderRadius.circular(999),
                     child: Container(
@@ -102,7 +103,7 @@ class _SidebarWidget extends StatelessWidget {
                       ),
                       child: Text(
                         '${treeSelection.totalCount}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 10,
                           fontWeight: FontWeight.w800,
                           color: AppColors.primary,
@@ -110,13 +111,13 @@ class _SidebarWidget extends StatelessWidget {
                       ),
                     ),
                   ),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                 ],
                 InkWell(
                   hoverColor: Colors.transparent,
                   splashColor: Colors.transparent,
                   highlightColor: Colors.transparent,
-                  overlayColor: WidgetStatePropertyAll(Colors.transparent),
+                  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                   onTap: onToggleSelectionMode,
                   borderRadius: BorderRadius.circular(999),
                   child: Container(
@@ -136,7 +137,7 @@ class _SidebarWidget extends StatelessWidget {
                           size: 12,
                           color: selectionMode ? AppColors.primary : AppColors.textHint,
                         ),
-                        SizedBox(width: 4),
+                        const SizedBox(width: 4),
                         Text(
                           'Select',
                           style: TextStyle(
@@ -149,9 +150,9 @@ class _SidebarWidget extends StatelessWidget {
                     ),
                   ),
                 ),
-                SizedBox(width: 4),
+                const SizedBox(width: 4),
                 if (state.modulesLoading)
-                  SizedBox(
+                  const SizedBox(
                     width: 12,
                     height: 12,
                     child: CircularProgressIndicator(strokeWidth: 1.5),
@@ -162,7 +163,7 @@ class _SidebarWidget extends StatelessWidget {
           ),
           Expanded(
             child: state.modulesLoading && state.modules.isEmpty
-                ? Center(child: CircularProgressIndicator(strokeWidth: 2))
+                ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
                 : state.modules.isEmpty
                     ? _SidebarEmpty(onAdd: onAddModule)
                     : Builder(
@@ -170,7 +171,7 @@ class _SidebarWidget extends StatelessWidget {
                           final modules = [...state.modules]
                             ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
                           return ReorderableListView.builder(
-                            key: PageStorageKey('course-materials-sidebar-scroll'),
+                            key: const PageStorageKey('course-materials-sidebar-scroll'),
                             buildDefaultDragHandles: false,
                             proxyDecorator: (child, index, animation) {
                               return AnimatedBuilder(
@@ -181,7 +182,6 @@ class _SidebarWidget extends StatelessWidget {
                                     scale: 1.0 + (0.02 * t),
                                     child: Material(
                                       color: Colors.transparent,
-                                      elevation: 0,
                                       child: DecoratedBox(
                                         decoration: BoxDecoration(
                                           borderRadius: BorderRadius.circular(12),
@@ -189,7 +189,7 @@ class _SidebarWidget extends StatelessWidget {
                                             BoxShadow(
                                               color: AppColors.primary.withOpacity(0.14),
                                               blurRadius: 16,
-                                              offset: Offset(0, 8),
+                                              offset: const Offset(0, 8),
                                             ),
                                           ],
                                         ),
@@ -258,7 +258,7 @@ class _SidebarWidget extends StatelessWidget {
           ),
           Container(
             padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               border: Border(top: BorderSide(color: _K.div)),
             ),
             child: SizedBox(
@@ -266,8 +266,8 @@ class _SidebarWidget extends StatelessWidget {
               height: 36,
               child: ElevatedButton.icon(
                 onPressed: onAddModule,
-                icon: Icon(Icons.add_rounded, size: 15),
-                label: Text(
+                icon: const Icon(Icons.add_rounded, size: 15),
+                label: const Text(
                   'Add Module',
                   style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700),
                 ),
@@ -312,7 +312,7 @@ class _SidebarEmpty extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.folder_open_outlined, size: 28, color: AppColors.textHint),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text(
                 'No modules yet',
                 style: TextStyle(
@@ -321,20 +321,20 @@ class _SidebarEmpty extends StatelessWidget {
                   color: AppColors.textTitle,
                 ),
               ),
-              SizedBox(height: 6),
+              const SizedBox(height: 6),
               Text(
                 'Create your first module to start building the course structure.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, height: 1.45),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               OutlinedButton.icon(
                 onPressed: onAdd,
-                icon: Icon(Icons.add_rounded, size: 16),
-                label: Text('Create first module'),
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text('Create first module'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,
-                  side: BorderSide(color: AppColors.primary),
+                  side: const BorderSide(color: AppColors.primary),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
@@ -433,7 +433,6 @@ class _ModuleRowWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final selected = _isSel || isDragging;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -442,23 +441,23 @@ class _ModuleRowWidget extends StatelessWidget {
           hoverColor: Colors.transparent,
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
-          overlayColor: WidgetStatePropertyAll(Colors.transparent),
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
           onTap: onModuleTap,
           child: AnimatedContainer(
-            duration: Duration(milliseconds: 160),
+            duration: const Duration(milliseconds: 160),
             curve: Curves.easeOutCubic,
             margin: const EdgeInsets.fromLTRB(6, 0, 6, 2),
             padding: const EdgeInsets.fromLTRB(6, 7, 6, 7),
             decoration: BoxDecoration(
-              color: selected ? AppColors.hoverBg : Colors.transparent,
+              color: selected ? const Color(0xFFF7FAFF) : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: selected ? AppColors.infoBorder : Colors.transparent,
+                color: selected ? const Color(0xFFD5E5FF) : Colors.transparent,
               ),
             ),
             child: Row(
               children: [
-                dragHandle ?? SizedBox(width: 18, height: 18),
+                dragHandle ?? const SizedBox(width: 18, height: 18),
                 if (selectionMode)
                   Padding(
                     padding: const EdgeInsets.only(right: 4),
@@ -469,24 +468,24 @@ class _ModuleRowWidget extends StatelessWidget {
                         tristate: true,
                         visualDensity: VisualDensity.compact,
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: BorderSide(color: AppColors.borderSoft, width: 1.1),
+                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.1),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                        onChanged: (value) => onModuleCheckChanged(value == true),
+                        onChanged: (value) => onModuleCheckChanged(value ?? false),
                       ),
                     ),
                   ),
                 Icon(
                   isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded,
                   size: 14,
-                  color: AppColors.textHint,
+                  color: const Color(0xFF94A3B8),
                 ),
-                SizedBox(width: 4),
+                const SizedBox(width: 4),
                 Icon(
                   Icons.folder_rounded,
                   size: 14,
-                  color: selected ? AppColors.primary : Color(0xFFEAB308),
+                  color: selected ? AppColors.primary : const Color(0xFFEAB308),
                 ),
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -502,10 +501,10 @@ class _ModuleRowWidget extends StatelessWidget {
                           color: selected ? AppColors.primary : AppColors.textTitle,
                         ),
                       ),
-                      SizedBox(height: 2),
+                      const SizedBox(height: 2),
                       Text(
                         '${materials.length} material${materials.length == 1 ? '' : 's'}',
-                        style: TextStyle(fontSize: 10.2, color: AppColors.textHint, height: 1.1),
+                        style: const TextStyle(fontSize: 10.2, color: Color(0xFF94A3B8), height: 1.1),
                       ),
                     ],
                   ),
@@ -514,23 +513,23 @@ class _ModuleRowWidget extends StatelessWidget {
                   Container(
                     width: 7,
                     height: 7,
-                    decoration: BoxDecoration(
-                      color: AppColors.successDot,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF22C55E),
                       shape: BoxShape.circle,
                     ),
                   ),
                 if (isExpanded) ...[
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   InkWell(
                     hoverColor: Colors.transparent,
                     splashColor: Colors.transparent,
                     highlightColor: Colors.transparent,
-                    overlayColor: WidgetStatePropertyAll(Colors.transparent),
+                    overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                     onTap: onAddMaterial,
                     borderRadius: BorderRadius.circular(8),
-                    child: Padding(
+                    child: const Padding(
                       padding: EdgeInsets.all(2),
-                      child: Icon(Icons.add_rounded, size: 14, color: AppColors.textHint),
+                      child: Icon(Icons.add_rounded, size: 14, color: Color(0xFF94A3B8)),
                     ),
                   ),
                 ],
@@ -540,7 +539,7 @@ class _ModuleRowWidget extends StatelessWidget {
         ),
         AnimatedCrossFade(
           crossFadeState: isExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-          duration: Duration(milliseconds: 180),
+          duration: const Duration(milliseconds: 180),
           firstChild: const SizedBox.shrink(),
           secondChild: _buildChildren(),
         ),
@@ -550,7 +549,7 @@ class _ModuleRowWidget extends StatelessWidget {
 
   Widget _buildChildren() {
     if (loading) {
-      return Padding(
+      return const Padding(
         padding: EdgeInsets.symmetric(vertical: 10),
         child: Center(
           child: SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 1.5)),
@@ -562,14 +561,14 @@ class _ModuleRowWidget extends StatelessWidget {
         margin: const EdgeInsets.fromLTRB(34, 6, 6, 4),
         padding: const EdgeInsets.all(10),
         decoration: BoxDecoration(
-          color: AppColors.cardBg,
+          color: Colors.white,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: _K.div),
         ),
         child: Row(
           children: [
             Icon(Icons.info_outline_rounded, size: 14, color: AppColors.textHint),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(
               child: Text(
                 'No materials yet. Use the plus button to upload one.',
@@ -676,11 +675,10 @@ class _MatRowWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    final iconMap = <String, (IconData, Color)>{
-      'video': (Icons.play_circle_outline_rounded, AppColors.primary),
-      'pdf': (Icons.picture_as_pdf_outlined, AppColors.errorDot),
-      'quiz': (Icons.quiz_outlined, AppColors.purpleText),
+    const iconMap = {
+      'video': (Icons.play_circle_outline_rounded, Color(0xFF2563EB)),
+      'pdf': (Icons.picture_as_pdf_outlined, Color(0xFFEF4444)),
+      'quiz': (Icons.quiz_outlined, Color(0xFF7C3AED)),
     };
     final (ico, col) = iconMap[material.type] ?? (Icons.article_outlined, AppColors.textMuted);
     final roots = _rootTopicsForMaterial(topics);
@@ -692,16 +690,16 @@ class _MatRowWidget extends StatelessWidget {
           hoverColor: Colors.transparent,
           splashColor: Colors.transparent,
           highlightColor: Colors.transparent,
-          overlayColor: WidgetStatePropertyAll(Colors.transparent),
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
           onTap: onTap,
           child: Container(
             margin: const EdgeInsets.fromLTRB(0, 1, 4, 1),
             padding: const EdgeInsets.fromLTRB(8, 7, 6, 7),
             decoration: BoxDecoration(
-              color: isSelected ? AppColors.hoverBg : Colors.transparent,
+              color: isSelected ? const Color(0xFFF7FAFF) : Colors.transparent,
               borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                color: isSelected ? AppColors.infoBorder : Colors.transparent,
+                color: isSelected ? const Color(0xFFD5E5FF) : Colors.transparent,
               ),
             ),
             child: Row(
@@ -716,9 +714,9 @@ class _MatRowWidget extends StatelessWidget {
                         tristate: true,
                         visualDensity: VisualDensity.compact,
                         materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        side: BorderSide(color: AppColors.borderSoft, width: 1.1),
+                        side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.1),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                        onChanged: (value) => onCheckChanged(value == true),
+                        onChanged: (value) => onCheckChanged(value ?? false),
                       ),
                     ),
                   ),
@@ -726,17 +724,17 @@ class _MatRowWidget extends StatelessWidget {
                   hoverColor: Colors.transparent,
                   splashColor: Colors.transparent,
                   highlightColor: Colors.transparent,
-                  overlayColor: WidgetStatePropertyAll(Colors.transparent),
+                  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                   onTap: roots.isNotEmpty ? onToggleExpanded : null,
                   child: Icon(
                     roots.isEmpty
                         ? Icons.remove_rounded
                         : (isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded),
                     size: 13,
-                    color: AppColors.textHint,
+                    color: const Color(0xFF94A3B8),
                   ),
                 ),
-                SizedBox(width: 4),
+                const SizedBox(width: 4),
                 Container(
                   width: 16,
                   height: 16,
@@ -747,7 +745,7 @@ class _MatRowWidget extends StatelessWidget {
                   ),
                   child: Icon(ico, size: 10, color: col),
                 ),
-                SizedBox(width: 7),
+                const SizedBox(width: 7),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -760,14 +758,14 @@ class _MatRowWidget extends StatelessWidget {
                           fontSize: 12,
                           height: 1.1,
                           fontWeight: isSelected ? FontWeight.w700 : FontWeight.w600,
-                          color: isSelected ? AppColors.primary : AppColors.textGray,
+                          color: isSelected ? AppColors.primary : const Color(0xFF334155),
                         ),
                       ),
                       if (topics.isNotEmpty) ...[
-                        SizedBox(height: 2),
+                        const SizedBox(height: 2),
                         Text(
                           '${roots.length} topic${roots.length == 1 ? '' : 's'}',
-                          style: TextStyle(fontSize: 10, color: AppColors.textHint, height: 1.1),
+                          style: const TextStyle(fontSize: 10, color: Color(0xFF94A3B8), height: 1.1),
                         ),
                       ],
                     ],
@@ -855,7 +853,6 @@ class _SidebarTopicNode extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final selected = active?.type == _CType.topic && active?.topic?.id == topic.id;
     final children = depth == 0 ? _childTopicsForParent(allTopics, topic.id) : const <TopicItem>[];
     final isRootTopic = depth == 0;
@@ -891,7 +888,7 @@ class _SidebarTopicNode extends StatelessWidget {
                 hoverColor: Colors.transparent,
                 splashColor: Colors.transparent,
                 highlightColor: Colors.transparent,
-                overlayColor: WidgetStatePropertyAll(Colors.transparent),
+                overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                 onTap: () => onTap(topic),
                 child: Container(
                   margin: const EdgeInsets.only(left: 16),
@@ -900,7 +897,7 @@ class _SidebarTopicNode extends StatelessWidget {
                     color: selected ? AppColors.primarySoft : Colors.transparent,
                     borderRadius: BorderRadius.circular(7),
                     border: Border.all(
-                      color: selected ? AppColors.infoBorder : Colors.transparent,
+                      color: selected ? const Color(0xFFD5E5FF) : Colors.transparent,
                     ),
                   ),
                   child: Row(
@@ -915,9 +912,9 @@ class _SidebarTopicNode extends StatelessWidget {
                               tristate: true,
                               visualDensity: VisualDensity.compact,
                               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                              side: BorderSide(color: AppColors.borderSoft, width: 1.1),
+                              side: const BorderSide(color: Color(0xFFCBD5E1), width: 1.1),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
-                              onChanged: (value) => onTopicCheckChanged(topic, value == true),
+                              onChanged: (value) => onTopicCheckChanged(topic, value ?? false),
                             ),
                           ),
                         ),
@@ -926,25 +923,25 @@ class _SidebarTopicNode extends StatelessWidget {
                           hoverColor: Colors.transparent,
                           splashColor: Colors.transparent,
                           highlightColor: Colors.transparent,
-                          overlayColor: WidgetStatePropertyAll(Colors.transparent),
+                          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                           onTap: children.isNotEmpty ? onToggleExpanded : null,
                           child: Icon(
                             children.isEmpty
                                 ? Icons.remove_rounded
                                 : (isExpanded ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded),
                             size: 12,
-                            color: AppColors.textHint,
+                            color: const Color(0xFF94A3B8),
                           ),
                         )
                       else
-                        SizedBox(width: 12, height: 12),
-                      SizedBox(width: 4),
+                        const SizedBox(width: 12, height: 12),
+                      const SizedBox(width: 4),
                       Icon(
                         isRootTopic ? Icons.topic_outlined : Icons.subdirectory_arrow_right_rounded,
                         size: isRootTopic ? 12 : 11,
-                        color: selected ? AppColors.primary : AppColors.textHint,
+                        color: selected ? AppColors.primary : const Color(0xFF94A3B8),
                       ),
-                      SizedBox(width: 5),
+                      const SizedBox(width: 5),
                       Expanded(
                         child: Text(
                           topic.title,
@@ -954,17 +951,17 @@ class _SidebarTopicNode extends StatelessWidget {
                             fontSize: isRootTopic ? 11.2 : 10.7,
                             height: 1.15,
                             fontWeight: selected ? FontWeight.w700 : (isRootTopic ? FontWeight.w600 : FontWeight.w500),
-                            color: selected ? AppColors.primary : (isRootTopic ? AppColors.textGray : AppColors.textMuted),
+                            color: selected ? AppColors.primary : (isRootTopic ? const Color(0xFF334155) : AppColors.textMuted),
                           ),
                         ),
                       ),
                       if (isRootTopic && children.isNotEmpty)
                         Text(
                           '${children.length}',
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 9.5,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textHint,
+                            color: Color(0xFF94A3B8),
                           ),
                         ),
                     ],
@@ -1002,7 +999,7 @@ class _FooterWidget extends StatelessWidget {
   final VoidCallback onUpload, onGenerate, onClose;
   const _FooterWidget({required this.ctx, required this.uploading, required this.canGenerate,
       this.selectionCount,
-      required this.onUpload, required this.onGenerate, required this.onClose});
+      required this.onUpload, required this.onGenerate, required this.onClose,});
 
   bool get _showSelectionLabel => (selectionCount ?? 0) > 0;
   String get _label => _showSelectionLabel
@@ -1023,33 +1020,32 @@ class _FooterWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     return Container(
       height: 56,
-      decoration: BoxDecoration(color: AppColors.cardBg,
-          border: Border(top: BorderSide(color: _K.div)),
+      decoration: BoxDecoration(color: Colors.white,
+          border: const Border(top: BorderSide(color: _K.div)),
           boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05),
-              blurRadius: 16, offset: Offset(0, -4))]),
+              blurRadius: 16, offset: const Offset(0, -4),),],),
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Row(children: [
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(7)),
           child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(_icon, size: 13, color: AppColors.primary), SizedBox(width: 6),
-            ConstrainedBox(constraints: BoxConstraints(maxWidth: 200),
+            Icon(_icon, size: 13, color: AppColors.primary), const SizedBox(width: 6),
+            ConstrainedBox(constraints: const BoxConstraints(maxWidth: 200),
                 child: Text(_label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-                        color: AppColors.primary))),
-          ])),
-        Spacer(),
+                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
+                        color: AppColors.primary,),),),
+          ],),),
+        const Spacer(),
         _Btn(icon: Icons.auto_awesome_rounded, label: canGenerate ? 'Generate Questions' : 'No content yet',
-            primary: true, disabled: !canGenerate, onTap: canGenerate ? onGenerate : null),
-        SizedBox(width: 8),
-        InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), onTap: onClose, borderRadius: BorderRadius.circular(6),
-            child: Padding(padding: EdgeInsets.all(7),
-                child: Icon(Icons.close_rounded, size: 15, color: AppColors.textHint))),
-      ]),
+            primary: true, disabled: !canGenerate, onTap: canGenerate ? onGenerate : null,),
+        const SizedBox(width: 8),
+        InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), onTap: onClose, borderRadius: BorderRadius.circular(6),
+            child: Padding(padding: const EdgeInsets.all(7),
+                child: Icon(Icons.close_rounded, size: 15, color: AppColors.textHint),),),
+      ],),
     );
   }
 }
@@ -1065,14 +1061,14 @@ class _EmptyStateWidget extends StatelessWidget {
         color: _K.bg,
         child: Center(
           child: Container(
-            constraints: BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 420),
             padding: const EdgeInsets.all(28),
             decoration: BoxDecoration(
-              color: AppColors.cardBg,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(22),
               border: Border.all(color: _K.div),
               boxShadow: [
-                BoxShadow(color: Color(0x08000000), blurRadius: 18, offset: Offset(0, 8)),
+                const BoxShadow(color: Color(0x08000000), blurRadius: 18, offset: Offset(0, 8)),
               ],
             ),
             child: Column(
@@ -1085,25 +1081,25 @@ class _EmptyStateWidget extends StatelessWidget {
                     color: _K.blueSoft,
                     borderRadius: BorderRadius.circular(22),
                   ),
-                  child: Icon(Icons.folder_open_rounded, size: 36, color: AppColors.primary),
+                  child: const Icon(Icons.folder_open_rounded, size: 36, color: AppColors.primary),
                 ),
-                SizedBox(height: 18),
+                const SizedBox(height: 18),
                 Text('Select a module or material', style: TextStyle(
-                    fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                SizedBox(height: 8),
+                    fontSize: 20, fontWeight: FontWeight.w800, color: AppColors.textTitle,),),
+                const SizedBox(height: 8),
                 Text(
                   'Use the structure panel to explore your modules, reorder them by dragging, or open a material to manage topics and content.',
                   textAlign: TextAlign.center,
                   style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
                 ),
-                SizedBox(height: 18),
+                const SizedBox(height: 18),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                   decoration: BoxDecoration(
                     color: _K.blueSoft,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(Icons.drag_indicator_rounded, size: 16, color: AppColors.primary),
@@ -1112,14 +1108,14 @@ class _EmptyStateWidget extends StatelessWidget {
                     ],
                   ),
                 ),
-                SizedBox(height: 22),
+                const SizedBox(height: 22),
                 OutlinedButton.icon(onPressed: onCreate,
-                    icon: Icon(Icons.add_rounded, size: 15),
-                    label: Text('New Module'),
+                    icon: const Icon(Icons.add_rounded, size: 15),
+                    label: const Text('New Module'),
                     style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary,
-                        side: BorderSide(color: AppColors.primary),
+                        side: const BorderSide(color: AppColors.primary),
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)))),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),),),
               ],
             ),
           ),
@@ -1156,9 +1152,7 @@ class _ModulePanelWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final description = (module.description ?? '').trim();
-    final hasDescription = description.isNotEmpty;
     final readyMaterials = materials.where((m) => m.status == 'ready').length;
     final processingMaterials = materials.where((m) => m.status != 'ready').length;
 
@@ -1169,208 +1163,67 @@ class _ModulePanelWidget extends StatelessWidget {
         child: LayoutBuilder(
           builder: (context, constraints) {
             final wide = constraints.maxWidth >= 1080;
+            final tight = constraints.maxWidth < 720;
 
-            final mainColumn = Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _ModuleCanvasHeader(
-                  module: module,
-                  materialCount: materials.length,
-                  onUpload: uploading ? null : onUpload,
-                ),
-                SizedBox(height: 18),
-                if (uploading) ...[
-                  _UploadProgressWidget(progress: uploadProgress),
-                  SizedBox(height: 18),
-                ],
-                _CanvasSection(
-                  title: 'Overview',
-                  icon: Icons.grid_view_rounded,
-                  child: Column(
-                    children: [
-                      LayoutBuilder(
-                        builder: (context, sectionConstraints) {
-                          final compact = sectionConstraints.maxWidth < 760;
-                          final children = [
-                            _SoftStatTile(
-                              icon: Icons.layers_rounded,
-                              iconBg: AppColors.infoBg,
-                              iconFg: AppColors.primary,
-                              label: 'Position',
-                              value: '#${module.orderIndex + 1}',
-                              description: 'Current order inside this course.',
-                            ),
-                            _SoftStatTile(
-                              icon: module.isPublished ? Icons.visibility_rounded : Icons.visibility_off_rounded,
-                              iconBg: module.isPublished ? AppColors.successBg : AppColors.warningBg,
-                              iconFg: module.isPublished ? AppColors.successText : AppColors.warningText,
-                              label: 'Visibility',
-                              value: module.isPublished ? 'Published' : 'Draft',
-                              description: module.isPublished ? 'Students can access this module.' : 'Hidden from students right now.',
-                            ),
-                            _SoftStatTile(
-                              icon: Icons.folder_open_rounded,
-                              iconBg: AppColors.headerBg,
-                              iconFg: AppColors.textMuted,
-                              label: 'Materials',
-                              value: '${materials.length}',
-                              description: '$readyMaterials ready and $processingMaterials processing.',
-                            ),
-                          ];
-
-                          if (compact) {
-                            return Column(
-                              children: [
-                                for (var i = 0; i < children.length; i++) ...[
-                                  children[i],
-                                  if (i != children.length - 1) SizedBox(height: 12),
-                                ],
-                              ],
-                            );
-                          }
-
-                          return Row(
-                            children: [
-                              for (var i = 0; i < children.length; i++) ...[
-                                Expanded(child: children[i]),
-                                if (i != children.length - 1) SizedBox(width: 14),
-                              ],
-                            ],
-                          );
-                        },
-                      ),
-                      SizedBox(height: 14),
-                      _DescriptionBlock(
-                        hasDescription: hasDescription,
-                        description: description,
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 18),
-                _CanvasSection(
-                  title: 'Materials',
-                  icon: Icons.folder_copy_rounded,
-                  trailing: _SmBtn(
-                    icon: Icons.upload_rounded,
-                    label: 'Upload',
-                    disabled: uploading,
-                    onTap: onUpload,
-                  ),
-                  child: materials.isEmpty
-                      ? _MatEmptyWidget(onUpload: onUpload)
-                      : Column(
-                          children: materials.asMap().entries.map(
-                            (e) => Padding(
-                              padding: EdgeInsets.only(bottom: e.key == materials.length - 1 ? 0 : 12),
-                              child: _ModuleMaterialCard(
-                                material: e.value,
-                                onTap: () => onMaterialTap(e.value),
-                              ),
-                            ),
-                          ).toList(),
-                        ),
-                ),
-              ],
+            final structure = _ModuleStructureCard(
+              module: module,
+              materials: materials,
+              readyMaterials: readyMaterials,
+              processingMaterials: processingMaterials,
+              onUpload: onUpload,
+              onMaterialTap: onMaterialTap,
             );
 
-            final sideColumn = Column(
-              children: [
-                _CanvasSection(
-                  title: 'Quick actions',
-                  icon: Icons.auto_fix_high_rounded,
-                  compactHeader: true,
-                  child: Column(
-                    children: [
-                      _ActionTile(
-                        icon: Icons.drive_file_rename_outline_rounded,
-                        iconBg: AppColors.infoBg,
-                        iconFg: AppColors.primary,
-                        title: 'Rename module',
-                        subtitle: 'Update the module title shown across the course.',
-                        onTap: onRename,
-                      ),
-                      SizedBox(height: 10),
-                      _ActionTile(
-                        icon: Icons.notes_rounded,
-                        iconBg: AppColors.headerBg,
-                        iconFg: AppColors.textMuted,
-                        title: 'Edit description',
-                        subtitle: hasDescription ? 'Refine the current summary and teaching context.' : 'Add a short summary for this module.',
-                        onTap: onEditDescription,
-                      ),
-                      SizedBox(height: 10),
-                      _ActionTile(
-                        icon: Icons.upload_file_rounded,
-                        iconBg: AppColors.infoBg,
-                        iconFg: AppColors.primary,
-                        title: 'Upload material',
-                        subtitle: uploading ? 'Upload in progress…' : 'Add a PDF, video, or document to this module.',
-                        onTap: uploading ? null : onUpload,
-                        emphasis: true,
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 16),
-                _CanvasSection(
-                  title: 'Module status',
-                  icon: Icons.tune_rounded,
-                  compactHeader: true,
-                  child: Column(
-                    children: [
-                      _ActionTile(
-                        icon: module.isPublished ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                        iconBg: module.isPublished ? AppColors.warningBg : AppColors.successBg,
-                        iconFg: module.isPublished ? AppColors.warningText : AppColors.successText,
-                        title: module.isPublished ? 'Unpublish module' : 'Publish module',
-                        subtitle: module.isPublished ? 'Hide this module from students.' : 'Make this module visible to students.',
-                        onTap: onTogglePublish,
-                      ),
-                      SizedBox(height: 10),
-                      _ActionTile(
-                        icon: Icons.swap_vert_rounded,
-                        iconBg: AppColors.headerBg,
-                        iconFg: AppColors.textMuted,
-                        title: 'Change position',
-                        subtitle: 'Currently #${module.orderIndex + 1} in the course structure.',
-                        onTap: onChangePosition,
-                      ),
-                      SizedBox(height: 10),
-                      _ActionTile(
-                        icon: Icons.share_rounded,
-                        iconBg: AppColors.successBg,
-                        iconFg: AppColors.successText,
-                        title: 'Share with another course',
-                        subtitle: module.sharedWithCourseIds.isEmpty
-                            ? 'Not shared with any other course.'
-                            : 'Shared with ${module.sharedWithCourseIds.length} course${module.sharedWithCourseIds.length == 1 ? '' : 's'}.',
-                        onTap: onShare,
-                      ),
-                    ],
-                  ),
-                ),
-                SizedBox(height: 16),
-                _CanvasDangerSection(onDelete: onDelete),
-              ],
+            final controls = _ModuleControlDock(
+              module: module,
+              materialCount: materials.length,
+              readyMaterials: readyMaterials,
+              processingMaterials: processingMaterials,
+              hasDescription: description.isNotEmpty,
+              uploading: uploading,
+              onUpload: uploading ? null : onUpload,
+              onRename: onRename,
+              onEditDescription: onEditDescription,
+              onTogglePublish: onTogglePublish,
+              onChangePosition: onChangePosition,
+              onShare: onShare,
+              onDelete: onDelete,
             );
-
-            if (wide) {
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(flex: 8, child: mainColumn),
-                  SizedBox(width: 20),
-                  SizedBox(width: 320, child: sideColumn),
-                ],
-              );
-            }
 
             return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                mainColumn,
-                SizedBox(height: 18),
-                sideColumn,
+                _ModuleBlueHeader(
+                  module: module,
+                  description: description,
+                  materialCount: materials.length,
+                  readyMaterials: readyMaterials,
+                  processingMaterials: processingMaterials,
+                  onUpload: uploading ? null : onUpload,
+                ),
+                if (uploading) ...[
+                  const SizedBox(height: 14),
+                  _UploadProgressWidget(progress: uploadProgress),
+                ],
+                SizedBox(height: tight ? 14 : 18),
+                if (wide)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(flex: 7, child: structure),
+                      const SizedBox(width: 20),
+                      SizedBox(width: 340, child: controls),
+                    ],
+                  )
+                else
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      structure,
+                      const SizedBox(height: 18),
+                      controls,
+                    ],
+                  ),
               ],
             );
           },
@@ -1380,38 +1233,53 @@ class _ModulePanelWidget extends StatelessWidget {
   }
 }
 
-class _ModuleCanvasHeader extends StatelessWidget {
+class _ModuleBlueHeader extends StatelessWidget {
   final ModuleItem module;
+  final String description;
   final int materialCount;
+  final int readyMaterials;
+  final int processingMaterials;
   final VoidCallback? onUpload;
 
-  const _ModuleCanvasHeader({
+  const _ModuleBlueHeader({
     required this.module,
+    required this.description,
     required this.materialCount,
+    required this.readyMaterials,
+    required this.processingMaterials,
     required this.onUpload,
   });
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    final description = (module.description ?? '').trim();
+    final title = module.title.trim().isEmpty ? 'Untitled module' : module.title.trim();
+    final moduleSummary = description.isNotEmpty
+        ? description
+        : 'This module is the first level in the course structure. Add materials, then organize them into topics and subtopics.';
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
       decoration: BoxDecoration(
-        color: AppColors.cardBg,
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF145CCB), AppColors.primary, Color(0xFF4CB5FF)],
+        ),
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: AppColors.shadowThin,
-            blurRadius: 18,
-            offset: Offset(0, 8),
+            color: AppColors.primary.withOpacity(0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
           ),
         ],
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxWidth < 760;
+          final compact = constraints.maxWidth < 820;
+          final statWidth = compact ? double.infinity : 240.0;
+
           final titleBlock = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1419,94 +1287,96 @@ class _ModuleCanvasHeader extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  _HeaderChip(
+                  _ModuleHeroPill(
                     label: module.isPublished ? 'Published' : 'Draft',
-                    bg: module.isPublished ? AppColors.successBg : AppColors.warningBg,
-                    fg: module.isPublished ? AppColors.successText : AppColors.warningText,
+                    icon: module.isPublished ? Icons.visibility_rounded : Icons.visibility_off_rounded,
                   ),
-                  _HeaderChip(
+                  _ModuleHeroPill(
                     label: '$materialCount material${materialCount == 1 ? '' : 's'}',
-                    bg: AppColors.headerBg,
-                    fg: AppColors.textGray,
+                    icon: Icons.folder_copy_rounded,
                   ),
+                  if (module.isShared)
+                    const _ModuleHeroPill(
+                      label: 'Shared',
+                      icon: Icons.share_rounded,
+                    ),
                 ],
               ),
-              SizedBox(height: 14),
+              const SizedBox(height: 16),
               Text(
-                module.title,
+                title,
+                maxLines: compact ? 3 : 2,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textTitle,
+                  fontSize: compact ? 26 : 34,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
                   height: 1.05,
+                  letterSpacing: -0.5,
                 ),
               ),
-              SizedBox(height: 8),
-              Text(
-                description.isNotEmpty
-                    ? description
-                    : 'Organize files, manage visibility, and keep this module ready for students.',
-                style: TextStyle(
-                  fontSize: 13.5,
-                  color: AppColors.textMuted,
-                  height: 1.6,
+              const SizedBox(height: 10),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 780),
+                child: Text(
+                  moduleSummary,
+                  maxLines: compact ? 4 : 3,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13.5,
+                    height: 1.55,
+                    fontWeight: FontWeight.w500,
+                    color: Colors.white.withOpacity(0.86),
+                  ),
                 ),
               ),
             ],
           );
 
-          final side = Container(
+          final statsCard = Container(
+            width: statWidth,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: AppColors.surfaceBg,
-              borderRadius: BorderRadius.circular(14),
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: Colors.white.withOpacity(0.22)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'Module order',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textMuted,
-                  ),
+                _ModuleHeroMetric(
+                  label: 'Order',
+                  value: '#${module.orderIndex + 1}',
+                  icon: Icons.format_list_numbered_rounded,
                 ),
-                SizedBox(height: 6),
-                Text(
-                  '#${module.orderIndex + 1}',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textTitle,
-                    height: 1,
-                  ),
+                const SizedBox(height: 12),
+                _ModuleHeroMetric(
+                  label: 'Ready files',
+                  value: '$readyMaterials/$materialCount',
+                  icon: Icons.verified_rounded,
                 ),
-                SizedBox(height: 10),
-                Text(
-                  'Updated ${_relativeDate(module.updatedAt)}',
-                  style: TextStyle(
-                    fontSize: 11.8,
-                    color: AppColors.textMuted,
-                    height: 1.4,
-                  ),
+                const SizedBox(height: 12),
+                _ModuleHeroMetric(
+                  label: 'Updated',
+                  value: _relativeDate(module.updatedAt),
+                  icon: Icons.schedule_rounded,
                 ),
-                SizedBox(height: 14),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: onUpload,
-                    icon: Icon(Icons.upload_rounded, size: 16),
-                    label: Text('Upload material'),
+                    icon: const Icon(Icons.upload_rounded, size: 16),
+                    label: Text(onUpload == null ? 'Uploading…' : 'Upload material'),
                     style: ElevatedButton.styleFrom(
                       elevation: 0,
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
+                      backgroundColor: Colors.white,
+                      disabledBackgroundColor: Colors.white.withOpacity(0.55),
+                      foregroundColor: AppColors.primary,
+                      disabledForegroundColor: AppColors.primary.withOpacity(0.55),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                     ),
                   ),
                 ),
@@ -1517,7 +1387,7 @@ class _ModuleCanvasHeader extends StatelessWidget {
           if (compact) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [titleBlock, SizedBox(height: 18), side],
+              children: [titleBlock, const SizedBox(height: 18), statsCard],
             );
           }
 
@@ -1525,14 +1395,577 @@ class _ModuleCanvasHeader extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Expanded(child: titleBlock),
-              SizedBox(width: 18),
-              SizedBox(width: 240, child: side),
+              const SizedBox(width: 22),
+              statsCard,
             ],
           );
         },
       ),
     );
   }
+}
+
+class _ModuleHeroPill extends StatelessWidget {
+  final String label;
+  final IconData icon;
+
+  const _ModuleHeroPill({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.16),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: Colors.white),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _ModuleHeroMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+
+  const _ModuleHeroMetric({required this.label, required this.value, required this.icon});
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 16, color: Colors.white),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white.withOpacity(0.72),
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w900,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+}
+
+class _ModuleStructureCard extends StatelessWidget {
+  final ModuleItem module;
+  final List<MaterialItem> materials;
+  final int readyMaterials;
+  final int processingMaterials;
+  final VoidCallback onUpload;
+  final void Function(MaterialItem) onMaterialTap;
+
+  const _ModuleStructureCard({
+    required this.module,
+    required this.materials,
+    required this.readyMaterials,
+    required this.processingMaterials,
+    required this.onUpload,
+    required this.onMaterialTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _CanvasSection(
+      title: 'Module workspace',
+      icon: Icons.account_tree_rounded,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _ModuleHierarchyStrip(materialCount: materials.length),
+          const SizedBox(height: 16),
+          _ModuleStatusBrief(
+            isPublished: module.isPublished,
+            hasDescription: (module.description ?? '').trim().isNotEmpty,
+            materialCount: materials.length,
+            readyMaterials: readyMaterials,
+            processingMaterials: processingMaterials,
+          ),
+          const SizedBox(height: 18),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Materials in this module',
+                      style: TextStyle(
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textTitle,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      materials.isEmpty
+                          ? 'Upload the first file to start building topics.'
+                          : 'Open a file to manage its topics and subtopics.',
+                      style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.4),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              _ModuleTinyButton(
+                icon: Icons.upload_rounded,
+                label: 'Upload',
+                onTap: onUpload,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          if (materials.isEmpty)
+            _MatEmptyWidget(onUpload: onUpload)
+          else
+            Column(
+              children: materials.asMap().entries.map(
+                (e) => Padding(
+                  padding: EdgeInsets.only(bottom: e.key == materials.length - 1 ? 0 : 12),
+                  child: _ModuleMaterialCard(
+                    material: e.value,
+                    onTap: () => onMaterialTap(e.value),
+                  ),
+                ),
+              ).toList(),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ModuleHierarchyStrip extends StatelessWidget {
+  final int materialCount;
+  const _ModuleHierarchyStrip({required this.materialCount});
+
+  @override
+  Widget build(BuildContext context) {
+    final nodes = [
+      (Icons.layers_rounded, 'Module'),
+      (Icons.insert_drive_file_rounded, 'Materials'),
+      (Icons.flag_rounded, 'Topics'),
+      (Icons.subdirectory_arrow_right_rounded, 'Subtopics'),
+    ];
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.borderGray),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 640;
+          final children = <Widget>[];
+          for (var i = 0; i < nodes.length; i++) {
+            final (icon, label) = nodes[i];
+            children.add(_HierarchyNode(icon: icon, label: label, active: i == 0));
+            if (i != nodes.length - 1) {
+              children.add(Padding(
+                padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 8),
+                child: Icon(
+                  compact ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded,
+                  size: 18,
+                  color: AppColors.textHint,
+                ),
+              ),);
+            }
+          }
+          return compact
+              ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: children)
+              : Row(children: children);
+        },
+      ),
+    );
+  }
+}
+
+class _HierarchyNode extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool active;
+
+  const _HierarchyNode({required this.icon, required this.label, required this.active});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: active ? AppColors.primarySoft : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+          border: active ? Border.all(color: AppColors.primary.withOpacity(0.28)) : null,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 15, color: active ? AppColors.primary : AppColors.textMuted),
+            const SizedBox(width: 7),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+                color: active ? AppColors.primary : AppColors.textMuted,
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _ModuleStatusBrief extends StatelessWidget {
+  final bool isPublished;
+  final bool hasDescription;
+  final int materialCount;
+  final int readyMaterials;
+  final int processingMaterials;
+
+  const _ModuleStatusBrief({
+    required this.isPublished,
+    required this.hasDescription,
+    required this.materialCount,
+    required this.readyMaterials,
+    required this.processingMaterials,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final checks = [
+      _ModuleCheckItem(
+        icon: Icons.visibility_rounded,
+        title: isPublished ? 'Visible to students' : 'Hidden from students',
+        detail: isPublished ? 'Published' : 'Draft',
+        complete: isPublished,
+      ),
+      _ModuleCheckItem(
+        icon: Icons.folder_copy_rounded,
+        title: materialCount == 0 ? 'No materials yet' : '$materialCount material${materialCount == 1 ? '' : 's'} attached',
+        detail: materialCount == 0 ? 'Upload needed' : '$readyMaterials ready, $processingMaterials processing',
+        complete: materialCount > 0,
+      ),
+      _ModuleCheckItem(
+        icon: Icons.notes_rounded,
+        title: hasDescription ? 'Description added' : 'No description',
+        detail: hasDescription ? 'Context is clear' : 'Add context',
+        complete: hasDescription,
+      ),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 720;
+        if (compact) {
+          return Column(
+            children: checks.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: item,
+            ),).toList(),
+          );
+        }
+        return Row(
+          children: [
+            for (var i = 0; i < checks.length; i++) ...[
+              Expanded(child: checks[i]),
+              if (i != checks.length - 1) const SizedBox(width: 12),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _ModuleCheckItem extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String detail;
+  final bool complete;
+
+  const _ModuleCheckItem({required this.icon, required this.title, required this.detail, required this.complete});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: complete ? AppColors.successBg : AppColors.surfaceBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: complete ? AppColors.successText.withOpacity(0.18) : AppColors.borderGray),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34,
+              height: 34,
+              decoration: BoxDecoration(
+                color: complete ? Colors.white.withOpacity(0.6) : AppColors.cardBg,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(icon, size: 16, color: complete ? AppColors.successText : AppColors.textMuted),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textTitle),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    detail,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+}
+
+class _ModuleControlDock extends StatelessWidget {
+  final ModuleItem module;
+  final int materialCount;
+  final int readyMaterials;
+  final int processingMaterials;
+  final bool hasDescription;
+  final bool uploading;
+  final VoidCallback? onUpload;
+  final VoidCallback? onRename;
+  final VoidCallback? onEditDescription;
+  final VoidCallback? onTogglePublish;
+  final VoidCallback? onChangePosition;
+  final VoidCallback? onShare;
+  final VoidCallback? onDelete;
+
+  const _ModuleControlDock({
+    required this.module,
+    required this.materialCount,
+    required this.readyMaterials,
+    required this.processingMaterials,
+    required this.hasDescription,
+    required this.uploading,
+    required this.onUpload,
+    required this.onRename,
+    required this.onEditDescription,
+    required this.onTogglePublish,
+    required this.onChangePosition,
+    required this.onShare,
+    required this.onDelete,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final completed = [module.isPublished, materialCount > 0, hasDescription].where((v) => v).length;
+    final progress = completed / 3;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _CanvasSection(
+          title: 'Module health',
+          icon: Icons.insights_rounded,
+          compactHeader: true,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Text(
+                    '${(progress * 100).round()}%',
+                    style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, color: AppColors.textTitle, height: 1),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'setup complete',
+                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textMuted),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 7,
+                  backgroundColor: AppColors.headerBg,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(height: 14),
+              _ModuleMiniFact(label: 'Materials', value: '$materialCount'),
+              const SizedBox(height: 8),
+              _ModuleMiniFact(label: 'Ready', value: '$readyMaterials'),
+              const SizedBox(height: 8),
+              _ModuleMiniFact(label: 'Processing', value: '$processingMaterials'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _CanvasSection(
+          title: 'Actions',
+          icon: Icons.bolt_rounded,
+          compactHeader: true,
+          child: Column(
+            children: [
+              _ActionTile(
+                icon: Icons.upload_file_rounded,
+                iconBg: AppColors.primarySoft,
+                iconFg: AppColors.primary,
+                title: uploading ? 'Uploading material…' : 'Upload material',
+                subtitle: 'Attach a PDF, video, or document to this module.',
+                onTap: onUpload,
+                emphasis: true,
+              ),
+              const SizedBox(height: 10),
+              _ActionTile(
+                icon: Icons.drive_file_rename_outline_rounded,
+                iconBg: AppColors.headerBg,
+                iconFg: AppColors.textMuted,
+                title: 'Rename',
+                subtitle: 'Change the module title in the structure tree.',
+                onTap: onRename,
+              ),
+              const SizedBox(height: 10),
+              _ActionTile(
+                icon: Icons.notes_rounded,
+                iconBg: AppColors.headerBg,
+                iconFg: AppColors.textMuted,
+                title: hasDescription ? 'Edit description' : 'Add description',
+                subtitle: 'Keep the module purpose clear.',
+                onTap: onEditDescription,
+              ),
+              const SizedBox(height: 10),
+              _ActionTile(
+                icon: module.isPublished ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                iconBg: module.isPublished ? const Color(0xFFFFF4E5) : AppColors.successBg,
+                iconFg: module.isPublished ? const Color(0xFFD97706) : AppColors.successText,
+                title: module.isPublished ? 'Unpublish' : 'Publish',
+                subtitle: module.isPublished ? 'Hide from students.' : 'Make visible to students.',
+                onTap: onTogglePublish,
+              ),
+              const SizedBox(height: 10),
+              _ActionTile(
+                icon: Icons.swap_vert_rounded,
+                iconBg: AppColors.headerBg,
+                iconFg: AppColors.textMuted,
+                title: 'Change position',
+                subtitle: 'Move this module in the course order.',
+                onTap: onChangePosition,
+              ),
+              const SizedBox(height: 10),
+              _ActionTile(
+                icon: Icons.share_rounded,
+                iconBg: AppColors.successBg,
+                iconFg: AppColors.successText,
+                title: 'Share module',
+                subtitle: module.sharedWithCourseIds.isEmpty
+                    ? 'Reuse this module in another course.'
+                    : 'Shared with ${module.sharedWithCourseIds.length} course${module.sharedWithCourseIds.length == 1 ? '' : 's'}.',
+                onTap: onShare,
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _CanvasDangerSection(onDelete: onDelete),
+      ],
+    );
+  }
+}
+
+class _ModuleMiniFact extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _ModuleMiniFact({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) => Row(
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w700),
+            ),
+          ),
+          Text(
+            value,
+            style: TextStyle(fontSize: 12.5, color: AppColors.textTitle, fontWeight: FontWeight.w900),
+          ),
+        ],
+      );
+}
+
+class _ModuleTinyButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _ModuleTinyButton({required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 15),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: BorderSide(color: AppColors.primary.withOpacity(0.4)),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      );
 }
 
 class _HeaderChip extends StatelessWidget {
@@ -1548,7 +1981,6 @@ class _HeaderChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
@@ -1584,7 +2016,6 @@ class _CanvasSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: EdgeInsets.all(compactHeader ? 18 : 20),
@@ -1592,8 +2023,8 @@ class _CanvasSection extends StatelessWidget {
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
-          BoxShadow(
-            color: AppColors.shadowThin,
+          const BoxShadow(
+            color: Color(0x080F172A),
             blurRadius: 20,
             offset: Offset(0, 8),
           ),
@@ -1608,12 +2039,12 @@ class _CanvasSection extends StatelessWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: AppColors.infoBg,
+                  color: const Color(0xFFEAF2FF),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Icon(icon, size: 18, color: AppColors.primary),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                 child: Text(
                   title,
@@ -1627,7 +2058,7 @@ class _CanvasSection extends StatelessWidget {
               if (trailing != null) trailing!,
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           child,
         ],
       ),
@@ -1654,7 +2085,6 @@ class _SoftStatTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -1674,7 +2104,7 @@ class _SoftStatTile extends StatelessWidget {
             ),
             child: Icon(icon, size: 20, color: iconFg),
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1687,7 +2117,7 @@ class _SoftStatTile extends StatelessWidget {
                     color: AppColors.textMuted,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
                   value,
                   style: TextStyle(
@@ -1697,7 +2127,7 @@ class _SoftStatTile extends StatelessWidget {
                     height: 1.2,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
                   description,
                   style: TextStyle(
@@ -1726,7 +2156,6 @@ class _DescriptionBlock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -1746,7 +2175,7 @@ class _DescriptionBlock extends StatelessWidget {
             ),
             child: Icon(Icons.notes_rounded, size: 18, color: AppColors.textMuted),
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1759,7 +2188,7 @@ class _DescriptionBlock extends StatelessWidget {
                     color: AppColors.textMuted,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
                   hasDescription ? description : 'No description added yet',
                   style: TextStyle(
@@ -1769,7 +2198,7 @@ class _DescriptionBlock extends StatelessWidget {
                     height: 1.35,
                   ),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   hasDescription
                       ? 'This text helps instructors and students understand the purpose of the module.'
@@ -1817,7 +2246,6 @@ class _ActionTileState extends State<_ActionTile> {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final disabled = widget.onTap == null;
     return MouseRegion(
       cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
@@ -1828,7 +2256,7 @@ class _ActionTileState extends State<_ActionTile> {
       child: GestureDetector(
         onTap: widget.onTap,
         child: AnimatedContainer(
-          duration: Duration(milliseconds: 140),
+          duration: const Duration(milliseconds: 140),
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1851,7 +2279,7 @@ class _ActionTileState extends State<_ActionTile> {
                   ),
                   child: Icon(widget.icon, size: 18, color: widget.iconFg),
                 ),
-                SizedBox(width: 14),
+                const SizedBox(width: 14),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1864,7 +2292,7 @@ class _ActionTileState extends State<_ActionTile> {
                           color: _hovered && !disabled ? AppColors.primary : AppColors.textTitle,
                         ),
                       ),
-                      SizedBox(height: 5),
+                      const SizedBox(height: 5),
                       Text(
                         widget.subtitle,
                         style: TextStyle(
@@ -1876,7 +2304,7 @@ class _ActionTileState extends State<_ActionTile> {
                     ],
                   ),
                 ),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Icon(
                   Icons.arrow_forward_rounded,
                   size: 16,
@@ -1898,7 +2326,6 @@ class _CanvasDangerSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
@@ -1912,18 +2339,18 @@ class _CanvasDangerSection extends StatelessWidget {
           Row(
             children: [
               Icon(Icons.delete_outline_rounded, size: 18, color: AppColors.dangerText),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Text(
                 'Danger zone',
                 style: TextStyle(
                   fontSize: 14.5,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.dangerTitle,
+                  color: AppColors.dangerText,
                 ),
               ),
             ],
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           Text(
             'Delete this module only when you are sure its content is no longer needed in the course.',
             style: TextStyle(
@@ -1932,16 +2359,16 @@ class _CanvasDangerSection extends StatelessWidget {
               height: 1.5,
             ),
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: onDelete,
-              icon: Icon(Icons.delete_outline_rounded, size: 16),
-              label: Text('Delete module'),
+              icon: const Icon(Icons.delete_outline_rounded, size: 16),
+              label: const Text('Delete module'),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.dangerText,
-                side: BorderSide(color: Color(0xFFFCA5A5)),
+                side: const BorderSide(color: Color(0xFFFCA5A5)),
                 padding: const EdgeInsets.symmetric(vertical: 13),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(14),
@@ -1967,7 +2394,7 @@ class _HPill extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.15),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.cardBg.withOpacity(0.2)),
+          border: Border.all(color: Colors.white.withOpacity(0.2)),
         ),
         child: Text(
           l,
@@ -1999,20 +2426,20 @@ class _UploadProgressWidget extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: _K.div),
+          border: Border.all(color: AppColors.borderGray),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
-                SizedBox(
+                const SizedBox(
                   width: 14,
                   height: 14,
                   child: CircularProgressIndicator(strokeWidth: 1.5),
                 ),
-                SizedBox(width: 10),
-                Expanded(
+                const SizedBox(width: 10),
+                const Expanded(
                   child: Text(
                     'Uploading material…',
                     style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
@@ -2020,7 +2447,7 @@ class _UploadProgressWidget extends StatelessWidget {
                 ),
                 Text(
                   '${(progress * 100).toInt()}%',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w700,
                     color: AppColors.primary,
@@ -2028,7 +2455,7 @@ class _UploadProgressWidget extends StatelessWidget {
                 ),
               ],
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
@@ -2050,22 +2477,21 @@ class _ModuleHeroWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final description = (module.description ?? '').trim();
     return Container(
       padding: const EdgeInsets.fromLTRB(26, 24, 26, 24),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
+        gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF145CCB), AppColors.primary, AppColors.infoText],
+          colors: [Color(0xFF145CCB), AppColors.primary, Color(0xFF4CB5FF)],
         ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withOpacity(0.16),
             blurRadius: 18,
-            offset: Offset(0, 8),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -2073,28 +2499,28 @@ class _ModuleHeroWidget extends StatelessWidget {
         builder: (context, constraints) {
           final compact = constraints.maxWidth < 980;
           final rightCard = Container(
-            constraints: BoxConstraints(minWidth: 180),
+            constraints: const BoxConstraints(minWidth: 180),
             padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.14),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.cardBg.withOpacity(0.16)),
+              border: Border.all(color: Colors.white.withOpacity(0.16)),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text('Module order', style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: Colors.white.withOpacity(0.74))),
-                SizedBox(height: 8),
-                Text('#${module.orderIndex + 1}', style: TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white, height: 1.0)),
-                SizedBox(height: 14),
+                const SizedBox(height: 8),
+                Text('#${module.orderIndex + 1}', style: const TextStyle(fontSize: 32, fontWeight: FontWeight.w800, color: Colors.white, height: 1.0)),
+                const SizedBox(height: 14),
                 Text('Updated ${_relativeDate(module.updatedAt)}', style: TextStyle(fontSize: 11.8, height: 1.45, color: Colors.white.withOpacity(0.86))),
               ],
             ),
           );
 
           final body = ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 760),
+            constraints: const BoxConstraints(maxWidth: 760),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -2102,18 +2528,18 @@ class _ModuleHeroWidget extends StatelessWidget {
                   spacing: 8,
                   runSpacing: 8,
                   children: [
-                    _HPill(module.isPublished ? '● Live' : '● Draft', module.isPublished ? Color(0xFF4ADE80) : Color(0xFFFBBF24)),
+                    _HPill(module.isPublished ? '● Live' : '● Draft', module.isPublished ? const Color(0xFF4ADE80) : const Color(0xFFFBBF24)),
                     const _HPill('MODULE', Colors.white70),
                     _HPill('$materialCount material${materialCount == 1 ? '' : 's'}', Colors.white70),
-                    if (module.isShared) _HPill('Shared', Colors.white70),
+                    if (module.isShared) const _HPill('Shared', Colors.white70),
                   ],
                 ),
-                SizedBox(height: 18),
+                const SizedBox(height: 18),
                 Text(
                   module.title,
-                  style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white, height: 1.04),
+                  style: const TextStyle(fontSize: 34, fontWeight: FontWeight.w800, color: Colors.white, height: 1.04),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Text(
                   description.isNotEmpty
                       ? description
@@ -2127,12 +2553,12 @@ class _ModuleHeroWidget extends StatelessWidget {
           if (compact) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [body, SizedBox(height: 20), rightCard],
+              children: [body, const SizedBox(height: 20), rightCard],
             );
           }
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: body), SizedBox(width: 20), rightCard],
+            children: [Expanded(child: body), const SizedBox(width: 20), rightCard],
           );
         },
       ),
@@ -2150,7 +2576,6 @@ class _ModuleInsightsStrip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final items = [
       (Icons.folder_copy_rounded, 'Materials', '$materialCount total', _K.blueSoft, AppColors.primary),
       (Icons.verified_rounded, 'Ready', '$readyMaterials available', _K.greenSoft, _K.green),
@@ -2160,7 +2585,7 @@ class _ModuleInsightsStrip extends StatelessWidget {
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final spacing = 14.0;
+        const spacing = 14.0;
         final itemWidth = constraints.maxWidth < 620
             ? constraints.maxWidth
             : (constraints.maxWidth < 1040
@@ -2172,13 +2597,13 @@ class _ModuleInsightsStrip extends StatelessWidget {
           children: items.map((item) => SizedBox(
             width: itemWidth,
             child: Container(
-              constraints: BoxConstraints(minHeight: 92),
+              constraints: const BoxConstraints(minHeight: 92),
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
               decoration: BoxDecoration(
-                color: AppColors.cardBg,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: _K.div),
-                boxShadow: [BoxShadow(color: Color(0x05000000), blurRadius: 10, offset: Offset(0, 3))],
+                boxShadow: [const BoxShadow(color: Color(0x05000000), blurRadius: 10, offset: Offset(0, 3))],
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -2189,14 +2614,14 @@ class _ModuleInsightsStrip extends StatelessWidget {
                     decoration: BoxDecoration(color: item.$4, borderRadius: BorderRadius.circular(13)),
                     child: Icon(item.$1, size: 20, color: item.$5),
                   ),
-                  SizedBox(width: 14),
+                  const SizedBox(width: 14),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         Text(item.$2, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-                        SizedBox(height: 6),
+                        const SizedBox(height: 6),
                         Text(item.$3, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle, height: 1.28)),
                       ],
                     ),
@@ -2204,7 +2629,7 @@ class _ModuleInsightsStrip extends StatelessWidget {
                 ],
               ),
             ),
-          )).toList(),
+          ),).toList(),
         );
       },
     );
@@ -2224,12 +2649,11 @@ class _MiniInfoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
       decoration: BoxDecoration(
-        color: AppColors.hoverBg,
+        color: const Color(0xFFFAFBFD),
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: _K.div),
       ),
@@ -2242,20 +2666,20 @@ class _MiniInfoTile extends StatelessWidget {
             decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(12)),
             child: Icon(icon, size: 18, color: iconFg),
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.textMuted, letterSpacing: 0.2)),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   value,
                   maxLines: multiline ? null : 1,
                   overflow: multiline ? TextOverflow.visible : TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 14.5, fontWeight: FontWeight.w700, color: AppColors.textTitle, height: 1.45),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(caption, style: TextStyle(fontSize: 11.8, color: AppColors.textMuted, height: 1.55)),
               ],
             ),
@@ -2266,6 +2690,7 @@ class _MiniInfoTile extends StatelessWidget {
   }
 }
 
+// ignore: unused_field
 enum _SectionTone { normal, danger }
 
 class _SectionNoteWidget extends StatelessWidget {
@@ -2279,9 +2704,8 @@ class _SectionNoteWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final isDanger = tone == _SectionTone.danger;
-    final bg = isDanger ? AppColors.dangerBg : AppColors.hoverBg;
+    final bg = isDanger ? const Color(0xFFFFF5F5) : const Color(0xFFFAFBFD);
     final border = isDanger ? AppColors.dangerBorder : _K.div;
     final fg = isDanger ? AppColors.dangerText : AppColors.primary;
     return Container(
@@ -2299,7 +2723,7 @@ class _SectionNoteWidget extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(title, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: isDanger ? AppColors.dangerTitle : AppColors.textTitle)),
-              SizedBox(height: 6),
+              const SizedBox(height: 6),
               Text(description, style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, height: 1.45)),
             ],
           );
@@ -2316,12 +2740,12 @@ class _SectionNoteWidget extends StatelessWidget {
           if (compact) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [textBlock, SizedBox(height: 14), button],
+              children: [textBlock, const SizedBox(height: 14), button],
             );
           }
           return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
-            children: [Expanded(child: textBlock), SizedBox(width: 14), button],
+            children: [Expanded(child: textBlock), const SizedBox(width: 14), button],
           );
         },
       ),
@@ -2339,9 +2763,9 @@ class _MatEmptyWidget extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppColors.hoverBg,
+            color: AppColors.surfaceBg,
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _K.div),
+            border: Border.all(color: AppColors.borderGray),
           ),
           child: Column(
             children: [
@@ -2349,20 +2773,20 @@ class _MatEmptyWidget extends StatelessWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(14)),
-                child: Icon(Icons.upload_file_outlined, size: 24, color: AppColors.primary),
+                child: const Icon(Icons.upload_file_outlined, size: 24, color: AppColors.primary),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text('No materials yet', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-              SizedBox(height: 5),
+              const SizedBox(height: 5),
               Text('Upload a PDF, video, or document to turn this module into usable learning content.', textAlign: TextAlign.center, style: TextStyle(fontSize: 11.5, color: AppColors.textMuted, height: 1.5)),
-              SizedBox(height: 14),
+              const SizedBox(height: 14),
               OutlinedButton.icon(
                 onPressed: onUpload,
-                icon: Icon(Icons.upload_rounded, size: 14),
-                label: Text('Upload material'),
+                icon: const Icon(Icons.upload_rounded, size: 14),
+                label: const Text('Upload material'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,
-                  side: BorderSide(color: AppColors.primary),
+                  side: const BorderSide(color: AppColors.primary),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
               ),
@@ -2378,21 +2802,20 @@ class _ModuleMaterialCard extends StatelessWidget {
   const _ModuleMaterialCard({required this.material, required this.onTap});
 
   static Map<String, (IconData, Color, Color, String)> get _colors => {
-    'video': (Icons.play_circle_filled_rounded, AppColors.badgeBlueBg, AppColors.primary, 'Video'),
-    'pdf': (Icons.picture_as_pdf_rounded, AppColors.dangerBorder, AppColors.dangerText, 'PDF'),
-    'quiz': (Icons.quiz_rounded, AppColors.purpleBg, AppColors.purpleText, 'Quiz'),
+    'video': (Icons.play_circle_filled_rounded, AppColors.badgeBlueBg, const Color(0xFF2563EB), 'Video'),
+    'pdf': (Icons.picture_as_pdf_rounded, const Color(0xFFFEE2E2), AppColors.dangerText, 'PDF'),
+    'quiz': (Icons.quiz_rounded, const Color(0xFFF3E8FF), const Color(0xFF9333EA), 'Quiz'),
   };
   static Map<String, (String, Color, Color)> get _status => {
     'ready': ('Ready', AppColors.successBg, AppColors.successText),
-    'processing': ('Processing', AppColors.warningSoftBg, AppColors.warningText),
-    'uploaded': ('Processing', AppColors.warningSoftBg, AppColors.warningText),
-    'draft_upload': ('Uploading', AppColors.infoBg, AppColors.infoText),
+    'processing': ('Processing', const Color(0xFFFEF3C7), const Color(0xFFD97706)),
+    'uploaded': ('Processing', const Color(0xFFFEF3C7), const Color(0xFFD97706)),
+    'draft_upload': ('Uploading', const Color(0xFFE0F2FE), const Color(0xFF0369A1)),
     'error': ('Error', AppColors.dangerBg, AppColors.dangerText),
   };
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final (ico, ib, ic, typeLabel) = _colors[material.type] ??
         (Icons.insert_drive_file_rounded, AppColors.headerBg, AppColors.textMuted, material.type.toUpperCase());
     final (sl, sb, sf) = _status[material.status] ??
@@ -2403,9 +2826,9 @@ class _ModuleMaterialCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          color: AppColors.hoverBg,
+          color: AppColors.surfaceBg,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _K.div),
+          border: Border.all(color: AppColors.borderGray),
         ),
         child: Row(
           children: [
@@ -2415,13 +2838,13 @@ class _ModuleMaterialCard extends StatelessWidget {
               decoration: BoxDecoration(color: ib, borderRadius: BorderRadius.circular(12)),
               child: Icon(ico, size: 22, color: ic),
             ),
-            SizedBox(width: 14),
+            const SizedBox(width: 14),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(material.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textTitle, height: 1.3)),
-                  SizedBox(height: 5),
+                  const SizedBox(height: 5),
                   Wrap(
                     spacing: 10,
                     runSpacing: 4,
@@ -2434,13 +2857,13 @@ class _ModuleMaterialCard extends StatelessWidget {
                 ],
               ),
             ),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
               decoration: BoxDecoration(color: sb, borderRadius: BorderRadius.circular(999)),
               child: Text(sl, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: sf)),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textHint),
           ],
         ),

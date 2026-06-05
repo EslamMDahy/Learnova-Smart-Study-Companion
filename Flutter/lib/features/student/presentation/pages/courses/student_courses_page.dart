@@ -12,93 +12,93 @@ class StudentCoursesPage extends StatelessWidget {
     // تحديث تدرجات الألوان (Gradients) لتصبح أكثر حيوية وجاذبية وعصرية
     final courses = [
       {
-        "title": "Intro to Machine Learning",
-        "code": "CS-204",
-        "credits": "3 Credits",
-        "teacher": "Dr. Sarah Chen",
-        "department": "Computer Science Dept.",
-        "schedule": "Mon/Wed 10:00 AM",
-        "location": "Building A, 302",
-        "description":
-            "A comprehensive introduction to machine learning concepts, algorithms, and applications.",
-        "status": "Open",
-        "button": "Enroll",
-        "gradient1": Color(0xff4F46E5), // Indigo
-        "gradient2": Color(0xff06B6D4), // Cyan
+        'title': 'Intro to Machine Learning',
+        'code': 'CS-204',
+        'credits': '3 Credits',
+        'teacher': 'Dr. Sarah Chen',
+        'department': 'Computer Science Dept.',
+        'schedule': 'Mon/Wed 10:00 AM',
+        'location': 'Building A, 302',
+        'description':
+            'A comprehensive introduction to machine learning concepts, algorithms, and applications.',
+        'status': 'Open',
+        'button': 'Enroll',
+        'gradient1': const Color(0xff4F46E5), // Indigo
+        'gradient2': const Color(0xff06B6D4), // Cyan
       },
       {
-        "title": "Advanced Algorithms",
-        "code": "CS-301",
-        "credits": "4 Credits",
-        "teacher": "Prof. Alan Smith",
-        "department": "Computer Science Dept.",
-        "schedule": "Tue/Thu 2:00 PM",
-        "location": "Remote",
-        "description":
-            "Deep dive into graph algorithms, dynamic programming, and NP-completeness.",
-        "status": "Waitlist",
-        "button": "Join Waitlist",
-        "gradient1": AppColors.purpleText, // Purple
-        "gradient2": Color(0xffEC4899), // Pink
+        'title': 'Advanced Algorithms',
+        'code': 'CS-301',
+        'credits': '4 Credits',
+        'teacher': 'Prof. Alan Smith',
+        'department': 'Computer Science Dept.',
+        'schedule': 'Tue/Thu 2:00 PM',
+        'location': 'Remote',
+        'description':
+            'Deep dive into graph algorithms, dynamic programming, and NP-completeness.',
+        'status': 'Waitlist',
+        'button': 'Join Waitlist',
+        'gradient1': AppColors.purpleText, // Purple
+        'gradient2': const Color(0xffEC4899), // Pink
       },
       {
-        "title": "Data Structures",
-        "code": "DS-101",
-        "credits": "3 Credits",
-        "teacher": "Dr. Emily White",
-        "department": "Data Science Dept.",
-        "schedule": "Fri 9:00 AM",
-        "location": "Lab 404",
-        "description":
-            "Fundamental data structures including arrays, linked lists, stacks, queues, trees, and graphs.",
-        "status": "Enrolled",
-        "button": "Enrolled",
-        "gradient1": Color(0xff1E3A8A), // Royal Blue
-        "gradient2": AppColors.primary, // Light Blue
+        'title': 'Data Structures',
+        'code': 'DS-101',
+        'credits': '3 Credits',
+        'teacher': 'Dr. Emily White',
+        'department': 'Data Science Dept.',
+        'schedule': 'Fri 9:00 AM',
+        'location': 'Lab 404',
+        'description':
+            'Fundamental data structures including arrays, linked lists, stacks, queues, trees, and graphs.',
+        'status': 'Enrolled',
+        'button': 'Enrolled',
+        'gradient1': const Color(0xff1E3A8A), // Royal Blue
+        'gradient2': AppColors.primary, // Light Blue
       },
       {
-        "title": "Full Stack Development",
-        "code": "WEB-200",
-        "credits": "3 Credits",
-        "teacher": "Michael Torres",
-        "department": "Engineering Dept.",
-        "schedule": "Mon/Wed 3:00 PM",
-        "location": "Building B, 101",
-        "description": "Modern web development with React, Node.js, and SQL.",
-        "status": "Open",
-        "button": "Enroll",
-        "gradient1": Color(0xff0F766E), // Teal
-        "gradient2": AppColors.successDot, // Emerald
+        'title': 'Full Stack Development',
+        'code': 'WEB-200',
+        'credits': '3 Credits',
+        'teacher': 'Michael Torres',
+        'department': 'Engineering Dept.',
+        'schedule': 'Mon/Wed 3:00 PM',
+        'location': 'Building B, 101',
+        'description': 'Modern web development with React, Node.js, and SQL.',
+        'status': 'Open',
+        'button': 'Enroll',
+        'gradient1': const Color(0xff0F766E), // Teal
+        'gradient2': AppColors.successDot, // Emerald
       },
       {
-        "title": "Engineering Ethics",
-        "code": "ETH-101",
-        "credits": "2 Credits",
-        "teacher": "Dr. James Wilson",
-        "department": "Humanities Dept.",
-        "schedule": "Fri 2:00 PM",
-        "location": "Hall C",
-        "description":
-            "Ethical considerations in engineering practice and sustainability.",
-        "status": "Closed",
-        "button": "Closed",
-        "gradient1": AppColors.textGray, // Cool Gray
-        "gradient2": AppColors.textGray500, // Slate
+        'title': 'Engineering Ethics',
+        'code': 'ETH-101',
+        'credits': '2 Credits',
+        'teacher': 'Dr. James Wilson',
+        'department': 'Humanities Dept.',
+        'schedule': 'Fri 2:00 PM',
+        'location': 'Hall C',
+        'description':
+            'Ethical considerations in engineering practice and sustainability.',
+        'status': 'Closed',
+        'button': 'Closed',
+        'gradient1': AppColors.textGray, // Cool Gray
+        'gradient2': AppColors.textGray500, // Slate
       },
       {
-        "title": "Digital Media Arts",
-        "code": "ART-220",
-        "credits": "3 Credits",
-        "teacher": "Lisa Ray",
-        "department": "Arts Dept.",
-        "schedule": "Tue/Thu 10:00 AM",
-        "location": "Studio 5",
-        "description":
-            "Exploration of digital tools for creative expression and graphic design.",
-        "status": "Open",
-        "button": "Enroll",
-        "gradient1": AppColors.warningText, // Amber
-        "gradient2": AppColors.errorDot, // Red
+        'title': 'Digital Media Arts',
+        'code': 'ART-220',
+        'credits': '3 Credits',
+        'teacher': 'Lisa Ray',
+        'department': 'Arts Dept.',
+        'schedule': 'Tue/Thu 10:00 AM',
+        'location': 'Studio 5',
+        'description':
+            'Exploration of digital tools for creative expression and graphic design.',
+        'status': 'Open',
+        'button': 'Enroll',
+        'gradient1': AppColors.warningText, // Amber
+        'gradient2': AppColors.errorDot, // Red
       },
     ];
 
@@ -111,7 +111,7 @@ class StudentCoursesPage extends StatelessWidget {
           children: [
             /// TITLE
             Text(
-              "My Courses",
+              'My Courses',
               style: TextStyle(
                 fontSize: 32,
                 fontWeight: FontWeight.w800,
@@ -119,22 +119,22 @@ class StudentCoursesPage extends StatelessWidget {
                 letterSpacing: -0.5,
               ),
             ),
-            SizedBox(height: 6),
+            const SizedBox(height: 6),
             Text(
-              "Manage your curriculum, AI assessments, and student cohorts.",
+              'Manage your curriculum, AI assessments, and student cohorts.',
               style: TextStyle(
                 fontSize: 15,
                 color: AppColors.textMuted,
               ),
             ),
-            SizedBox(height: 32),
+            const SizedBox(height: 32),
 
             /// TOP BAR
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  "Showing 24 courses",
+                  'Showing 24 courses',
                   style: TextStyle(
                     color: AppColors.textGray,
                     fontWeight: FontWeight.w600,
@@ -144,13 +144,13 @@ class StudentCoursesPage extends StatelessWidget {
                 Row(
                   children: [
                     _topIconButton(Icons.grid_view_rounded, true),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     _topIconButton(Icons.view_agenda_outlined, false),
                   ],
                 ),
               ],
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             /// GRID
             LayoutBuilder(
@@ -161,7 +161,7 @@ class StudentCoursesPage extends StatelessWidget {
 
                 return GridView.builder(
                   shrinkWrap: true,
-                  physics: NeverScrollableScrollPhysics(),
+                  physics: const NeverScrollableScrollPhysics(),
                   itemCount: courses.length,
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: count,
@@ -173,9 +173,9 @@ class StudentCoursesPage extends StatelessWidget {
                   itemBuilder: (context, index) {
                     final course = courses[index];
                     final status = course['status'].toString();
-                    final isClosed = status == "Closed";
-                    final isWaitlist = status == "Waitlist";
-                    final isEnrolled = status == "Enrolled";
+                    final isClosed = status == 'Closed';
+                    final isWaitlist = status == 'Waitlist';
+                    final isEnrolled = status == 'Enrolled';
 
                     return GestureDetector(
                       onTap: () {
@@ -190,8 +190,8 @@ class StudentCoursesPage extends StatelessWidget {
                             BoxShadow(
                               color: Colors.black.withOpacity(0.015),
                               blurRadius: 12,
-                              offset: Offset(0, 4),
-                            )
+                              offset: const Offset(0, 4),
+                            ),
                           ],
                         ),
                         child: Column(
@@ -237,14 +237,14 @@ class StudentCoursesPage extends StatelessWidget {
                                         ),
                                         child: Text(
                                           status,
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 11,
                                             fontWeight: FontWeight.w700,
                                           ),
                                         ),
                                       ),
-                                      SizedBox(width: 8),
+                                      const SizedBox(width: 8),
                                       Container(
                                         padding: const EdgeInsets.symmetric(
                                           horizontal: 10,
@@ -257,16 +257,16 @@ class StudentCoursesPage extends StatelessWidget {
                                         ),
                                         child: Text(
                                           course['credits'].toString(),
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             color: Colors.white,
                                             fontSize: 11,
                                             fontWeight: FontWeight.w600,
                                           ),
                                         ),
                                       ),
-                                      Spacer(),
+                                      const Spacer(),
                                       if (isEnrolled)
-                                        CircleAvatar(
+                                        const CircleAvatar(
                                           radius: 11,
                                           backgroundColor: AppColors.primary,
                                           child: Icon(
@@ -277,21 +277,21 @@ class StudentCoursesPage extends StatelessWidget {
                                         ),
                                     ],
                                   ),
-                                  Spacer(),
+                                  const Spacer(),
                                   Text(
                                     course['code'].toString(),
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       color: Colors.white70,
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
                                     ),
                                   ),
-                                  SizedBox(height: 2),
+                                  const SizedBox(height: 2),
                                   Text(
                                     course['title'].toString(),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
-                                    style: TextStyle(
+                                    style: const TextStyle(
                                       color: Colors.white,
                                       fontSize: 20,
                                       fontWeight: FontWeight.w700,
@@ -315,13 +315,13 @@ class StudentCoursesPage extends StatelessWidget {
                                         CircleAvatar(
                                           radius: 16,
                                           backgroundColor: AppColors.infoBg,
-                                          child: Icon(
+                                          child: const Icon(
                                             Icons.person,
                                             color: AppColors.primary,
                                             size: 16,
                                           ),
                                         ),
-                                        SizedBox(width: 12),
+                                        const SizedBox(width: 12),
                                         Expanded(
                                           child: Column(
                                             crossAxisAlignment:
@@ -347,43 +347,43 @@ class StudentCoursesPage extends StatelessWidget {
                                         ),
                                       ],
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
 
                                     /// SCHEDULE & LOCATION
                                     Row(
                                       children: [
                                         Icon(Icons.access_time_rounded,
-                                            size: 14, color: AppColors.textHint),
-                                        SizedBox(width: 6),
+                                            size: 14, color: AppColors.textHint,),
+                                        const SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
                                             course['schedule'].toString(),
                                             style: TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w500,
-                                                color: AppColors.textGray),
+                                                color: AppColors.textGray,),
                                           ),
                                         ),
                                       ],
                                     ),
-                                    SizedBox(height: 6),
+                                    const SizedBox(height: 6),
                                     Row(
                                       children: [
                                         Icon(Icons.location_on_outlined,
-                                            size: 14, color: AppColors.textHint),
-                                        SizedBox(width: 6),
+                                            size: 14, color: AppColors.textHint,),
+                                        const SizedBox(width: 6),
                                         Expanded(
                                           child: Text(
                                             course['location'].toString(),
                                             style: TextStyle(
                                                 fontSize: 12,
                                                 fontWeight: FontWeight.w500,
-                                                color: AppColors.textGray),
+                                                color: AppColors.textGray,),
                                           ),
                                         ),
                                       ],
                                     ),
-                                    SizedBox(height: 12),
+                                    const SizedBox(height: 12),
 
                                     /// DESCRIPTION (تم تحديد حد أقصى سطرين للملائمة مع الطول الجديد)
                                     Text(
@@ -398,7 +398,7 @@ class StudentCoursesPage extends StatelessWidget {
                                     ),
 
                                     // السبيسر السحري الذي يقوم بحجز المساحة ودفع زر Enroll ونهاية المحتوى إلى الأسفل تماماً لتوحيد الطول
-                                    Spacer(),
+                                    const Spacer(),
 
                                     /// BUTTON (Enroll)
                                     SizedBox(
@@ -423,7 +423,7 @@ class StudentCoursesPage extends StatelessWidget {
                                                       ? AppColors.textGray
                                                       : Colors.white,
                                           side: isWaitlist
-                                              ? BorderSide(
+                                              ? const BorderSide(
                                                   color: AppColors.primary,
                                                   width: 1.5,
                                                 )
@@ -435,7 +435,7 @@ class StudentCoursesPage extends StatelessWidget {
                                         ),
                                         child: Text(
                                           course['button'].toString(),
-                                          style: TextStyle(
+                                          style: const TextStyle(
                                             fontWeight: FontWeight.w700,
                                             fontSize: 13,
                                           ),
@@ -454,24 +454,24 @@ class StudentCoursesPage extends StatelessWidget {
                 );
               },
             ),
-            SizedBox(height: 48),
+            const SizedBox(height: 48),
 
             /// PAGINATION
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _paginationButton(Icons.chevron_left, false),
-                SizedBox(width: 8),
-                _pageNumber("1", true),
-                _pageNumber("2", false),
-                _pageNumber("3", false),
+                const SizedBox(width: 8),
+                _pageNumber('1', true),
+                _pageNumber('2', false),
+                _pageNumber('3', false),
                 Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child:
-                      Text("...", style: TextStyle(color: AppColors.textHint)),
+                      Text('...', style: TextStyle(color: AppColors.textHint)),
                 ),
-                _pageNumber("8", false),
-                SizedBox(width: 8),
+                _pageNumber('8', false),
+                const SizedBox(width: 8),
                 _paginationButton(Icons.chevron_right, true),
               ],
             ),
@@ -489,7 +489,7 @@ class StudentCoursesPage extends StatelessWidget {
         color: active ? AppColors.primary : AppColors.cardBg,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-            color: active ? Colors.transparent : AppColors.border),
+            color: active ? Colors.transparent : AppColors.border,),
       ),
       child: Icon(
         icon,

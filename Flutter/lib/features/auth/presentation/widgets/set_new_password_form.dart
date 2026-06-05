@@ -86,22 +86,22 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
       padding: EdgeInsets.symmetric(horizontal: widget.isMobile ? 24 : 56),
       child: Center(
         child: SingleChildScrollView(
-          physics: BouncingScrollPhysics(),
+          physics: const BouncingScrollPhysics(),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 420),
             child: Form(
               key: _formKey,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppAuthHeaderIcon(
+                  const AppAuthHeaderIcon(
                     icon: Icons.security,
                     title: 'Set new password',
                     subtitle:
                         'Please choose a strong password. It must be different from\npreviously used passwords.',
                   ),
 
-                  SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
                   if (_localError != null) ...[
                     AppInfoCard(
@@ -109,7 +109,7 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                       title: 'Invalid link',
                       message: _localError!,
                     ),
-                    SizedBox(height: 18),
+                    const SizedBox(height: 18),
                   ],
 
                   if (state.error != null) ...[
@@ -118,7 +118,7 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                       title: 'Reset failed',
                       message: state.error!,
                     ),
-                    SizedBox(height: 18),
+                    const SizedBox(height: 18),
                   ],
 
                   AppLabeledIconField(
@@ -150,7 +150,7 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                     ),
                   ),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   AppLabeledIconField(
                     label: 'Confirm Password',
@@ -179,7 +179,7 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                     ),
                   ),
 
-                  SizedBox(height: 20),
+                  const SizedBox(height: 20),
 
                   AppPrimaryLoadingButton(
                     label: 'Reset Password',
@@ -187,7 +187,7 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                     onPressed: _submit,
                   ),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   Center(
                     child: AppBackLink(showLabel: true, 
@@ -196,7 +196,7 @@ class _SetNewPasswordFormState extends ConsumerState<SetNewPasswordForm> {
                     ),
                   ),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                 ],
               ),
             ),

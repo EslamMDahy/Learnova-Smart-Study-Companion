@@ -76,7 +76,7 @@ class AdminJoinRequestsRoutePage extends ConsumerWidget {
     final hasOrg = orgId.isNotEmpty;
 
     if (!hasOrg) {
-      return Center(child: Text('Create an organization first.'));
+      return const Center(child: Text('Create an organization first.'));
     }
 
     return JoinRequestsContent(organizationId: orgId);
@@ -105,6 +105,6 @@ class AdminHelpRoutePage extends StatelessWidget {
   const AdminHelpRoutePage({super.key});
   @override
   Widget build(BuildContext context) {
-    return Center(child: Text('Help & Support (Coming soon)'));
+    return const Center(child: Text('Help & Support (Coming soon)'));
   }
 }

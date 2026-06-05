@@ -87,7 +87,7 @@ class _NavBar extends StatelessWidget {
         children: [
           // Logo
           Image.asset('assets/logo.webp', height: 28, cacheWidth: (28 * MediaQuery.of(context).devicePixelRatio).round()),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(
             'Learnova',
             style: TextStyle(
@@ -98,18 +98,18 @@ class _NavBar extends StatelessWidget {
             ),
           ),
 
-          SizedBox(width: 40),
+          const SizedBox(width: 40),
 
           // Nav links (hide on small screens)
           if (MediaQuery.sizeOf(context).width > 700) ...[
-            _NavLink('Features'),
-            SizedBox(width: 28),
-            _NavLink('How It Works'),
-            SizedBox(width: 28),
-            _NavLink('Benefits'),
+            const _NavLink('Features'),
+            const SizedBox(width: 28),
+            const _NavLink('How It Works'),
+            const SizedBox(width: 28),
+            const _NavLink('Benefits'),
           ],
 
-          Spacer(),
+          const Spacer(),
 
           // Auth buttons
           TextButton(
@@ -118,10 +118,10 @@ class _NavBar extends StatelessWidget {
               foregroundColor: AppColors.textGray,
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             ),
-            child: Text('Login',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            child: const Text('Login',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           ElevatedButton(
             onPressed: onSignUp,
             style: ElevatedButton.styleFrom(
@@ -130,10 +130,10 @@ class _NavBar extends StatelessWidget {
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8)),
+                  borderRadius: BorderRadius.circular(8),),
             ),
-            child: Text('Sign Up',
-                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+            child: const Text('Sign Up',
+                style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),),
           ),
         ],
       ),
@@ -182,7 +182,7 @@ class _HeroSection extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _HeroText(onGetStarted: onGetStarted, onLogin: onLogin),
-                SizedBox(height: 40),
+                const SizedBox(height: 40),
                 _HeroMockup(),
               ],
             )
@@ -191,7 +191,7 @@ class _HeroSection extends StatelessWidget {
                 Expanded(
                   child: _HeroText(onGetStarted: onGetStarted, onLogin: onLogin),
                 ),
-                SizedBox(width: 60),
+                const SizedBox(width: 60),
                 Expanded(child: _HeroMockup()),
               ],
             ),
@@ -221,16 +221,16 @@ class _HeroText extends StatelessWidget {
               letterSpacing: -1.0,
             ),
             children: [
-              TextSpan(text: 'Smart Study\nCompanion: '),
-              TextSpan(
+              const TextSpan(text: 'Smart Study\nCompanion: '),
+              const TextSpan(
                 text: 'AI-\nPowered',
                 style: TextStyle(color: AppColors.primary),
               ),
-              TextSpan(text: ' Learning &\nAssessment'),
+              const TextSpan(text: ' Learning &\nAssessment'),
             ],
           ),
         ),
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
 
         // Subtitle
         Text(
@@ -243,7 +243,7 @@ class _HeroText extends StatelessWidget {
             height: 1.65,
           ),
         ),
-        SizedBox(height: 32),
+        const SizedBox(height: 32),
 
         // Buttons
         Row(
@@ -256,20 +256,20 @@ class _HeroText extends StatelessWidget {
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
+                    borderRadius: BorderRadius.circular(8),),
               ),
-              child: Text('Get Started',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+              child: const Text('Get Started',
+                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 16),
             TextButton(
               onPressed: onLogin,
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.textGray,
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               ),
-              child: Text('Login',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+              child: const Text('Login',
+                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),),
             ),
           ],
         ),
@@ -285,7 +285,7 @@ class _HeroMockup extends StatelessWidget {
     return Container(
       height: 320,
       decoration: BoxDecoration(
-        color: Color(0xFF0E7490),
+        color: const Color(0xFF0E7490),
         borderRadius: BorderRadius.circular(16),
       ),
       clipBehavior: Clip.antiAlias,
@@ -326,7 +326,7 @@ class _HeroMockup extends StatelessWidget {
                 color: Colors.white.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.2)),
+                    color: Colors.white.withValues(alpha: 0.2),),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -336,13 +336,13 @@ class _HeroMockup extends StatelessWidget {
                   Row(
                     children: [
                       _dot(AppColors.errorDot),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       _dot(AppColors.warningText),
-                      SizedBox(width: 6),
+                      const SizedBox(width: 6),
                       _dot(AppColors.successDot),
                     ],
                   ),
-                  SizedBox(height: 14),
+                  const SizedBox(height: 14),
                   // Mock bar chart rows
                   for (final pct in [0.7, 0.45, 0.85, 0.55])
                     Padding(
@@ -357,7 +357,7 @@ class _HeroMockup extends StatelessWidget {
                               borderRadius: BorderRadius.circular(4),
                             ),
                           ),
-                          SizedBox(width: 10),
+                          const SizedBox(width: 10),
                           Expanded(
                             child: ClipRRect(
                               borderRadius: BorderRadius.circular(4),
@@ -366,27 +366,27 @@ class _HeroMockup extends StatelessWidget {
                                 minHeight: 8,
                                 backgroundColor: AppColors.cardBg.withValues(alpha: 0.2),
                                 valueColor: const AlwaysStoppedAnimation<Color>(
-                                    AppColors.primary),
+                                    AppColors.primary,),
                               ),
                             ),
                           ),
                         ],
                       ),
                     ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   // Completed badge
                   Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
+                        horizontal: 12, vertical: 6,),
                     decoration: BoxDecoration(
                       color: AppColors.successDot,
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Row(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.check_circle,
-                            size: 14, color: Colors.white),
+                            size: 14, color: Colors.white,),
                         SizedBox(width: 6),
                         Text(
                           'Completed in 1.2x',
@@ -439,8 +439,8 @@ class _AudienceSection extends StatelessWidget {
               letterSpacing: -0.4,
             ),
           ),
-          SizedBox(height: 10),
-          Text(
+          const SizedBox(height: 10),
+          const Text(
             'Designed to serve every stakeholder in the educational process with specialized tools.',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -449,10 +449,10 @@ class _AudienceSection extends StatelessWidget {
               height: 1.5,
             ),
           ),
-          SizedBox(height: 48),
+          const SizedBox(height: 48),
           LayoutBuilder(builder: (_, constraints) {
             if (constraints.maxWidth > 800) {
-              return Row(
+              return const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(child: _AudienceCard(
@@ -464,7 +464,7 @@ class _AudienceSection extends StatelessWidget {
                       'Track student performance analytics',
                       'Reduce grading time by 80%',
                     ],
-                  )),
+                  ),),
                   SizedBox(width: 20),
                   Expanded(child: _AudienceCard(
                     icon: Icons.person_outline_rounded,
@@ -475,7 +475,7 @@ class _AudienceSection extends StatelessWidget {
                       'Instant feedback on quizzes',
                       'AI-powered study assistant',
                     ],
-                  )),
+                  ),),
                   SizedBox(width: 20),
                   Expanded(child: _AudienceCard(
                     icon: Icons.business_outlined,
@@ -486,11 +486,11 @@ class _AudienceSection extends StatelessWidget {
                       'Deep analytics & global insights',
                       'Scalable & secure assessment',
                     ],
-                  )),
+                  ),),
                 ],
               );
             }
-            return Column(
+            return const Column(
               children: [
                 _AudienceCard(
                   icon: Icons.school_outlined,
@@ -526,7 +526,7 @@ class _AudienceSection extends StatelessWidget {
                 ),
               ],
             );
-          }),
+          },),
         ],
       ),
     );
@@ -559,7 +559,7 @@ class _AudienceCard extends StatelessWidget {
           BoxShadow(
             color: Colors.black.withValues(alpha: 0.04),
             blurRadius: 12,
-            offset: Offset(0, 2),
+            offset: const Offset(0, 2),
           ),
         ],
       ),
@@ -575,7 +575,7 @@ class _AudienceCard extends StatelessWidget {
             ),
             child: Icon(icon, size: 22, color: AppColors.primary),
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           Text(
             title,
             style: TextStyle(
@@ -584,7 +584,7 @@ class _AudienceCard extends StatelessWidget {
               color: AppColors.textTitle,
             ),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text(
             subtitle,
             style: TextStyle(
@@ -593,14 +593,14 @@ class _AudienceCard extends StatelessWidget {
               height: 1.5,
             ),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           ...bullets.map((b) => Padding(
                 padding: const EdgeInsets.only(bottom: 6),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(Icons.check, size: 14, color: AppColors.primary),
-                    SizedBox(width: 8),
+                    const Icon(Icons.check, size: 14, color: AppColors.primary),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         b,
@@ -613,7 +613,7 @@ class _AudienceCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              )),
+              ),),
         ],
       ),
     );
@@ -637,7 +637,7 @@ class _FeaturesSection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
+          const Text(
             'KEY FEATURES',
             style: TextStyle(
               fontSize: 11,
@@ -646,7 +646,7 @@ class _FeaturesSection extends StatelessWidget {
               letterSpacing: 1.2,
             ),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Text(
             'Everything needed for modern assessment',
             style: TextStyle(
@@ -656,11 +656,11 @@ class _FeaturesSection extends StatelessWidget {
               letterSpacing: -0.4,
             ),
           ),
-          SizedBox(height: 40),
+          const SizedBox(height: 40),
           LayoutBuilder(builder: (_, constraints) {
             final cols = constraints.maxWidth > 900 ? 3 : (constraints.maxWidth > 600 ? 2 : 1);
             return _FeatureGrid(columns: cols, onExplore: onExplore);
-          }),
+          },),
         ],
       ),
     );
@@ -673,7 +673,7 @@ class _FeatureGrid extends StatelessWidget {
   const _FeatureGrid({required this.columns, required this.onExplore});
 
   static List<_FeatureItem> get _features => [
-    _FeatureItem(
+    const _FeatureItem(
       icon: Icons.description_outlined,
       color: AppColors.primary,
       title: 'AI Material Processing',
@@ -691,13 +691,13 @@ class _FeatureGrid extends StatelessWidget {
       title: 'Auto-Grading & Analytics',
       desc: 'Instant grading for objective questions and AI-assisted grading for subjective answers with detailed rubrics.',
     ),
-    _FeatureItem(
+    const _FeatureItem(
       icon: Icons.recommend_outlined,
       color: AppColors.successDot,
       title: 'Personalized Recommendations',
       desc: 'The system identifies knowledge gaps and recommends specific study materials to each student.',
     ),
-    _FeatureItem(
+    const _FeatureItem(
       icon: Icons.support_agent_outlined,
       color: Color(0xFF06B6D4),
       title: 'AI Chatbot Assistant',
@@ -711,25 +711,25 @@ class _FeatureGrid extends StatelessWidget {
     final rows = <Widget>[];
     for (var i = 0; i < _features.length; i += columns) {
       final rowItems = _features.sublist(
-          i, i + columns > _features.length ? _features.length : i + columns);
+          i, i + columns > _features.length ? _features.length : i + columns,);
       rows.add(Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           for (var j = 0; j < rowItems.length; j++) ...[
-            if (j > 0) SizedBox(width: 20),
+            if (j > 0) const SizedBox(width: 20),
             Expanded(child: _FeatureCard(item: rowItems[j])),
           ],
           // Fill remaining slots if last row is partial
           for (var k = rowItems.length; k < columns; k++) ...[
-            SizedBox(width: 20),
+            const SizedBox(width: 20),
             if (k == columns - 1)
               Expanded(child: _ExploreCta(onTap: onExplore))
             else
-              Expanded(child: SizedBox()),
+              const Expanded(child: SizedBox()),
           ],
         ],
-      ));
-      rows.add(SizedBox(height: 20));
+      ),);
+      rows.add(const SizedBox(height: 20));
     }
     // If features filled all cells evenly, add CTA as its own row
     if (_features.length % columns == 0) {
@@ -737,11 +737,11 @@ class _FeatureGrid extends StatelessWidget {
         children: [
           Expanded(child: _ExploreCta(onTap: onExplore)),
           for (var i = 1; i < columns; i++) ...[
-            SizedBox(width: 20),
-            Expanded(child: SizedBox()),
+            const SizedBox(width: 20),
+            const Expanded(child: SizedBox()),
           ],
         ],
-      ));
+      ),);
     }
     return Column(children: rows);
   }
@@ -781,7 +781,7 @@ class _FeatureCard extends StatelessWidget {
             ),
             child: Icon(item.icon, size: 20, color: item.color),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Text(
             item.title,
             style: TextStyle(
@@ -790,7 +790,7 @@ class _FeatureCard extends StatelessWidget {
               color: AppColors.textTitle,
             ),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text(
             item.desc,
             style: TextStyle(
@@ -825,7 +825,7 @@ class _ExploreCta extends StatelessWidget {
         children: [
           GestureDetector(
             onTap: onTap,
-            child: Text(
+            child: const Text(
               'Explore the Platform',
               style: TextStyle(
                 fontSize: 14,
@@ -836,7 +836,7 @@ class _ExploreCta extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text(
             'Discover all features by signing up for a demo.',
             style: TextStyle(
@@ -845,10 +845,10 @@ class _ExploreCta extends StatelessWidget {
               height: 1.4,
             ),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           GestureDetector(
             onTap: onTap,
-            child: Text(
+            child: const Text(
               'View Full Feature List',
               style: TextStyle(
                 fontSize: 12,
@@ -896,13 +896,13 @@ class _WorkflowSection extends StatelessWidget {
               letterSpacing: -0.4,
             ),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           Text(
             'From raw material to graded assessment, in five simple steps.',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 14, color: AppColors.textGray),
           ),
-          SizedBox(height: 56),
+          const SizedBox(height: 56),
           LayoutBuilder(builder: (_, c) {
             if (c.maxWidth > 700) {
               return Row(
@@ -928,10 +928,10 @@ class _WorkflowSection extends StatelessWidget {
                   .map((s) => Padding(
                         padding: const EdgeInsets.only(bottom: 20),
                         child: _StepCard(step: s),
-                      ))
+                      ),)
                   .toList(),
             );
-          }),
+          },),
         ],
       ),
     );
@@ -959,21 +959,21 @@ class _StepCard extends StatelessWidget {
           Container(
             width: 44,
             height: 44,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.primary,
               shape: BoxShape.circle,
             ),
             alignment: Alignment.center,
             child: Text(
               '${step.n}',
-              style: TextStyle(
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,
                 fontWeight: FontWeight.w800,
               ),
             ),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           Text(
             step.label,
             textAlign: TextAlign.center,
@@ -983,7 +983,7 @@ class _StepCard extends StatelessWidget {
               color: AppColors.textTitle,
             ),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             step.desc,
             textAlign: TextAlign.center,
@@ -1013,16 +1013,16 @@ class _PortalsSection extends StatelessWidget {
     return Container(
       color: AppColors.cardBg,
       padding: EdgeInsets.symmetric(
-          vertical: 72, horizontal: isMobile ? 24 : 80),
+          vertical: 72, horizontal: isMobile ? 24 : 80,),
       child: isMobile
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [_PortalsText(), SizedBox(height: 32), _PortalsMockup()],
+              children: [_PortalsText(), const SizedBox(height: 32), _PortalsMockup()],
             )
           : Row(
               children: [
                 Expanded(child: _PortalsText()),
-                SizedBox(width: 60),
+                const SizedBox(width: 60),
                 Expanded(child: _PortalsMockup()),
               ],
             ),
@@ -1047,25 +1047,25 @@ class _PortalsText extends StatelessWidget {
             letterSpacing: -0.4,
           ),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         Text(
           'Each user type gets a dedicated interface optimized for their specific tasks and responsibilities.',
           style: TextStyle(fontSize: 14, color: AppColors.textGray, height: 1.6),
         ),
-        SizedBox(height: 28),
-        _PortalRow(
+        const SizedBox(height: 28),
+        const _PortalRow(
           icon: Icons.menu_book_outlined,
           title: 'Instructor Portal',
           desc: 'The command center for course management. Upload content, review AI suggestions, release assignments, and view class-wide analytics.',
         ),
-        SizedBox(height: 16),
-        _PortalRow(
+        const SizedBox(height: 16),
+        const _PortalRow(
           icon: Icons.person_outline_rounded,
           title: 'Student Portal',
           desc: 'A clean, distraction-free environment for taking assessments, reviewing past performance, and accessing AI study aids.',
         ),
-        SizedBox(height: 16),
-        _PortalRow(
+        const SizedBox(height: 16),
+        const _PortalRow(
           icon: Icons.admin_panel_settings_outlined,
           title: 'Admin Portal',
           desc: 'Organization-level controls for managing users, departments, billing, and system-wide configurations.',
@@ -1096,7 +1096,7 @@ class _PortalRow extends StatelessWidget {
           ),
           child: Icon(icon, size: 18, color: AppColors.primary),
         ),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1105,13 +1105,13 @@ class _PortalRow extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textTitle)),
-              SizedBox(height: 3),
+                      color: AppColors.textTitle,),),
+              const SizedBox(height: 3),
               Text(desc,
                   style: TextStyle(
                       fontSize: 13,
                       color: AppColors.textGray,
-                      height: 1.5)),
+                      height: 1.5,),),
             ],
           ),
         ),
@@ -1140,7 +1140,7 @@ class _PortalsMockup extends StatelessWidget {
             right: 0,
             child: Container(
               height: 80,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
@@ -1162,9 +1162,9 @@ class _PortalsMockup extends StatelessWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.hub_outlined,
-                      size: 36, color: Colors.white.withValues(alpha: 0.8)),
-                  SizedBox(height: 10),
-                  Text(
+                      size: 36, color: Colors.white.withValues(alpha: 0.8),),
+                  const SizedBox(height: 10),
+                  const Text(
                     'Unified Learning Ecosystem',
                     textAlign: TextAlign.center,
                     style: TextStyle(
@@ -1193,13 +1193,13 @@ class _StatsBar extends StatelessWidget {
     Theme.of(context);
     const stats = [
       _Stat('Saves Time',
-          'Instructors save hours weekly on grading and question creation.'),
+          'Instructors save hours weekly on grading and question creation.',),
       _Stat('Better Outcomes',
-          'Instant feedback loops help students learn from mistakes faster.'),
+          'Instant feedback loops help students learn from mistakes faster.',),
       _Stat('Fair Assessment',
-          'Standardized, objective grading eliminates unconscious bias.'),
+          'Standardized, objective grading eliminates unconscious bias.',),
       _Stat('Scalable',
-          'Effortlessly manage classes of 15 or 10,000 students.'),
+          'Effortlessly manage classes of 15 or 10,000 students.',),
     ];
 
     return Container(
@@ -1212,7 +1212,7 @@ class _StatsBar extends StatelessWidget {
               if (s != stats.first) {
                 yield Container(
                     width: 1, height: 48, color: AppColors.border,
-                    margin: const EdgeInsets.symmetric(horizontal: 20));
+                    margin: const EdgeInsets.symmetric(horizontal: 20),);
               }
               yield Expanded(child: _StatChip(stat: s));
             }).toList(),
@@ -1222,9 +1222,9 @@ class _StatsBar extends StatelessWidget {
           children: stats.map((s) => Padding(
             padding: const EdgeInsets.only(bottom: 16),
             child: _StatChip(stat: s),
-          )).toList(),
+          ),).toList(),
         );
-      }),
+      },),
     );
   }
 }
@@ -1249,11 +1249,11 @@ class _StatChip extends StatelessWidget {
             style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w800,
-                color: AppColors.textTitle)),
-        SizedBox(height: 4),
+                color: AppColors.textTitle,),),
+        const SizedBox(height: 4),
         Text(stat.desc,
             style: TextStyle(
-                fontSize: 12, color: AppColors.textMuted, height: 1.4)),
+                fontSize: 12, color: AppColors.textMuted, height: 1.4,),),
       ],
     );
   }
@@ -1276,7 +1276,7 @@ class _CtaBanner extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 72, horizontal: 40),
       child: Column(
         children: [
-          Text(
+          const Text(
             'Transform Learning with AI',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -1286,8 +1286,8 @@ class _CtaBanner extends StatelessWidget {
               letterSpacing: -0.5,
             ),
           ),
-          SizedBox(height: 12),
-          Text(
+          const SizedBox(height: 12),
+          const Text(
             'Join the institutions that are already modernising their educational\ninfrastructure with Smart Study Companion.',
             textAlign: TextAlign.center,
             style: TextStyle(
@@ -1296,7 +1296,7 @@ class _CtaBanner extends StatelessWidget {
               height: 1.6,
             ),
           ),
-          SizedBox(height: 36),
+          const SizedBox(height: 36),
           Wrap(
             spacing: 12,
             runSpacing: 12,
@@ -1309,25 +1309,25 @@ class _CtaBanner extends StatelessWidget {
                   foregroundColor: AppColors.primary,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 28, vertical: 14),
+                      horizontal: 28, vertical: 14,),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(8),),
                 ),
-                child: Text('Sign Up',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                child: const Text('Sign Up',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),),
               ),
               OutlinedButton(
                 onPressed: onLogin,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  side: BorderSide(color: Colors.white60, width: 1.5),
+                  side: const BorderSide(color: Colors.white60, width: 1.5),
                   padding: const EdgeInsets.symmetric(
-                      horizontal: 28, vertical: 14),
+                      horizontal: 28, vertical: 14,),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8)),
+                      borderRadius: BorderRadius.circular(8),),
                 ),
-                child: Text('Login',
-                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                child: const Text('Login',
+                    style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),),
               ),
             ],
           ),
@@ -1367,25 +1367,25 @@ class _Footer extends StatelessWidget {
                       children: [
                         Row(children: [
                           Image.asset('assets/logo.webp', height: 22, cacheWidth: (22 * MediaQuery.of(context).devicePixelRatio).round()),
-                          SizedBox(width: 6),
+                          const SizedBox(width: 6),
                           Text('Learnova',
                               style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w800,
-                                  color: AppColors.textTitle)),
-                        ]),
-                        SizedBox(height: 10),
+                                  color: AppColors.textTitle,),),
+                        ],),
+                        const SizedBox(height: 10),
                         Text(
                           'Empowering education through fast, intelligent, flexible, scalable, and secure tools.',
                           style: TextStyle(
                               fontSize: 12,
                               color: AppColors.textMuted,
-                              height: 1.5),
+                              height: 1.5,),
                         ),
                       ],
                     ),
                   ),
-                  SizedBox(width: 40),
+                  const SizedBox(width: 40),
                   Expanded(child: _FooterLinks()),
                 ],
               );
@@ -1395,31 +1395,31 @@ class _Footer extends StatelessWidget {
               children: [
                 Row(children: [
                   Image.asset('assets/logo.webp', height: 22, cacheWidth: (22 * MediaQuery.of(context).devicePixelRatio).round()),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Text('Learnova',
                       style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: AppColors.textTitle)),
-                ]),
-                SizedBox(height: 24),
+                          color: AppColors.textTitle,),),
+                ],),
+                const SizedBox(height: 24),
                 _FooterLinks(),
               ],
             );
-          }),
-          SizedBox(height: 36),
+          },),
+          const SizedBox(height: 36),
           Divider(color: AppColors.border),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Row(
             children: [
               Text(
                 '© 2025 Learnova. All rights reserved.',
                 style: TextStyle(fontSize: 12, color: AppColors.textHint),
               ),
-              Spacer(),
+              const Spacer(),
               // Social icons
               Icon(Icons.language, size: 18, color: AppColors.textHint),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Icon(Icons.send, size: 18, color: AppColors.textHint),
             ],
           ),
@@ -1435,7 +1435,7 @@ class _FooterLinks extends StatelessWidget {
     Theme.of(context);
     return LayoutBuilder(builder: (_, c) {
       if (c.maxWidth > 500) {
-        return Row(
+        return const Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Expanded(child: _FooterCol(title: 'Platform', links: ['Features', 'Pricing', 'For Institutions'])),
@@ -1444,7 +1444,7 @@ class _FooterLinks extends StatelessWidget {
           ],
         );
       }
-      return Column(
+      return const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _FooterCol(title: 'Platform', links: ['Features', 'Pricing', 'For Institutions']),
@@ -1454,7 +1454,7 @@ class _FooterLinks extends StatelessWidget {
           _FooterCol(title: 'Legal', links: ['Privacy Policy', 'Terms of Service', 'Security']),
         ],
       );
-    });
+    },);
   }
 }
 
@@ -1473,14 +1473,14 @@ class _FooterCol extends StatelessWidget {
             style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
-                color: AppColors.textTitle)),
-        SizedBox(height: 12),
+                color: AppColors.textTitle,),),
+        const SizedBox(height: 12),
         ...links.map((l) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
               child: Text(l,
                   style: TextStyle(
-                      fontSize: 13, color: AppColors.textMuted)),
-            )),
+                      fontSize: 13, color: AppColors.textMuted,),),
+            ),),
       ],
     );
   }

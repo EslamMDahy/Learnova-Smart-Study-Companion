@@ -11,18 +11,9 @@ class CourseOutcomesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
+    return ColoredBox(
       color: AppColors.pageBg,
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.cardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: CourseOutcomesManager(courseId: course.id, embedded: true),
-      ),
+      child: CourseOutcomesManager(courseId: course.id, embedded: true),
     );
   }
 }

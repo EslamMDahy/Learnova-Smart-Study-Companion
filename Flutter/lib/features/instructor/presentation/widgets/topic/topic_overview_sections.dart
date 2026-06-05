@@ -37,7 +37,7 @@ class TopicOverviewSnapshotCard extends StatelessWidget {
                           : 'Draft',
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: _MetricTile(
                   icon: Icons.trending_up_rounded,
@@ -49,7 +49,7 @@ class TopicOverviewSnapshotCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
@@ -61,7 +61,7 @@ class TopicOverviewSnapshotCard extends StatelessWidget {
                   value: mappedOutcomes.isEmpty ? 'Not mapped' : '${mappedOutcomes.length} linked',
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: _MetricTile(
                   icon: Icons.schedule_rounded,
@@ -120,7 +120,7 @@ class TopicAlignmentCard extends StatelessWidget {
                       ),
                       child: Text(
                         '${lo.code} • ${(lo.description ?? lo.title).trim()}',
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w700,
                           color: AppColors.primary,
@@ -190,7 +190,7 @@ class TopicInsightsCard extends StatelessWidget {
                   ),
                   child: Icon(items[i].icon, size: 18, color: AppColors.primary),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -203,7 +203,7 @@ class TopicInsightsCard extends StatelessWidget {
                           color: AppColors.textTitle,
                         ),
                       ),
-                      SizedBox(height: 4),
+                      const SizedBox(height: 4),
                       Text(
                         items[i].body,
                         style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.6),
@@ -213,7 +213,7 @@ class TopicInsightsCard extends StatelessWidget {
                 ),
               ],
             ),
-            if (i != items.length - 1) SizedBox(height: 16),
+            if (i != items.length - 1) const SizedBox(height: 16),
           ],
         ],
       ),
@@ -279,7 +279,7 @@ class _TopicSectionCard extends StatelessWidget {
             child: Row(
               children: [
                 Icon(icon, size: 16, color: AppColors.primary),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text(
                   title,
                   style: TextStyle(
@@ -337,7 +337,7 @@ class _MetricTile extends StatelessWidget {
             ),
             child: Icon(icon, size: 18, color: iconColor),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -346,7 +346,7 @@ class _MetricTile extends StatelessWidget {
                   label,
                   style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   value,
                   style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textTitle),

@@ -39,7 +39,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
           child: Center(
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 1200),
+              constraints: const BoxConstraints(maxWidth: 1200),
               child: Column(
                 children: [
                   Text(
@@ -52,7 +52,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                       height: 1.1,
                     ),
                   ),
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
                   Text(
                     'Choose a plan that fits your needs. Get savings with a yearly subscription.',
                     textAlign: TextAlign.center,
@@ -63,7 +63,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                       height: 1.35,
                     ),
                   ),
-                  SizedBox(height: 22),
+                  const SizedBox(height: 22),
 
                   
                   UpgradePeriodToggle(
@@ -71,10 +71,10 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                     onToggle: () => setState(() => isYearly = !isYearly),
                   ),
 
-                  SizedBox(height: 28),
+                  const SizedBox(height: 28),
 
                   if (isNarrow) ...[
-                    UpgradePlanCard(
+                    const UpgradePlanCard(
                       title: 'Starter',
                       price: 'Free',
                       period: '',
@@ -92,7 +92,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                       tone: UpgradeTone.neutral,
                       onPressed: null,
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     UpgradePlanCard(
                       title: 'Professional',
                       price: isYearly
@@ -117,7 +117,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                       tone: UpgradeTone.primary,
                       onPressed: () => _comingSoon('Upgrade'),
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     UpgradePlanCard(
                       title: 'Enterprise',
                       price: 'Custom',
@@ -142,7 +142,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
+                        const Expanded(
                           child: UpgradePlanCard(
                             title: 'Starter',
                             price: 'Free',
@@ -162,7 +162,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                             onPressed: null,
                           ),
                         ),
-                        SizedBox(width: 18),
+                        const SizedBox(width: 18),
                         Expanded(
                           child: UpgradePlanCard(
                             title: 'Professional',
@@ -190,7 +190,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                             onPressed: () => _comingSoon('Upgrade'),
                           ),
                         ),
-                        SizedBox(width: 18),
+                        const SizedBox(width: 18),
                         Expanded(
                           child: UpgradePlanCard(
                             title: 'Enterprise',
@@ -217,7 +217,7 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                     ),
                   ],
 
-                  SizedBox(height: 18),
+                  const SizedBox(height: 18),
 
                   Container(
                     padding: const EdgeInsets.all(14),
@@ -230,8 +230,8 @@ class _UpgradePlansContentState extends State<UpgradePlansContent> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.lock_outline,
-                            size: 18, color: AppColors.textMuted),
-                        SizedBox(width: 10),
+                            size: 18, color: AppColors.textMuted,),
+                        const SizedBox(width: 10),
                         Text(
                           'Secure payments · Cancel anytime · Invoice available',
                           style: TextStyle(

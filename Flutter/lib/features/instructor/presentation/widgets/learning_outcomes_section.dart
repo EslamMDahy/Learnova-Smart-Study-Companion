@@ -97,13 +97,13 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
             onEdit:   () => _editOutcome(_outcomes[i]),
             onDelete: () => _delete(_outcomes[i].id),
           ),
-        )),
+        ),),
 
-      SizedBox(height: 10),
+      const SizedBox(height: 10),
 
       // ── Input card ───────────────────────────────────────────────────────
       AnimatedContainer(
-        duration: Duration(milliseconds: 150),
+        duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
@@ -113,9 +113,9 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
             width: _isFocused ? 1.5 : 1,
           ),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: Offset(0, 1)),
+            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 1)),
             if (_isFocused)
-              BoxShadow(color: AppColors.primary.withOpacity(0.08), blurRadius: 10, offset: Offset(0, 2)),
+              BoxShadow(color: AppColors.primary.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 2)),
           ],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -125,8 +125,8 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
             Text('Difficulty',
                 style: AppText.label.copyWith(
                     fontSize: 12, fontWeight: FontWeight.w700,
-                    color: AppColors.textTitle)),
-            SizedBox(width: 12),
+                    color: AppColors.textTitle,),),
+            const SizedBox(width: 12),
             ...OutcomeDifficulty.values.map((d) {
               final sel   = _selectedDiff == d;
               final color = _diffColor(d);
@@ -135,25 +135,25 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
                 child: GestureDetector(
                   onTap: () => setState(() => _selectedDiff = d),
                   child: AnimatedContainer(
-                    duration: Duration(milliseconds: 120),
+                    duration: const Duration(milliseconds: 120),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                     decoration: BoxDecoration(
                       color: sel ? color.withOpacity(0.1) : AppColors.cardBg,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                           color: sel ? color : AppColors.border,
-                          width: sel ? 1.5 : 1),
+                          width: sel ? 1.5 : 1,),
                     ),
                     child: Text(d.label, style: TextStyle(
                         fontSize: 11.5, fontWeight: FontWeight.w600,
-                        color: sel ? color : AppColors.textMuted)),
+                        color: sel ? color : AppColors.textMuted,),),
                   ),
                 ),
               );
             }),
-          ]),
+          ],),
 
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           // Description input row
           Row(children: [
@@ -184,7 +184,7 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
                 ),
               ),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             SizedBox(
               width: 40, height: 40,
               child: AppButton(
@@ -194,10 +194,10 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
                 padding: EdgeInsets.zero,
               ),
             ),
-          ]),
-        ]),
+          ],),
+        ],),
       ),
-    ]);
+    ],);
   }
 
   static Color _diffColor(OutcomeDifficulty d) {
@@ -241,20 +241,20 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
       backgroundColor: AppColors.cardBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 480),
+        constraints: const BoxConstraints(maxWidth: 480),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
 
             // Title
             Text('Edit ${widget.outcome.code}',
-                style: AppText.h1.copyWith(fontSize: 17, color: AppColors.textTitle)),
-            SizedBox(height: 18),
+                style: AppText.h1.copyWith(fontSize: 17, color: AppColors.textTitle),),
+            const SizedBox(height: 18),
 
             // Description label + input
             Text('Description', style: AppText.label.copyWith(
-                fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-            SizedBox(height: 6),
+                fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle,),),
+            const SizedBox(height: 6),
             Container(
               decoration: BoxDecoration(
                 color: AppColors.cardBg,
@@ -277,12 +277,12 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
               ),
             ),
 
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             // Difficulty label + chips
             Text('Difficulty', style: AppText.label.copyWith(
-                fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-            SizedBox(height: 8),
+                fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle,),),
+            const SizedBox(height: 8),
             Row(children: OutcomeDifficulty.values.map((d) {
               final sel   = _diff == d;
               final color = _diffColor(d);
@@ -291,7 +291,7 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
                 child: GestureDetector(
                   onTap: () => setState(() => _diff = d),
                   child: AnimatedContainer(
-                    duration: Duration(milliseconds: 120),
+                    duration: const Duration(milliseconds: 120),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
                       color: sel ? color.withOpacity(0.08) : AppColors.pageBg,
@@ -301,13 +301,13 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
                     alignment: Alignment.center,
                     child: Text(d.label, style: TextStyle(
                         fontSize: 12, fontWeight: FontWeight.w600,
-                        color: sel ? color : AppColors.textMuted)),
+                        color: sel ? color : AppColors.textMuted,),),
                   ),
                 ),
-              ));
-            }).toList()),
+              ),);
+            }).toList(),),
 
-            SizedBox(height: 22),
+            const SizedBox(height: 22),
 
             // Footer buttons
             Row(mainAxisAlignment: MainAxisAlignment.end, children: [
@@ -318,20 +318,20 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
                 height: 40,
                 padding: const EdgeInsets.symmetric(horizontal: 18),
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               AppButton(
                 label: 'Save',
                 onTap: () {
                   final t = _ctrl.text.trim();
                   if (t.isEmpty) return;
                   Navigator.pop(context,
-                      widget.outcome.copyWith(title: t, difficulty: _diff));
+                      widget.outcome.copyWith(title: t, difficulty: _diff),);
                 },
                 height: 40,
                 padding: const EdgeInsets.symmetric(horizontal: 18),
               ),
-            ]),
-          ]),
+            ],),
+          ],),
         ),
       ),
     );
@@ -384,9 +384,9 @@ class _OutcomeTile extends StatelessWidget {
             border: Border.all(color: AppColors.badgeBlueBorder),
           ),
           child: Text(outcome.code, style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg)),
+              fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg,),),
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
 
         // Difficulty chip
         Container(
@@ -396,17 +396,17 @@ class _OutcomeTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(outcome.difficulty.label, style: TextStyle(
-              fontSize: 10.5, fontWeight: FontWeight.w700, color: diffColor)),
+              fontSize: 10.5, fontWeight: FontWeight.w700, color: diffColor,),),
         ),
-        SizedBox(width: 10),
+        const SizedBox(width: 10),
 
         // Description
         Expanded(child: Text(outcome.title,
-            style: AppText.input.copyWith(fontSize: 12.5, height: 1.4))),
+            style: AppText.input.copyWith(fontSize: 12.5, height: 1.4),),),
 
         // Edit
         IconButton(
-          icon: Icon(Icons.edit_outlined, size: 15),
+          icon: const Icon(Icons.edit_outlined, size: 15),
           color: AppColors.muted,
           tooltip: 'Edit',
           visualDensity: VisualDensity.compact,
@@ -415,13 +415,13 @@ class _OutcomeTile extends StatelessWidget {
 
         // Delete
         IconButton(
-          icon: Icon(Icons.close, size: 15),
+          icon: const Icon(Icons.close, size: 15),
           color: AppColors.dangerText,
           tooltip: 'Remove',
           visualDensity: VisualDensity.compact,
           onPressed: onDelete,
         ),
-      ]),
+      ],),
     );
   }
 }
@@ -440,11 +440,11 @@ class _EmptyHint extends StatelessWidget {
     ),
     child: Row(children: [
       Icon(Icons.info_outline, size: 14, color: AppColors.hint),
-      SizedBox(width: 8),
+      const SizedBox(width: 8),
       Expanded(child: Text(
         'No outcomes added yet. Add learning outcomes to guide students and link topics.',
         style: AppText.mutedSmall.copyWith(fontSize: 12, height: 1.5),
-      )),
-    ]),
+      ),),
+    ],),
   );
 }

@@ -15,14 +15,14 @@ class CourseTopicsTab extends ConsumerWidget {
     final modules = state.modules;
 
     if (state.modulesLoading) {
-      return Center(child: CircularProgressIndicator());
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (modules.isEmpty) {
-      return _NoModulesState();
+      return const _NoModulesState();
     }
 
-    return _BackendTopicsPendingState();
+    return const _BackendTopicsPendingState();
   }
 }
 
@@ -47,7 +47,7 @@ class _NoModulesState extends StatelessWidget {
                 color: AppColors.purpleText,
               ),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               'No Modules Yet',
               style: TextStyle(
@@ -56,7 +56,7 @@ class _NoModulesState extends StatelessWidget {
                 color: AppColors.textTitle,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Create modules in the Materials tab first,\nthen manage their topics here.',
               textAlign: TextAlign.center,
@@ -79,7 +79,7 @@ class _BackendTopicsPendingState extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 460),
+            constraints: const BoxConstraints(maxWidth: 460),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
@@ -90,13 +90,13 @@ class _BackendTopicsPendingState extends StatelessWidget {
                     color: AppColors.primarySoft,
                     borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Icon(
+                  child: const Icon(
                     Icons.construction_rounded,
                     size: 30,
                     color: AppColors.primary,
                   ),
                 ),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Text(
                   'Topics management is temporarily hidden',
                   style: TextStyle(
@@ -106,7 +106,7 @@ class _BackendTopicsPendingState extends StatelessWidget {
                   ),
                   textAlign: TextAlign.center,
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   'This tab was using local mock authoring paths. It is now disabled until the backend-driven topics workflow is wired end-to-end.',
                   style: TextStyle(

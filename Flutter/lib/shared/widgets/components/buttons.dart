@@ -46,7 +46,7 @@ class AppButton extends StatelessWidget {
     List<BoxShadow> shadow = [
       BoxShadow(
         blurRadius: 2,
-        offset: Offset(0, 1),
+        offset: const Offset(0, 1),
         color: AppColors.shadowBlue,
       ),
     ];
@@ -58,7 +58,7 @@ class AppButton extends StatelessWidget {
         shadow = [
           BoxShadow(
             blurRadius: 2,
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
             color: AppColors.shadowBlue,
           ),
         ];
@@ -71,7 +71,7 @@ class AppButton extends StatelessWidget {
         shadow = [
           BoxShadow(
             blurRadius: 2,
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
             color: AppColors.shadowThin,
           ),
         ];
@@ -84,7 +84,7 @@ class AppButton extends StatelessWidget {
         shadow = [
           BoxShadow(
             blurRadius: 2,
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
             color: AppColors.shadowThin,
           ),
         ];
@@ -99,7 +99,7 @@ class AppButton extends StatelessWidget {
     }
 
     final child = loading
-        ? SizedBox(
+        ? const SizedBox(
             width: 18,
             height: 18,
             child: CircularProgressIndicator(strokeWidth: 2),
@@ -117,7 +117,7 @@ class AppButton extends StatelessWidget {
       cursor: (loading || onTap == null)
           ? SystemMouseCursors.basic
           : SystemMouseCursors.click,
-      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
         onTap: (loading ? null : onTap),
         borderRadius: BorderRadius.circular(8),
         child: Container(

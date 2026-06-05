@@ -85,7 +85,7 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
                   color: AppColors.primary,
                   borderRadius: BorderRadius.circular(22),
                 ),
-                child: Center(
+                child: const Center(
                   child: Text(
                     'L',
                     style: TextStyle(
@@ -106,12 +106,12 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     if (errMsg == null) ...[
-                      SizedBox(
+                      const SizedBox(
                         width: 26,
                         height: 26,
                         child: CircularProgressIndicator(strokeWidth: 2.5),
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       Text(
                         'Restoring session…',
                         style: TextStyle(
@@ -134,12 +134,12 @@ class _SessionBootstrapperState extends ConsumerState<SessionBootstrapper> {
                           ),
                         ),
                       ),
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
                       ElevatedButton(
                         onPressed: () => ref
                             .read(sessionBootstrapControllerProvider.notifier)
                             .ensureBootstrapped(),
-                        child: Text('Retry'),
+                        child: const Text('Retry'),
                       ),
                     ],
                   ],

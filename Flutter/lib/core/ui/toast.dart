@@ -21,7 +21,7 @@ class AppToast {
     String? actionLabel, VoidCallback? onAction,
   }) => _show(context, type: AppToastType.success, title: title,
         message: message, duration: duration,
-        actionLabel: actionLabel, onAction: onAction);
+        actionLabel: actionLabel, onAction: onAction,);
 
   static void info(BuildContext context, {
     String title = 'Info',
@@ -30,7 +30,7 @@ class AppToast {
     String? actionLabel, VoidCallback? onAction,
   }) => _show(context, type: AppToastType.info, title: title,
         message: message, duration: duration,
-        actionLabel: actionLabel, onAction: onAction);
+        actionLabel: actionLabel, onAction: onAction,);
 
   static void warning(BuildContext context, {
     String title = 'Warning',
@@ -39,7 +39,7 @@ class AppToast {
     String? actionLabel, VoidCallback? onAction,
   }) => _show(context, type: AppToastType.warning, title: title,
         message: message, duration: duration,
-        actionLabel: actionLabel, onAction: onAction);
+        actionLabel: actionLabel, onAction: onAction,);
 
   static void error(BuildContext context, {
     String title = 'Error',
@@ -48,7 +48,7 @@ class AppToast {
     String? actionLabel, VoidCallback? onAction,
   }) => _show(context, type: AppToastType.error, title: title,
         message: message, duration: duration,
-        actionLabel: actionLabel, onAction: onAction);
+        actionLabel: actionLabel, onAction: onAction,);
 
   static void show(BuildContext context, {
     required String title,
@@ -59,7 +59,7 @@ class AppToast {
   }) => _show(context, type: AppToastType.info, title: title,
         message: message, duration: duration,
         actionLabel: actionLabel, onAction: onAction,
-        overrideIcon: icon);
+        overrideIcon: icon,);
 
   static void _show(BuildContext context, {
     required AppToastType type,
@@ -108,11 +108,11 @@ class AppToast {
           ),
         ),
       );
-    });
+    },);
 
     _current = entry;
     overlay.insert(entry);
-    _autoTimer = Timer(duration + Duration(milliseconds: 500), dismiss);
+    _autoTimer = Timer(duration + const Duration(milliseconds: 500), dismiss);
   }
 }
 
@@ -143,7 +143,7 @@ class _Tokens {
       case AppToastType.success:
         return _Tokens(
           glow: AppColors.successDot,
-          iconGrad: [Color(0xFF15803D), Color(0xFF4ADE80)],
+          iconGrad: [const Color(0xFF15803D), const Color(0xFF4ADE80)],
           bar: AppColors.successText,
           titleColor: AppColors.successText,
           messageColor: AppColors.successText,
@@ -153,7 +153,7 @@ class _Tokens {
       case AppToastType.warning:
         return _Tokens(
           glow: AppColors.warningText,
-          iconGrad: [AppColors.warningText, Color(0xFFFCD34D)],
+          iconGrad: [AppColors.warningText, const Color(0xFFFCD34D)],
           bar: AppColors.warningText,
           titleColor: AppColors.warningText,
           messageColor: AppColors.warningText,
@@ -163,7 +163,7 @@ class _Tokens {
       case AppToastType.error:
         return _Tokens(
           glow: AppColors.errorDot,
-          iconGrad: [AppColors.dangerTitle, Color(0xFFFCA5A5)],
+          iconGrad: [AppColors.dangerTitle, const Color(0xFFFCA5A5)],
           bar: AppColors.dangerText,
           titleColor: AppColors.dangerTitle,
           messageColor: AppColors.dangerText,
@@ -173,10 +173,10 @@ class _Tokens {
       case AppToastType.info:
         return _Tokens(
           glow: AppColors.primary,
-          iconGrad: [Color(0xFF1558A8), AppColors.infoText],
+          iconGrad: [const Color(0xFF1558A8), AppColors.infoText],
           bar: AppColors.primary,
-          titleColor: Color(0xFF0C2D5A),
-          messageColor: Color(0xFF1E4A8A),
+          titleColor: const Color(0xFF0C2D5A),
+          messageColor: const Color(0xFF1E4A8A),
           borderColor: AppColors.badgeBlueBorder,
           icon: override ?? Icons.info_rounded,
         );
@@ -208,14 +208,14 @@ class _ToastRoot extends StatefulWidget {
 class _ToastRootState extends State<_ToastRoot>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: Duration(milliseconds: 440))..forward();
+      vsync: this, duration: const Duration(milliseconds: 440),)..forward();
 
   late final Animation<Offset> _slide = Tween<Offset>(
-    begin: Offset(0.6, 0), end: Offset.zero,
+    begin: const Offset(0.6, 0), end: Offset.zero,
   ).animate(CurvedAnimation(parent: _c, curve: Curves.easeOutExpo));
 
   late final Animation<double> _fade = Tween<double>(begin: 0.0, end: 1.0)
-      .animate(CurvedAnimation(parent: _c, curve: Interval(0.0, 0.55)));
+      .animate(CurvedAnimation(parent: _c, curve: const Interval(0.0, 0.55)));
 
   late final Animation<double> _scale = Tween<double>(begin: 0.88, end: 1.0)
       .animate(CurvedAnimation(parent: _c, curve: Curves.easeOutBack));
@@ -265,7 +265,7 @@ class _ToastCard extends StatefulWidget {
 class _ToastCardState extends State<_ToastCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _prog = AnimationController(
-      vsync: this, duration: widget.duration)..forward();
+      vsync: this, duration: widget.duration,)..forward();
 
   bool _hovered = false;
 
@@ -288,7 +288,7 @@ class _ToastCardState extends State<_ToastCard>
       onEnter: (_) => _setHover(true),
       onExit:  (_) => _setHover(false),
       child: AnimatedContainer(
-        duration: Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           // ── Light white with faint blue tint ──────────────────────
           color: AppColors.cardBg,
@@ -302,12 +302,12 @@ class _ToastCardState extends State<_ToastCard>
               color: t.glow.withOpacity(_hovered ? 0.18 : 0.10),
               blurRadius: _hovered ? 40 : 24,
               spreadRadius: -4,
-              offset: Offset(0, 8),
+              offset: const Offset(0, 8),
             ),
             BoxShadow(
               color: Colors.black.withOpacity(kIsWeb ? 0.06 : 0.09),
               blurRadius: 20,
-              offset: Offset(0, 4),
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -335,14 +335,14 @@ class _ToastCardState extends State<_ToastCard>
                       BoxShadow(
                         color: t.glow.withOpacity(0.35),
                         blurRadius: 10,
-                        offset: Offset(0, 3),
+                        offset: const Offset(0, 3),
                       ),
                     ],
                   ),
                   child: Icon(t.icon, color: Colors.white, size: 19),
                 ),
 
-                SizedBox(width: 13),
+                const SizedBox(width: 13),
 
                 // Title + message + optional action
                 Expanded(child: Column(
@@ -357,7 +357,7 @@ class _ToastCardState extends State<_ToastCard>
                         height: 1.2,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(widget.message,
                       maxLines: hasAction ? 2 : 3,
                       overflow: TextOverflow.ellipsis,
@@ -369,7 +369,7 @@ class _ToastCardState extends State<_ToastCard>
                       ),
                     ),
                     if (hasAction) ...[
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
                       GestureDetector(
                         onTap: () { widget.onAction?.call(); widget.onDismiss(); },
                         child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -381,22 +381,22 @@ class _ToastCardState extends State<_ToastCard>
                               letterSpacing: 0.1,
                             ),
                           ),
-                          SizedBox(width: 3),
+                          const SizedBox(width: 3),
                           Icon(Icons.arrow_forward_rounded,
-                              size: 13, color: t.bar),
-                        ]),
+                              size: 13, color: t.bar,),
+                        ],),
                       ),
                     ],
                   ],
-                )),
+                ),),
 
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
 
                 // Close button
                 GestureDetector(
                   onTap: widget.onDismiss,
                   child: AnimatedContainer(
-                    duration: Duration(milliseconds: 150),
+                    duration: const Duration(milliseconds: 150),
                     width: 28, height: 28,
                     decoration: BoxDecoration(
                       color: _hovered
@@ -405,10 +405,10 @@ class _ToastCardState extends State<_ToastCard>
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(Icons.close_rounded, size: 15,
-                        color: t.titleColor.withOpacity(0.4)),
+                        color: t.titleColor.withOpacity(0.4),),
                   ),
                 ),
-              ]),
+              ],),
             ),
 
             // ── Progress bar ────────────────────────────────────────
@@ -417,7 +417,7 @@ class _ToastCardState extends State<_ToastCard>
               builder: (_, __) => Stack(children: [
                 // track
                 Container(height: 2.5,
-                    color: t.borderColor.withOpacity(0.4)),
+                    color: t.borderColor.withOpacity(0.4),),
                 // fill
                 FractionallySizedBox(
                   widthFactor: 1.0 - _prog.value,
@@ -436,10 +436,10 @@ class _ToastCardState extends State<_ToastCard>
                     ),
                   ),
                 ),
-              ]),
+              ],),
             ),
 
-          ]),
+          ],),
         ),
       ),
     );

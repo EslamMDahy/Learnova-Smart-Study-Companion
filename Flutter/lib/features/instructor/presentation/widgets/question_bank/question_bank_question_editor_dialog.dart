@@ -6,7 +6,6 @@ import '../../../data/materials_models.dart';
 import '../../../data/modules_materials_providers.dart';
 import '../../../data/modules_models.dart';
 import '../../../data/question_models.dart';
-import '../../../data/questions_api.dart';
 import '../../../data/topics_models.dart';
 import '../../mappers/question_draft_payload_mapper.dart';
 import '../../models/question_draft_item.dart';
@@ -95,7 +94,7 @@ class _QuestionBankQuestionEditorDialogState
     return Dialog(
       insetPadding: const EdgeInsets.all(24),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 1100, maxHeight: 760),
+        constraints: const BoxConstraints(maxWidth: 1100, maxHeight: 760),
         child: Column(
           children: [
             Container(
@@ -117,7 +116,7 @@ class _QuestionBankQuestionEditorDialogState
                             color: AppColors.textTitle,
                           ),
                         ),
-                        SizedBox(height: 6),
+                        const SizedBox(height: 6),
                         Text(
                           'Create reusable questions for selected course topics. Every question is assigned to one exact topic before save.',
                           style: TextStyle(
@@ -131,8 +130,8 @@ class _QuestionBankQuestionEditorDialogState
                   ),
                   TextButton.icon(
                     onPressed: _saving ? null : () => Navigator.of(context).pop(),
-                    icon: Icon(Icons.close_rounded),
-                    label: Text('Close'),
+                    icon: const Icon(Icons.close_rounded),
+                    label: const Text('Close'),
                   ),
                 ],
               ),
@@ -156,7 +155,7 @@ class _QuestionBankQuestionEditorDialogState
                               color: AppColors.textTitle,
                             ),
                           ),
-                          SizedBox(height: 6),
+                          const SizedBox(height: 6),
                           Text(
                             '${widget.topicTargets.length} topic target${widget.topicTargets.length == 1 ? '' : 's'} available for assignment.',
                             style: TextStyle(
@@ -164,11 +163,11 @@ class _QuestionBankQuestionEditorDialogState
                               color: AppColors.textMuted,
                             ),
                           ),
-                          SizedBox(height: 14),
+                          const SizedBox(height: 14),
                           Expanded(
                             child: ListView.separated(
                               itemCount: widget.topicTargets.length,
-                              separatorBuilder: (_, __) => SizedBox(height: 10),
+                              separatorBuilder: (_, __) => const SizedBox(height: 10),
                               itemBuilder: (context, index) {
                                 final target = widget.topicTargets[index];
                                 return Container(
@@ -189,7 +188,7 @@ class _QuestionBankQuestionEditorDialogState
                                           color: AppColors.textTitle,
                                         ),
                                       ),
-                                      SizedBox(height: 4),
+                                      const SizedBox(height: 4),
                                       Text(
                                         target.material.displayTitle,
                                         style: TextStyle(
@@ -197,7 +196,7 @@ class _QuestionBankQuestionEditorDialogState
                                           color: AppColors.textTitle,
                                         ),
                                       ),
-                                      SizedBox(height: 2),
+                                      const SizedBox(height: 2),
                                       Text(
                                         target.module.title,
                                         style: TextStyle(
@@ -215,7 +214,7 @@ class _QuestionBankQuestionEditorDialogState
                       ),
                     ),
                   ),
-                  VerticalDivider(width: 1, thickness: 1),
+                  const VerticalDivider(width: 1, thickness: 1),
                   Expanded(
                     child: Padding(
                       padding: const EdgeInsets.all(20),
@@ -240,15 +239,15 @@ class _QuestionBankQuestionEditorDialogState
                                         setState(() {
                                           _drafts.add(QuestionDraftItem.empty(
                                             widget.topicTargets.first.topic.id,
-                                          ));
+                                          ),);
                                         });
                                       },
-                                icon: Icon(Icons.add_rounded, size: 18),
-                                label: Text('Add question'),
+                                icon: const Icon(Icons.add_rounded, size: 18),
+                                label: const Text('Add question'),
                               ),
                             ],
                           ),
-                          SizedBox(height: 12),
+                          const SizedBox(height: 12),
                           if (_error != null)
                             Container(
                               width: double.infinity,
@@ -277,13 +276,13 @@ class _QuestionBankQuestionEditorDialogState
                                             setState(() {
                                               _drafts.add(QuestionDraftItem.empty(
                                                 widget.topicTargets.first.topic.id,
-                                              ));
+                                              ),);
                                             });
                                           },
                                   )
                                 : ListView.separated(
                                     itemCount: _drafts.length,
-                                    separatorBuilder: (_, __) => SizedBox(height: 14),
+                                    separatorBuilder: (_, __) => const SizedBox(height: 14),
                                     itemBuilder: (context, index) {
                                       final draft = _drafts[index];
                                       return _QuestionDraftCard(
@@ -325,21 +324,21 @@ class _QuestionBankQuestionEditorDialogState
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  Spacer(),
+                  const Spacer(),
                   TextButton(
                     onPressed: _saving ? null : () => Navigator.of(context).pop(),
-                    child: Text('Cancel'),
+                    child: const Text('Cancel'),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   ElevatedButton.icon(
                     onPressed: _saving || _drafts.isEmpty ? null : _saveAll,
                     icon: _saving
-                        ? SizedBox(
+                        ? const SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Icon(Icons.save_outlined, size: 18),
+                        : const Icon(Icons.save_outlined, size: 18),
                     label: Text(_saving ? 'Saving...' : 'Save to Question Bank'),
                   ),
                 ],
@@ -361,7 +360,7 @@ class _EditorEmptyState extends StatelessWidget {
     Theme.of(context);
     return Center(
       child: Container(
-        constraints: BoxConstraints(maxWidth: 420),
+        constraints: const BoxConstraints(maxWidth: 420),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
@@ -378,24 +377,24 @@ class _EditorEmptyState extends StatelessWidget {
                 color: AppColors.primarySoft,
                 borderRadius: BorderRadius.circular(18),
               ),
-              child: Icon(Icons.edit_note_rounded, color: AppColors.primary),
+              child: const Icon(Icons.edit_note_rounded, color: AppColors.primary),
             ),
-            SizedBox(height: 14),
-            Text(
+            const SizedBox(height: 14),
+            const Text(
               'No draft questions yet',
               style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               'Start by adding a question draft. You can create several questions in one pass and assign each one to a single topic.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.6),
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             ElevatedButton.icon(
               onPressed: onAdd,
-              icon: Icon(Icons.add_rounded),
-              label: Text('Add first question'),
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('Add first question'),
             ),
           ],
         ),
@@ -450,14 +449,14 @@ class _QuestionDraftCard extends StatelessWidget {
                 alignment: Alignment.center,
                 child: Text(
                   '${index + 1}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     fontWeight: FontWeight.w800,
                     color: AppColors.primary,
                   ),
                 ),
               ),
-              SizedBox(width: 10),
-              Expanded(
+              const SizedBox(width: 10),
+              const Expanded(
                 child: Text(
                   'Question draft',
                   style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800),
@@ -466,12 +465,12 @@ class _QuestionDraftCard extends StatelessWidget {
               if (onDelete != null)
                 IconButton(
                   onPressed: onDelete,
-                  icon: Icon(Icons.delete_outline_rounded),
+                  icon: const Icon(Icons.delete_outline_rounded),
                   tooltip: 'Remove draft',
                 ),
             ],
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           Row(
             children: [
               Expanded(
@@ -495,29 +494,29 @@ class _QuestionDraftCard extends StatelessWidget {
                   },
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<QuestionType>(
                   value: draft.type,
                   decoration: _fieldDecoration('Question type'),
                   items: [
-                    DropdownMenuItem(
+                    const DropdownMenuItem(
                       value: QuestionType.multipleChoice,
                       child: Text('Multiple Choice'),
                     ),
-                    DropdownMenuItem(
+                    const DropdownMenuItem(
                       value: QuestionType.multiSelect,
                       child: Text('Multi Select'),
                     ),
-                    DropdownMenuItem(
+                    const DropdownMenuItem(
                       value: QuestionType.trueFalse,
                       child: Text('True / False'),
                     ),
-                    DropdownMenuItem(
+                    const DropdownMenuItem(
                       value: QuestionType.shortAnswer,
                       child: Text('Short Answer'),
                     ),
-                    DropdownMenuItem(
+                    const DropdownMenuItem(
                       value: QuestionType.essay,
                       child: Text('Essay'),
                     ),
@@ -528,15 +527,15 @@ class _QuestionDraftCard extends StatelessWidget {
                   },
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: DropdownButtonFormField<QuestionDifficulty>(
                   value: draft.difficulty,
                   decoration: _fieldDecoration('Difficulty'),
                   items: [
-                    DropdownMenuItem(value: QuestionDifficulty.easy, child: Text('Easy')),
-                    DropdownMenuItem(value: QuestionDifficulty.medium, child: Text('Medium')),
-                    DropdownMenuItem(value: QuestionDifficulty.hard, child: Text('Hard')),
+                    const DropdownMenuItem(value: QuestionDifficulty.easy, child: Text('Easy')),
+                    const DropdownMenuItem(value: QuestionDifficulty.medium, child: Text('Medium')),
+                    const DropdownMenuItem(value: QuestionDifficulty.hard, child: Text('Hard')),
                   ],
                   onChanged: (value) {
                     if (value == null) return;
@@ -547,13 +546,13 @@ class _QuestionDraftCard extends StatelessWidget {
             ],
           ),
           if (assignedTarget != null) ...[
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             Text(
               'Saving under: ${assignedTarget.module.title} → ${assignedTarget.material.displayTitle} → ${assignedTarget.topic.title}',
               style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
             ),
           ],
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           TextFormField(
             initialValue: draft.questionText,
             decoration: _fieldDecoration('Question text'),
@@ -561,13 +560,13 @@ class _QuestionDraftCard extends StatelessWidget {
             maxLines: 5,
             onChanged: (value) => onChanged(draft.copyWith(questionText: value)),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           if (draft.type == QuestionType.multipleChoice || draft.type == QuestionType.multiSelect) ...[
             _OptionEditor(
               draft: draft,
               onChanged: onChanged,
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
           ],
           if (draft.type == QuestionType.trueFalse) ...[
             Container(
@@ -578,26 +577,26 @@ class _QuestionDraftCard extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Text(
+                  const Text(
                     'Correct answer',
                     style: TextStyle(fontWeight: FontWeight.w700),
                   ),
-                  Spacer(),
+                  const Spacer(),
                   ChoiceChip(
-                    selected: draft.correctBool == true,
-                    label: Text('True'),
+                    selected: draft.correctBool ?? false,
+                    label: const Text('True'),
                     onSelected: (_) => onChanged(draft.copyWith(correctBool: true)),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   ChoiceChip(
                     selected: draft.correctBool == false,
-                    label: Text('False'),
+                    label: const Text('False'),
                     onSelected: (_) => onChanged(draft.copyWith(correctBool: false)),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
           ],
           if (draft.type == QuestionType.shortAnswer || draft.type == QuestionType.essay) ...[
             TextFormField(
@@ -611,7 +610,7 @@ class _QuestionDraftCard extends StatelessWidget {
               maxLines: draft.type == QuestionType.shortAnswer ? 4 : 6,
               onChanged: (value) => onChanged(draft.copyWith(expectedAnswer: value)),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
           ],
           TextFormField(
             initialValue: draft.explanation,
@@ -661,7 +660,7 @@ class _OptionEditor extends StatelessWidget {
         children: [
           Row(
             children: [
-              Expanded(
+              const Expanded(
                 child: Text(
                   'Answer options',
                   style: TextStyle(fontWeight: FontWeight.w800),
@@ -674,12 +673,12 @@ class _OptionEditor extends StatelessWidget {
                         final nextOptions = [...draft.options, ''];
                         onChanged(draft.copyWith(options: nextOptions));
                       },
-                icon: Icon(Icons.add_rounded, size: 16),
-                label: Text('Add option'),
+                icon: const Icon(Icons.add_rounded, size: 16),
+                label: const Text('Add option'),
               ),
             ],
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           ...List.generate(draft.options.length, (index) {
             final optionLabel = String.fromCharCode(65 + index);
             return Padding(
@@ -713,10 +712,10 @@ class _OptionEditor extends StatelessWidget {
                     alignment: Alignment.center,
                     child: Text(
                       optionLabel,
-                      style: TextStyle(fontWeight: FontWeight.w800),
+                      style: const TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: TextFormField(
                       initialValue: draft.options[index],
@@ -766,7 +765,7 @@ class _OptionEditor extends StatelessWidget {
                               ),
                             );
                           },
-                    icon: Icon(Icons.delete_outline_rounded),
+                    icon: const Icon(Icons.delete_outline_rounded),
                   ),
                 ],
               ),

@@ -88,7 +88,7 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
     ref.read(_aiGeneratingProvider(widget.moduleId).notifier).state = true;
 
     // Simulate AI extraction from materials
-    await Future.delayed(Duration(milliseconds: 1800));
+    await Future.delayed(const Duration(milliseconds: 1800));
 
     if (!mounted) {
       ref.read(_aiGeneratingProvider(widget.moduleId).notifier).state = false;
@@ -100,10 +100,10 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
 
     // Generate AI topics (simulated)
     final aiTopics = [
-      TopicCreateRequest(title: 'Introduction & Overview', source: TopicSource.ai),
-      TopicCreateRequest(title: 'Core Concepts & Terminology', source: TopicSource.ai),
-      TopicCreateRequest(title: 'Practical Applications', source: TopicSource.ai, difficulty: TopicDifficulty.intermediate),
-      TopicCreateRequest(title: 'Advanced Techniques', source: TopicSource.ai, difficulty: TopicDifficulty.advanced),
+      const TopicCreateRequest(title: 'Introduction & Overview', source: TopicSource.ai),
+      const TopicCreateRequest(title: 'Core Concepts & Terminology', source: TopicSource.ai),
+      const TopicCreateRequest(title: 'Practical Applications', source: TopicSource.ai, difficulty: TopicDifficulty.intermediate),
+      const TopicCreateRequest(title: 'Advanced Techniques', source: TopicSource.ai, difficulty: TopicDifficulty.advanced),
     ];
 
     // Only add topics not already present
@@ -133,7 +133,7 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
     if (mounted) {
       AppToast.success(context,
           title: 'AI Topics Generated',
-          message: '${created.length} topics extracted from materials.');
+          message: '${created.length} topics extracted from materials.',);
     }
   }
 
@@ -158,7 +158,7 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
     if (mounted) {
       AppToast.success(context,
           title: 'Topic added',
-          message: '"${topic.title}" created manually.');
+          message: '"${topic.title}" created manually.',);
     }
   }
 
@@ -176,7 +176,7 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
         );
     if (mounted) {
       AppToast.success(context,
-          title: 'Topic updated', message: '"${updated.title}" saved.');
+          title: 'Topic updated', message: '"${updated.title}" saved.',);
     }
   }
 
@@ -185,13 +185,13 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('Delete Topic'),
+        title: const Text('Delete Topic'),
         content: Text('Delete "${t.title}"? This cannot be undone.'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(
               onPressed: () => Navigator.pop(context, true),
-              child: Text('Delete', style: TextStyle(color: AppColors.dangerText))),
+              child: Text('Delete', style: TextStyle(color: AppColors.dangerText)),),
         ],
       ),
     );
@@ -232,30 +232,30 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
               decoration: BoxDecoration(color: _C.blueSoft, borderRadius: BorderRadius.circular(10)),
               child: Icon(Icons.topic_outlined, size: 18, color: _C.blue),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(widget.moduleTitle,
-                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textTitle),),
               Text('${topics.length} topic${topics.length == 1 ? "" : "s"}'
                   '${aiCount > 0 ? " · $aiCount AI" : ""}'
                   '${manualCount > 0 ? " · $manualCount Manual" : ""}',
-                  style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-            ])),
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),),
+            ],),),
             // AI Generate button
             _AiGenerateButton(loading: aiGen, onTap: _generateWithAi),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             // Manual Add button
             FilledButton.icon(
               onPressed: _openAddDialog,
-              icon: Icon(Icons.add, size: 16),
-              label: Text('Add Topic'),
+              icon: const Icon(Icons.add, size: 16),
+              label: const Text('Add Topic'),
               style: FilledButton.styleFrom(
                 backgroundColor: _C.purple,
-                textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               ),
             ),
-          ]),
+          ],),
         ),
 
         // ── Legend row ────────────────────────────────────────────────────────
@@ -268,21 +268,21 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
             _DiffDot(label: 'Beginner', color: _C.green),
             _DiffDot(label: 'Intermediate', color: _C.amber),
             _DiffDot(label: 'Advanced', color: _C.red),
-          ]),
+          ],),
         ),
         Container(height: 1, color: AppColors.border),
 
         // ── Body ─────────────────────────────────────────────────────────────
         Expanded(
           child: loading
-              ? Center(child: CircularProgressIndicator())
+              ? const Center(child: CircularProgressIndicator())
               : aiGen
                   ? _AiLoadingState()
                   : topics.isEmpty
                       ? _EmptyState(onGenerate: _generateWithAi, onAdd: _openAddDialog)
                       : ListView.separated(
                           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-                          separatorBuilder: (_, __) => SizedBox(height: 8),
+                          separatorBuilder: (_, __) => const SizedBox(height: 8),
                           itemCount: topics.length,
                           itemBuilder: (_, i) => _TopicCard(
                             topic: topics[i],
@@ -292,7 +292,7 @@ class _TopicManagementPanelState extends ConsumerState<TopicManagementPanel> {
                           ),
                         ),
         ),
-      ]),
+      ],),
     );
   }
 }
@@ -322,7 +322,7 @@ class _AiGenerateButtonState extends State<_AiGenerateButton> {
       child: GestureDetector(
         onTap: widget.loading ? null : widget.onTap,
         child: AnimatedContainer(
-          duration: Duration(milliseconds: 120),
+          duration: const Duration(milliseconds: 120),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
           decoration: BoxDecoration(
             color: _h && !widget.loading ? _C.blueSoft : AppColors.cardBg,
@@ -337,12 +337,12 @@ class _AiGenerateButtonState extends State<_AiGenerateButton> {
               )
             else
               Icon(Icons.auto_awesome_rounded, size: 15, color: _C.blue),
-            SizedBox(width: 7),
+            const SizedBox(width: 7),
             Text(
               widget.loading ? 'Generating…' : 'Generate with AI',
               style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: _C.blue),
             ),
-          ]),
+          ],),
         ),
       ),
     );
@@ -379,32 +379,32 @@ class _TopicCard extends StatelessWidget {
       ),
       child: Row(children: [
         _SourceBadge(source: topic.source),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(topic.title,
-              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textTitle)),
-          SizedBox(height: 6),
+              style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textTitle),),
+          const SizedBox(height: 6),
           Wrap(spacing: 6, runSpacing: 4, children: [
             _DifficultyChip(difficulty: topic.difficulty),
             if (lo != null) _LoChip(code: lo.code, description: lo.title, difficulty: lo.difficulty),
-          ]),
-        ])),
-        SizedBox(width: 8),
+          ],),
+        ],),),
+        const SizedBox(width: 8),
         IconButton(
-          icon: Icon(Icons.edit_outlined, size: 17),
+          icon: const Icon(Icons.edit_outlined, size: 17),
           color: AppColors.textMuted,
           tooltip: 'Edit',
           onPressed: onEdit,
           visualDensity: VisualDensity.compact,
         ),
         IconButton(
-          icon: Icon(Icons.delete_outline, size: 17),
+          icon: const Icon(Icons.delete_outline, size: 17),
           color: AppColors.dangerText,
           tooltip: 'Delete',
           onPressed: onDelete,
           visualDensity: VisualDensity.compact,
         ),
-      ]),
+      ],),
     );
   }
 }
@@ -460,12 +460,12 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
       Navigator.pop(context, widget.existing!.copyWith(
         title: title, source: _source, difficulty: _difficulty,
         linkedOutcomeId: _linkedOutcomeId?.toString(), updatedAt: DateTime.now(),
-      ));
+      ),);
     } else {
       Navigator.pop(context, TopicCreateRequest(
         title: title, source: _source,
         difficulty: _difficulty, linkedOutcomeId: _linkedOutcomeId?.toString(),
-      ));
+      ),);
     }
   }
 
@@ -478,7 +478,7 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
       backgroundColor: AppColors.cardBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 500),
+        constraints: const BoxConstraints(maxWidth: 500),
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -495,19 +495,19 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
                   size: 18, color: isEdit ? _C.purple : _C.blue,
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(isEdit ? 'Edit Topic' : 'Add Topic Manually',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle),),
                 Text(isEdit ? 'Update topic details.' : 'Add a topic the AI might have missed.',
-                    style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-              ]),
-            ]),
-            SizedBox(height: 22),
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),),
+              ],),
+            ],),
+            const SizedBox(height: 22),
 
             // Topic Name
-            _FieldLabel('Topic Name', required: true),
-            SizedBox(height: 6),
+            const _FieldLabel('Topic Name', required: true),
+            const SizedBox(height: 6),
             TextField(
               controller: _titleCtrl,
               onChanged: (_) { if (_titleError != null) setState(() => _titleError = null); },
@@ -518,61 +518,61 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(9)),
                 focusedBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(9),
-                    borderSide: BorderSide(color: _C.blue, width: 1.5)),
+                    borderSide: BorderSide(color: _C.blue, width: 1.5),),
                 isDense: true,
               ),
             ),
-            SizedBox(height: 18),
+            const SizedBox(height: 18),
 
             // Source
-            _FieldLabel('Source'),
-            SizedBox(height: 8),
+            const _FieldLabel('Source'),
+            const SizedBox(height: 8),
             Row(children: [
               Expanded(child: _RadioChip(
                 label: 'AI Generated', icon: Icons.auto_awesome,
                 selected: _source == TopicSource.ai, selectedColor: _C.blue,
                 onTap: () => setState(() => _source = TopicSource.ai),
-              )),
-              SizedBox(width: 10),
+              ),),
+              const SizedBox(width: 10),
               Expanded(child: _RadioChip(
                 label: 'Manual', icon: Icons.edit_note_rounded,
                 selected: _source == TopicSource.manual, selectedColor: _C.purple,
                 onTap: () => setState(() => _source = TopicSource.manual),
-              )),
-            ]),
-            SizedBox(height: 18),
+              ),),
+            ],),
+            const SizedBox(height: 18),
 
             // Difficulty
-            _FieldLabel('Difficulty Level'),
-            SizedBox(height: 8),
+            const _FieldLabel('Difficulty Level'),
+            const SizedBox(height: 8),
             Row(children: [
               Expanded(child: _DifficultyBtn(
                 label: 'Beginner', color: _C.green,
                 selected: _difficulty == TopicDifficulty.beginner,
                 onTap: () => setState(() => _difficulty = TopicDifficulty.beginner),
-              )),
-              SizedBox(width: 8),
+              ),),
+              const SizedBox(width: 8),
               Expanded(child: _DifficultyBtn(
                 label: 'Intermediate', color: _C.amber,
                 selected: _difficulty == TopicDifficulty.intermediate,
                 onTap: () => setState(() => _difficulty = TopicDifficulty.intermediate),
-              )),
-              SizedBox(width: 8),
+              ),),
+              const SizedBox(width: 8),
               Expanded(child: _DifficultyBtn(
                 label: 'Advanced', color: _C.red,
                 selected: _difficulty == TopicDifficulty.advanced,
                 onTap: () => setState(() => _difficulty = TopicDifficulty.advanced),
-              )),
-            ]),
+              ),),
+            ],),
 
             // Learning Outcome link
             if (widget.outcomes.isNotEmpty) ...[
-              SizedBox(height: 18),
-              _FieldLabel('Link to Learning Outcome'),
-              SizedBox(height: 4),
+              const SizedBox(height: 18),
+              const _FieldLabel('Link to Learning Outcome'),
+              const SizedBox(height: 4),
               Text('Connect this topic to a course learning outcome.',
-                  style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-              SizedBox(height: 8),
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),),
+              const SizedBox(height: 8),
               DropdownButtonFormField<int?>(
                 value: _linkedOutcomeId,
                 decoration: InputDecoration(
@@ -581,42 +581,42 @@ class _TopicEditDialogState extends State<_TopicEditDialog> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(9)),
                   focusedBorder: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(9),
-                      borderSide: BorderSide(color: _C.blue, width: 1.5)),
+                      borderSide: BorderSide(color: _C.blue, width: 1.5),),
                   isDense: true,
                 ),
                 items: [
                   DropdownMenuItem<int?>(
-                      child: Text('— None —', style: TextStyle(color: AppColors.textMuted))),
+                      child: Text('— None —', style: TextStyle(color: AppColors.textMuted)),),
                   ...widget.outcomes.map((o) => DropdownMenuItem<int?>(
                     value: o.id,
                     child: Row(children: [
                       _DiffDotInline(o.difficulty),
-                      SizedBox(width: 8),
+                      const SizedBox(width: 8),
                       Expanded(child: Text('${o.code} – ${o.title}',
-                          overflow: TextOverflow.ellipsis)),
-                    ]),
-                  )),
+                          overflow: TextOverflow.ellipsis,),),
+                    ],),
+                  ),),
                 ],
                 onChanged: (v) => setState(() => _linkedOutcomeId = v),
               ),
             ],
 
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             // Actions
             Row(mainAxisAlignment: MainAxisAlignment.end, children: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: Text('Cancel'),
+                child: const Text('Cancel'),
               ),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               FilledButton(
                 onPressed: _submit,
                 style: FilledButton.styleFrom(backgroundColor: _C.blue),
                 child: Text(isEdit ? 'Save Changes' : 'Add Topic'),
               ),
-            ]),
-          ]),
+            ],),
+          ],),
         ),
       ),
     );
@@ -639,35 +639,35 @@ class _EmptyState extends StatelessWidget {
         decoration: BoxDecoration(color: _C.blueSoft, borderRadius: BorderRadius.circular(16)),
         child: Icon(Icons.topic_outlined, size: 30, color: _C.blue),
       ),
-      SizedBox(height: 16),
+      const SizedBox(height: 16),
       Text('No topics yet',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-      SizedBox(height: 6),
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textTitle),),
+      const SizedBox(height: 6),
       Text(
         'Generate topics automatically from materials,\nor add them manually.',
         textAlign: TextAlign.center,
         style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
       ),
-      SizedBox(height: 20),
+      const SizedBox(height: 20),
       Row(mainAxisSize: MainAxisSize.min, children: [
         FilledButton.icon(
           onPressed: onGenerate,
-          icon: Icon(Icons.auto_awesome_rounded, size: 16),
-          label: Text('Generate with AI'),
+          icon: const Icon(Icons.auto_awesome_rounded, size: 16),
+          label: const Text('Generate with AI'),
           style: FilledButton.styleFrom(backgroundColor: _C.blue),
         ),
-        SizedBox(width: 10),
+        const SizedBox(width: 10),
         OutlinedButton.icon(
           onPressed: onAdd,
-          icon: Icon(Icons.add, size: 16),
-          label: Text('Add Manually'),
+          icon: const Icon(Icons.add, size: 16),
+          label: const Text('Add Manually'),
           style: OutlinedButton.styleFrom(
             foregroundColor: _C.purple,
             side: BorderSide(color: _C.purple),
           ),
         ),
-      ]),
-    ]),
+      ],),
+    ],),
   );
 }
 
@@ -681,13 +681,13 @@ class _AiLoadingState extends StatelessWidget {
         decoration: BoxDecoration(color: _C.blueSoft, borderRadius: BorderRadius.circular(16)),
         child: Icon(Icons.auto_awesome_rounded, size: 30, color: _C.blue),
       ),
-      SizedBox(height: 16),
+      const SizedBox(height: 16),
       Text('AI is analyzing materials…',
-          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-      SizedBox(height: 8),
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: AppColors.textTitle),),
+      const SizedBox(height: 8),
       Text('Extracting topics from course materials.',
-          style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-      SizedBox(height: 20),
+          style: TextStyle(fontSize: 13, color: AppColors.textMuted),),
+      const SizedBox(height: 20),
       SizedBox(
         width: 180,
         child: LinearProgressIndicator(
@@ -696,7 +696,7 @@ class _AiLoadingState extends StatelessWidget {
           minHeight: 4,
         ),
       ),
-    ]),
+    ],),
   );
 }
 
@@ -721,12 +721,12 @@ class _SourceBadge extends StatelessWidget {
       ),
       child: Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(isAi ? Icons.auto_awesome : Icons.edit_note_rounded,
-            size: 12, color: isAi ? _C.blue : _C.purple),
-        SizedBox(width: 4),
+            size: 12, color: isAi ? _C.blue : _C.purple,),
+        const SizedBox(width: 4),
         Text(isAi ? 'AI' : 'Manual',
             style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                color: isAi ? _C.blue : _C.purple)),
-      ]),
+                color: isAi ? _C.blue : _C.purple,),),
+      ],),
     );
   }
 }
@@ -748,7 +748,7 @@ class _DifficultyChip extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
       decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
       child: Text(difficulty.label,
-          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color)),
+          style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: color),),
     );
   }
 }
@@ -779,9 +779,9 @@ class _LoChip extends StatelessWidget {
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
           Container(width: 6, height: 6, decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle)),
-          SizedBox(width: 5),
+          const SizedBox(width: 5),
           Text(code, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.infoText)),
-        ]),
+        ],),
       ),
     );
   }
@@ -810,9 +810,9 @@ class _BadgeLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
     Container(width: 8, height: 8, decoration: BoxDecoration(color: fg, shape: BoxShape.circle)),
-    SizedBox(width: 4),
+    const SizedBox(width: 4),
     Text(label, style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-  ]);
+  ],);
 }
 
 class _DiffDot extends StatelessWidget {
@@ -821,9 +821,9 @@ class _DiffDot extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
     Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
-    SizedBox(width: 4),
+    const SizedBox(width: 4),
     Text(label, style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
-  ]);
+  ],);
 }
 
 class _FieldLabel extends StatelessWidget {
@@ -832,20 +832,20 @@ class _FieldLabel extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Row(children: [
     Text(text, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-    if (required) Text(' *', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.errorDot)),
-  ]);
+    if (required) const Text(' *', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.errorDot)),
+  ],);
 }
 
 class _RadioChip extends StatelessWidget {
   final String label; final IconData icon; final bool selected;
   final Color selectedColor; final VoidCallback onTap;
   const _RadioChip({required this.label, required this.icon, required this.selected,
-      required this.selectedColor, required this.onTap});
+      required this.selectedColor, required this.onTap,});
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: AnimatedContainer(
-      duration: Duration(milliseconds: 120),
+      duration: const Duration(milliseconds: 120),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
         color: selected ? selectedColor.withOpacity(0.08) : AppColors.pageBg,
@@ -854,10 +854,10 @@ class _RadioChip extends StatelessWidget {
       ),
       child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
         Icon(icon, size: 15, color: selected ? selectedColor : AppColors.textMuted),
-        SizedBox(width: 6),
+        const SizedBox(width: 6),
         Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600,
-            color: selected ? selectedColor : AppColors.textMuted)),
-      ]),
+            color: selected ? selectedColor : AppColors.textMuted,),),
+      ],),
     ),
   );
 }
@@ -870,7 +870,7 @@ class _DifficultyBtn extends StatelessWidget {
     child: GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: Duration(milliseconds: 120),
+        duration: const Duration(milliseconds: 120),
         padding: const EdgeInsets.symmetric(vertical: 9),
         decoration: BoxDecoration(
           color: selected ? color.withOpacity(0.08) : AppColors.cardBg,
@@ -879,7 +879,7 @@ class _DifficultyBtn extends StatelessWidget {
         ),
         alignment: Alignment.center,
         child: Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-            color: selected ? color : AppColors.textMuted)),
+            color: selected ? color : AppColors.textMuted,),),
       ),
     ),
   );

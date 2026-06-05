@@ -140,7 +140,7 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
 
   void _onSearchChanged(String value) {
     _searchDebounce?.cancel();
-    _searchDebounce = Timer(Duration(milliseconds: 280), () {
+    _searchDebounce = Timer(const Duration(milliseconds: 280), () {
       if (!mounted) return;
       setState(() {
         _searchText = value;
@@ -210,20 +210,20 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(height: 6),
-                      _Breadcrumb(),
-                      SizedBox(height: 14),
+                      const SizedBox(height: 6),
+                      const _Breadcrumb(),
+                      const SizedBox(height: 14),
                       _HeaderRow(
                         onCreateNewCourse: widget.onCreateNewCourse,
                         onRefresh: widget.onRefresh,
                       ),
-                      SizedBox(height: 18),
+                      const SizedBox(height: 18),
                       _StatsRow(
                         totalCourses: _totalCoursesCached,
                         activeStudents: _activeStudentsTotalCached,
                         pendingInvites: _pendingInvitesTotalCached,
                       ),
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
                       _CoursesFiltersBar(
                         controller: _search,
                         isNarrow: isNarrow,
@@ -239,7 +239,7 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
                         onMoreFilters: () {},
                         onRefresh: widget.onRefresh ?? () {},
                       ),
-                      SizedBox(height: 12),
+                      const SizedBox(height: 12),
                       _ActiveFiltersChips(
                         searchText: _searchText,
                         selectedSemester: selectedSemester,
@@ -271,9 +271,9 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
                           message: widget.errorText!.trim(),
                           onRetry: widget.onRefresh,
                         ),
-                        SizedBox(height: 12),
+                        const SizedBox(height: 12),
                       ],
-                      SizedBox(height: 18),
+                      const SizedBox(height: 18),
                       _CoursesGrid(
                         columns: columns,
                         courses: courses,
@@ -286,7 +286,7 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
                         onArchiveCourse: widget.onArchiveCourse,
                         onDeleteCourse: widget.onDeleteCourse,
                       ),
-                      SizedBox(height: 24),
+                      const SizedBox(height: 24),
                     ],
                   ),
                 ),
@@ -367,16 +367,16 @@ class _CoursesFiltersBar extends StatelessWidget {
     return Container(
       height: isNarrow ? null : 56,
       padding: EdgeInsets.symmetric(
-          horizontal: 16, vertical: isNarrow ? 12 : 0),
+          horizontal: 16, vertical: isNarrow ? 12 : 0,),
       decoration: BoxDecoration(
         color:        Colors.white,
         borderRadius: BorderRadius.circular(12),
         border:       Border.all(color: AppColors.borderGray),
         boxShadow: [
-          BoxShadow(
+          const BoxShadow(
               color: Color(0x08000000),
               blurRadius: 8,
-              offset: Offset(0, 2)),
+              offset: Offset(0, 2),),
         ],
       ),
       child: isNarrow
@@ -384,25 +384,25 @@ class _CoursesFiltersBar extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 search,
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Row(children: [
                   semesterDrop,
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   statusDrop,
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   typeDrop,
-                ]),
+                ],),
               ],
             )
           : Row(children: [
               Expanded(child: search),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               semesterDrop,
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               statusDrop,
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               typeDrop,
-            ]),
+            ],),
     );
   }
 }
@@ -446,14 +446,14 @@ class _ActiveFiltersChips extends StatelessWidget {
     Widget chip(String label, VoidCallback onDeleted) {
       return InputChip(
         label: Text(label,
-            style: TextStyle(
-                fontWeight: FontWeight.w800, fontSize: 12)),
+            style: const TextStyle(
+                fontWeight: FontWeight.w800, fontSize: 12,),),
         onDeleted:       onDeleted,
-        deleteIcon:      Icon(Icons.close_rounded, size: 16),
+        deleteIcon:      const Icon(Icons.close_rounded, size: 16),
         backgroundColor: AppColors.headerBg,
         side:  BorderSide(color: AppColors.border),
         shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(999)),
+            borderRadius: BorderRadius.circular(999),),
       );
     }
 
@@ -474,11 +474,11 @@ class _ActiveFiltersChips extends StatelessWidget {
             chip('Type: $selectedType', onClearType),
           TextButton.icon(
             onPressed: onClearAll,
-            icon:  Icon(Icons.restart_alt_rounded, size: 18),
-            label: Text('Clear all',
-                style: TextStyle(fontWeight: FontWeight.w900)),
+            icon:  const Icon(Icons.restart_alt_rounded, size: 18),
+            label: const Text('Clear all',
+                style: TextStyle(fontWeight: FontWeight.w900),),
             style: TextButton.styleFrom(
-                foregroundColor: _CourseTokens.blue),
+                foregroundColor: _CourseTokens.blue,),
           ),
         ],
       ),
@@ -515,7 +515,7 @@ class _CourseTokens {
 
   static const hoverShadow = [
     BoxShadow(
-        color: Color(0x14000000), blurRadius: 26, offset: Offset(0, 14)),
+        color: Color(0x14000000), blurRadius: 26, offset: Offset(0, 14),),
   ];
 }
 
@@ -529,21 +529,21 @@ class _Breadcrumb extends StatelessWidget {
     return Row(
       children: [
         Icon(Icons.home_rounded, size: 14, color: _CourseTokens.textHint),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Text('Home',
             style: TextStyle(
                 color:      _CourseTokens.textHint,
                 fontSize:   12,
-                fontWeight: FontWeight.w600)),
-        SizedBox(width: 8),
-        Icon(Icons.chevron_right_rounded,
-            size: 16, color: Color(0xFFCBD5E1)),
-        SizedBox(width: 8),
+                fontWeight: FontWeight.w600,),),
+        const SizedBox(width: 8),
+        const Icon(Icons.chevron_right_rounded,
+            size: 16, color: Color(0xFFCBD5E1),),
+        const SizedBox(width: 8),
         Text('Courses Management',
             style: TextStyle(
                 color:      _CourseTokens.textHint,
                 fontSize:   12,
-                fontWeight: FontWeight.w600)),
+                fontWeight: FontWeight.w600,),),
       ],
     );
   }
@@ -570,14 +570,14 @@ class _HeaderRow extends StatelessWidget {
                   fontSize:   30,
                   fontWeight: FontWeight.w900,
                   color:      _CourseTokens.textPrimary,
-                  height:     1.05)),
-          SizedBox(height: 6),
+                  height:     1.05,),),
+          const SizedBox(height: 6),
           Text(
               'Manage your curriculum, AI assessments, and student cohorts.',
               style: TextStyle(
                   color:      _CourseTokens.textMuted,
                   fontSize:   13.2,
-                  fontWeight: FontWeight.w600)),
+                  fontWeight: FontWeight.w600,),),
         ],
       );
 
@@ -588,7 +588,7 @@ class _HeaderRow extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             left,
-            SizedBox(height: 14),
+            const SizedBox(height: 14),
             Align(alignment: Alignment.centerLeft, child: btn),
           ],
         );
@@ -596,10 +596,10 @@ class _HeaderRow extends StatelessWidget {
 
       return Row(children: [
         Expanded(child: left),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         btn,
-      ]);
-    });
+      ],);
+    },);
   }
 }
 
@@ -620,30 +620,30 @@ class _PrimaryButtonState extends State<_PrimaryButton> {
       onEnter: (_) => setState(() => hover = true),
       onExit:  (_) => setState(() => hover = false),
       child: AnimatedContainer(
-        duration: Duration(milliseconds: 140),
+        duration: const Duration(milliseconds: 140),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10),
           boxShadow: hover ? _CourseTokens.hoverShadow : [],
         ),
         child: ElevatedButton.icon(
           onPressed: widget.onPressed,
-          icon:  Icon(Icons.add, size: 18, color: Colors.white),
-          label: Text('Create New Course',
+          icon:  const Icon(Icons.add, size: 18, color: Colors.white),
+          label: const Text('Create New Course',
               style: TextStyle(
                   height: 1.0,
                   leadingDistribution: TextLeadingDistribution.even,
                   fontSize:   12.6,
                   fontWeight: FontWeight.w800,
-                  color:      Colors.white)),
+                  color:      Colors.white,),),
           style: ElevatedButton.styleFrom(
             alignment: Alignment.center,
             backgroundColor: _CourseTokens.blue,
             elevation:   0,
             shadowColor: Colors.transparent,
             padding: const EdgeInsets.symmetric(
-                horizontal: 16, vertical: 12),
+                horizontal: 16, vertical: 12,),
             shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10)),
+                borderRadius: BorderRadius.circular(10),),
           ),
         ),
       ),
@@ -674,22 +674,22 @@ class _StatsRow extends StatelessWidget {
           title:     'TOTAL COURSES',
           value:     totalCourses.toString(),
           icon:      Icons.folder_outlined,
-          iconBg:    Color(0xFFEAF2FF),
+          iconBg:    const Color(0xFFEAF2FF),
           iconColor: AppColors.primary,
         ),
         _MiniStatCard(
           title:     'ACTIVE STUDENTS',
           value:     activeStudents.toString(),
           icon:      Icons.people_outline_rounded,
-          iconBg:    Color(0xFFE9FBF1),
+          iconBg:    const Color(0xFFE9FBF1),
           iconColor: AppColors.successText,
         ),
         _MiniStatCard(
           title:     'PENDING INVITES',
           value:     pendingInvites.toString(),
           icon:      Icons.mail_outline_rounded,
-          iconBg:    Color(0xFFFFF4DB),
-          iconColor: Color(0xFFF59E0B),
+          iconBg:    const Color(0xFFFFF4DB),
+          iconColor: const Color(0xFFF59E0B),
         ),
       ];
 
@@ -698,18 +698,18 @@ class _StatsRow extends StatelessWidget {
           Expanded(
               child: SizedBox(
                   height: _CourseTokens.statCardHeight,
-                  child: cards[0])),
-          SizedBox(width: 16),
+                  child: cards[0],),),
+          const SizedBox(width: 16),
           Expanded(
               child: SizedBox(
                   height: _CourseTokens.statCardHeight,
-                  child: cards[1])),
-          SizedBox(width: 16),
+                  child: cards[1],),),
+          const SizedBox(width: 16),
           Expanded(
               child: SizedBox(
                   height: _CourseTokens.statCardHeight,
-                  child: cards[2])),
-        ]);
+                  child: cards[2],),),
+        ],);
       }
 
       return Wrap(
@@ -719,10 +719,10 @@ class _StatsRow extends StatelessWidget {
             .map((w) => SizedBox(
                 width:  (c.maxWidth - 16) / 2,
                 height: _CourseTokens.statCardHeight,
-                child:  w))
+                child:  w,),)
             .toList(),
       );
-    });
+    },);
   }
 }
 
@@ -755,14 +755,14 @@ class _MiniStatCard extends StatelessWidget {
                       color:         _CourseTokens.textHint,
                       fontSize:      10.4,
                       fontWeight:    FontWeight.w800,
-                      letterSpacing: 0.35)),
-              SizedBox(height: 8),
+                      letterSpacing: 0.35,),),
+              const SizedBox(height: 8),
               Text(value,
                   style: TextStyle(
                       color:      _CourseTokens.textPrimary,
                       fontSize:   24,
                       fontWeight: FontWeight.w900,
-                      height:     1.0)),
+                      height:     1.0,),),
             ],
           ),
         ),
@@ -775,7 +775,7 @@ class _MiniStatCard extends StatelessWidget {
           ),
           child: Icon(icon, size: 18, color: iconColor),
         ),
-      ]),
+      ],),
     );
   }
 }
@@ -811,7 +811,7 @@ class _CoursesGrid extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading && courses.isEmpty) {
-      return Padding(
+      return const Padding(
         padding: EdgeInsets.only(top: 16),
         child:   _CoursesGridSkeleton(),
       );
@@ -846,7 +846,7 @@ class _CoursesGrid extends StatelessWidget {
           );
         }).toList(),
       );
-    });
+    },);
   }
 }
 
@@ -872,11 +872,11 @@ class _CoursesGridSkeleton extends StatelessWidget {
           return SizedBox(
             width:  cardW,
             height: _CourseTokens.courseCardHeight,
-            child:  _SkeletonCard(),
+            child:  const _SkeletonCard(),
           );
         }),
       );
-    });
+    },);
   }
 }
 
@@ -888,48 +888,48 @@ class _NoResultsState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        constraints: BoxConstraints(maxWidth: 520),
+        constraints: const BoxConstraints(maxWidth: 520),
         padding:     const EdgeInsets.all(22),
         decoration: BoxDecoration(
           color:        Colors.white,
           borderRadius: BorderRadius.circular(16),
           border:       Border.all(color: AppColors.border),
           boxShadow: [
-            BoxShadow(
+            const BoxShadow(
                 color:      Color(0x0D000000),
                 blurRadius: 2,
-                offset:     Offset(0, 1)),
+                offset:     Offset(0, 1),),
           ],
         ),
         child: Column(mainAxisSize: MainAxisSize.min, children: [
-          Icon(Icons.search_off_rounded,
-              size: 34, color: AppColors.primary),
-          SizedBox(height: 10),
+          const Icon(Icons.search_off_rounded,
+              size: 34, color: AppColors.primary,),
+          const SizedBox(height: 10),
           Text('No results match your filters',
               style: TextStyle(
                   fontSize:   18,
                   fontWeight: FontWeight.w900,
-                  color:      AppColors.textTitle),
-              textAlign: TextAlign.center),
-          SizedBox(height: 8),
+                  color:      AppColors.textTitle,),
+              textAlign: TextAlign.center,),
+          const SizedBox(height: 8),
           Text(
               'Try clearing filters or searching with a different keyword.',
               style:     TextStyle(color: AppColors.textMuted),
-              textAlign: TextAlign.center),
-          SizedBox(height: 14),
+              textAlign: TextAlign.center,),
+          const SizedBox(height: 14),
           if (onClear != null)
             ElevatedButton.icon(
               onPressed: onClear,
-              icon:  Icon(Icons.filter_alt_off_rounded, size: 18),
-              label: Text('Clear filters'),
+              icon:  const Icon(Icons.filter_alt_off_rounded, size: 18),
+              label: const Text('Clear filters'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                    borderRadius: BorderRadius.circular(12),),
               ),
             ),
-        ]),
+        ],),
       ),
     );
   }
@@ -943,7 +943,7 @@ class _CoursesEmptyState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 520),
+        constraints: const BoxConstraints(maxWidth: 520),
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
@@ -951,10 +951,10 @@ class _CoursesEmptyState extends StatelessWidget {
             borderRadius: BorderRadius.circular(14),
             border:       Border.all(color: _CourseTokens.border),
             boxShadow: [
-              BoxShadow(
+              const BoxShadow(
                   color:      Color(0x0D000000),
                   blurRadius: 2,
-                  offset:     Offset(0, 1)),
+                  offset:     Offset(0, 1),),
             ],
           ),
           child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -962,19 +962,19 @@ class _CoursesEmptyState extends StatelessWidget {
               width:  54,
               height: 54,
               decoration: BoxDecoration(
-                color:        Color(0xFFEAF2FF),
+                color:        const Color(0xFFEAF2FF),
                 borderRadius: BorderRadius.circular(16),
               ),
               child: Icon(Icons.folder_open_rounded,
-                  color: _CourseTokens.blue, size: 28),
+                  color: _CourseTokens.blue, size: 28,),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text('No courses yet',
                 style: TextStyle(
                     fontSize:   16,
                     fontWeight: FontWeight.w900,
-                    color:      _CourseTokens.textPrimary)),
-            SizedBox(height: 6),
+                    color:      _CourseTokens.textPrimary,),),
+            const SizedBox(height: 6),
             Text(
                 'Create your first course to start uploading materials, generating AI quizzes, and inviting students.',
                 textAlign: TextAlign.center,
@@ -982,28 +982,28 @@ class _CoursesEmptyState extends StatelessWidget {
                     fontSize:   12.8,
                     fontWeight: FontWeight.w600,
                     color:      _CourseTokens.textMuted,
-                    height:     1.35)),
-            SizedBox(height: 14),
+                    height:     1.35,),),
+            const SizedBox(height: 14),
             SizedBox(
               height: 40,
               child: ElevatedButton.icon(
                 onPressed: onCreate,
-                icon:  Icon(Icons.add_rounded,
-                    size: 18, color: Colors.white),
-                label: Text('Create course',
+                icon:  const Icon(Icons.add_rounded,
+                    size: 18, color: Colors.white,),
+                label: const Text('Create course',
                     style: TextStyle(
                         fontWeight: FontWeight.w900,
-                        color:      Colors.white)),
+                        color:      Colors.white,),),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: _CourseTokens.blue,
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 14),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),),
                 ),
               ),
             ),
-          ]),
+          ],),
         ),
       ),
     );
@@ -1028,7 +1028,7 @@ class _SkeletonCardState extends State<_SkeletonCard>
     super.initState();
     _c = AnimationController(
         vsync:    this,
-        duration: Duration(milliseconds: 1100))
+        duration: const Duration(milliseconds: 1100),)
       ..repeat(reverse: true);
   }
 
@@ -1046,7 +1046,7 @@ class _SkeletonCardState extends State<_SkeletonCard>
         final color = Color.lerp(
             AppColors.borderGray,
             AppColors.headerBg,
-            _c.value)!;
+            _c.value,)!;
 
         return Container(
           decoration: BoxDecoration(
@@ -1060,7 +1060,7 @@ class _SkeletonCardState extends State<_SkeletonCard>
               decoration: BoxDecoration(
                 color: color,
                 borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(_CourseTokens.radiusCard)),
+                    top: Radius.circular(_CourseTokens.radiusCard),),
               ),
             ),
             Expanded(
@@ -1074,44 +1074,44 @@ class _SkeletonCardState extends State<_SkeletonCard>
                         width:  double.infinity,
                         decoration: BoxDecoration(
                             color: color,
-                            borderRadius: BorderRadius.circular(6))),
-                    SizedBox(height: 10),
+                            borderRadius: BorderRadius.circular(6),),),
+                    const SizedBox(height: 10),
                     Container(
                         height: 14,
                         width:  160,
                         decoration: BoxDecoration(
                             color: color,
-                            borderRadius: BorderRadius.circular(6))),
-                    SizedBox(height: 18),
+                            borderRadius: BorderRadius.circular(6),),),
+                    const SizedBox(height: 18),
                     Row(children: [
                       Container(
                           height: 12,
                           width:  90,
                           decoration: BoxDecoration(
                               color: color,
-                              borderRadius: BorderRadius.circular(6))),
-                      SizedBox(width: 12),
+                              borderRadius: BorderRadius.circular(6),),),
+                      const SizedBox(width: 12),
                       Container(
                           height: 12,
                           width:  90,
                           decoration: BoxDecoration(
                               color: color,
-                              borderRadius: BorderRadius.circular(6))),
-                    ]),
-                    Spacer(),
+                              borderRadius: BorderRadius.circular(6),),),
+                    ],),
+                    const Spacer(),
                     Container(height: 1, color: _CourseTokens.divider),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Container(
                         height: 12,
                         width:  140,
                         decoration: BoxDecoration(
                             color: color,
-                            borderRadius: BorderRadius.circular(6))),
+                            borderRadius: BorderRadius.circular(6),),),
                   ],
                 ),
               ),
             ),
-          ]),
+          ],),
         );
       },
     );
@@ -1224,6 +1224,14 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
         context.go(Routes.courseMaterials(slug));
         return;
       case 'invite':
+        if (c.isPublic) {
+          AppToast.warning(
+            context,
+            title: 'Invitations unavailable',
+            message: 'This course is open for enrollment, so it does not use private invitations.',
+          );
+          return;
+        }
         await showDialog<bool>(
           context: context,
           builder: (_) => InviteStudentsDialog(courseId: c.id),
@@ -1247,7 +1255,7 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
       AppToast.warning(
         context,
         title: 'Unavailable',
-        message: 'Course editing is not connected yet.',
+        message: 'The current backend exposes create, list, materials, and invitations only. Course update is not available.',
       );
       return;
     }
@@ -1284,7 +1292,7 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
       AppToast.warning(
         context,
         title: 'Unavailable',
-        message: 'Course archiving is not connected yet.',
+        message: 'The current backend does not expose a course archive/update endpoint.',
       );
       return;
     }
@@ -1327,7 +1335,7 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
       AppToast.warning(
         context,
         title: 'Unavailable',
-        message: 'Course deletion is not connected yet.',
+        message: 'The current backend does not expose a course delete endpoint.',
       );
       return;
     }
@@ -1374,15 +1382,15 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
     final isArchived = lifecycleStatus == CourseLifecycleStatus.archived;
     final statusLabel = lifecycleStatus.label;
     final statusBg = isActive
-        ? Color(0xE616A34A)
+        ? const Color(0xE616A34A)
         : (isDraft
-            ? Color(0xE5F59E0B)
-            : Color(0xBF64748B));
+            ? const Color(0xE5F59E0B)
+            : const Color(0xBF64748B));
     final heroGradient = isDraft
-        ? LinearGradient(colors: [AppColors.textTitle, Color(0xFF1E293B)])
+        ? LinearGradient(colors: [AppColors.textTitle, const Color(0xFF1E293B)])
         : (isArchived
             ? LinearGradient(colors: [AppColors.textHint, AppColors.textGray500])
-            : LinearGradient(colors: [Color(0xFF134E4A), Color(0xFF0891B2)]));
+            : const LinearGradient(colors: [Color(0xFF134E4A), Color(0xFF0891B2)]));
     final enrollCount = widget.course.enrollmentCount ?? 0;
     final modulesCount = widget.course.moduleCount ?? 0;
     final code = (widget.course.courseCode?.isNotEmpty ?? false) ? widget.course.courseCode! : '—';
@@ -1394,7 +1402,7 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
     onEnter: (_) => setState(() => hover = true),
     onExit: (_) => setState(() => hover = false),
     child: AnimatedContainer(
-      duration: Duration(milliseconds: 150),
+      duration: const Duration(milliseconds: 150),
       curve: Curves.easeOut,
       transform: hover ? (Matrix4.identity()..translate(0.0, -1.0)) : Matrix4.identity(),
       decoration: BoxDecoration(
@@ -1406,12 +1414,12 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
         ),
         boxShadow: [
           if (hover)
-            BoxShadow(color: Color(0x14137FEC), blurRadius: 28, offset: Offset(0, 10))
+            const BoxShadow(color: Color(0x14137FEC), blurRadius: 28, offset: Offset(0, 10))
           else
-            BoxShadow(color: Color(0x0C000000), blurRadius: 10, offset: Offset(0, 3)),
+            const BoxShadow(color: Color(0x0C000000), blurRadius: 10, offset: Offset(0, 3)),
         ],
       ),
-      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
         borderRadius: BorderRadius.circular(12),
         onTap: () {
           final slug = buildCourseRouteSlug(widget.course);
@@ -1451,7 +1459,7 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                         decoration: BoxDecoration(
-                          color: Color(0xE6FFFFFF),
+                          color: const Color(0xE6FFFFFF),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -1481,10 +1489,10 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
                               size: 12,
                               color: Colors.white,
                             ),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             Text(
                               statusLabel,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
@@ -1515,7 +1523,7 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
                         color: AppColors.textTitle,
                       ),
                     ),
-                    SizedBox(height: 4),
+                    const SizedBox(height: 4),
                     Text(
                       meta,
                       maxLines: 1,
@@ -1526,26 +1534,26 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
                         color: AppColors.muted,
                       ),
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Row(
                       children: [
                         _CourseStat(icon: Icons.groups_rounded, label: '$enrollCount Students'),
-                        SizedBox(width: 14),
+                        const SizedBox(width: 14),
                         _CourseStat(icon: Icons.grid_view_rounded, label: '$modulesCount Modules'),
                       ],
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Container(height: 1, color: AppColors.divider),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         // Avatar stack (mocked, but matches HTML look)
-                        _AvatarStack(),
-                        Spacer(),
+                        const _AvatarStack(),
+                        const Spacer(),
                         Row(
                           children: [
                             _IconBtnSm(icon: Icons.schedule_rounded, onTap: () {}),
-                            SizedBox(width: 4),
+                            const SizedBox(width: 4),
                             _IconBtnSm(
                               key: _moreKey,
                               icon: Icons.more_horiz_rounded,
@@ -1669,8 +1677,8 @@ class _EditCourseDialogState extends State<_EditCourseDialog> {
                         color: AppColors.primarySoft,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Icon(Icons.edit_rounded,
-                          color: AppColors.primary, size: 20),
+                      child: const Icon(Icons.edit_rounded,
+                          color: AppColors.primary, size: 20,),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -1711,7 +1719,7 @@ class _EditCourseDialogState extends State<_EditCourseDialog> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _EditCourseLabel('Course title'),
+                      const _EditCourseLabel('Course title'),
                       const SizedBox(height: 6),
                       _EditCourseTextField(
                         controller: _titleCtrl,
@@ -1725,7 +1733,7 @@ class _EditCourseDialogState extends State<_EditCourseDialog> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _EditCourseLabel('Course code'),
+                                const _EditCourseLabel('Course code'),
                                 const SizedBox(height: 6),
                                 _EditCourseTextField(
                                   controller: _codeCtrl,
@@ -1740,7 +1748,7 @@ class _EditCourseDialogState extends State<_EditCourseDialog> {
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _EditCourseLabel('Category'),
+                                const _EditCourseLabel('Category'),
                                 const SizedBox(height: 6),
                                 _EditCourseTextField(
                                   controller: _categoryCtrl,
@@ -1791,7 +1799,7 @@ class _EditCourseDialogState extends State<_EditCourseDialog> {
                       const SizedBox(height: 10),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
+                            horizontal: 12, vertical: 10,),
                         decoration: BoxDecoration(
                           color: AppColors.surfaceBg,
                           borderRadius: BorderRadius.circular(12),
@@ -1826,7 +1834,7 @@ class _EditCourseDialogState extends State<_EditCourseDialog> {
                             Switch(
                               value: _approvalRequired,
                               onChanged: (value) => setState(
-                                  () => _approvalRequired = value),
+                                  () => _approvalRequired = value,),
                             ),
                           ],
                         ),
@@ -1910,7 +1918,7 @@ class _EditCourseTextField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.primary, width: 1.4),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
         ),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
@@ -1961,7 +1969,7 @@ class _EditCourseDropdown extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: BorderSide(color: AppColors.primary, width: 1.4),
+              borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
             ),
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
@@ -2098,7 +2106,7 @@ class _CourseStat extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         Icon(icon, size: 16, color: AppColors.muted),
-        SizedBox(width: 6),
+        const SizedBox(width: 6),
         Text(
           label,
           style: TextStyle(
@@ -2124,7 +2132,7 @@ class _AvatarStack extends StatelessWidget {
         children: [
           _AvatarDot(left: 0,  bg: AppColors.border),
           _AvatarDot(left: 16, bg: AppColors.badgeBlueBg),
-          _AvatarDot(left: 32, bg: Color(0xFFE9FBF1)),
+          const _AvatarDot(left: 32, bg: Color(0xFFE9FBF1)),
         ],
       ),
     );
@@ -2173,11 +2181,11 @@ class _IconBtnSmState extends State<_IconBtnSm> {
     return MouseRegion(
       onEnter: (_) => setState(() => hover = true),
       onExit: (_) => setState(() => hover = false),
-      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
         onTap: widget.onTap,
         borderRadius: BorderRadius.circular(10),
         child: AnimatedContainer(
-          duration: Duration(milliseconds: 120),
+          duration: const Duration(milliseconds: 120),
           width: 30,
           height: 30,
           decoration: BoxDecoration(
@@ -2216,7 +2224,7 @@ class _ApiHero extends StatelessWidget {
     final statusColor = status == _CourseStatus.active
         ? AppColors.successText
         : status == _CourseStatus.draft
-            ? Color(0xFFF59E0B)
+            ? const Color(0xFFF59E0B)
             : AppColors.textMuted;
 
     return Stack(
@@ -2226,9 +2234,9 @@ class _ApiHero extends StatelessWidget {
             fit:             BoxFit.cover,
             gaplessPlayback: true,
             errorBuilder:    (_, __, ___) =>
-                Container(color: Color(0xFFEFF2F6)))
+                Container(color: const Color(0xFFEFF2F6)),)
       else
-        Container(color: Color(0xFFEFF2F6)),
+        Container(color: const Color(0xFFEFF2F6)),
 
       const Positioned.fill(
         child: DecoratedBox(
@@ -2249,7 +2257,7 @@ class _ApiHero extends StatelessWidget {
           borderRadius: BorderRadius.circular(4),
           child: Container(
               padding: const EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 4.5),
+                  horizontal: 8, vertical: 4.5,),
               color: Colors.white.withValues(alpha: 0.90),
               child: Text(code,
                   style: TextStyle(
@@ -2257,7 +2265,7 @@ class _ApiHero extends StatelessWidget {
                       fontWeight:  FontWeight.w700,
                       fontSize:    12,
                       height:      1.33,
-                      color:       _CourseTokens.textPrimary)),
+                      color:       _CourseTokens.textPrimary,),),
             ),
           ),
         ),
@@ -2270,7 +2278,7 @@ class _ApiHero extends StatelessWidget {
           borderRadius: BorderRadius.circular(9999),
           child: Container(
               padding: const EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 4),
+                  horizontal: 8, vertical: 4,),
               color: statusColor.withValues(alpha: 0.90),
               child: Row(mainAxisSize: MainAxisSize.min, children: [
                 Icon(
@@ -2282,19 +2290,19 @@ class _ApiHero extends StatelessWidget {
                   size:  14,
                   color: Colors.white,
                 ),
-                SizedBox(width: 4),
+                const SizedBox(width: 4),
                 Text(statusLabel,
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontFamily:  'Inter',
                         fontWeight:  FontWeight.w700,
                         fontSize:    12,
                         height:      1.33,
-                        color:       Colors.white)),
-              ]),
+                        color:       Colors.white,),),
+              ],),
             ),
           ),
         ),
-      ]
+      ],
     );
   }
 }
@@ -2346,8 +2354,8 @@ class _ApiBody extends StatelessWidget {
                   fontWeight:  FontWeight.w700,
                   fontSize:    18,
                   height:      1.2,
-                  color:       _CourseTokens.textPrimary)),
-          SizedBox(height: 4),
+                  color:       _CourseTokens.textPrimary,),),
+          const SizedBox(height: 4),
           Text(meta.isEmpty ? '—' : meta,
               maxLines:  1,
               overflow:  TextOverflow.ellipsis,
@@ -2355,33 +2363,33 @@ class _ApiBody extends StatelessWidget {
                   fontFamily:  'Inter',
                   fontWeight:  FontWeight.w400,
                   fontSize:    14,
-                  color:       _CourseTokens.textMuted)),
-          SizedBox(height: 10),
+                  color:       _CourseTokens.textMuted,),),
+          const SizedBox(height: 10),
           Row(children: [
             Icon(Icons.people_outline,
-                size: 18, color: _CourseTokens.textMuted),
-            SizedBox(width: 6),
+                size: 18, color: _CourseTokens.textMuted,),
+            const SizedBox(width: 6),
             Text('$students Students',
                 style: TextStyle(
                     fontFamily:  'Inter',
                     fontWeight:  FontWeight.w400,
                     fontSize:    14,
-                    color:       _CourseTokens.textMuted)),
-            SizedBox(width: 14),
+                    color:       _CourseTokens.textMuted,),),
+            const SizedBox(width: 14),
             Icon(Icons.menu_book_outlined,
-                size: 18, color: _CourseTokens.textMuted),
-            SizedBox(width: 6),
+                size: 18, color: _CourseTokens.textMuted,),
+            const SizedBox(width: 6),
             Text('$modules Modules',
                 style: TextStyle(
                     fontFamily:  'Inter',
                     fontWeight:  FontWeight.w400,
                     fontSize:    14,
-                    color:       _CourseTokens.textMuted)),
-          ]),
-          Spacer(),
+                    color:       _CourseTokens.textMuted,),),
+          ],),
+          const Spacer(),
           Divider(
-              height: 1, thickness: 1, color: _CourseTokens.divider),
-          SizedBox(height: 10),
+              height: 1, thickness: 1, color: _CourseTokens.divider,),
+          const SizedBox(height: 10),
           SizedBox(
             height: 34,
             child: Row(children: [
@@ -2391,17 +2399,17 @@ class _ApiBody extends StatelessWidget {
                   child: showPeople
                       ? _PeopleFooter(memberCountText: memberCountText)
                       : _NoteFooter(
-                          text: 'Updated ${_fmtDate(updatedAt)}'),
+                          text: 'Updated ${_fmtDate(updatedAt)}',),
                 ),
               ),
               _IconActionButton(
-                  icon: Icons.work_outline_rounded, onTap: onWorkTap),
-              SizedBox(width: 6),
+                  icon: Icons.work_outline_rounded, onTap: onWorkTap,),
+              const SizedBox(width: 6),
               _IconActionButton(
                   key:  moreKey,
                   icon: Icons.more_vert_rounded,
-                  onTap: onMoreTap),
-            ]),
+                  onTap: onMoreTap,),
+            ],),
           ),
         ],
       ),
@@ -2418,12 +2426,12 @@ class _PeopleFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(mainAxisSize: MainAxisSize.min, children: [
-      _AvatarStackSmall(),
+      const _AvatarStackSmall(),
       if (memberCountText.trim().isNotEmpty) ...[
-        SizedBox(width: 10),
+        const SizedBox(width: 10),
         Container(
           padding: const EdgeInsets.symmetric(
-              horizontal: 10, vertical: 6),
+              horizontal: 10, vertical: 6,),
           decoration: BoxDecoration(
             color:        AppColors.headerBg,
             borderRadius: BorderRadius.circular(999),
@@ -2434,10 +2442,10 @@ class _PeopleFooter extends StatelessWidget {
                   fontFamily:  'Inter',
                   fontWeight:  FontWeight.w600,
                   fontSize:    12,
-                  color:       _CourseTokens.textMuted)),
+                  color:       _CourseTokens.textMuted,),),
         ),
       ],
-    ]);
+    ],);
   }
 }
 
@@ -2454,7 +2462,7 @@ class _NoteFooter extends StatelessWidget {
             fontFamily:  'Inter',
             fontWeight:  FontWeight.w500,
             fontSize:    12,
-            color:       _CourseTokens.textMuted));
+            color:       _CourseTokens.textMuted,),);
   }
 }
 
@@ -2468,7 +2476,7 @@ class _AvatarStackSmall extends StatelessWidget {
       child: Stack(children: [
         _a(0,  AppColors.border),
         _a(16, AppColors.badgeBlueBg),
-      ]),
+      ],),
     );
   }
 
@@ -2483,7 +2491,7 @@ class _AvatarStackSmall extends StatelessWidget {
           color:  bg,
         ),
         child: Icon(Icons.person,
-            size: 14, color: AppColors.textMuted),
+            size: 14, color: AppColors.textMuted,),
       ),
     );
   }
@@ -2515,14 +2523,14 @@ class _IconActionButtonState extends State<_IconActionButton> {
     return MouseRegion(
       onEnter: (_) => setState(() => hover = true),
       onExit:  (_) => setState(() => hover = false),
-      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
         onTap: widget.onTap,
         onTapDown: widget.onTapDown == null
             ? null
             : (d) => widget.onTapDown!(d.globalPosition),
         borderRadius: BorderRadius.circular(10),
         child: AnimatedContainer(
-          duration: Duration(milliseconds: 140),
+          duration: const Duration(milliseconds: 140),
           width:  34, height: 34,
           decoration: BoxDecoration(
             color: hover
@@ -2531,7 +2539,7 @@ class _IconActionButtonState extends State<_IconActionButton> {
             borderRadius: BorderRadius.circular(10),
           ),
           child: Icon(widget.icon,
-              size: 18, color: _CourseTokens.textMuted),
+              size: 18, color: _CourseTokens.textMuted,),
         ),
       ),
     );
@@ -2574,31 +2582,31 @@ class _InlineErrorBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color:        Color(0xFFFFFBEB),
+        color:        const Color(0xFFFFFBEB),
         borderRadius: BorderRadius.circular(14),
-        border:       Border.all(color: Color(0xFFFDE68A)),
+        border:       Border.all(color: const Color(0xFFFDE68A)),
       ),
       child: Row(children: [
-        Icon(Icons.warning_rounded, color: Color(0xFFB45309)),
-        SizedBox(width: 10),
+        const Icon(Icons.warning_rounded, color: Color(0xFFB45309)),
+        const SizedBox(width: 10),
         Expanded(
           child: Text(message,
-              style: TextStyle(
+              style: const TextStyle(
                   color:      Color(0xFF92400E),
-                  fontWeight: FontWeight.w700),
+                  fontWeight: FontWeight.w700,),
               maxLines:  2,
-              overflow:  TextOverflow.ellipsis),
+              overflow:  TextOverflow.ellipsis,),
         ),
-        SizedBox(width: 10),
+        const SizedBox(width: 10),
         if (onRetry != null)
           TextButton.icon(
             onPressed: onRetry,
-            icon:  Icon(Icons.refresh_rounded, size: 18),
-            label: Text('Retry'),
+            icon:  const Icon(Icons.refresh_rounded, size: 18),
+            label: const Text('Retry'),
             style: TextButton.styleFrom(
-                foregroundColor: Color(0xFF92400E)),
+                foregroundColor: const Color(0xFF92400E),),
           ),
-      ]),
+      ],),
     );
   }
 }
@@ -2614,14 +2622,14 @@ class _MenuItemRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(children: [
-      Icon(icon, size: 18, color: Color(0xFF334155)),
-      SizedBox(width: 10),
+      Icon(icon, size: 18, color: const Color(0xFF334155)),
+      const SizedBox(width: 10),
       Text(text,
           style: TextStyle(
               fontWeight: FontWeight.w700,
               fontSize:   13.5,
-              color:      AppColors.textTitle)),
-    ]);
+              color:      AppColors.textTitle,),),
+    ],);
   }
 }
 

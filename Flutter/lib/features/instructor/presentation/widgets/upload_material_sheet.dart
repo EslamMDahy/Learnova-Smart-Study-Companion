@@ -75,7 +75,7 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
     super.initState();
     _pulseCtrl = AnimationController(
       vsync: this,
-      duration: Duration(seconds: 2),
+      duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
     _pulse = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
   }
@@ -89,7 +89,6 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
   Future<void> _browse() async {
     final files = await pickBrowserFiles(
       acceptedExtensions: ['pdf'],
-      multiple: true,
     );
     for (final file in files) {
       _queuePickedFile(file);
@@ -105,7 +104,7 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
         bytes: file.bytes,
         status: valid ? _FileStatus.ready : _FileStatus.error,
         errorMsg: valid ? null : 'Only PDF files are supported right now, up to 50 MB',
-      ));
+      ),);
     });
   }
 
@@ -161,12 +160,12 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
               BoxShadow(
                 color: AppColors.primary.withOpacity(0.12),
                 blurRadius: 80,
-                offset: Offset(0, 24),
+                offset: const Offset(0, 24),
               ),
               BoxShadow(
                 color: Colors.black.withOpacity(0.18),
                 blurRadius: 40,
-                offset: Offset(0, 8),
+                offset: const Offset(0, 8),
               ),
             ],
           ),
@@ -199,10 +198,10 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
                   onSave: readyCount > 0 ? _save : null,
                 ),
               ),
-            ]),
+            ],),
           ),
         );
-      }),
+      },),
     );
   }
 }
@@ -233,7 +232,7 @@ class _LeftPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -282,30 +281,30 @@ class _LeftPanel extends StatelessWidget {
                     color: AppColors.primary.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                        color: AppColors.primary.withOpacity(0.4)),
+                        color: AppColors.primary.withOpacity(0.4),),
                   ),
                   child: Icon(Icons.upload_file_rounded,
-                      size: 20, color: AppColors.infoText),
+                      size: 20, color: AppColors.infoText,),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text('Upload Materials',
                       style: TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: AppColors.infoText,
-                          letterSpacing: 0.5)),
+                          letterSpacing: 0.5,),),
                   Text('→ $moduleTitle',
                       style: TextStyle(
                           fontSize: 11,
-                          color: Colors.white.withOpacity(0.4))),
-                ]),
-              ]),
+                          color: Colors.white.withOpacity(0.4),),),
+                ],),
+              ],),
 
-              SizedBox(height: 36),
+              const SizedBox(height: 36),
 
               // Big headline
-              Text(
+              const Text(
                 'Drop your\nPDFs here.',
                 style: TextStyle(
                   fontSize: 38,
@@ -315,15 +314,15 @@ class _LeftPanel extends StatelessWidget {
                   letterSpacing: -1.0,
                 ),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Text(
                 'PDF only  ·  Max 50 MB',
                 style: TextStyle(
                     fontSize: 13,
-                    color: Colors.white.withOpacity(0.45)),
+                    color: Colors.white.withOpacity(0.45),),
               ),
 
-              SizedBox(height: 40),
+              const SizedBox(height: 40),
 
               // Drop zone box
               Expanded(
@@ -335,7 +334,7 @@ class _LeftPanel extends StatelessWidget {
                     child: AnimatedBuilder(
                       animation: pulse,
                       builder: (_, __) => AnimatedContainer(
-                        duration: Duration(milliseconds: 200),
+                        duration: const Duration(milliseconds: 200),
                         width: double.infinity,
                         decoration: BoxDecoration(
                           color: hovering
@@ -383,7 +382,7 @@ class _LeftPanel extends StatelessWidget {
                                 ),
                               ),
                             ),
-                            SizedBox(height: 20),
+                            const SizedBox(height: 20),
                             Text(
                               hovering
                                   ? 'Release to add PDFs'
@@ -397,7 +396,7 @@ class _LeftPanel extends StatelessWidget {
                                 letterSpacing: -0.3,
                               ),
                             ),
-                            SizedBox(height: 6),
+                            const SizedBox(height: 6),
                             Text(
                               'or click anywhere here to browse',
                               style: TextStyle(
@@ -405,13 +404,13 @@ class _LeftPanel extends StatelessWidget {
                                 color: Colors.white.withOpacity(0.4),
                               ),
                             ),
-                            SizedBox(height: 28),
+                            const SizedBox(height: 28),
                             // Browse button
                             GestureDetector(
                               onTap: onBrowse,
                               child: Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 32, vertical: 13),
+                                    horizontal: 32, vertical: 13,),
                                 decoration: BoxDecoration(
                                   color: AppColors.primary,
                                   borderRadius: BorderRadius.circular(10),
@@ -420,11 +419,11 @@ class _LeftPanel extends StatelessWidget {
                                       color: AppColors.primary
                                           .withOpacity(0.4),
                                       blurRadius: 20,
-                                      offset: Offset(0, 6),
+                                      offset: const Offset(0, 6),
                                     ),
                                   ],
                                 ),
-                                child: Text(
+                                child: const Text(
                                   'Browse Files',
                                   style: TextStyle(
                                     fontSize: 14,
@@ -443,26 +442,26 @@ class _LeftPanel extends StatelessWidget {
                 ),
               ),
 
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               // Tips — compact inline
               Row(children: [
                 Icon(Icons.auto_awesome_rounded, size: 13, color: AppColors.infoText),
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
                 Text('AI auto-analysis', style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.45))),
-                SizedBox(width: 16),
+                const SizedBox(width: 16),
                 Icon(Icons.layers_outlined, size: 13, color: AppColors.infoText),
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
                 Text('Multi-PDF upload', style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.45))),
-                SizedBox(width: 16),
+                const SizedBox(width: 16),
                 Icon(Icons.text_snippet_outlined, size: 13, color: AppColors.infoText),
-                SizedBox(width: 6),
+                const SizedBox(width: 6),
                 Text('OCR supported', style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.45))),
-              ]),
+              ],),
             ],
           ),
         ),
-      ]),
+      ],),
     );
   }
 }
@@ -524,8 +523,8 @@ class _RightPanel extends StatelessWidget {
                     fontSize: 20,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textTitle,
-                    letterSpacing: -0.4)),
-            Spacer(),
+                    letterSpacing: -0.4,),),
+            const Spacer(),
             if (queue.isNotEmpty)
               Container(
                 padding:
@@ -535,15 +534,15 @@ class _RightPanel extends StatelessWidget {
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text('${queue.length} Files',
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.primary)),
+                        color: AppColors.primary,),),
               ),
-          ]),
+          ],),
         ),
 
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 28),
           child: Text(
@@ -554,7 +553,7 @@ class _RightPanel extends StatelessWidget {
           ),
         ),
 
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         Divider(height: 1, color: AppColors.headerBg),
 
         // File list
@@ -571,22 +570,22 @@ class _RightPanel extends StatelessWidget {
                         border: Border.all(color: AppColors.border),
                       ),
                       child: Icon(Icons.inbox_outlined,
-                          size: 32, color: AppColors.borderSoft),
+                          size: 32, color: AppColors.borderSoft,),
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Text('Nothing here yet',
                         style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textHint)),
-                    SizedBox(height: 6),
+                            color: AppColors.textHint,),),
+                    const SizedBox(height: 6),
                     Text('Drop files on the left\nto add them to the queue',
                         textAlign: TextAlign.center,
                         style: TextStyle(
                             fontSize: 13,
                             color: AppColors.borderSoft,
-                            height: 1.5)),
-                  ]),
+                            height: 1.5,),),
+                  ],),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
@@ -613,12 +612,12 @@ class _RightPanel extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   side: BorderSide(color: AppColors.border),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9)),
+                      borderRadius: BorderRadius.circular(9),),
                   foregroundColor: AppColors.textMuted,
                 ),
-                child: Text('Clear Completed',
+                child: const Text('Clear Completed',
                     style:
-                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600),),
               ),
             ),
           ),
@@ -637,13 +636,13 @@ class _RightPanel extends StatelessWidget {
               height: 48,
               child: ElevatedButton.icon(
                 onPressed: onSave,
-                icon: Icon(Icons.save_alt_rounded, size: 18),
+                icon: const Icon(Icons.save_alt_rounded, size: 18),
                 label: Text(
                   readyCount > 1
                       ? 'Save to Course ($readyCount)'
                       : 'Save to Course',
-                  style: TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                      fontSize: 14, fontWeight: FontWeight.w700,),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -653,11 +652,11 @@ class _RightPanel extends StatelessWidget {
                   elevation: 0,
                   shadowColor: Colors.transparent,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),),
                 ),
               ),
             ),
-            SizedBox(height: 10),
+            const SizedBox(height: 10),
             // Cancel
             SizedBox(
               width: double.infinity,
@@ -667,16 +666,16 @@ class _RightPanel extends StatelessWidget {
                 style: TextButton.styleFrom(
                   foregroundColor: AppColors.textHint,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                      borderRadius: BorderRadius.circular(12),),
                 ),
-                child: Text('Cancel',
+                child: const Text('Cancel',
                     style: TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w500)),
+                        fontSize: 14, fontWeight: FontWeight.w500,),),
               ),
             ),
-          ]),
+          ],),
         ),
-      ]),
+      ],),
     );
   }
 }
@@ -702,10 +701,10 @@ class _QueueTile extends StatelessWidget {
             AppColors.successBg, AppColors.successDot);
       case 'PPTX': case 'PPT':
         return (Icons.slideshow_rounded,
-            AppColors.warningBg, Color(0xFFF97316));
+            AppColors.warningBg, const Color(0xFFF97316));
       default:
         return (Icons.insert_drive_file_rounded,
-            AppColors.purpleBg, Color(0xFFA855F7));
+            AppColors.purpleBg, const Color(0xFFA855F7));
     }
   }
 
@@ -723,10 +722,10 @@ class _QueueTile extends StatelessWidget {
           width: 46,
           height: 46,
           decoration: BoxDecoration(
-              color: iconBg, borderRadius: BorderRadius.circular(12)),
+              color: iconBg, borderRadius: BorderRadius.circular(12),),
           child: Icon(icon, size: 22, color: iconFg),
         ),
-        SizedBox(width: 14),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -737,37 +736,37 @@ class _QueueTile extends StatelessWidget {
                 style: TextStyle(
                     fontSize: 13.5,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.textGray)),
-            SizedBox(height: 5),
+                    color: AppColors.textGray,),),
+            const SizedBox(height: 5),
             if (isReady)
               Row(children: [
-                Icon(Icons.check_circle_rounded,
-                    size: 14, color: AppColors.successDot),
-                SizedBox(width: 5),
+                const Icon(Icons.check_circle_rounded,
+                    size: 14, color: AppColors.successDot,),
+                const SizedBox(width: 5),
                 Text(file.displaySize,
-                    style: TextStyle(
+                    style: const TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.successDot)),
-                SizedBox(width: 8),
+                        color: AppColors.successDot,),),
+                const SizedBox(width: 8),
                 Text('Ready for Review',
                     style: TextStyle(
-                        fontSize: 12, color: AppColors.textHint)),
-              ])
+                        fontSize: 12, color: AppColors.textHint,),),
+              ],)
             else if (isError)
               Row(children: [
-                Icon(Icons.error_outline_rounded,
-                    size: 14, color: AppColors.errorDot),
-                SizedBox(width: 5),
+                const Icon(Icons.error_outline_rounded,
+                    size: 14, color: AppColors.errorDot,),
+                const SizedBox(width: 5),
                 Expanded(
                   child: Text(file.errorMsg ?? 'Error',
-                      style: TextStyle(
-                          fontSize: 12, color: AppColors.errorDot)),
+                      style: const TextStyle(
+                          fontSize: 12, color: AppColors.errorDot,),),
                 ),
-              ]),
-          ]),
+              ],),
+          ],),
         ),
-        InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+        InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
           onTap: onRemove,
           borderRadius: BorderRadius.circular(8),
           child: Container(
@@ -777,10 +776,10 @@ class _QueueTile extends StatelessWidget {
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(Icons.close_rounded,
-                size: 14, color: AppColors.borderSoft),
+                size: 14, color: AppColors.borderSoft,),
           ),
         ),
-      ]),
+      ],),
     );
   }
 }

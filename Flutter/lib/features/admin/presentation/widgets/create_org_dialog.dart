@@ -74,7 +74,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
       return Column(
         children: [
           left,
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           right,
         ],
       );
@@ -82,7 +82,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
     return Row(
       children: [
         Expanded(child: left),
-        SizedBox(width: 20),
+        const SizedBox(width: 20),
         Expanded(child: right),
       ],
     );
@@ -108,22 +108,22 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    AppDialogTitleBlock(
+                    const AppDialogTitleBlock(
                       title: 'Create New Organization',
                       subtitle:
                           'Set up a new institutional account for your university, school, or research center.',
                     ),
-                    SizedBox(height: 22),
+                    const SizedBox(height: 22),
 
                     AppCard(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          AppCardHeaderRow(
+                          const AppCardHeaderRow(
                             icon: Icons.account_balance_outlined,
                             title: 'Organization Details',
                           ),
-                          SizedBox(height: 18),
+                          const SizedBox(height: 18),
 
                           _twoFields(
                             isNarrow: isNarrow,
@@ -155,7 +155,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                             ),
                           ),
 
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
                           _twoFields(
                             isNarrow: isNarrow,
@@ -177,7 +177,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                             ),
                           ),
 
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
 
                           AppLabeledField(
                             label: 'Description (max 50 chars)',
@@ -192,7 +192,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                             ),
                           ),
 
-                          SizedBox(height: 18),
+                          const SizedBox(height: 18),
 
                           AppLabeledField(
                             label: 'Organization Logo',
@@ -202,12 +202,12 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                             ),
                           ),
 
-                          SizedBox(height: 22),
+                          const SizedBox(height: 22),
                           Divider(height: 1, color: AppColors.divider),
-                          SizedBox(height: 18),
+                          const SizedBox(height: 18),
 
-                          AppSubHeaderText(title: 'Primary Administrator'),
-                          SizedBox(height: 14),
+                          const AppSubHeaderText(title: 'Primary Administrator'),
+                          const SizedBox(height: 14),
 
                           _twoFields(
                             isNarrow: isNarrow,
@@ -229,14 +229,14 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                             ),
                           ),
 
-                          SizedBox(height: 18),
+                          const SizedBox(height: 18),
 
-                          AppInfoInlineBox(
+                          const AppInfoInlineBox(
                             message:
                                 'Need help? Chat with our support team or learn more about how organizations work.',
                           ),
 
-                          SizedBox(height: 22),
+                          const SizedBox(height: 22),
 
                           Align(
                             alignment: Alignment.centerRight,
@@ -253,7 +253,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                                       vertical: 12,
                                     ),
                                   ),
-                                  child: Text(
+                                  child: const Text(
                                     'Cancel',
                                     style:
                                         TextStyle(fontWeight: FontWeight.w800),
@@ -264,10 +264,10 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: AppColors.primary,
                                     disabledBackgroundColor:
-                                        Color(0xFF93C5FD),
+                                        const Color(0xFF93C5FD),
                                     foregroundColor: Colors.white,
                                     elevation: 0,
-                                    minimumSize: Size(0, 48),
+                                    minimumSize: const Size(0, 48),
                                     padding: const EdgeInsets.symmetric(
                                       horizontal: 18,
                                       vertical: 16,
@@ -276,7 +276,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                   ),
-                                  child: Text(
+                                  child: const Text(
                                     'Create Organization',
                                     style:
                                         TextStyle(fontWeight: FontWeight.w900),
@@ -289,7 +289,7 @@ class _CreateOrgDialogState extends State<CreateOrgDialog> {
                       ),
                     ),
 
-                    SizedBox(height: 22),
+                    const SizedBox(height: 22),
 
                     Center(
                       child: Text(

@@ -46,7 +46,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
         context.replace(clean.toString());
 
         _successTimer?.cancel();
-        _successTimer = Timer(Duration(seconds: 3), () {
+        _successTimer = Timer(const Duration(seconds: 3), () {
           if (!mounted) return;
           setState(() {
             _showResetSuccess    = false;
@@ -121,11 +121,11 @@ class _LoginFormState extends ConsumerState<LoginForm> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppFormHeader(
+            const AppFormHeader(
               title: 'Login',
               subtitle: 'Please sign in to access your dashboard.',
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
 
             if (_showVerifiedSuccess && err == null) ...[
               AppSuccessBanner(
@@ -134,7 +134,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                     'Your email has been verified successfully. You can log in now.',
                 onClose: () => setState(() => _showVerifiedSuccess = false),
               ),
-              SizedBox(height: 18),
+              const SizedBox(height: 18),
             ],
 
             if (_showResetSuccess && err == null) ...[
@@ -144,12 +144,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                     'Your password has been updated. Log in with the new one.',
                 onClose: () => setState(() => _showResetSuccess = false),
               ),
-              SizedBox(height: 18),
+              const SizedBox(height: 18),
             ],
 
             if (err != null) ...[
               AppErrorBox(message: err),
-              SizedBox(height: 18),
+              const SizedBox(height: 18),
             ],
 
             AppLabeledIconField(
@@ -167,7 +167,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               },
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             AppLabeledIconField(
               label: 'Password',
@@ -193,7 +193,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               ),
             ),
 
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
 
             AppRememberForgotRow(
               value: rememberMe,
@@ -202,7 +202,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               onForgot: () => context.go(Routes.forgotPassword),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             AppPrimaryLoadingButton(
               label: 'Log In',
@@ -210,9 +210,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               onPressed: _onLogin,
             ),
 
-            SizedBox(height: 28),
-            AppAuthOrDivider(),
-            SizedBox(height: 24),
+            const SizedBox(height: 28),
+            const AppAuthOrDivider(),
+            const SizedBox(height: 24),
 
             AppSocialButton(
               label: 'Google',
@@ -220,7 +220,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               disabled: isLoading,
               onTap: () {},
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             AppSocialButton(
               label: 'Microsoft',
               imagePath: 'assets/microsoft.png',
@@ -228,12 +228,12 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               onTap: () {},
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Text(
+                const Text(
                   "Don't have an account? ",
                   style: TextStyle(color: Colors.black),
                 ),
@@ -241,9 +241,9 @@ class _LoginFormState extends ConsumerState<LoginForm> {
                   hoverColor: Colors.transparent,
                   splashColor: Colors.transparent,
                   highlightColor: Colors.transparent,
-                  overlayColor: WidgetStatePropertyAll(Colors.transparent),
+                  overlayColor: const WidgetStatePropertyAll(Colors.transparent),
                   onTap: isLoading ? null : () => context.go(Routes.signup),
-                  child: Text(
+                  child: const Text(
                     'Sign up',
                     style: TextStyle(
                       color: AppColors.primary,
@@ -254,7 +254,7 @@ class _LoginFormState extends ConsumerState<LoginForm> {
               ],
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
           ],
         ),
       ),

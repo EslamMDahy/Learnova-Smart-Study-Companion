@@ -42,7 +42,7 @@ Future<ModuleSelectorResult?> showModuleSelectorSheet(
 
   return showDialog<ModuleSelectorResult>(
     context: context,
-    barrierColor: Color(0xFF0B1A2B).withOpacity(0.55),
+    barrierColor: const Color(0xFF0B1A2B).withOpacity(0.55),
     builder: (_) => Dialog(
       elevation: 0,
       backgroundColor: Colors.transparent,
@@ -70,7 +70,7 @@ class _ReusableCourse {
 final _reusableCoursesProvider =
     FutureProvider.autoDispose.family<List<_ReusableCourse>, int>((ref, currentCourseId) async {
   final coursesResponse = await ref.read(coursesRepositoryProvider).myCourses(
-    enrichMissingModuleCounts: false,
+    
   );
   final modulesApi = ref.read(modulesApiProvider);
 
@@ -139,7 +139,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
           BoxShadow(
             color: Colors.black.withOpacity(0.12),
             blurRadius: 32,
-            offset: Offset(0, 14),
+            offset: const Offset(0, 14),
           ),
         ],
       ),
@@ -188,8 +188,8 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
 
   Widget _buildOptions(AsyncValue<List<_ReusableCourse>> reusableAsync) {
     return reusableAsync.when(
-      loading: () => Center(child: CircularProgressIndicator()),
-      error: (e, _) => _ErrorState(message: 'Failed to load reusable modules.'),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => const _ErrorState(message: 'Failed to load reusable modules.'),
       data: (courses) {
         final readyCount = courses.fold<int>(0, (sum, c) {
           final ready = c.modules.where((m) => !_isBlocked(m)).length;
@@ -223,7 +223,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                     onTap: () => setState(() => _step = _SelectorStep.create),
                   ),
                 ),
-                SizedBox(width: 14),
+                const SizedBox(width: 14),
                 Expanded(
                   child: _ActionCard(
                     icon: Icons.content_copy_rounded,
@@ -243,7 +243,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                 ),
               ],
             ),
-            SizedBox(height: 18),
+            const SizedBox(height: 18),
             _SectionCard(
               title: 'Reusable source courses',
               subtitle: courses.isEmpty
@@ -252,7 +252,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
               actionLabel: courses.isEmpty ? null : 'Open browser',
               onAction: courses.isEmpty ? null : () => setState(() => _step = _SelectorStep.chooseCourse),
               child: courses.isEmpty
-                  ? _EmptyState(
+                  ? const _EmptyState(
                       icon: Icons.inbox_outlined,
                       title: 'No reusable modules yet',
                       message: 'Create modules in another course first, then return here to copy them.',
@@ -272,7 +272,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                             child: Row(
                               children: [
                                 Icon(Icons.info_outline_rounded, size: 16, color: AppColors.textMuted),
-                                SizedBox(width: 8),
+                                const SizedBox(width: 8),
                                 Expanded(
                                   child: Text(
                                     '$blockedCount ${blockedCount == 1 ? 'module already exists' : 'modules already exist'} in this course and will stay disabled to avoid duplicate copies.',
@@ -311,8 +311,8 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
 
   Widget _buildChooseCourse(AsyncValue<List<_ReusableCourse>> reusableAsync) {
     return reusableAsync.when(
-      loading: () => Center(child: CircularProgressIndicator()),
-      error: (e, _) => _ErrorState(message: 'Failed to load source courses.'),
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => const _ErrorState(message: 'Failed to load source courses.'),
       data: (courses) {
         if (courses.isEmpty) {
           return Padding(
@@ -321,8 +321,8 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _BackLink(label: 'Back to module options', onTap: () => setState(() => _step = _SelectorStep.options)),
-                SizedBox(height: 18),
-                Expanded(
+                const SizedBox(height: 18),
+                const Expanded(
                   child: _EmptyState(
                     icon: Icons.inbox_outlined,
                     title: 'No courses available to copy from',
@@ -340,7 +340,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _BackLink(label: 'Back to module options', onTap: () => setState(() => _step = _SelectorStep.options)),
-              SizedBox(height: 18),
+              const SizedBox(height: 18),
               Expanded(
                 child: _SectionCard(
                   title: 'Courses you can copy from',
@@ -349,7 +349,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                   child: ListView.separated(
                     padding: EdgeInsets.zero,
                     itemCount: courses.length,
-                    separatorBuilder: (_, __) => SizedBox(height: 10),
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (_, i) {
                       final entry = courses[i];
                       final ready = entry.modules.where((m) => !_isBlocked(m)).length;
@@ -379,7 +379,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
   Widget _buildChooseModule() {
     final entry = _selectedCourse;
     if (entry == null) {
-      return _ErrorState(message: 'No course selected.');
+      return const _ErrorState(message: 'No course selected.');
     }
 
     final readyModules = entry.modules.where((m) => !_isBlocked(m)).toList();
@@ -391,7 +391,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _BackLink(label: 'Back to course list', onTap: () => setState(() => _step = _SelectorStep.chooseCourse)),
-          SizedBox(height: 18),
+          const SizedBox(height: 18),
           Expanded(
             child: _SectionCard(
               title: entry.course.safeTitle,
@@ -402,14 +402,14 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                 padding: EdgeInsets.zero,
                 children: [
                   if (readyModules.isEmpty)
-                    _EmptyState(
+                    const _EmptyState(
                       icon: Icons.content_copy_outlined,
                       title: 'No modules available to copy',
                       message: 'All modules in this course are already present in your current course.',
                     )
                   else ...[
-                    _StateLabel('Modules ready to copy'),
-                    SizedBox(height: 8),
+                    const _StateLabel('Modules ready to copy'),
+                    const SizedBox(height: 8),
                     ...readyModules.map((module) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: _ModuleTile(
@@ -425,12 +425,12 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                               ),
                             ),
                           ),
-                        )),
+                        ),),
                   ],
                   if (blockedModules.isNotEmpty) ...[
-                    SizedBox(height: 8),
-                    _StateLabel('Unavailable in this course'),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
+                    const _StateLabel('Unavailable in this course'),
+                    const SizedBox(height: 8),
                     ...blockedModules.map((module) => Padding(
                           padding: const EdgeInsets.only(bottom: 10),
                           child: _ModuleTile(
@@ -438,7 +438,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                             enabled: false,
                             reason: _blockedReason(module),
                           ),
-                        )),
+                        ),),
                   ],
                 ],
               ),
@@ -481,11 +481,11 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Module details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text('This section will appear in the course structure.', style: TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.textMuted)),
-          SizedBox(height: 16),
-          _FieldLabel('Module title', required: true),
-          SizedBox(height: 6),
+          const SizedBox(height: 16),
+          const _FieldLabel('Module title', required: true),
+          const SizedBox(height: 6),
           TextField(
             controller: _titleCtrl,
             textInputAction: TextInputAction.next,
@@ -497,12 +497,12 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
               hintText: 'e.g. Chapter 2',
               errorText: _titleError,
               helperText: 'Shown directly in the materials sidebar.',
-              prefixIcon: Icon(Icons.folder_open_outlined, size: 18),
+              prefixIcon: const Icon(Icons.folder_open_outlined, size: 18),
             ),
           ),
-          SizedBox(height: 12),
-          _FieldLabel('Description'),
-          SizedBox(height: 6),
+          const SizedBox(height: 12),
+          const _FieldLabel('Description'),
+          const SizedBox(height: 6),
           TextField(
             controller: _descCtrl,
             maxLines: 2,
@@ -515,7 +515,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
               hintText: 'Optional note about this module.',
               errorText: _descError,
               helperText: 'Optional. Keep it short.',
-              prefixIcon: Padding(
+              prefixIcon: const Padding(
                 padding: EdgeInsets.only(left: 12, right: 8, bottom: 18),
                 child: Icon(Icons.subject_rounded, size: 18),
               ),
@@ -536,7 +536,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Live preview', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
@@ -552,22 +552,22 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                   color: AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.folder_open_rounded, color: AppColors.primary, size: 18),
+                child: const Icon(Icons.folder_open_rounded, color: AppColors.primary, size: 18),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   Text(previewTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                  SizedBox(height: 4),
+                  const SizedBox(height: 4),
                   Text(previewDescription, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.8, height: 1.4, color: AppColors.textMuted)),
-                ]),
+                ],),
               ),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
                 decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(999)),
-                child: Text('Module', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
+                child: const Text('Module', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
               ),
-            ]),
+            ],),
           ),
         ],
       ),
@@ -579,7 +579,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _BackLink(label: 'Back to module options', onTap: () => setState(() => _step = _SelectorStep.options)),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(16),
@@ -590,17 +590,17 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
             ),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text('Create a module', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-              SizedBox(height: 6),
+              const SizedBox(height: 6),
               Text('Use a short, clear title. Description is optional and only appears as extra context.', style: TextStyle(fontSize: 12.8, height: 1.45, color: AppColors.textMuted)),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               Wrap(spacing: 8, runSpacing: 8, children: [
                 quickChip('Chapter 1'),
                 quickChip('Week 2'),
                 quickChip('Assessment Prep'),
-              ]),
-            ]),
+              ],),
+            ],),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
@@ -608,21 +608,21 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                 if (compact) {
                   return ListView(
                     padding: EdgeInsets.zero,
-                    children: [detailsCard, SizedBox(height: 14), previewCard],
+                    children: [detailsCard, const SizedBox(height: 14), previewCard],
                   );
                 }
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(flex: 7, child: detailsCard),
-                    SizedBox(width: 14),
+                    const SizedBox(width: 14),
                     Expanded(flex: 5, child: previewCard),
                   ],
                 );
               },
             ),
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Row(
             children: [
               Expanded(
@@ -634,10 +634,10 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                     side: BorderSide(color: AppColors.border),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  child: Text('Cancel'),
+                  child: const Text('Cancel'),
                 ),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                 flex: 2,
                 child: FilledButton.icon(
@@ -647,8 +647,8 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
                     padding: const EdgeInsets.symmetric(vertical: 15),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
-                  icon: Icon(Icons.add_rounded, size: 18),
-                  label: Text('Create module', style: TextStyle(fontWeight: FontWeight.w700)),
+                  icon: const Icon(Icons.add_rounded, size: 18),
+                  label: const Text('Create module', style: TextStyle(fontWeight: FontWeight.w700)),
                 ),
               ),
             ],
@@ -674,7 +674,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
       fillColor: AppColors.cardBg,
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
       prefixIcon: prefixIcon,
-      prefixIconConstraints: BoxConstraints(minWidth: 42, minHeight: 42),
+      prefixIconConstraints: const BoxConstraints(minWidth: 42, minHeight: 42),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
         borderSide: BorderSide(color: AppColors.border),
@@ -685,7 +685,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(8),
-        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
     );
   }
@@ -769,8 +769,8 @@ class _PreviewMiniPill extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: Colors.white70),
-          SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 11.8, fontWeight: FontWeight.w600, color: Colors.white70)),
+          const SizedBox(width: 6),
+          Text(label, style: const TextStyle(fontSize: 11.8, fontWeight: FontWeight.w600, color: Colors.white70)),
         ],
       ),
     );
@@ -803,21 +803,21 @@ class _Header extends StatelessWidget {
               color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(10),
             ),
-            child: Icon(Icons.widgets_outlined, color: AppColors.primary),
+            child: const Icon(Icons.widgets_outlined, color: AppColors.primary),
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(subtitle, style: TextStyle(fontSize: 12.8, height: 1.45, color: AppColors.textMuted)),
               ],
             ),
           ),
-          SizedBox(width: 12),
-          InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent),
+          const SizedBox(width: 12),
+          InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent),
             onTap: onClose,
             borderRadius: BorderRadius.circular(99),
             child: Container(
@@ -871,7 +871,7 @@ class _ActionCard extends StatelessWidget {
       child: Material(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(10),
-        child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent),
+        child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent),
           borderRadius: BorderRadius.circular(10),
           onTap: enabled ? onTap : null,
           child: Container(
@@ -894,7 +894,7 @@ class _ActionCard extends StatelessWidget {
                       ),
                       child: Icon(icon, size: 18, color: iconFg),
                     ),
-                    Spacer(),
+                    const Spacer(),
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
@@ -905,15 +905,15 @@ class _ActionCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                SizedBox(height: 18),
+                const SizedBox(height: 18),
                 Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 Text(description, style: TextStyle(fontSize: 12.8, height: 1.55, color: AppColors.textMuted)),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Text(cta, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: enabled ? AppColors.primary : AppColors.textMuted)),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Icon(Icons.arrow_forward_rounded, size: 16, color: enabled ? AppColors.primary : AppColors.textMuted),
                   ],
                 ),
@@ -965,7 +965,7 @@ class _SectionCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
                     Text(subtitle, style: TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.textMuted)),
                   ],
                 ),
@@ -974,12 +974,12 @@ class _SectionCard extends StatelessWidget {
               if (actionLabel != null)
                 TextButton.icon(
                   onPressed: onAction,
-                  icon: Icon(Icons.arrow_forward_rounded, size: 16),
+                  icon: const Icon(Icons.arrow_forward_rounded, size: 16),
                   label: Text(actionLabel!),
                 ),
             ],
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           if (expandChild) Expanded(child: child) else child,
         ],
       ),
@@ -1006,7 +1006,7 @@ class _CourseTile extends StatelessWidget {
     return Material(
       color: AppColors.cardBg,
       borderRadius: BorderRadius.circular(10),
-      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent),
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent),
         borderRadius: BorderRadius.circular(10),
         onTap: onTap,
         child: Container(
@@ -1024,9 +1024,9 @@ class _CourseTile extends StatelessWidget {
                   color: AppColors.primarySoft,
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(Icons.menu_book_rounded, color: AppColors.primary),
+                child: const Icon(Icons.menu_book_rounded, color: AppColors.primary),
               ),
-              SizedBox(width: 14),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -1047,9 +1047,9 @@ class _CourseTile extends StatelessWidget {
                         ),
                       ],
                     ),
-                    SizedBox(height: 6),
+                    const SizedBox(height: 6),
                     Text('${course.courseType} • ${course.visibilityLevel}', style: TextStyle(fontSize: 12.2, color: AppColors.textMuted)),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     Wrap(
                       spacing: 8,
                       runSpacing: 8,
@@ -1062,7 +1062,7 @@ class _CourseTile extends StatelessWidget {
                   ],
                 ),
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Icon(Icons.chevron_right_rounded, color: AppColors.textMuted),
             ],
           ),
@@ -1107,20 +1107,20 @@ class _ModuleTile extends StatelessWidget {
             ),
             child: Icon(Icons.folder_copy_outlined, color: enabled ? AppColors.primary : AppColors.textMuted),
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(module.title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: enabled ? AppColors.textTitle : AppColors.textMuted)),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
                   (module.description ?? '').trim().isEmpty ? 'No description yet' : module.description!,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.textMuted),
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -1133,7 +1133,7 @@ class _ModuleTile extends StatelessWidget {
               ],
             ),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           if (enabled)
             FilledButton.icon(
               onPressed: onTap,
@@ -1141,8 +1141,8 @@ class _ModuleTile extends StatelessWidget {
                 backgroundColor: AppColors.primary,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              icon: Icon(Icons.copy_all_rounded, size: 16),
-              label: Text('Copy'),
+              icon: const Icon(Icons.copy_all_rounded, size: 16),
+              label: const Text('Copy'),
             )
           else
             Icon(Icons.block_rounded, color: AppColors.textMuted),
@@ -1155,7 +1155,7 @@ class _ModuleTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       borderRadius: BorderRadius.circular(10),
-      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), borderRadius: BorderRadius.circular(10), onTap: onTap, child: card),
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), borderRadius: BorderRadius.circular(10), onTap: onTap, child: card),
     );
   }
 }
@@ -1180,7 +1180,7 @@ class _MiniBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: AppColors.primary),
-          SizedBox(width: 6),
+          const SizedBox(width: 6),
           Text(text, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
         ],
       ),
@@ -1229,7 +1229,7 @@ class _BackLink extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent),
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent),
       onTap: onTap,
       borderRadius: BorderRadius.circular(6),
       child: Padding(
@@ -1238,7 +1238,7 @@ class _BackLink extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.textMuted),
-            SizedBox(width: 6),
+            const SizedBox(width: 6),
             Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
           ],
         ),
@@ -1259,7 +1259,7 @@ class _FieldLabel extends StatelessWidget {
       children: [
         Text(text, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
         if (required)
-          Text(' *', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.errorDot)),
+          const Text(' *', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.errorDot)),
       ],
     );
   }
@@ -1295,9 +1295,9 @@ class _EmptyState extends StatelessWidget {
             ),
             child: Icon(icon, color: AppColors.textMuted),
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           Text(title, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text(message, textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.textMuted)),
         ],
       ),

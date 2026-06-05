@@ -6,8 +6,8 @@ class _ModuleDialogWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) => AlertDialog(
     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    title: Row(children: [Icon(Icons.add_box_outlined, size: 18, color: AppColors.primary),
-        SizedBox(width: 8), Text('New Module', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800))]),
+    title: const Row(children: [Icon(Icons.add_box_outlined, size: 18, color: AppColors.primary),
+        SizedBox(width: 8), Text('New Module', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),]),
     content: Column(mainAxisSize: MainAxisSize.min, children: [
       TextField(controller: titleCtrl, autofocus: true, decoration: InputDecoration(
           hintText: 'e.g. Lecture 1: Introduction', labelText: 'Title *',

@@ -84,15 +84,15 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
           child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppSectionHeader(
+                  const AppSectionHeader(
                     title: 'Join Requests',
                     subtitle:
                         'Manage student and instructor accounts, roles, and permissions.',
                   ),
-                  SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
                   _StatsRow(isNarrow: isNarrow, users: state.users),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   
                   
@@ -103,7 +103,7 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
                     isNarrow: isNarrow,
                     onSearchChanged: (v) {
                       _searchDebounce?.cancel();
-                      _searchDebounce = Timer(Duration(milliseconds: 280), () {
+                      _searchDebounce = Timer(const Duration(milliseconds: 280), () {
                         if (!mounted) return;
                         setState(() => _searchText = v);
                         ref.read(joinRequestsControllerProvider.notifier).search(v);
@@ -115,7 +115,7 @@ class _JoinRequestsContentState extends ConsumerState<JoinRequestsContent> {
                     onRefresh: (_orgId.isEmpty || state.loading) ? () {} : _refresh,
                   ),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                 _JoinRequestsTableFigma(
                   isNarrow: isNarrow,
@@ -195,7 +195,7 @@ class _StatsRow extends StatelessWidget {
         value: '$total',
         subtitle: 'All join requests',
         subtitleColor: AppColors.cGray500,
-        iconBg: Color(0x1A137FEC),
+        iconBg: const Color(0x1A137FEC),
         icon: Icons.people_alt_outlined,
         iconColor: AppColors.primary,
       ),
@@ -236,11 +236,11 @@ class _StatsRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(child: cards[0]),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(child: cards[1]),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(child: cards[2]),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         SizedBox(width: 319, child: cards[3]),
       ],
     );
@@ -328,7 +328,7 @@ class _JoinRequestsTableFigma extends StatelessWidget {
             isEmpty: users.isEmpty,
             child: ListView.separated(
               shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
               itemCount: users.length,
               separatorBuilder: (_, __) =>
                   Divider(height: 1, color: AppColors.cBorderSoft),
@@ -385,7 +385,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
               ),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 16),
 
             // User info (same as UM)
             Expanded(
@@ -405,7 +405,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                       alignment: Alignment.center,
                       child: Text(
                         _initials(user.fullName),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -414,7 +414,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                         ),
                       ),
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -431,7 +431,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                               color: AppColors.cText,
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
                             user.email,
                             overflow: TextOverflow.ellipsis,
@@ -443,7 +443,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
                               color: AppColors.cGray500,
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
                             'ID: —',
                             style: TextStyle(
@@ -479,7 +479,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
               Expanded(
                 flex: 3,
                 child: Padding(
-                  padding: EdgeInsets.only(left: _kCellLeftPad),
+                  padding: const EdgeInsets.only(left: _kCellLeftPad),
                   child: Text(
                     '—',
                     overflow: TextOverflow.ellipsis,
@@ -498,7 +498,7 @@ class _JoinRequestRowFigma extends ConsumerWidget {
               Expanded(
                 flex: 2,
                 child: Padding(
-                  padding: EdgeInsets.only(left: _kCellLeftPad),
+                  padding: const EdgeInsets.only(left: _kCellLeftPad),
                   child: Text(
                     '—',
                     overflow: TextOverflow.ellipsis,
@@ -593,12 +593,12 @@ class _JoinRequestActionsMenuState extends ConsumerState<_JoinRequestActionsMenu
 
     return PopupMenuButton<int>(
       tooltip: 'Actions',
-      offset: Offset(0, 36),
+      offset: const Offset(0, 36),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       enabled: !_busy,
       itemBuilder: (_) => [
-        PopupMenuItem(value: 0, child: Text('Accept')),
-        PopupMenuItem(value: 1, child: Text('Decline')),
+        const PopupMenuItem(value: 0, child: Text('Accept')),
+        const PopupMenuItem(value: 1, child: Text('Decline')),
       ],
       onSelected: (v) async {
         if (v == 0) {
@@ -638,7 +638,7 @@ class _JoinRequestActionsMenuState extends ConsumerState<_JoinRequestActionsMenu
           ),
           child: Center(
             child: _busy
-                ? SizedBox(
+                ? const SizedBox(
                     width: 16,
                     height: 16,
                     child: CircularProgressIndicator(strokeWidth: 2),

@@ -297,7 +297,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                           height: 1.22,
                         ),
                       ),
-                      SizedBox(height: 6),
+                      const SizedBox(height: 6),
                       Text(
                         'Create a new assessment item for your students.',
                         style: TextStyle(
@@ -313,7 +313,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                   borderRadius: BorderRadius.circular(10),
                   onTap: () => Navigator.of(context).pop(),
                   child: Padding(
-                    padding: EdgeInsets.all(6),
+                    padding: const EdgeInsets.all(6),
                     child: Icon(
                       Icons.close_rounded,
                       size: 20,
@@ -343,9 +343,9 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
                             _buildMetaSection(),
-                            SizedBox(height: 18),
+                            const SizedBox(height: 18),
                             _buildQuestionTextSection(),
-                            SizedBox(height: 18),
+                            const SizedBox(height: 18),
                             if (_type == QuestionType.multipleChoice || _type == QuestionType.multiSelect) ...<Widget>[
                               _buildMultipleChoiceSection(),
                             ] else if (_type == QuestionType.trueFalse) ...<Widget>[
@@ -353,10 +353,10 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                             ] else ...<Widget>[
                               _buildWrittenAnswerSection(),
                             ],
-                            SizedBox(height: 18),
+                            const SizedBox(height: 18),
                             _buildExplanationSection(),
                             if (_error != null) ...<Widget>[
-                              SizedBox(height: 12),
+                              const SizedBox(height: 12),
                               Text(
                                 _error!,
                                 style: TextStyle(
@@ -379,13 +379,13 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
             padding: const EdgeInsets.fromLTRB(24, 0, 24, 20),
             child: Row(
               children: <Widget>[
-                Spacer(),
+                const Spacer(),
                 ElevatedButton(
                   onPressed: _saving ? null : () => _submit(addAnother: true),
                   style: _primaryButtonStyle(),
                   child: Text(_saving ? 'Adding...' : 'Add Another'),
                 ),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 ElevatedButton(
                   onPressed: _saving ? null : () => _submit(addAnother: false),
                   style: _primaryButtonStyle(),
@@ -409,10 +409,9 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
         controller: _tabController,
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.textMuted,
-        labelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-        unselectedLabelStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
+        labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        unselectedLabelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500),
         indicatorColor: AppColors.primary,
-        indicatorWeight: 2,
         dividerColor: Colors.transparent,
         overlayColor: WidgetStateProperty.all<Color>(Colors.transparent),
         onTap: (int index) {
@@ -433,27 +432,19 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       Expanded(
         flex: 2,
         child: _targets.isEmpty || _selectedTopicId == null
-            ? _ReadonlyField(
+            ? const _ReadonlyField(
                 label: 'Target Topic',
                 value: 'No topic selected',
               )
-            : AppModernDropdown<int>(
-                label: 'Target Topic',
-                value: _selectedTopicId!,
-                icon: Icons.topic_outlined,
-                items: _targets.map((QuestionAuthoringTarget target) {
-                  return DropdownMenuItem<int>(
-                    value: target.topicId,
-                    child: Text(target.label),
-                  );
-                }).toList(),
-                onChanged: (int? value) {
-                  if (value == null) return;
+            : _QuestionTargetPicker(
+                selectedTopicId: _selectedTopicId!,
+                targets: _targets,
+                onChanged: (int value) {
                   setState(() => _selectedTopicId = value);
                 },
               ),
       ),
-      SizedBox(width: 16),
+      const SizedBox(width: 16),
       Expanded(
         child: AppModernDropdown<QuestionDifficulty>(
           label: 'Difficulty',
@@ -487,7 +478,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
           return Column(
             children: <Widget>[
               fields.first,
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               fields.last,
             ],
           );
@@ -503,22 +494,22 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       children: <Widget>[
         Row(
           children: <Widget>[
-            Expanded(child: _SectionLabel('Question Text')),
+            const Expanded(child: _SectionLabel('Question Text')),
             TextButton.icon(
               onPressed: widget.showAiHint ? () {} : null,
-              icon: Icon(Icons.auto_awesome_outlined, size: 14),
-              label: Text('Generate with AI'),
+              icon: const Icon(Icons.auto_awesome_outlined, size: 14),
+              label: const Text('Generate with AI'),
               style: TextButton.styleFrom(
                 foregroundColor: AppColors.primary,
-                textStyle: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
-                padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+                textStyle: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700),
+                padding: const EdgeInsets.symmetric(),
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
             ),
           ],
         ),
-        SizedBox(height: 10),
+        const SizedBox(height: 10),
         Container(
           decoration: BoxDecoration(
             color: AppColors.surfaceBg,
@@ -536,18 +527,18 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                 ),
                 child: Row(
                   children: <Widget>[
-                    _ToolbarButton(label: 'B'),
-                    SizedBox(width: 4),
-                    _ToolbarButton(label: 'I', italic: true),
-                    SizedBox(width: 4),
-                    _ToolbarButton(label: 'U', underlined: true),
-                    SizedBox(width: 8),
+                    const _ToolbarButton(label: 'B'),
+                    const SizedBox(width: 4),
+                    const _ToolbarButton(label: 'I', italic: true),
+                    const SizedBox(width: 4),
+                    const _ToolbarButton(label: 'U', underlined: true),
+                    const SizedBox(width: 8),
                     Icon(Icons.format_list_bulleted_rounded, size: 16, color: AppColors.textMuted),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Icon(Icons.image_outlined, size: 16, color: AppColors.textMuted),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Icon(Icons.code_rounded, size: 16, color: AppColors.textMuted),
-                    Spacer(),
+                    const Spacer(),
                     if (_selectedTarget != null)
                       Text(
                         _selectedTarget!.label,
@@ -587,8 +578,8 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       children: <Widget>[
         Row(
           children: <Widget>[
-            _SectionLabel('Answer Options'),
-            SizedBox(width: 8),
+            const _SectionLabel('Answer Options'),
+            const SizedBox(width: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
@@ -603,7 +594,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
             ),
           ],
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         ...List<Widget>.generate(_optionCtrls.length, (int index) {
           return Padding(
             padding: const EdgeInsets.only(bottom: 12),
@@ -642,7 +633,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                           ),
                         ),
                 ),
-                SizedBox(width: 12),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -655,7 +646,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                           color: AppColors.textMuted,
                         ),
                       ),
-                      SizedBox(height: 6),
+                      const SizedBox(height: 6),
                       TextField(
                         controller: _optionCtrls[index],
                         decoration: _inputDecoration(
@@ -671,12 +662,12 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
         }),
         TextButton.icon(
           onPressed: () => setState(() => _optionCtrls.add(TextEditingController())),
-          icon: Icon(Icons.add_circle_outline_rounded, size: 16),
-          label: Text('Add another option'),
+          icon: const Icon(Icons.add_circle_outline_rounded, size: 16),
+          label: const Text('Add another option'),
           style: TextButton.styleFrom(
             foregroundColor: AppColors.primary,
-            padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-            textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+            padding: const EdgeInsets.symmetric(),
+            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
           ),
         ),
       ],
@@ -687,8 +678,8 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _SectionLabel('Correct Answer'),
-        SizedBox(height: 12),
+        const _SectionLabel('Correct Answer'),
+        const SizedBox(height: 12),
         Row(
           children: <Widget>[
             Expanded(
@@ -698,7 +689,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
                 onTap: () => setState(() => _correctBool = true),
               ),
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Expanded(
               child: _BooleanAnswerCard(
                 label: 'False',
@@ -719,8 +710,8 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _SectionLabel('Expected Answer'),
-        SizedBox(height: 10),
+        const _SectionLabel('Expected Answer'),
+        const SizedBox(height: 10),
         TextField(
           controller: _answerCtrl,
           maxLines: 4,
@@ -737,18 +728,18 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _SectionLabel('Explanation (Optional)'),
-          SizedBox(height: 10),
+          const _SectionLabel('Explanation (Optional)'),
+          const SizedBox(height: 10),
           TextField(
             controller: _explanationCtrl,
             maxLines: 3,
             decoration: _inputDecoration('Explain why the correct answer is correct...'),
           ),
-          SizedBox(height: 8),
+          const SizedBox(height: 8),
           Row(
             children: <Widget>[
               Icon(Icons.info_outline_rounded, size: 14, color: AppColors.textMuted),
-              SizedBox(width: 6),
+              const SizedBox(width: 6),
               Text(
                 'This will be shown to students after they submit their answer.',
                 style: TextStyle(
@@ -771,7 +762,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       elevation: 0,
       padding: const EdgeInsets.symmetric(horizontal: 26, vertical: 16),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-      textStyle: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+      textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
     );
   }
 
@@ -796,7 +787,7 @@ class _AddQuestionSheetState extends State<AddQuestionSheet>
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.primary, width: 1.5),
+        borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 15),
     );
@@ -826,7 +817,7 @@ class _ReadonlyField extends StatelessWidget {
             color: AppColors.textGray,
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Container(
           height: 44,
           width: double.infinity,
@@ -849,6 +840,371 @@ class _ReadonlyField extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _QuestionTargetPicker extends StatefulWidget {
+  final int selectedTopicId;
+  final List<QuestionAuthoringTarget> targets;
+  final ValueChanged<int> onChanged;
+
+  const _QuestionTargetPicker({
+    required this.selectedTopicId,
+    required this.targets,
+    required this.onChanged,
+  });
+
+  @override
+  State<_QuestionTargetPicker> createState() => _QuestionTargetPickerState();
+}
+
+class _QuestionTargetPickerState extends State<_QuestionTargetPicker> {
+  bool _hovered = false;
+
+  QuestionAuthoringTarget get _selectedTarget {
+    return widget.targets.firstWhere(
+      (QuestionAuthoringTarget target) => target.topicId == widget.selectedTopicId,
+      orElse: () => widget.targets.first,
+    );
+  }
+
+  Future<void> _openPicker() async {
+    final int? result = await showDialog<int>(
+      context: context,
+      barrierDismissible: false,
+      barrierColor: Colors.black.withOpacity(0.30),
+      builder: (_) => _QuestionTargetPickerDialog(
+        targets: widget.targets,
+        selectedTopicId: widget.selectedTopicId,
+      ),
+    );
+    if (result == null) return;
+    widget.onChanged(result);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final QuestionAuthoringTarget selected = _selectedTarget;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          'Target Topic',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+            color: AppColors.textGray,
+          ),
+        ),
+        const SizedBox(height: 8),
+        MouseRegion(
+          cursor: SystemMouseCursors.click,
+          onEnter: (_) => setState(() => _hovered = true),
+          onExit: (_) => setState(() => _hovered = false),
+          child: GestureDetector(
+            onTap: _openPicker,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 140),
+              height: 44,
+              padding: const EdgeInsets.symmetric(horizontal: 12),
+              decoration: BoxDecoration(
+                color: _hovered ? AppColors.primarySoft : AppColors.surfaceBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: _hovered ? AppColors.primary : AppColors.border,
+                  width: _hovered ? 1.4 : 1,
+                ),
+              ),
+              child: Row(
+                children: <Widget>[
+                  const Icon(Icons.account_tree_outlined, size: 18, color: AppColors.primary),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      selected.label,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontFamily: 'Inter',
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                        color: AppColors.textGray,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Icon(Icons.unfold_more_rounded, color: AppColors.textMuted, size: 19),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _QuestionTargetPickerDialog extends StatefulWidget {
+  final int selectedTopicId;
+  final List<QuestionAuthoringTarget> targets;
+
+  const _QuestionTargetPickerDialog({
+    required this.selectedTopicId,
+    required this.targets,
+  });
+
+  @override
+  State<_QuestionTargetPickerDialog> createState() => _QuestionTargetPickerDialogState();
+}
+
+class _QuestionTargetPickerDialogState extends State<_QuestionTargetPickerDialog> {
+  final TextEditingController _searchCtrl = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String query = _searchCtrl.text.trim().toLowerCase();
+    final List<QuestionAuthoringTarget> filtered = widget.targets.where((QuestionAuthoringTarget target) {
+      if (query.isEmpty) return true;
+      return <String>[
+        target.topicName,
+        target.parentTopicName ?? '',
+        target.materialName ?? '',
+        target.moduleName ?? '',
+      ].join(' ').toLowerCase().contains(query);
+    }).toList();
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.all(24),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680, maxHeight: 680),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppColors.borderGray),
+          ),
+          child: Column(
+            children: <Widget>[
+              Padding(
+                padding: const EdgeInsets.fromLTRB(22, 20, 14, 16),
+                child: Row(
+                  children: <Widget>[
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        color: AppColors.infoBg,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Icon(Icons.account_tree_outlined, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            'Choose target topic',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w900,
+                              color: AppColors.textTitle,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            'Pick the exact topic or subtopic where this question belongs.',
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textMuted,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.close_rounded),
+                    ),
+                  ],
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 22),
+                child: Container(
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceBg,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.borderGray),
+                  ),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      prefixIcon: Icon(Icons.search_rounded, color: AppColors.textMuted),
+                      hintText: 'Search topic, material, or module...',
+                      hintStyle: TextStyle(color: AppColors.textHint),
+                      border: InputBorder.none,
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Expanded(
+                child: filtered.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No matching topics found.',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textMuted,
+                          ),
+                        ),
+                      )
+                    : ListView(
+                        padding: const EdgeInsets.fromLTRB(18, 0, 18, 18),
+                        children: _buildGroupedTargetRows(context, filtered),
+                      ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  List<Widget> _buildGroupedTargetRows(
+    BuildContext context,
+    List<QuestionAuthoringTarget> targets,
+  ) {
+    final List<Widget> rows = <Widget>[];
+    String? currentModule;
+    String? currentMaterial;
+
+    for (final QuestionAuthoringTarget target in targets) {
+      if (target.moduleName != currentModule) {
+        currentModule = target.moduleName;
+        rows.add(_groupHeader(Icons.school_outlined, currentModule ?? 'Module'));
+        currentMaterial = null;
+      }
+      if (target.materialName != currentMaterial) {
+        currentMaterial = target.materialName;
+        rows.add(_groupHeader(Icons.description_outlined, currentMaterial ?? 'Material', indent: 14));
+      }
+      rows.add(
+        Padding(
+          padding: const EdgeInsets.only(left: 28, top: 6),
+          child: _treeOption(
+            context,
+            selected: widget.selectedTopicId == target.topicId,
+            icon: target.isSubtopic ? Icons.subdirectory_arrow_right_rounded : Icons.topic_outlined,
+            title: target.label,
+            subtitle: target.subtitle,
+            onTap: () => Navigator.of(context).pop(target.topicId),
+          ),
+        ),
+      );
+    }
+    return rows;
+  }
+
+  Widget _groupHeader(IconData icon, String title, {double indent = 0}) {
+    return Padding(
+      padding: EdgeInsets.only(left: indent, top: 14, bottom: 6),
+      child: Row(
+        children: <Widget>[
+          Icon(icon, size: 15, color: AppColors.textMuted),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              title,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.45,
+                color: AppColors.textMuted,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _treeOption(
+    BuildContext context, {
+    required bool selected,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(13),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.selectedBg : AppColors.surfaceBg,
+          borderRadius: BorderRadius.circular(13),
+          border: Border.all(
+            color: selected ? AppColors.primary.withOpacity(0.50) : AppColors.borderGray,
+          ),
+        ),
+        child: Row(
+          children: <Widget>[
+            Container(
+              width: 32,
+              height: 32,
+              decoration: BoxDecoration(
+                color: selected ? AppColors.primary : AppColors.cardBg,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, size: 16, color: selected ? Colors.white : AppColors.primary),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    title,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 13.2,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.textTitle,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textMuted,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            if (selected) const Icon(Icons.check_circle_rounded, color: AppColors.primary, size: 18),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -940,7 +1296,7 @@ class _BooleanAnswerCard extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Text(
               label,
               style: TextStyle(

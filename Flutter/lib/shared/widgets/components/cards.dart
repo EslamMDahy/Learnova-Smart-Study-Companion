@@ -34,7 +34,7 @@ class AppCardShell extends StatelessWidget {
     final defaultShadow = <BoxShadow>[
       BoxShadow(
         blurRadius: 2,
-        offset: kIsWeb ? Offset(0, 4) : Offset(0, 1),
+        offset: kIsWeb ? const Offset(0, 4) : const Offset(0, 1),
         color: AppColors.shadowSoft,
       ),
     ];
@@ -84,7 +84,7 @@ class AppCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             blurRadius: 2,
-            offset: (kIsWeb ? Offset(0, 4) : Offset(0, 1)),
+            offset: (kIsWeb ? const Offset(0, 4) : const Offset(0, 1)),
             color: AppColors.shadowSoft,
           ),
         ],
@@ -136,7 +136,7 @@ class AppNotificationCard extends StatelessWidget {
               color: AppColors.textGray,
             ),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -154,7 +154,7 @@ class AppNotificationCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
                     Text(
                       rightTag,
                       style: TextStyle(
@@ -166,7 +166,7 @@ class AppNotificationCard extends StatelessWidget {
                     ),
                   ],
                 ),
-                SizedBox(height: 3),
+                const SizedBox(height: 3),
                 Text(
                   subtitle,
                   style: TextStyle(
@@ -207,7 +207,7 @@ class FigmaUmCardShell extends StatelessWidget {
       borderRadius: borderRadius,
       borderColor: AppColors.cBorder,
       boxShadow: [
-        BoxShadow(
+        const BoxShadow(
           color: Color(0x0D000000),
           blurRadius: 2,
           offset: (kIsWeb ? Offset(0, 4) : Offset(0, 1)),
@@ -231,7 +231,7 @@ class JrCardShell extends StatelessWidget {
       maxWidth: width,
       borderColor: AppColors.borderGray,
       boxShadow: [
-        BoxShadow(
+        const BoxShadow(
           color: Color(0x0D000000),
           blurRadius: 2,
           offset: (kIsWeb ? Offset(0, 4) : Offset(0, 1)),
@@ -275,7 +275,7 @@ class FigmaUmStatCard extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.cBorder),
         boxShadow: [
-          BoxShadow(
+          const BoxShadow(
             color: Color(0x0D000000),
             blurRadius: 2,
             offset: (kIsWeb ? Offset(0, 4) : Offset(0, 1)),
@@ -297,7 +297,7 @@ class FigmaUmStatCard extends StatelessWidget {
                   color: AppColors.cMuted,
                 ),
               ),
-              Spacer(),
+              const Spacer(),
               Container(
                 width: 32,
                 height: 32,
@@ -310,7 +310,7 @@ class FigmaUmStatCard extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             value,
             style: TextStyle(
@@ -321,7 +321,7 @@ class FigmaUmStatCard extends StatelessWidget {
               color: AppColors.cText,
             ),
           ),
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             subtitle,
             style: TextStyle(
@@ -391,7 +391,7 @@ class UpgradePlanCard extends StatelessWidget {
                 ? AppColors.primary.withValues(alpha: 0.10)
                 : AppColors.textTitle.withValues(alpha: 0.04),
             blurRadius: (kIsWeb ? 12 : 30),
-            offset: Offset(0, 12),
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -403,7 +403,7 @@ class UpgradePlanCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
-                  colors: [AppColors.badgeBlueBg, Color(0xFFEDE9FE)],
+                  colors: [AppColors.badgeBlueBg, const Color(0xFFEDE9FE)],
                 ),
                 borderRadius: BorderRadius.circular(999),
               ),
@@ -417,7 +417,7 @@ class UpgradePlanCard extends StatelessWidget {
                 ),
               ),
             ),
-            SizedBox(height: 14),
+            const SizedBox(height: 14),
           ],
 
           Text(
@@ -428,7 +428,7 @@ class UpgradePlanCard extends StatelessWidget {
               color: AppColors.textTitle,
             ),
           ),
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           if (isFree) ...[
             Text(
@@ -445,7 +445,7 @@ class UpgradePlanCard extends StatelessWidget {
               children: [
                 if (!isCustom)
                   Padding(
-                    padding: EdgeInsets.only(bottom: 8, right: 2),
+                    padding: const EdgeInsets.only(bottom: 8, right: 2),
                     child: Text(
                       '\$',
                       style: TextStyle(
@@ -480,7 +480,7 @@ class UpgradePlanCard extends StatelessWidget {
           ],
 
           if (subPriceText != null) ...[
-            SizedBox(height: 6),
+            const SizedBox(height: 6),
             Text(
               subPriceText!,
               style: TextStyle(
@@ -491,7 +491,7 @@ class UpgradePlanCard extends StatelessWidget {
             ),
           ],
 
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
           Text(
             description,
             style: TextStyle(
@@ -502,9 +502,9 @@ class UpgradePlanCard extends StatelessWidget {
             ),
           ),
 
-          SizedBox(height: 18),
+          const SizedBox(height: 18),
           Divider(color: AppColors.headerBg, thickness: 1.4),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           ...features.map(
             (f) => Padding(
@@ -528,7 +528,7 @@ class UpgradePlanCard extends StatelessWidget {
                           : AppColors.textTitle,
                     ),
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       f,
@@ -544,7 +544,7 @@ class UpgradePlanCard extends StatelessWidget {
             ),
           ),
 
-          SizedBox(height: 10),
+          const SizedBox(height: 10),
 
           SizedBox(
             width: double.infinity,
@@ -553,7 +553,7 @@ class UpgradePlanCard extends StatelessWidget {
               style: ElevatedButton.styleFrom(
                 backgroundColor:
                     isPrimary ? AppColors.primary : AppColors.cardBg,
-                disabledBackgroundColor: Color(0xFF93C5FD),
+                disabledBackgroundColor: const Color(0xFF93C5FD),
                 foregroundColor:
                     isPrimary ? Colors.white : AppColors.primary,
                 elevation: 0,
@@ -569,7 +569,7 @@ class UpgradePlanCard extends StatelessWidget {
               ),
               child: Text(
                 buttonText,
-                style: TextStyle(
+                style: const TextStyle(
                   fontWeight: FontWeight.w900,
                   fontSize: 14.5,
                 ),

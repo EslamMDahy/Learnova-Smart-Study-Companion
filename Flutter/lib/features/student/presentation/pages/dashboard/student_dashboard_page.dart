@@ -15,7 +15,7 @@ class StudentDashboardPage extends StatelessWidget {
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
           child: isSmall
-              ? Column(
+              ? const Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _LeftContent(),
@@ -23,7 +23,7 @@ class StudentDashboardPage extends StatelessWidget {
                     _RightContent(),
                   ],
                 )
-              : Row(
+              : const Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // الجزء الأيسر (العريض) يأخذ نسبة 7 نفس الصورة
@@ -67,7 +67,7 @@ class _LeftContent extends StatelessWidget {
             letterSpacing: -0.5,
           ),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
           'You have 2 upcoming quizzes and 3 new recommendations.',
           style: TextStyle(
@@ -75,10 +75,10 @@ class _LeftContent extends StatelessWidget {
             color: AppColors.textMuted,
           ),
         ),
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
 
         /// صف كروت الإحصائيات الأربعة
-        Row(
+        const Row(
           children: [
             Expanded(
               child: _StatCard(
@@ -117,7 +117,7 @@ class _LeftContent extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(height: 32),
+        const SizedBox(height: 32),
 
         /// عنوان الكورسات
         Row(
@@ -138,7 +138,7 @@ class _LeftContent extends StatelessWidget {
                 minimumSize: Size.zero,
                 tapTargetSize: MaterialTapTargetSize.shrinkWrap,
               ),
-              child: Text(
+              child: const Text(
                 'View All',
                 style: TextStyle(
                   color: AppColors.primary,
@@ -149,10 +149,10 @@ class _LeftContent extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
 
         /// كروت الكورسات (اثنين بجانب بعضهما)
-        Row(
+        const Row(
           children: [
             Expanded(
               child: _CourseCard(
@@ -169,7 +169,7 @@ class _LeftContent extends StatelessWidget {
             ),
           ],
         ),
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
 
         /// قسم تحليلات الذكاء الاصطناعي (AI Insights) بنفس اللون الفاتح الجميل
         Container(
@@ -183,9 +183,9 @@ class _LeftContent extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Icon(Icons.auto_awesome,
-                      color: AppColors.primary, size: 18),
-                  SizedBox(width: 8),
+                  const Icon(Icons.auto_awesome,
+                      color: AppColors.primary, size: 18,),
+                  const SizedBox(width: 8),
                   Text(
                     'AI Learning Insights',
                     style: TextStyle(
@@ -194,13 +194,13 @@ class _LeftContent extends StatelessWidget {
                       color: AppColors.textTitle,
                     ),
                   ),
-                  SizedBox(width: 6),
+                  const SizedBox(width: 6),
                   Text(
                     'Based on your recent quiz performance in ',
                     style:
                         TextStyle(color: AppColors.textMuted, fontSize: 12),
                   ),
-                  Text(
+                  const Text(
                     'Calculus II.',
                     style: TextStyle(
                       color: AppColors.primary,
@@ -210,7 +210,7 @@ class _LeftContent extends StatelessWidget {
                   ),
                 ],
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               _InsightRowItem(
                 icon: Icons.error_outline_rounded,
                 iconColor: AppColors.errorDot,
@@ -220,7 +220,7 @@ class _LeftContent extends StatelessWidget {
                 buttonText: 'Practice Now',
                 isPrimaryButton: true,
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               _InsightRowItem(
                 icon: Icons.trending_down_rounded,
                 iconColor: AppColors.warningText,
@@ -269,14 +269,14 @@ class _RightContent extends StatelessWidget {
                   color: AppColors.textTitle,
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               _buildDeadlineRow(
-                  'OCT', '24', 'Midterm Exam', 'Data Structures • 10:00 AM'),
+                  'OCT', '24', 'Midterm Exam', 'Data Structures • 10:00 AM',),
               _buildDeadlineRow('OCT', '28', 'Lab Report Submission',
-                  'Physics 101 • 11:59 PM'),
+                  'Physics 101 • 11:59 PM',),
               _buildDeadlineRow('NOV', '02', 'Quiz: Photosynthesis',
-                  'Advanced Biology • Online'),
-              SizedBox(height: 8),
+                  'Advanced Biology • Online',),
+              const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
                 height: 38,
@@ -285,7 +285,7 @@ class _RightContent extends StatelessWidget {
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: AppColors.border),
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8)),
+                        borderRadius: BorderRadius.circular(8),),
                   ),
                   child: Text(
                     'View Calendar',
@@ -301,7 +301,7 @@ class _RightContent extends StatelessWidget {
           ),
         ),
 
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
 
         /// كارت النتائج الأخيرة (Recent Results) مع خط الـ Timeline الواصل بينهم
         Container(
@@ -323,7 +323,7 @@ class _RightContent extends StatelessWidget {
                   color: AppColors.textTitle,
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // تم بناء هيكل يدوي هنا لرسم الخط العمودي الرمادي الواصل بين الدوائر كما بالصورة
               Stack(
@@ -345,23 +345,23 @@ class _RightContent extends StatelessWidget {
                           '2 hours ago',
                           '95/100',
                           AppColors.successBg,
-                          AppColors.successText),
-                      SizedBox(height: 16),
+                          AppColors.successText,),
+                      const SizedBox(height: 16),
                       _buildResultRow(
                           'B+',
                           'Organic Chemistry',
                           'Yesterday',
                           '88/100',
                           AppColors.infoBg,
-                          AppColors.infoText),
-                      SizedBox(height: 16),
+                          AppColors.infoText,),
+                      const SizedBox(height: 16),
                       _buildResultRow(
                           'C',
                           'History Essay',
                           '3 days ago',
                           '72/100',
                           AppColors.warningSoftBg,
-                          AppColors.warningText),
+                          AppColors.warningText,),
                     ],
                   ),
                 ],
@@ -374,7 +374,7 @@ class _RightContent extends StatelessWidget {
   }
 
   Widget _buildDeadlineRow(
-      String month, String day, String title, String subtitle) {
+      String month, String day, String title, String subtitle,) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -391,22 +391,22 @@ class _RightContent extends StatelessWidget {
               children: [
                 Text(
                   month,
-                  style: TextStyle(
+                  style: const TextStyle(
                       fontSize: 10,
                       color: AppColors.primary,
-                      fontWeight: FontWeight.w700),
+                      fontWeight: FontWeight.w700,),
                 ),
                 Text(
                   day,
                   style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,
-                      color: AppColors.textTitle),
+                      color: AppColors.textTitle,),
                 ),
               ],
             ),
           ),
-          SizedBox(width: 14),
+          const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -415,11 +415,11 @@ class _RightContent extends StatelessWidget {
                     style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
-                        color: AppColors.textTitle)),
-                SizedBox(height: 2),
+                        color: AppColors.textTitle,),),
+                const SizedBox(height: 2),
                 Text(subtitle,
                     style: TextStyle(
-                        fontSize: 11, color: AppColors.textMuted)),
+                        fontSize: 11, color: AppColors.textMuted,),),
               ],
             ),
           ),
@@ -429,7 +429,7 @@ class _RightContent extends StatelessWidget {
   }
 
   Widget _buildResultRow(String grade, String title, String time, String score,
-      Color bg, Color text) {
+      Color bg, Color text,) {
     return Row(
       children: [
         CircleAvatar(
@@ -437,9 +437,9 @@ class _RightContent extends StatelessWidget {
           backgroundColor: bg,
           child: Text(grade,
               style: TextStyle(
-                  color: text, fontSize: 12, fontWeight: FontWeight.w700)),
+                  color: text, fontSize: 12, fontWeight: FontWeight.w700,),),
         ),
-        SizedBox(width: 14),
+        const SizedBox(width: 14),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -448,11 +448,11 @@ class _RightContent extends StatelessWidget {
                   style: TextStyle(
                       fontWeight: FontWeight.w600,
                       fontSize: 13,
-                      color: AppColors.textTitle)),
-              SizedBox(height: 2),
+                      color: AppColors.textTitle,),),
+              const SizedBox(height: 2),
               Text(time,
                   style:
-                      TextStyle(fontSize: 11, color: AppColors.textHint)),
+                      TextStyle(fontSize: 11, color: AppColors.textHint),),
             ],
           ),
         ),
@@ -460,7 +460,7 @@ class _RightContent extends StatelessWidget {
             style: TextStyle(
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
-                color: AppColors.textTitle)),
+                color: AppColors.textTitle,),),
       ],
     );
   }
@@ -480,7 +480,7 @@ class _StatCard extends StatelessWidget {
       {required this.title,
       required this.value,
       required this.percent,
-      required this.icon});
+      required this.icon,});
 
   @override
   Widget build(BuildContext context) {
@@ -502,11 +502,11 @@ class _StatCard extends StatelessWidget {
                   style: TextStyle(
                       color: AppColors.textMuted,
                       fontSize: 12,
-                      fontWeight: FontWeight.w500)),
+                      fontWeight: FontWeight.w500,),),
               Icon(icon, color: AppColors.primary, size: 18),
             ],
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Row(
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
@@ -514,15 +514,15 @@ class _StatCard extends StatelessWidget {
                   style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textTitle)),
-              SizedBox(width: 6),
+                      color: AppColors.textTitle,),),
+              const SizedBox(width: 6),
               Padding(
                 padding: const EdgeInsets.only(bottom: 3),
                 child: Text(percent,
-                    style: TextStyle(
+                    style: const TextStyle(
                         color: AppColors.successDot,
                         fontWeight: FontWeight.w600,
-                        fontSize: 11)),
+                        fontSize: 11,),),
               ),
             ],
           ),
@@ -553,7 +553,7 @@ class _CourseCard extends StatelessWidget {
           Container(
             height: 130,
             width: double.infinity,
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
               gradient: LinearGradient(
                 colors: [Color(0xff092C28), Color(0xff0A192F)],
@@ -571,14 +571,14 @@ class _CourseCard extends StatelessWidget {
                         const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                     decoration: BoxDecoration(
                         color: Colors.black.withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(4)),
-                    child: Text('CS-101',
+                        borderRadius: BorderRadius.circular(4),),
+                    child: const Text('CS-101',
                         style: TextStyle(
                             color: Colors.white,
                             fontSize: 9,
-                            fontWeight: FontWeight.w600)),
+                            fontWeight: FontWeight.w600,),),
                   ),
-                )
+                ),
               ],
             ),
           ),
@@ -591,12 +591,12 @@ class _CourseCard extends StatelessWidget {
                     style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
-                        color: AppColors.textTitle)),
-                SizedBox(height: 2),
+                        color: AppColors.textTitle,),),
+                const SizedBox(height: 2),
                 Text(instructor,
                     style: TextStyle(
-                        fontSize: 12, color: AppColors.textMuted)),
-                SizedBox(height: 12),
+                        fontSize: 12, color: AppColors.textMuted,),),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   height: 36,
@@ -607,11 +607,11 @@ class _CourseCard extends StatelessWidget {
                       foregroundColor: AppColors.textGray,
                       elevation: 0,
                       shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6)),
+                          borderRadius: BorderRadius.circular(6),),
                     ),
-                    child: Text('Continue',
+                    child: const Text('Continue',
                         style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600)),
+                            fontSize: 13, fontWeight: FontWeight.w600,),),
                   ),
                 ),
               ],
@@ -659,7 +659,7 @@ class _InsightRowItem extends StatelessWidget {
             backgroundColor: iconBg,
             child: Icon(icon, color: iconColor, size: 16),
           ),
-          SizedBox(width: 12),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -668,15 +668,15 @@ class _InsightRowItem extends StatelessWidget {
                     style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 13,
-                        color: AppColors.textGray)),
-                SizedBox(height: 2),
+                        color: AppColors.textGray,),),
+                const SizedBox(height: 2),
                 Text(subtitle,
                     style: TextStyle(
-                        color: AppColors.textMuted, fontSize: 11)),
+                        color: AppColors.textMuted, fontSize: 11,),),
               ],
             ),
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           SizedBox(
             height: 32,
             child: ElevatedButton(
@@ -691,12 +691,12 @@ class _InsightRowItem extends StatelessWidget {
                     ? BorderSide.none
                     : BorderSide(color: AppColors.border),
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6)),
+                    borderRadius: BorderRadius.circular(6),),
                 padding: const EdgeInsets.symmetric(horizontal: 12),
               ),
               child: Text(buttonText,
-                  style: TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600)),
+                  style: const TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.w600,),),
             ),
           ),
         ],

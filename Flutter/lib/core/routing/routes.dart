@@ -42,8 +42,10 @@ class Routes {
   static const instructorCourseStudents     = '/instructor/courses/:courseSlug/students';
   static const instructorCourseAnalytics    = '/instructor/courses/:courseSlug/analytics';
   static const instructorCourseQuestionBank = '/instructor/courses/:courseSlug/question-bank';
+  static const instructorCourseTemplates    = '/instructor/courses/:courseSlug/templates';
   static const instructorCourseQuizzes      = '/instructor/courses/:courseSlug/quizzes';
   static const instructorQuestionBank  = '/instructor/question-bank';
+  static const instructorExamCorrection = '/instructor/exam-correction';
   static const instructorQuizzes       = '/instructor/quizzes';
   static const instructorSettings      = '/instructor/settings';
   static const instructorHelp          = '/instructor/help';
@@ -55,6 +57,7 @@ class Routes {
   static const courseStudentsSegment     = 'students';
   static const courseAnalyticsSegment    = 'analytics';
   static const courseQuestionBankSegment = 'question-bank';
+  static const courseTemplatesSegment    = 'templates';
   static const courseQuizzesSegment      = 'quizzes';
 
   static String courseDetails(String slug)      => '/instructor/courses/$slug';
@@ -63,6 +66,7 @@ class Routes {
   static String courseStudents(String slug)     => '/instructor/courses/$slug/students';
   static String courseAnalytics(String slug)    => '/instructor/courses/$slug/analytics';
   static String courseQuestionBank(String slug) => '/instructor/courses/$slug/question-bank';
+  static String courseTemplates(String slug)    => '/instructor/courses/$slug/templates';
   static String courseQuizzes(String slug)      => '/instructor/courses/$slug/quizzes';
 
   /// Navigate to the "check your email" screen after signup or unverified login.

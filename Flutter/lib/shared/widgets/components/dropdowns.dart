@@ -46,7 +46,7 @@ class AppDropdown extends StatelessWidget {
               focusColor: AppColors.surfaceBg,
               style: AppText.input.copyWith(fontWeight: FontWeight.w600),
               icon: Icon(Icons.keyboard_arrow_down_rounded,
-                  size: 22, color: AppColors.cGray500),
+                  size: 22, color: AppColors.cGray500,),
               onChanged: enabled ? (v) => onChanged(v!) : null,
               items: items
                   .map((e) => DropdownMenuItem(
@@ -55,7 +55,7 @@ class AppDropdown extends StatelessWidget {
                           e,
                           style: AppText.input.copyWith(fontWeight: FontWeight.w600),
                         ),
-                      ))
+                      ),)
                   .toList(),
             ),
           ),
@@ -188,32 +188,32 @@ class AppProfileMenu extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(name,
-                  style: TextStyle(
-                      fontWeight: FontWeight.w700, fontSize: 13)),
-              SizedBox(height: 2),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w700, fontSize: 13,),),
+              const SizedBox(height: 2),
               Text(email,
                   style: TextStyle(
                       fontWeight: FontWeight.w500,
                       fontSize: 12,
-                      color: AppColors.textGray500)),
+                      color: AppColors.textGray500,),),
             ],
           ),
         ),
-        PopupMenuDivider(),
-        PopupMenuItem(
+        const PopupMenuDivider(),
+        const PopupMenuItem(
           value: 'logout',
           child: Text('Logout'),
         ),
       ],
       child: Row(
         children: [
-          CircleAvatar(radius: 16, child: Icon(Icons.person, size: 18)),
-          SizedBox(width: 8),
+          const CircleAvatar(radius: 16, child: Icon(Icons.person, size: 18)),
+          const SizedBox(width: 8),
           Text(name,
               style:
-                  TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-          SizedBox(width: 4),
-          Icon(Icons.expand_more_rounded, size: 18),
+                  const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),),
+          const SizedBox(width: 4),
+          const Icon(Icons.expand_more_rounded, size: 18),
         ],
       ),
     );
@@ -313,7 +313,7 @@ class _FigmaUmDropdown40State extends State<FigmaUmDropdown40> {
         onTap: _isOpen ? _close : _open,
         child: AnimatedContainer(
           key: _key,
-          duration: kIsWeb ? Duration.zero : Duration(milliseconds: 120),
+          duration: kIsWeb ? Duration.zero : const Duration(milliseconds: 120),
           width: widget.width,
           height: 40,
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -338,9 +338,9 @@ class _FigmaUmDropdown40State extends State<FigmaUmDropdown40> {
               ),
               AnimatedRotation(
                 turns: _isOpen ? 0.5 : 0.0,
-                duration: Duration(milliseconds: 150),
+                duration: const Duration(milliseconds: 150),
                 child: Icon(Icons.keyboard_arrow_down_rounded,
-                    size: 18, color: _isOpen ? _blue : _muted),
+                    size: 18, color: _isOpen ? _blue : _muted,),
               ),
             ],
           ),
@@ -383,10 +383,10 @@ class _FigmaDropdownMenuState extends State<_FigmaDropdownMenu>
   void initState() {
     super.initState();
     _ac = AnimationController(
-        vsync: this, duration: Duration(milliseconds: 160))
+        vsync: this, duration: const Duration(milliseconds: 160),)
       ..forward();
     _fade = CurvedAnimation(parent: _ac, curve: Curves.easeOut);
-    _slide = Tween<Offset>(begin: Offset(0, -0.05), end: Offset.zero)
+    _slide = Tween<Offset>(begin: const Offset(0, -0.05), end: Offset.zero)
         .animate(CurvedAnimation(parent: _ac, curve: Curves.easeOut));
   }
 
@@ -430,7 +430,7 @@ class _FigmaDropdownMenuState extends State<_FigmaDropdownMenu>
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.border),
                   boxShadow: [
-                    BoxShadow(
+                    const BoxShadow(
                       color: Color(0x14000000),
                       blurRadius: (kIsWeb ? 12 : 18),
                       offset: (kIsWeb ? Offset(0, 4) : Offset(0, 6)),
@@ -458,7 +458,7 @@ class _FigmaDropdownMenuState extends State<_FigmaDropdownMenu>
           ),
         ),
       ),
-    ]);
+    ],);
   }
 }
 
@@ -582,17 +582,17 @@ class AppProfileDropdown extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(name,
-                  style: TextStyle(
-                      fontWeight: FontWeight.w800, fontSize: 13)),
-              SizedBox(height: 2),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w800, fontSize: 13,),),
+              const SizedBox(height: 2),
               Text(subtitle,
                   style: TextStyle(
-                      fontWeight: FontWeight.w600, fontSize: 12, color: _mute)),
+                      fontWeight: FontWeight.w600, fontSize: 12, color: _mute,),),
             ],
           ),
         ),
-        PopupMenuDivider(),
-        PopupMenuItem(
+        const PopupMenuDivider(),
+        const PopupMenuItem(
           value: AppProfileMenuAction.profile,
           child: Row(
             children: [
@@ -602,7 +602,7 @@ class AppProfileDropdown extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuItem(
+        const PopupMenuItem(
           value: AppProfileMenuAction.settings,
           child: Row(
             children: [
@@ -612,8 +612,8 @@ class AppProfileDropdown extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuDivider(),
-        PopupMenuItem(
+        const PopupMenuDivider(),
+        const PopupMenuItem(
           value: AppProfileMenuAction.logout,
           child: Row(
             children: [
@@ -635,15 +635,15 @@ class AppProfileDropdown extends StatelessWidget {
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            CircleAvatar(
+            const CircleAvatar(
               radius: 14,
               child: Icon(Icons.person, size: 16),
             ),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Text(name,
-                style: TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 12)),
-            SizedBox(width: 6),
+                style: const TextStyle(
+                    fontWeight: FontWeight.w700, fontSize: 12,),),
+            const SizedBox(width: 6),
             Icon(Icons.expand_more_rounded, size: 18, color: _mute),
           ],
         ),
@@ -763,7 +763,7 @@ class _AppModernDropdownState<T> extends State<AppModernDropdown<T>> {
             color: _labelColor,
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         MouseRegion(
           onEnter: (_) => setState(() => _hover = true),
           onExit: (_) => setState(() => _hover = false),
@@ -773,7 +773,7 @@ class _AppModernDropdownState<T> extends State<AppModernDropdown<T>> {
               key: _key,
               duration: kIsWeb
                   ? Duration.zero
-                  : Duration(milliseconds: 120),
+                  : const Duration(milliseconds: 120),
               height: 44,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               decoration: BoxDecoration(
@@ -797,7 +797,7 @@ class _AppModernDropdownState<T> extends State<AppModernDropdown<T>> {
                   ),
                   AnimatedRotation(
                     turns: _isOpen ? 0.5 : 0.0,
-                    duration: Duration(milliseconds: 150),
+                    duration: const Duration(milliseconds: 150),
                     child: Icon(
                       Icons.keyboard_arrow_down_rounded,
                       size: 20,
@@ -847,10 +847,10 @@ class _ModernDropdownMenuState<T> extends State<_ModernDropdownMenu<T>>
   void initState() {
     super.initState();
     _ac = AnimationController(
-        vsync: this, duration: Duration(milliseconds: 160))
+        vsync: this, duration: const Duration(milliseconds: 160),)
       ..forward();
     _fade = CurvedAnimation(parent: _ac, curve: Curves.easeOut);
-    _slide = Tween<Offset>(begin: Offset(0, -0.05), end: Offset.zero)
+    _slide = Tween<Offset>(begin: const Offset(0, -0.05), end: Offset.zero)
         .animate(CurvedAnimation(parent: _ac, curve: Curves.easeOut));
   }
 
@@ -912,7 +912,7 @@ class _ModernDropdownMenuState<T> extends State<_ModernDropdownMenu<T>>
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.border),
                   boxShadow: [
-                    BoxShadow(
+                    const BoxShadow(
                       color: Color(0x14000000),
                       blurRadius: kIsWeb ? 12 : 18,
                       offset:
@@ -941,7 +941,7 @@ class _ModernDropdownMenuState<T> extends State<_ModernDropdownMenu<T>>
           ),
         ),
       ),
-    ]);
+    ],);
   }
 }
 
@@ -1006,8 +1006,8 @@ class _ModernDropdownItemState extends State<_ModernDropdownItem> {
                 ),
               ),
               if (widget.selected)
-                Icon(Icons.check_rounded,
-                    size: 16, color: AppColors.primary),
+                const Icon(Icons.check_rounded,
+                    size: 16, color: AppColors.primary,),
             ],
           ),
         ),
@@ -1129,10 +1129,10 @@ class _FigmaUmActionMenuOverlayState<T>
     super.initState();
     _ac = AnimationController(
       vsync: this,
-      duration: Duration(milliseconds: 160),
+      duration: const Duration(milliseconds: 160),
     )..forward();
     _fade = CurvedAnimation(parent: _ac, curve: Curves.easeOut);
-    _slide = Tween<Offset>(begin: Offset(0, -0.05), end: Offset.zero)
+    _slide = Tween<Offset>(begin: const Offset(0, -0.05), end: Offset.zero)
         .animate(CurvedAnimation(parent: _ac, curve: Curves.easeOut));
   }
 
@@ -1194,7 +1194,7 @@ class _FigmaUmActionMenuOverlayState<T>
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: _border),
                   boxShadow: [
-                    BoxShadow(
+                    const BoxShadow(
                       color: Color(0x14000000),
                       blurRadius: (kIsWeb ? 12 : 18),
                       offset: (kIsWeb ? Offset(0, 4) : Offset(0, 6)),
@@ -1227,7 +1227,7 @@ class _FigmaUmActionMenuOverlayState<T>
           ),
         ),
       ),
-    ]);
+    ],);
   }
 }
 
@@ -1280,7 +1280,7 @@ class _FigmaUmActionMenuItemState extends State<_FigmaUmActionMenuItem> {
             children: [
               if (widget.icon != null) ...[
                 Icon(widget.icon, size: 18, color: fg),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
               ],
               Expanded(
                 child: Text(

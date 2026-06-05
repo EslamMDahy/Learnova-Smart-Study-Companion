@@ -23,7 +23,7 @@ class LeftPanel extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
           decoration: BoxDecoration(
             image: DecorationImage(
-              image: ResizeImage(AssetImage('assets/login.webp'), width: bgCacheWidth),
+              image: ResizeImage(const AssetImage('assets/login.webp'), width: bgCacheWidth),
               fit: BoxFit.cover,
             ),
             gradient: LinearGradient(
@@ -42,8 +42,8 @@ class LeftPanel extends StatelessWidget {
               Row(
                 children: [
                   Image.asset('assets/logo.webp', height: 40, cacheWidth: (40 * dpr).round()),
-                  SizedBox(width: 12),
-                  Text(
+                  const SizedBox(width: 12),
+                  const Text(
                     'Learnova',
                     style: TextStyle(
                       color: Colors.white,
@@ -53,7 +53,7 @@ class LeftPanel extends StatelessWidget {
                   ),
                 ],
               ),
-              SizedBox(height: 40),
+              const SizedBox(height: 40),
               Text.rich(
                 TextSpan(
                   children: [
@@ -78,10 +78,10 @@ class LeftPanel extends StatelessWidget {
                   ],
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxTextWidth),
-                child: Text(
+                child: const Text(
                   'Experience personalized assessments, adaptive question banks, and intelligent insights designed for students, instructors, and administrators.',
                   style: TextStyle(
                     color: Colors.white70,
@@ -90,8 +90,8 @@ class LeftPanel extends StatelessWidget {
                   ),
                 ),
               ),
-              SizedBox(height: 30),
-              Wrap(
+              const SizedBox(height: 30),
+              const Wrap(
                 spacing: 12,
                 runSpacing: 12,
                 children: [
@@ -106,7 +106,7 @@ class LeftPanel extends StatelessWidget {
                   ),
                 ],
               ),
-              SizedBox(height: 50),
+              const SizedBox(height: 50),
             ],
           ),
         );
@@ -134,10 +134,10 @@ class _FeatureTag extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: Colors.white, size: 18),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(
             title,
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white,
               fontSize: 13,
               fontWeight: FontWeight.w600,

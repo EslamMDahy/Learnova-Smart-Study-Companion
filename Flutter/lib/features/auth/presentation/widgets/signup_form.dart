@@ -139,16 +139,16 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
       padding: EdgeInsets.symmetric(horizontal: widget.isMobile ? 24 : 56),
       child: Center(
         child: SingleChildScrollView(
-          physics: BouncingScrollPhysics(),
+          physics: const BouncingScrollPhysics(),
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 420),
+            constraints: const BoxConstraints(maxWidth: 420),
             child: Form(
               key: _formKey,
               autovalidateMode: _autoValidate,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppFormHeader(
+                  const AppFormHeader(
                     title: 'Create account',
                     subtitle:
                         'Start your journey with AI-driven personalized assessments today.',
@@ -157,7 +157,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
 
                   if (shownError != null) ...[
                     AppErrorBox(message: shownError),
-                    SizedBox(height: 14),
+                    const SizedBox(height: 14),
                   ],
 
                   AppSegmentedControl<AccountType>(
@@ -165,12 +165,12 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                     value: accountType,
                     onChanged: _onSwitchAccountType,
                     options: [
-                      AppSegmentOption(label: 'User', value: AccountType.user),
-                      AppSegmentOption(label: 'Owner', value: AccountType.owner),
+                      const AppSegmentOption(label: 'User', value: AccountType.user),
+                      const AppSegmentOption(label: 'Owner', value: AccountType.owner),
                     ],
                   ),
 
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
 
                   if (accountType == AccountType.user) ...[
                     AppSegmentedControl<UserKind>(
@@ -178,12 +178,12 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                       value: userKind,
                       onChanged: (k) => setState(() => userKind = k),
                       options: [
-                        AppSegmentOption(label: 'Student', value: UserKind.student),
-                        AppSegmentOption(label: 'Instructor', value: UserKind.instructor),
-                        AppSegmentOption(label: 'Assistant', value: UserKind.assistant),
+                        const AppSegmentOption(label: 'Student', value: UserKind.student),
+                        const AppSegmentOption(label: 'Instructor', value: UserKind.instructor),
+                        const AppSegmentOption(label: 'Assistant', value: UserKind.assistant),
                       ],
                     ),
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                   ],
 
                   Row(
@@ -199,7 +199,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               (v ?? '').trim().isEmpty ? 'Required' : null,
                         ),
                       ),
-                      SizedBox(width: 16),
+                      const SizedBox(width: 16),
                       Expanded(
                         child: AppLabeledIconField(
                           label: 'Last Name',
@@ -214,7 +214,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                     ],
                   ),
 
-                  SizedBox(height: 14),
+                  const SizedBox(height: 14),
 
                   AppLabeledIconField(
                     label: 'Email',
@@ -231,7 +231,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                     },
                   ),
 
-                  SizedBox(height: 14),
+                  const SizedBox(height: 14),
 
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -259,12 +259,12 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               setState(() => _obscurePassword = !_obscurePassword),
                         ),
                       ),
-                      SizedBox(height: 10),
+                      const SizedBox(height: 10),
                       AppPasswordStrengthHints(password: passwordController.text),
                     ],
                   ),
 
-                  SizedBox(height: 10),
+                  const SizedBox(height: 10),
 
                   Row(
                     children: [
@@ -286,7 +286,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               'I agree to the ',
                               style: AppText.input.copyWith(fontSize: 14),
                             ),
-                            InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+                            InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                               onTap: state.loading ? null : () {},
                               child: Text(
                                 'Terms',
@@ -301,7 +301,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               ' and ',
                               style: AppText.input.copyWith(fontSize: 14),
                             ),
-                            InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+                            InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                               onTap: state.loading ? null : () {},
                               child: Text(
                                 'Privacy Policy',
@@ -318,7 +318,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                     ],
                   ),
 
-                  SizedBox(height: 14),
+                  const SizedBox(height: 14),
 
                   SizedBox(
                     width: double.infinity,
@@ -332,7 +332,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                       ),
                       onPressed: state.loading ? null : _onCreateAccount,
                       child: state.loading
-                          ? SizedBox(
+                          ? const SizedBox(
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
@@ -340,14 +340,14 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                                 color: Colors.white,
                               ),
                             )
-                          : Text(
+                          : const Text(
                               'Create Account',
                               style: TextStyle(color: Colors.white, fontSize: 16),
                             ),
                     ),
                   ),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -356,7 +356,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                         'Already have an account? ',
                         style: AppText.input.copyWith(color: AppColors.title),
                       ),
-                      InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+                      InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                         onTap: state.loading ? null : () => context.go(Routes.login),
                         child: Text(
                           'Log in',
@@ -369,7 +369,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                     ],
                   ),
 
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                 ],
               ),
             ),

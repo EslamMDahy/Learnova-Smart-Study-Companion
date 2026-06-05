@@ -37,12 +37,12 @@ class _VerifyEmailSentPageState extends ConsumerState<VerifyEmailSentPage>
 
   late final AnimationController _ac = AnimationController(
     vsync: this,
-    duration: Duration(milliseconds: 450),
+    duration: const Duration(milliseconds: 450),
   )..forward();
   late final Animation<double> _fade =
       CurvedAnimation(parent: _ac, curve: Curves.easeOut);
   late final Animation<Offset> _slide = Tween<Offset>(
-    begin: Offset(0, 0.05),
+    begin: const Offset(0, 0.05),
     end: Offset.zero,
   ).animate(CurvedAnimation(parent: _ac, curve: Curves.easeOut));
 
@@ -64,7 +64,7 @@ class _VerifyEmailSentPageState extends ConsumerState<VerifyEmailSentPage>
   void _startCooldown() {
     _cooldownTimer?.cancel();
     setState(() => _secondsLeft = _cooldownSec);
-    _cooldownTimer = Timer.periodic(Duration(seconds: 1), (t) {
+    _cooldownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) {
         t.cancel();
         return;
@@ -137,7 +137,7 @@ class _VerifyEmailSentPageState extends ConsumerState<VerifyEmailSentPage>
           ),
 
           // ── Footer ────────────────────────────────────────────────────
-          Positioned(
+          const Positioned(
             bottom: 0,
             left: 0,
             right: 0,
@@ -156,7 +156,7 @@ class _VerifyEmailSentPageState extends ConsumerState<VerifyEmailSentPage>
                     alignment: Alignment.center,
                     children: [
                       // Ghost envelope text in background
-                      Opacity(
+                      const Opacity(
                         opacity: 0.04,
                         child: Icon(
                           Icons.mark_email_unread_outlined,
@@ -167,7 +167,7 @@ class _VerifyEmailSentPageState extends ConsumerState<VerifyEmailSentPage>
 
                       // Foreground card
                       ConstrainedBox(
-                        constraints: BoxConstraints(maxWidth: 460),
+                        constraints: const BoxConstraints(maxWidth: 460),
                         child: _Card(
                           email: _email,
                           hasEmail: _hasEmail,
@@ -204,7 +204,7 @@ class _TopBar extends StatelessWidget {
       child: Row(
         children: [
           Image.asset('assets/logo.webp', height: 32, cacheWidth: (32 * MediaQuery.of(context).devicePixelRatio).round()),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Text(
             'Learnova',
             style: TextStyle(
@@ -294,9 +294,9 @@ class _Card extends StatelessWidget {
             height: 1.2,
           ),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 360),
+          constraints: const BoxConstraints(maxWidth: 360),
           child: Text(
             hasEmail
                 ? 'We\'ve sent a verification link to $email. Click the link to activate your account.'
@@ -309,24 +309,24 @@ class _Card extends StatelessWidget {
             ),
           ),
         ),
-        SizedBox(height: 32),
+        const SizedBox(height: 32),
 
         // Spam tip
-        _TipRow(
+        const _TipRow(
           icon: Icons.folder_special_outlined,
           text:
               'Can\'t find it? Check your spam or junk folder.',
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
 
         // Feedback banners
         if (state.error != null) ...[
           _Banner.error(message: state.error!),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
         ],
         if (state.successMessage != null) ...[
           _Banner.success(message: state.successMessage!),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
         ],
 
         // Primary: I've Verified
@@ -339,17 +339,17 @@ class _Card extends StatelessWidget {
               foregroundColor: Colors.white,
               elevation: 0,
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),),
             ),
             onPressed: state.checkingVerification ? null : onCheckVerified,
             child: state.checkingVerification
-                ? SizedBox(
+                ? const SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Colors.white),
+                        strokeWidth: 2, color: Colors.white,),
                   )
-                : Text(
+                : const Text(
                     'I\'ve Verified, Continue',
                     style:
                         TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
@@ -357,7 +357,7 @@ class _Card extends StatelessWidget {
           ),
         ),
 
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
 
         // Resend + Logout row
         Row(
@@ -377,7 +377,7 @@ class _Card extends StatelessWidget {
                     ),
                     backgroundColor: AppColors.cardBg,
                     shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10)),
+                        borderRadius: BorderRadius.circular(10),),
                   ),
                   onPressed: (canResend && !state.loading) ? onResend : null,
                   icon: state.loading
@@ -386,20 +386,20 @@ class _Card extends StatelessWidget {
                           height: 16,
                           child: CircularProgressIndicator(
                               strokeWidth: 2,
-                              color: AppColors.textGray500),
+                              color: AppColors.textGray500,),
                         )
-                      : Icon(Icons.refresh_rounded, size: 16),
+                      : const Icon(Icons.refresh_rounded, size: 16),
                   label: Text(
                     secondsLeft > 0
                         ? 'Resend in ${secondsLeft}s'
                         : 'Resend Email',
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600, fontSize: 14),
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w600, fontSize: 14,),
                   ),
                 ),
               ),
             ),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             SizedBox(
               height: 48,
               child: OutlinedButton.icon(
@@ -408,12 +408,12 @@ class _Card extends StatelessWidget {
                   side: BorderSide(color: AppColors.dangerBorder),
                   backgroundColor: AppColors.cardBg,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),),
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
                 onPressed: state.loading ? null : onLogout,
-                icon: Icon(Icons.logout_rounded, size: 16),
-                label: Text(
+                icon: const Icon(Icons.logout_rounded, size: 16),
+                label: const Text(
                   'Log out',
                   style:
                       TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
@@ -447,7 +447,7 @@ class _TipRow extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, size: 18, color: AppColors.textGray500),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               text,
@@ -511,7 +511,7 @@ class _Banner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Icon(icon, size: 18, color: iconColor),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               message,

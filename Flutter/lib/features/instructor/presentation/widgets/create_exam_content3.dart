@@ -26,12 +26,12 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
           child: Column(
             children: [
               _buildTimingAttemptsCard(),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               _buildDisplaySecurityCard(),
             ],
           ),
         ),
-        SizedBox(width: 32),
+        const SizedBox(width: 32),
         
         Expanded(child: _buildQuizSummaryCard()),
       ],
@@ -57,7 +57,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
                   helperText: 'Leave blank for no time limit.',
                 ),
               ),
-              SizedBox(width: 20),
+              const SizedBox(width: 20),
               Expanded(
                 child: _buildDropdownField(
                   label: 'Allowed Attempts',
@@ -66,7 +66,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
               ),
             ],
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
@@ -77,7 +77,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
                       'Determines which score is recorded in the gradebook.',
                 ),
               ),
-              SizedBox(width: 20),
+              const SizedBox(width: 20),
               Expanded(
                 child: _buildInputField(
                   label: 'Due Date',
@@ -108,7 +108,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
             value: _shuffleQuestions,
             onChanged: (v) => setState(() => _shuffleQuestions = v),
           ),
-          Divider(height: 32),
+          const Divider(height: 32),
           _buildSwitchTile(
             title: 'Show Results Immediately',
             subtitle:
@@ -116,7 +116,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
             value: _showResults,
             onChanged: (v) => setState(() => _showResults = v),
           ),
-          Divider(height: 32),
+          const Divider(height: 32),
           _buildSwitchTile(
             title: 'One Question at a Time',
             subtitle:
@@ -149,15 +149,15 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
               color: AppColors.textGray,
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           _summaryRow('Total Questions', '15'),
           Divider(height: 32, color: AppColors.headerBg),
           _summaryRow('Total Points', '100'),
           Divider(height: 32, color: AppColors.headerBg),
           _summaryRow('Difficulty', 'Medium', color: Colors.orange),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           _buildInfoBox(),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           _summaryButton(
             Icons.visibility_outlined,
             'Preview as Student',
@@ -197,13 +197,13 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
                 ),
                 child: Icon(icon, color: iconColor, size: 20),
               ),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     title,
-                    style: TextStyle(
+                    style: const TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 16,
                     ),
@@ -216,7 +216,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
               ),
             ],
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           child,
         ],
       ),
@@ -235,9 +235,9 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
       children: [
         Text(
           label,
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         TextField(
           decoration: InputDecoration(
             hintText: hint,
@@ -258,7 +258,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
           ),
         ),
         if (helperText != null) ...[
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             helperText,
             style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
@@ -278,9 +278,9 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
       children: [
         Text(
           label,
-          style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           decoration: BoxDecoration(
@@ -290,13 +290,13 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(value, style: TextStyle(fontSize: 14)),
-              Icon(Icons.keyboard_arrow_down, color: Colors.grey),
+              Text(value, style: const TextStyle(fontSize: 14)),
+              const Icon(Icons.keyboard_arrow_down, color: Colors.grey),
             ],
           ),
         ),
         if (helperText != null) ...[
-          SizedBox(height: 4),
+          const SizedBox(height: 4),
           Text(
             helperText,
             style: TextStyle(color: Colors.grey.shade500, fontSize: 11),
@@ -320,7 +320,7 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
             children: [
               Text(
                 title,
-                style: TextStyle(
+                style: const TextStyle(
                   fontWeight: FontWeight.w600,
                   fontSize: 14,
                 ),
@@ -367,8 +367,8 @@ class _CreateExamContent3State extends State<CreateExamContent3> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, size: 18, color: AppColors.primary),
-          SizedBox(width: 10),
+          const Icon(Icons.info_outline, size: 18, color: AppColors.primary),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               'This quiz is currently saved as a draft. Publishing will make it visible to enrolled students immediately or on the scheduled date.',

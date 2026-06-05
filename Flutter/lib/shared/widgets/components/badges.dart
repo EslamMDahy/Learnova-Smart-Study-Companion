@@ -25,7 +25,7 @@ class AppFilterChip extends StatelessWidget {
     final textColor = selected ? Colors.white : AppColors.textGray;
     final weight = selected ? FontWeight.w700 : FontWeight.w500;
 
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       borderRadius: BorderRadius.circular(8),
       onTap: onTap,
       child: Container(
@@ -157,7 +157,7 @@ class JrStatusBadge extends StatelessWidget {
             borderRadius: BorderRadius.circular(9999),
           ),
         ),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Text(
           label,
           overflow: TextOverflow.ellipsis,
@@ -207,7 +207,7 @@ class UpgradePeriodToggle extends StatelessWidget {
           BoxShadow(
             color: AppColors.shadowThin,
             blurRadius: (kIsWeb ? 12 : 18),
-            offset: (kIsWeb ? Offset(0, 4) : Offset(0, 8)),
+            offset: (kIsWeb ? const Offset(0, 4) : const Offset(0, 8)),
           ),
         ],
       ),
@@ -219,13 +219,13 @@ class UpgradePeriodToggle extends StatelessWidget {
             selected: !isYearly,
             onTap: isYearly ? onToggle : null,
           ),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           UpgradeToggleChip(
             text: 'Yearly',
             selected: isYearly,
             onTap: !isYearly ? onToggle : null,
           ),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
@@ -262,11 +262,11 @@ class UpgradeToggleChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       onTap: onTap,
       borderRadius: BorderRadius.circular(999),
       child: AnimatedContainer(
-        duration: kIsWeb ? Duration.zero : Duration(milliseconds: 180),
+        duration: kIsWeb ? Duration.zero : const Duration(milliseconds: 180),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: selected ? AppColors.primary : AppColors.surfaceBg,

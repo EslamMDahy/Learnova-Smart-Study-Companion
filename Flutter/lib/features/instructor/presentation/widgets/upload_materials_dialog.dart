@@ -24,7 +24,7 @@ class _UploadMaterialsDialogState extends State<UploadMaterialsDialog> {
       backgroundColor: AppColors.cardBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 860),
+        constraints: const BoxConstraints(maxWidth: 860),
         child: Container(
           padding: const EdgeInsets.all(32),
           child: Column(
@@ -41,39 +41,39 @@ class _UploadMaterialsDialogState extends State<UploadMaterialsDialog> {
                   height: 1.15,
                 ),
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               RichText(
                 text: TextSpan(
                   style: TextStyle(fontSize: 13.5, color: _muted, height: 1.5),
                   children: [
-                    TextSpan(text: 'Add resources for the AI to analyze and generate study aids.\n'),
-                    TextSpan(text: 'Supported formats: '),
+                    const TextSpan(text: 'Add resources for the AI to analyze and generate study aids.\n'),
+                    const TextSpan(text: 'Supported formats: '),
                     TextSpan(
                       text: 'PDF only',
                       style: TextStyle(fontWeight: FontWeight.w700, color: _text),
                     ),
-                    TextSpan(text: '. Max file size: '),
+                    const TextSpan(text: '. Max file size: '),
                     TextSpan(
                       text: '50MB',
                       style: TextStyle(fontWeight: FontWeight.w700, color: _text),
                     ),
-                    TextSpan(text: '.'),
+                    const TextSpan(text: '.'),
                   ],
                 ),
               ),
-              SizedBox(height: 28),
+              const SizedBox(height: 28),
 
               // ── Body: drag-drop + queue ────────────────────────────────
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(flex: 3, child: _DragDropArea(isDragging: _isDragging)),
-                  SizedBox(width: 20),
-                  Expanded(flex: 2, child: _UploadQueue()),
+                  const SizedBox(width: 20),
+                  const Expanded(flex: 2, child: _UploadQueue()),
                 ],
               ),
 
-              SizedBox(height: 28),
+              const SizedBox(height: 28),
 
               // ── Footer ─────────────────────────────────────────────────
               Row(
@@ -87,13 +87,13 @@ class _UploadMaterialsDialogState extends State<UploadMaterialsDialog> {
                       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                     ),
-                    child: Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
+                    child: const Text('Cancel', style: TextStyle(fontWeight: FontWeight.w600)),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   ElevatedButton.icon(
                     onPressed: () {},
-                    icon: Icon(Icons.save_rounded, size: 18, color: Colors.white),
-                    label: Text(
+                    icon: const Icon(Icons.save_rounded, size: 18, color: Colors.white),
+                    label: const Text(
                       'Save to Course',
                       style: TextStyle(fontWeight: FontWeight.w700, color: Colors.white),
                     ),
@@ -121,7 +121,7 @@ class _DragDropArea extends StatelessWidget {
   const _DragDropArea({required this.isDragging});
 
   static Color get _blue => AppColors.primary;
-  static Color get _blueCircle => AppThemeRuntime.isDark ? Color(0xFF172554) : Color(0xFFD0EAFC);
+  static Color get _blueCircle => AppThemeRuntime.isDark ? const Color(0xFF172554) : const Color(0xFFD0EAFC);
   static Color get _bg => AppColors.pageBg;
   static Color get _borderColor => AppColors.border;
   static Color get _muted => AppColors.textMuted;
@@ -134,7 +134,7 @@ class _DragDropArea extends StatelessWidget {
       children: [
         // Drop zone
         AnimatedContainer(
-          duration: Duration(milliseconds: 160),
+          duration: const Duration(milliseconds: 160),
           height: 260,
           width: double.infinity,
           decoration: BoxDecoration(
@@ -161,7 +161,7 @@ class _DragDropArea extends StatelessWidget {
                   color: _blue,
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               Text(
                 'Drag & Drop files here',
                 style: TextStyle(
@@ -170,17 +170,17 @@ class _DragDropArea extends StatelessWidget {
                   color: _text,
                 ),
               ),
-              SizedBox(height: 6),
+              const SizedBox(height: 6),
               Text(
                 'or click to browse from your computer.',
                 style: TextStyle(fontSize: 13, color: _muted),
               ),
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(
                 'AI processing will start automatically upon upload.',
                 style: TextStyle(fontSize: 12, color: _muted),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               ElevatedButton(
                 onPressed: () {},
                 style: ElevatedButton.styleFrom(
@@ -190,7 +190,7 @@ class _DragDropArea extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: Text(
+                child: const Text(
                   'Browse Files',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
@@ -199,7 +199,7 @@ class _DragDropArea extends StatelessWidget {
           ),
         ),
 
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
 
         // Guidelines box
         Container(
@@ -209,7 +209,7 @@ class _DragDropArea extends StatelessWidget {
             borderRadius: BorderRadius.circular(10),
             border: Border.all(color: AppColors.border),
           ),
-          child: Column(
+          child: const Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _GuideRow(
@@ -246,7 +246,7 @@ class _GuideRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, size: 15, color: AppColors.primary),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Expanded(
           child: Text(
             text,
@@ -287,14 +287,14 @@ class _UploadQueue extends StatelessWidget {
                   color: AppColors.textTitle,
                 ),
               ),
-              Spacer(),
+              const Spacer(),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
                   color: AppColors.infoBg,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Text(
+                child: const Text(
                   '3 Files',
                   style: TextStyle(
                     fontSize: 11,
@@ -305,10 +305,10 @@ class _UploadQueue extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
 
           // File items
-          _QueueItem(
+          const _QueueItem(
             icon: Icons.picture_as_pdf_rounded,
             iconColor: AppColors.errorDot,
             name: 'Lecture_04_Neural_Nets.pdf',
@@ -317,15 +317,15 @@ class _UploadQueue extends StatelessWidget {
             progressLabel: 'Uploading... 45%',
             showClose: true,
           ),
-          SizedBox(height: 14),
-          _QueueItem(
+          const SizedBox(height: 14),
+          const _QueueItem(
             icon: Icons.description_rounded,
             iconColor: AppColors.primary,
             name: 'Assignment_Brief_v2.docx',
             sub: 'AI Analyzing Content...',
             isAnalyzing: true,
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           _QueueItem(
             icon: Icons.video_file_rounded,
             iconColor: AppColors.purpleText,
@@ -334,9 +334,9 @@ class _UploadQueue extends StatelessWidget {
             isDone: true,
           ),
 
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Divider(height: 1, color: AppColors.border),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
 
           SizedBox(
             width: double.infinity,
@@ -348,7 +348,7 @@ class _UploadQueue extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 10),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: Text(
+              child: const Text(
                 'Clear Completed',
                 style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
               ),
@@ -390,7 +390,7 @@ class _QueueItem extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Icon(icon, color: iconColor, size: 28),
-        SizedBox(width: 10),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -413,32 +413,32 @@ class _QueueItem extends StatelessWidget {
                     Icon(Icons.close, size: 16, color: AppColors.textHint),
                 ],
               ),
-              SizedBox(height: 3),
+              const SizedBox(height: 3),
               if (progress != null) ...[ 
                 Text(
                   progressLabel ?? sub,
                   style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                 ),
-                SizedBox(height: 5),
+                const SizedBox(height: 5),
                 LinearProgressIndicator(
                   value: progress,
                   minHeight: 4,
                   borderRadius: BorderRadius.circular(2),
                   backgroundColor: AppColors.border,
-                  valueColor: AlwaysStoppedAnimation(AppColors.primary),
+                  valueColor: const AlwaysStoppedAnimation(AppColors.primary),
                 ),
               ] else if (isAnalyzing) ...[ 
                 Row(
                   children: [
                     Icon(Icons.sync_rounded, size: 13, color: AppColors.purpleText),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text(
                       'AI Analyzing Content...',
                       style: TextStyle(fontSize: 11, color: AppColors.purpleText),
                     ),
                   ],
                 ),
-                SizedBox(height: 5),
+                const SizedBox(height: 5),
                 LinearProgressIndicator(
                   minHeight: 4,
                   borderRadius: BorderRadius.circular(2),
@@ -449,7 +449,7 @@ class _QueueItem extends StatelessWidget {
                 Row(
                   children: [
                     Icon(Icons.check_circle_rounded, size: 13, color: AppColors.successText),
-                    SizedBox(width: 4),
+                    const SizedBox(width: 4),
                     Text(
                       'Ready for Review',
                       style: TextStyle(fontSize: 11, color: AppColors.successText),

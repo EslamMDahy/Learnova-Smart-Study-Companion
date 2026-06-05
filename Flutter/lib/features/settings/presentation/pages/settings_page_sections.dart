@@ -27,7 +27,7 @@ extension _SettingsPageSections on _SettingsPageState {
           child: Row(
             children: [
               Icon(icon, color: AppColors.muted, size: 20),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   resolved,
@@ -38,12 +38,12 @@ extension _SettingsPageSections on _SettingsPageState {
                   ),
                 ),
               ),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Icon(Icons.lock_outline, color: AppColors.muted, size: 18),
             ],
           ),
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         Text(
           helperText,
           style: AppText.mutedSmall,
@@ -65,11 +65,11 @@ extension _SettingsPageSections on _SettingsPageState {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppSectionHeader(
+            const AppSectionHeader(
               title: 'Personal Information',
               subtitle: 'Update your personal details here.',
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             LayoutBuilder(
               builder: (context, c) {
                 final isWide = c.maxWidth >= 780;
@@ -96,14 +96,14 @@ extension _SettingsPageSections on _SettingsPageState {
                     ? Row(
                         children: [
                           Expanded(child: first),
-                          SizedBox(width: 24),
+                          const SizedBox(width: 24),
                           Expanded(child: last),
                         ],
                       )
                     : Column(
                         children: [
                           first,
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           last,
                         ],
                       );
@@ -111,7 +111,7 @@ extension _SettingsPageSections on _SettingsPageState {
                 return Column(
                   children: [
                     row,
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     _buildReadOnlyProfileValue(
                       label: 'University Email',
                       value: universityEmailCtrl.text,
@@ -119,7 +119,7 @@ extension _SettingsPageSections on _SettingsPageState {
                       icon: Icons.email_outlined,
                       helperText: 'Managed by your account identity and not editable from settings yet.',
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     LayoutBuilder(
                       builder: (context, c2) {
                         final wide2 = c2.maxWidth >= 780;
@@ -147,20 +147,20 @@ extension _SettingsPageSections on _SettingsPageState {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Expanded(child: id),
-                                  SizedBox(width: 24),
+                                  const SizedBox(width: 24),
                                   Expanded(child: phone),
                                 ],
                               )
                             : Column(
                                 children: [
                                   id,
-                                  SizedBox(height: 16),
+                                  const SizedBox(height: 16),
                                   phone,
                                 ],
                               );
                       },
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     AppLabeledIconField(
                       label: 'Bio / Academic Interests',
                       controller: bio,
@@ -187,11 +187,11 @@ extension _SettingsPageSections on _SettingsPageState {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AppSectionHeader(
+            const AppSectionHeader(
               title: 'Security',
               subtitle: 'Manage your password and authentication settings.',
             ),
-            SizedBox(height: 24),
+            const SizedBox(height: 24),
             LayoutBuilder(
               builder: (context, c) {
                 final isWide = c.maxWidth >= 780;
@@ -217,7 +217,7 @@ extension _SettingsPageSections on _SettingsPageState {
                         onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
                       ),
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     AppLabeledIconField(
                       label: 'New Password',
                       controller: newPassword,
@@ -237,7 +237,7 @@ extension _SettingsPageSections on _SettingsPageState {
                         onPressed: () => setState(() => _obscureNew = !_obscureNew),
                       ),
                     ),
-                    SizedBox(height: 20),
+                    const SizedBox(height: 20),
                     AppLabeledIconField(
                       label: 'Confirm New Password',
                       controller: confirmPassword,
@@ -257,7 +257,7 @@ extension _SettingsPageSections on _SettingsPageState {
                         onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
                       ),
                     ),
-                    SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     Align(
                       alignment: Alignment.centerLeft,
                       child: AppPrimaryLoadingButton(
@@ -309,7 +309,7 @@ extension _SettingsPageSections on _SettingsPageState {
                 return Row(
                   children: [
                     Expanded(child: left),
-                    SizedBox(width: 32),
+                    const SizedBox(width: 32),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -322,7 +322,7 @@ extension _SettingsPageSections on _SettingsPageState {
                               color: AppColors.title,
                             ),
                           ),
-                          SizedBox(height: 8),
+                          const SizedBox(height: 8),
                           Text(
                             'Use a strong password and avoid reusing it across services.',
                             style: TextStyle(
@@ -351,32 +351,32 @@ extension _SettingsPageSections on _SettingsPageState {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppSectionHeader(
+          const AppSectionHeader(
             title: 'Preferences',
             subtitle: 'Customize your system experience.',
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           AppModernDropdown<String>(
             label: 'Interface Language',
             value: _language,
             items: [
-              DropdownMenuItem(value: 'English (US)', child: Text('English (US)')),
-              DropdownMenuItem(value: 'English (UK)', child: Text('English (UK)')),
-              DropdownMenuItem(value: 'Arabic', child: Text('Arabic')),
+              const DropdownMenuItem(value: 'English (US)', child: Text('English (US)')),
+              const DropdownMenuItem(value: 'English (UK)', child: Text('English (UK)')),
+              const DropdownMenuItem(value: 'Arabic', child: Text('Arabic')),
             ],
             onChanged: (v) {
               if (v == null) return;
               setState(() => _language = v);
             },
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           AppModernDropdown<String>(
             label: 'Theme Mode',
             value: themeMode,
             items: [
-              DropdownMenuItem(value: 'light', child: Text('Light')),
-              DropdownMenuItem(value: 'dark', child: Text('Dark')),
-              DropdownMenuItem(value: 'system', child: Text('System')),
+              const DropdownMenuItem(value: 'light', child: Text('Light')),
+              const DropdownMenuItem(value: 'dark', child: Text('Dark')),
+              const DropdownMenuItem(value: 'system', child: Text('System')),
             ],
             onChanged: (v) {
               if (v == null) return;
@@ -384,21 +384,21 @@ extension _SettingsPageSections on _SettingsPageState {
               ref.read(settingsControllerProvider.notifier).applyLocalThemeMode(v);
             },
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           AppModernDropdown<String>(
             label: 'Profile Visibility',
             value: profileVisibility,
             items: [
-              DropdownMenuItem(value: 'public', child: Text('Public')),
-              DropdownMenuItem(value: 'private', child: Text('Private')),
-              DropdownMenuItem(value: 'connections', child: Text('Connections')),
+              const DropdownMenuItem(value: 'public', child: Text('Public')),
+              const DropdownMenuItem(value: 'private', child: Text('Private')),
+              const DropdownMenuItem(value: 'connections', child: Text('Connections')),
             ],
             onChanged: (v) {
               if (v == null) return;
               setState(() => profileVisibility = v);
             },
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
             title: 'Show Online Status',
@@ -406,7 +406,7 @@ extension _SettingsPageSections on _SettingsPageState {
             value: showOnlineStatus,
             onChanged: (v) => setState(() => showOnlineStatus = v),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -418,11 +418,11 @@ extension _SettingsPageSections on _SettingsPageState {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          AppSectionHeader(
+          const AppSectionHeader(
             title: 'Notifications',
             subtitle: 'Control how and when you receive updates.',
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
             title: 'Email Notifications',
@@ -430,7 +430,7 @@ extension _SettingsPageSections on _SettingsPageState {
             value: emailNotifications,
             onChanged: (v) => setState(() => emailNotifications = v),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
             title: 'Assignment Alerts',
@@ -438,7 +438,7 @@ extension _SettingsPageSections on _SettingsPageState {
             value: assignmentAlerts,
             onChanged: (v) => setState(() => assignmentAlerts = v),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
             title: 'Course Updates',
@@ -446,7 +446,7 @@ extension _SettingsPageSections on _SettingsPageState {
             value: courseUpdates,
             onChanged: (v) => setState(() => courseUpdates = v),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
             title: 'Announcements',
@@ -454,7 +454,7 @@ extension _SettingsPageSections on _SettingsPageState {
             value: announcementNotifications,
             onChanged: (v) => setState(() => announcementNotifications = v),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
             title: 'Grading Notifications',
@@ -462,7 +462,7 @@ extension _SettingsPageSections on _SettingsPageState {
             value: gradingNotifications,
             onChanged: (v) => setState(() => gradingNotifications = v),
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           // ignore: deprecated_member_use_from_same_package
           AppToggleRow(
             title: 'Deadline Reminders',
@@ -491,8 +491,8 @@ extension _SettingsPageSections on _SettingsPageState {
                 color: AppColors.dangerTitle,
               ),
             ),
-            SizedBox(height: 6),
-            Text(
+            const SizedBox(height: 6),
+            const Text(
               'Once you delete your account, there is no going back. Please be certain.',
               style: TextStyle(
                 fontWeight: FontWeight.w400,
@@ -526,14 +526,14 @@ extension _SettingsPageSections on _SettingsPageState {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     textContent,
-                    SizedBox(height: 12),
+                    const SizedBox(height: 12),
                     SizedBox(width: double.infinity, child: button),
                   ],
                 )
               : Row(
                   children: [
                     Expanded(child: textContent),
-                    SizedBox(width: 16),
+                    const SizedBox(width: 16),
                     SizedBox(width: 170, child: button),
                   ],
                 ),
@@ -550,7 +550,7 @@ extension _SettingsPageSections on _SettingsPageState {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _DeleteAccountDialog(),
+      builder: (_) => const _DeleteAccountDialog(),
     );
   }
 
@@ -689,7 +689,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
   void _startCountdown([int seconds = 60]) {
     _timer?.cancel();
     setState(() => _secondsLeft = seconds);
-    _timer = Timer.periodic(Duration(seconds: 1), (t) {
+    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) return;
       if (_secondsLeft <= 1) {
         t.cancel();
@@ -774,7 +774,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
       child: ConstrainedBox(
-        constraints: BoxConstraints(maxWidth: 520),
+        constraints: const BoxConstraints(maxWidth: 520),
         child: Padding(
           padding: AppSpacing.cardPadding,
           child: Column(
@@ -786,28 +786,28 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                   Expanded(
                     child: Text(
                       title,
-                      style: TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
+                      style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 18),
                     ),
                   ),
                   IconButton(
                     onPressed: isBusy ? null : () => Navigator.of(context).pop(),
-                    icon: Icon(Icons.close_rounded),
+                    icon: const Icon(Icons.close_rounded),
                   ),
                 ],
               ),
-              SizedBox(height: 6),
+              const SizedBox(height: 6),
               Text(subtitle, style: TextStyle(color: AppColors.muted)),
-              SizedBox(height: 14),
+              const SizedBox(height: 14),
 
               // step pills
               Row(
                 children: [
                   _StepPill(active: !_otpStep, label: '1  Password'),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   _StepPill(active: _otpStep, label: '2  OTP'),
                 ],
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               Container(
                 width: double.infinity,
@@ -821,8 +821,8 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Icon(Icons.warning_amber_rounded, color: AppColors.dangerText, size: 20),
-                    SizedBox(width: 10),
-                    Expanded(
+                    const SizedBox(width: 10),
+                    const Expanded(
                       child: Text(
                         'Deleting your account is permanent. You’ll lose access to your data.',
                         style: TextStyle(
@@ -835,7 +835,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                   ],
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
 
               if (!_otpStep)
                 AppLabeledIconField(
@@ -869,14 +869,14 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                       keyboardType: TextInputType.text,
                       onChanged: (_) => setState(() {}),
                     ),
-                    SizedBox(height: 10),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Text(
                           'Didn’t get the code?',
                           style: TextStyle(color: AppColors.muted, fontSize: 13),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         TextButton(
                           onPressed: (isBusy || _secondsLeft > 0)
                               ? null
@@ -894,7 +894,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                   ],
                 ),
 
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
               Row(
                 children: [
                   Expanded(
@@ -916,7 +916,7 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
                       borderColor: AppColors.borderSoft,
                     ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: AppPrimaryLoadingButton(
                       label: _otpStep ? 'Confirm delete' : 'Request OTP',

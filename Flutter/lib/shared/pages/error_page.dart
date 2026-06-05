@@ -38,13 +38,13 @@ class _ErrorPageState extends State<ErrorPage>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ac = AnimationController(
     vsync: this,
-    duration: Duration(milliseconds: 500),
+    duration: const Duration(milliseconds: 500),
   )..forward();
 
   late final Animation<double> _fade =
       CurvedAnimation(parent: _ac, curve: Curves.easeOut);
   late final Animation<Offset> _slide = Tween<Offset>(
-    begin: Offset(0, 0.06),
+    begin: const Offset(0, 0.06),
     end: Offset.zero,
   ).animate(CurvedAnimation(parent: _ac, curve: Curves.easeOut));
 
@@ -107,7 +107,7 @@ class _ErrorPageState extends State<ErrorPage>
           ),
 
           // ── Bottom footer ─────────────────────────────────────────────
-          Positioned(
+          const Positioned(
             bottom: 0,
             left: 0,
             right: 0,
@@ -149,7 +149,7 @@ class _TopBar extends StatelessWidget {
       child: Row(
         children: [
           Image.asset('assets/logo.webp', height: 32, cacheWidth: (32 * MediaQuery.of(context).devicePixelRatio).round()),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Text(
             'Learnova',
             style: TextStyle(
@@ -230,7 +230,7 @@ class _Body extends StatelessWidget {
             style: TextStyle(
               fontSize: 220,
               fontWeight: FontWeight.w900,
-              color: Color(0xFF000000).withValues(alpha: 0.04),
+              color: const Color(0xFF000000).withValues(alpha: 0.04),
               height: 1,
               letterSpacing: -8,
             ),
@@ -240,7 +240,7 @@ class _Body extends StatelessWidget {
           Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
               Text(
                 variant.headline,
                 textAlign: TextAlign.center,
@@ -251,9 +251,9 @@ class _Body extends StatelessWidget {
                   height: 1.2,
                 ),
               ),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 380),
+                constraints: const BoxConstraints(maxWidth: 380),
                 child: Text(
                   message?.isNotEmpty ?? false ? message! : variant.subtitle,
                   textAlign: TextAlign.center,
@@ -267,7 +267,7 @@ class _Body extends StatelessWidget {
 
               // Error ID (optional)
               if (errorId != null) ...[
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Text(
                   'Error ID: $errorId',
                   style: TextStyle(
@@ -278,7 +278,7 @@ class _Body extends StatelessWidget {
                 ),
               ],
 
-              SizedBox(height: 40),
+              const SizedBox(height: 40),
 
               // Buttons
               _Buttons(
@@ -330,7 +330,7 @@ class _Buttons extends StatelessWidget {
               ),
             ),
             onPressed: onDashboard,
-            child: Text(
+            child: const Text(
               'Return to Dashboard',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
             ),
@@ -351,10 +351,10 @@ class _Buttons extends StatelessWidget {
               backgroundColor: AppColors.cardBg,
             ),
             onPressed: onRefresh,
-            icon: Icon(Icons.refresh_rounded, size: 18),
+            icon: const Icon(Icons.refresh_rounded, size: 18),
             label: Text(
               refreshLabel,
-              style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
             ),
           ),
         ),

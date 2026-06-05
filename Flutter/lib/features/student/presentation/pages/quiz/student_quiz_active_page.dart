@@ -32,19 +32,19 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
             child: Row(
               children: [
                 Text(
-                  "Mid-Term Assessment: Computer Science 101",
+                  'Mid-Term Assessment: Computer Science 101',
                   style: TextStyle(
                     fontWeight: FontWeight.w800,
                     fontSize: 16,
                     color: AppColors.textTitle,
                   ),
                 ),
-                Spacer(),
+                const Spacer(),
                 Icon(Icons.timer_outlined,
-                    size: 18, color: AppColors.textMuted),
-                SizedBox(width: 8),
+                    size: 18, color: AppColors.textMuted,),
+                const SizedBox(width: 8),
                 Text(
-                  "00:45:12",
+                  '00:45:12',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 14,
@@ -73,14 +73,14 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Question Palette",
+                        'Question Palette',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 15,
                           color: AppColors.textTitle,
                         ),
                       ),
-                      SizedBox(height: 20),
+                      const SizedBox(height: 20),
 
                       /// شبكة أرقام الأسئلة
                       Expanded(
@@ -94,9 +94,9 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                           ),
                           itemBuilder: (context, index) {
                             // محاكاة الألوان: أول 4 أسئلة تم حلهم بالأزرق، الباقي أبيض
-                            bool isAnswered = index < 4;
+                            final bool isAnswered = index < 4;
                             // تلوين السؤال الحالي بلون خفيف لتمييزه
-                            bool isCurrent = (index + 1) == _currentQuestion;
+                            final bool isCurrent = (index + 1) == _currentQuestion;
 
                             return Container(
                               alignment: Alignment.center,
@@ -117,7 +117,7 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: Text(
-                                "${index + 1}",
+                                '${index + 1}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
                                   fontSize: 13,
@@ -133,7 +133,7 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                         ),
                       ),
 
-                      SizedBox(height: 16),
+                      const SizedBox(height: 16),
 
                       /// زر الـ Submit Assessment الأخضر في أسفل الـ Palette
                       SizedBox(
@@ -147,7 +147,7 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                               MaterialPageRoute(
                                 builder: (context) =>
                                     const StudentQuizResultPage(
-                                        isSubmitted: true),
+                                        isSubmitted: true,),
                               ),
                               (route) => false,
                             );
@@ -156,13 +156,13 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                             backgroundColor: AppColors.successDot, // اللون الأخضر التفاعلي
                             foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(8)),
+                                borderRadius: BorderRadius.circular(8),),
                             elevation: 0,
                           ),
-                          child: Text(
-                            "Submit Assessment",
+                          child: const Text(
+                            'Submit Assessment',
                             style: TextStyle(
-                                fontWeight: FontWeight.w800, fontSize: 14),
+                                fontWeight: FontWeight.w800, fontSize: 14,),
                           ),
                         ),
                       ),
@@ -183,16 +183,16 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Text(
-                                  "Question $_currentQuestion",
-                                  style: TextStyle(
+                                  'Question $_currentQuestion',
+                                  style: const TextStyle(
                                     fontSize: 18,
                                     fontWeight: FontWeight.w800,
                                     color: AppColors.primary, // تمييز تايتل السؤال بالأزرق
                                   ),
                                 ),
-                                SizedBox(height: 16),
+                                const SizedBox(height: 16),
                                 Text(
-                                  "Which of the following sorting algorithms has a time complexity of O(n log n) in the average case?",
+                                  'Which of the following sorting algorithms has a time complexity of O(n log n) in the average case?',
                                   style: TextStyle(
                                     fontSize: 16,
                                     fontWeight: FontWeight.w600,
@@ -200,21 +200,21 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                                     height: 1.5,
                                   ),
                                 ),
-                                SizedBox(height: 32),
+                                const SizedBox(height: 32),
 
                                 /// قائمة الاختيارات الأربعة
-                                _buildOption(0, "Bubble Sort"),
-                                _buildOption(1, "Merge Sort"),
-                                _buildOption(2, "Selection Sort"),
-                                _buildOption(3, "Insertion Sort"),
+                                _buildOption(0, 'Bubble Sort'),
+                                _buildOption(1, 'Merge Sort'),
+                                _buildOption(2, 'Selection Sort'),
+                                _buildOption(3, 'Insertion Sort'),
                               ],
                             ),
                           ),
                         ),
 
-                        SizedBox(height: 24),
+                        const SizedBox(height: 24),
                         Divider(color: AppColors.border),
-                        SizedBox(height: 16),
+                        const SizedBox(height: 16),
 
                         /// 🚀 أزرار التنقل (Previous و Next Question) في أسفل الصفحة كما طلبت
                         Row(
@@ -224,40 +224,40 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                               onPressed: _currentQuestion > 1
                                   ? () => setState(() => _currentQuestion--)
                                   : null, // يتعطل لو في أول سؤال
-                              icon: Icon(Icons.chevron_left_rounded,
-                                  size: 18),
-                              label: Text("Previous",
+                              icon: const Icon(Icons.chevron_left_rounded,
+                                  size: 18,),
+                              label: const Text('Previous',
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 13)),
+                                      fontSize: 13,),),
                               style: OutlinedButton.styleFrom(
                                 foregroundColor: AppColors.textGray,
                                 side:
                                     BorderSide(color: AppColors.border),
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 14),
+                                    horizontal: 20, vertical: 14,),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
+                                    borderRadius: BorderRadius.circular(8),),
                               ),
                             ),
                             ElevatedButton.icon(
                               onPressed: _currentQuestion < 20
                                   ? () => setState(() => _currentQuestion++)
                                   : null, // يتعطل لو في آخر سؤال
-                              icon: Text("Next Question",
+                              icon: const Text('Next Question',
                                   style: TextStyle(
                                       fontWeight: FontWeight.w700,
-                                      fontSize: 13)),
-                              label: Icon(Icons.chevron_right_rounded,
-                                  size: 18),
+                                      fontSize: 13,),),
+                              label: const Icon(Icons.chevron_right_rounded,
+                                  size: 18,),
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.primary,
                                 foregroundColor: Colors.white,
                                 elevation: 0,
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 20, vertical: 14),
+                                    horizontal: 20, vertical: 14,),
                                 shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(8)),
+                                    borderRadius: BorderRadius.circular(8),),
                               ),
                             ),
                           ],
@@ -268,7 +268,7 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                 ),
               ],
             ),
-          )
+          ),
         ],
       ),
     );
@@ -276,7 +276,7 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
 
   /// ويدجت بناء خيارات الأسئلة التفاعلية بشكل الراديو بوتون
   Widget _buildOption(int index, String text) {
-    bool isSelected = _selectedOptionIndex == index;
+    final bool isSelected = _selectedOptionIndex == index;
     return InkWell(
       onTap: () => setState(() => _selectedOptionIndex = index),
       borderRadius: BorderRadius.circular(10),
@@ -303,7 +303,7 @@ class _StudentQuizActivePageState extends State<StudentQuizActivePage> {
                   : AppColors.textHint,
               size: 20,
             ),
-            SizedBox(width: 14),
+            const SizedBox(width: 14),
             Text(
               text,
               style: TextStyle(

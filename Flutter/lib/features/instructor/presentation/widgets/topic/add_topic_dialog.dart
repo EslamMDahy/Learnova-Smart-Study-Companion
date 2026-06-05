@@ -46,14 +46,14 @@ class AddTopicUnifiedButton extends StatelessWidget {
               ),
               borderRadius: BorderRadius.circular(8),
               boxShadow: [
-                BoxShadow(
+                const BoxShadow(
                   color: Color(0x22137FEC),
                   blurRadius: 8,
                   offset: Offset(0, 3),
                 ),
               ],
             ),
-            child: Row(
+            child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 Icon(Icons.add_rounded, size: 14, color: Colors.white),
@@ -137,7 +137,7 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
       child: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 500),
+          constraints: const BoxConstraints(maxWidth: 500),
           child: GestureDetector(
             onTap: () => FocusScope.of(context).unfocus(),
             child: Container(
@@ -148,7 +148,7 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
                   BoxShadow(
                     color: Colors.black.withOpacity(0.16),
                     blurRadius: 30,
-                    offset: Offset(0, 12),
+                    offset: const Offset(0, 12),
                   ),
                 ],
               ),
@@ -163,8 +163,8 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
                   Padding(
                     padding: const EdgeInsets.all(20),
                     child: AnimatedSwitcher(
-                      duration: Duration(milliseconds: 180),
-                      child: _isManual ? _manualBody(key: ValueKey('manual_field')) : _aiBody(key: ValueKey('ai_field')),
+                      duration: const Duration(milliseconds: 180),
+                      child: _isManual ? _manualBody(key: const ValueKey('manual_field')) : _aiBody(key: const ValueKey('ai_field')),
                     ),
                   ),
                   Container(
@@ -182,13 +182,13 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
                           style: OutlinedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(vertical: 13),
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(12),),
                             side: BorderSide(color: _AddTopicColors.divider),
                           ),
-                          child: Text('Cancel'),
+                          child: const Text('Cancel'),
                         ),
                       ),
-                      SizedBox(width: 12),
+                      const SizedBox(width: 12),
                       Expanded(
                         child: ElevatedButton.icon(
                           onPressed: () {
@@ -206,11 +206,11 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
                             foregroundColor: Colors.white,
                             elevation: 0,
                             shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(12)),
+                                borderRadius: BorderRadius.circular(12),),
                           ),
                         ),
                       ),
-                    ]),
+                    ],),
                   ),
                 ],
               ),
@@ -225,33 +225,33 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 18, 16, 16),
       decoration: BoxDecoration(
-          border: Border(bottom: BorderSide(color: _AddTopicColors.divider))),
+          border: Border(bottom: BorderSide(color: _AddTopicColors.divider)),),
       child: Row(children: [
         Container(
           width: 38, height: 38,
           decoration: BoxDecoration(
             gradient: LinearGradient(
-                colors: [AppColors.primary, AppColors.purpleText]),
+                colors: [AppColors.primary, AppColors.purpleText],),
             borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(Icons.tag_rounded, color: Colors.white, size: 18),
+          child: const Icon(Icons.tag_rounded, color: Colors.white, size: 18),
         ),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         Expanded(
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Text('Add Topic', style: TextStyle(
-                fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-            SizedBox(height: 2),
+                fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle,),),
+            const SizedBox(height: 2),
             Text('Create a topic manually or let AI extract one for you.',
-                style: TextStyle(fontSize: 12, color: AppColors.textMuted)),
-          ]),
+                style: TextStyle(fontSize: 12, color: AppColors.textMuted),),
+          ],),
         ),
         IconButton(
           onPressed: () => Navigator.pop(context),
-          icon: Icon(Icons.close_rounded, size: 18),
+          icon: const Icon(Icons.close_rounded, size: 18),
           splashRadius: 20,
         ),
-      ]),
+      ],),
     );
   }
 
@@ -270,27 +270,27 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
           color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(10),
           boxShadow: [
-            BoxShadow(color: Color(0x12000000), blurRadius: 4, offset: Offset(0, 1)),
+            const BoxShadow(color: Color(0x12000000), blurRadius: 4, offset: Offset(0, 1)),
           ],
         ),
         labelPadding: EdgeInsets.zero,
         tabs: [
           Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(Icons.edit_rounded, size: 14,
-                color: _isManual ? AppColors.primary : AppColors.textHint),
-            SizedBox(width: 6),
+                color: _isManual ? AppColors.primary : AppColors.textHint,),
+            const SizedBox(width: 6),
             Text('Manual', style: TextStyle(
                 fontSize: 12.5, fontWeight: FontWeight.w700,
-                color: _isManual ? AppColors.primary : AppColors.textMuted)),
-          ])),
+                color: _isManual ? AppColors.primary : AppColors.textMuted,),),
+          ],),),
           Tab(child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(Icons.auto_awesome_rounded, size: 14,
-                color: !_isManual ? _AddTopicColors.purple : AppColors.textHint),
-            SizedBox(width: 6),
+                color: !_isManual ? _AddTopicColors.purple : AppColors.textHint,),
+            const SizedBox(width: 6),
             Text('AI Generate', style: TextStyle(
                 fontSize: 12.5, fontWeight: FontWeight.w700,
-                color: !_isManual ? _AddTopicColors.purple : AppColors.textMuted)),
-          ])),
+                color: !_isManual ? _AddTopicColors.purple : AppColors.textMuted,),),
+          ],),),
         ],
       ),
     );
@@ -304,8 +304,8 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text('Topic name', style: TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-        SizedBox(height: 8),
+            fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted,),),
+        const SizedBox(height: 8),
         TextField(
           controller: _titleCtrl,
           autofocus: true,
@@ -319,28 +319,28 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
             fillColor: AppColors.surfaceBg,
             border: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: _AddTopicColors.divider)),
+                borderSide: BorderSide(color: _AddTopicColors.divider),),
             enabledBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: _AddTopicColors.divider)),
+                borderSide: BorderSide(color: _AddTopicColors.divider),),
             focusedBorder: OutlineInputBorder(
                 borderRadius: BorderRadius.circular(12),
-                borderSide: BorderSide(color: AppColors.primary, width: 1.4)),
+                borderSide: const BorderSide(color: AppColors.primary, width: 1.4),),
             contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
           ),
         ),
         if (outcomes.isNotEmpty) ...[
-          SizedBox(height: 18),
+          const SizedBox(height: 18),
           Row(children: [
             Text('Link to Learning Outcomes',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-            SizedBox(width: 6),
+                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted),),
+            const SizedBox(width: 6),
             Text('(optional)',
-                style: TextStyle(fontSize: 11, color: AppColors.textMuted.withOpacity(0.7))),
-          ]),
-          SizedBox(height: 8),
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted.withOpacity(0.7)),),
+          ],),
+          const SizedBox(height: 8),
           Container(
-            constraints: BoxConstraints(maxHeight: 160),
+            constraints: const BoxConstraints(maxHeight: 160),
             decoration: BoxDecoration(
               color: AppColors.surfaceBg,
               borderRadius: BorderRadius.circular(12),
@@ -361,7 +361,7 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
                     case OutcomeDifficulty.advanced: dotColor = AppColors.dangerText; break;
                     default: dotColor = AppColors.successText;
                   }
-                  return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+                  return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                     onTap: () => setState(() {
                       if (selected) {
                         _selectedOutcomeIds.remove(lo.id);
@@ -389,15 +389,15 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
                             ),
                           ),
                           child: selected
-                              ? Icon(Icons.check, size: 11, color: Colors.white)
+                              ? const Icon(Icons.check, size: 11, color: Colors.white)
                               : null,
                         ),
-                        SizedBox(width: 10),
+                        const SizedBox(width: 10),
                         Container(
                           width: 7, height: 7,
                           decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
                         ),
-                        SizedBox(width: 7),
+                        const SizedBox(width: 7),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
@@ -405,9 +405,9 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(lo.code,
-                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg)),
+                              style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg),),
                         ),
-                        SizedBox(width: 8),
+                        const SizedBox(width: 8),
                         Expanded(child: Text(lo.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -415,8 +415,8 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
                               fontSize: 12.5,
                               color: selected ? AppColors.textTitle : AppColors.textMuted,
                               fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
-                            ))),
-                      ]),
+                            ),),),
+                      ],),
                     ),
                   );
                 },
@@ -427,10 +427,10 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
             Padding(
               padding: const EdgeInsets.only(top: 6),
               child: Text('${_selectedOutcomeIds.length} outcome${_selectedOutcomeIds.length == 1 ? '' : 's'} linked',
-                  style: TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w600)),
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w600),),
             ),
         ],
-        SizedBox(height: 14),
+        const SizedBox(height: 14),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -438,15 +438,15 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: _AddTopicColors.blueMid),
           ),
-          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          child: const Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Icon(Icons.info_outline_rounded, size: 16, color: AppColors.primary),
             SizedBox(width: 8),
             Expanded(child: Text(
               'Use clear topic names so question generation and analytics stay well organized.',
               style: TextStyle(fontSize: 12, height: 1.5,
-                  color: AppColors.primary, fontWeight: FontWeight.w500),
-            )),
-          ]),
+                  color: AppColors.primary, fontWeight: FontWeight.w500,),
+            ),),
+          ],),
         ),
       ],
     );
@@ -454,7 +454,7 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
 
   Widget _aiBody({required ValueKey<String> key}) {
     return Column(
-      key: ValueKey('ai'),
+      key: const ValueKey('ai'),
       mainAxisSize: MainAxisSize.min,
       children: [
         Container(
@@ -462,7 +462,7 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
             gradient: LinearGradient(
-                colors: [AppColors.purpleBg, AppColors.badgeIndigoBg]),
+                colors: [AppColors.purpleBg, AppColors.badgeIndigoBg],),
             borderRadius: BorderRadius.circular(14),
             border: Border.all(color: _AddTopicColors.purpleBorder),
           ),
@@ -470,21 +470,21 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
             Container(
               width: 52, height: 52,
               decoration: BoxDecoration(
-                  color: AppColors.cardBg, borderRadius: BorderRadius.circular(16)),
+                  color: AppColors.cardBg, borderRadius: BorderRadius.circular(16),),
               child: Icon(Icons.auto_awesome_rounded, color: _AddTopicColors.purple, size: 24),
             ),
-            SizedBox(height: 12),
+            const SizedBox(height: 12),
             Text('Generate Topics with AI', style: TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w800, color: _AddTopicColors.purple)),
-            SizedBox(height: 6),
+                fontSize: 15, fontWeight: FontWeight.w800, color: _AddTopicColors.purple,),),
+            const SizedBox(height: 6),
             Text(
               'AI will analyze the selected material and extract suggested topics automatically.',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 12.5, height: 1.6, color: AppColors.textMuted),
             ),
-          ]),
+          ],),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         Container(
           width: double.infinity,
           padding: const EdgeInsets.all(12),
@@ -495,12 +495,12 @@ class _AddTopicDialogV2State extends State<AddTopicDialogV2>
           ),
           child: Row(children: [
             Icon(Icons.bolt_rounded, size: 15, color: _AddTopicColors.purple),
-            SizedBox(width: 8),
+            const SizedBox(width: 8),
             Expanded(child: Text(
               'You can review and refine the generated topics later.',
               style: TextStyle(fontSize: 12, color: AppColors.textMuted),
-            )),
-          ]),
+            ),),
+          ],),
         ),
       ],
     );

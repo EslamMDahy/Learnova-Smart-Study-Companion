@@ -27,7 +27,7 @@ class GlobalLoadingOverlay extends ConsumerWidget {
                   fit: BoxFit.contain,
                 ),
 
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 // Brand name (clean & modern)
                 Text(
@@ -38,7 +38,7 @@ class GlobalLoadingOverlay extends ConsumerWidget {
                       ),
                 ),
 
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
 
                 Text(
                   'Loading...',

@@ -34,7 +34,7 @@ class EmptyStatePage extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 48),
         child: ConstrainedBox(
           // Keep the content readable on ultra-wide screens
-          constraints: BoxConstraints(maxWidth: 480),
+          constraints: const BoxConstraints(maxWidth: 480),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -53,7 +53,7 @@ class EmptyStatePage extends StatelessWidget {
                   color: AppColors.primary,
                 ),
               ),
-              SizedBox(height: 20),
+              const SizedBox(height: 20),
 
               // ── Title ───────────────────────────────────────────────────
               Text(
@@ -61,7 +61,7 @@ class EmptyStatePage extends StatelessWidget {
                 style: AppTextStyles.sectionTitle.copyWith(fontSize: 20),
                 textAlign: TextAlign.center,
               ),
-              SizedBox(height: 8),
+              const SizedBox(height: 8),
 
               // ── Description ─────────────────────────────────────────────
               Text(
@@ -72,7 +72,7 @@ class EmptyStatePage extends StatelessWidget {
 
               // ── Action button (optional) ─────────────────────────────────
               if (actionLabel != null && onAction != null) ...[
-                SizedBox(height: 28),
+                const SizedBox(height: 28),
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(

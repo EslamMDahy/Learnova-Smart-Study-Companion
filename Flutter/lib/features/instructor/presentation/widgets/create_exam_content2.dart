@@ -29,9 +29,9 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildAIQuestionGenerator(),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               _buildFiltersBar(),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               Text(
                 'AVAILABLE QUESTIONS',
                 style: TextStyle(
@@ -41,14 +41,14 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
                   letterSpacing: 1.1,
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               _buildQuestionsList(),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               _buildPagination(),
             ],
           ),
         ),
-        SizedBox(width: 32),
+        const SizedBox(width: 32),
         
         Expanded(child: _buildQuizSummaryCard()),
       ],
@@ -72,13 +72,13 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
               color: AppColors.cardBg,
               shape: BoxShape.circle,
             ),
-            child: Icon(
+            child: const Icon(
               Icons.auto_awesome,
               color: AppColors.primary,
               size: 20,
             ),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -111,7 +111,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
                 borderRadius: BorderRadius.circular(8),
               ),
             ),
-            child: Text(
+            child: const Text(
               'Generate Questions',
               style: TextStyle(
                 color: AppColors.primary,
@@ -132,7 +132,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
           child: TextField(
             decoration: InputDecoration(
               hintText: 'Search questions by keyword or',
-              prefixIcon: Icon(
+              prefixIcon: const Icon(
                 Icons.search,
                 size: 20,
                 color: Colors.grey,
@@ -151,11 +151,11 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
             ),
           ),
         ),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         _buildDropdownFilter('All Topics'),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         _buildDropdownFilter('Any Difficulty'),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         _buildDropdownFilter('All Types'),
       ],
     );
@@ -175,7 +175,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
             label,
             style: TextStyle(fontSize: 13, color: AppColors.textGray),
           ),
-          Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey),
+          const Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey),
         ],
       ),
     );
@@ -193,7 +193,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
           'Easy',
           Colors.green,
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         _buildQuestionCard(
           'Explain the difference between SQL and NoSQL databases, providing examples for each.',
           'Databases',
@@ -202,7 +202,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
           'Medium',
           Colors.orange,
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         _buildQuestionCard(
           'In Python, which of the following is NOT a mutable data type?',
           'Programming',
@@ -211,7 +211,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
           'Easy',
           Colors.green,
         ),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         _buildQuestionCard(
           'Describe the CAP theorem and its implications for distributed system design.',
           'System Design',
@@ -267,7 +267,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
               ),
             ),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -280,13 +280,13 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
                     color: AppColors.textGray,
                   ),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Row(
                   children: [
                     _metaItem(Icons.folder_outlined, tag),
-                    SizedBox(width: 16),
+                    const SizedBox(width: 16),
                     _metaItem(Icons.list_alt, type),
-                    SizedBox(width: 16),
+                    const SizedBox(width: 16),
                     _metaItem(Icons.history, usage),
                   ],
                 ),
@@ -333,22 +333,22 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
               color: AppColors.textGray,
             ),
           ),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           _summaryRow('Total Questions', '15'),
           Divider(height: 32, color: AppColors.headerBg),
           _summaryRow('Total Points', '100'),
           Divider(height: 32, color: AppColors.headerBg),
           _summaryRow('Difficulty', 'Medium', color: Colors.orange),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           _buildInfoBox(),
-          SizedBox(height: 24),
+          const SizedBox(height: 24),
           _summaryButton(
             Icons.visibility_outlined,
             'Preview as Student',
             Colors.black,
             Colors.white,
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           _summaryButton(
             Icons.add,
             'Add New Question',
@@ -371,8 +371,8 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(Icons.info_outline, size: 18, color: AppColors.primary),
-          SizedBox(width: 10),
+          const Icon(Icons.info_outline, size: 18, color: AppColors.primary),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               'This quiz is currently saved as a draft. Publishing will make it visible to enrolled students immediately or on the scheduled date.',
@@ -393,7 +393,7 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
     return Row(
       children: [
         Icon(icon, size: 14, color: AppColors.textHint),
-        SizedBox(width: 4),
+        const SizedBox(width: 4),
         Text(
           label,
           style: TextStyle(color: AppColors.textMuted, fontSize: 12),
@@ -451,11 +451,11 @@ class _CreateExamContent2State extends State<CreateExamContent2> {
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Icon(Icons.chevron_left, color: AppColors.textHint),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         _pageNode('1', true),
         _pageNode('2', false),
         _pageNode('3', false),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Icon(Icons.chevron_right, color: AppColors.textHint),
       ],
     );

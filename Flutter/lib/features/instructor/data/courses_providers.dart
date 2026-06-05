@@ -28,7 +28,7 @@ final coursesRepositoryProvider = Provider<CoursesRepository>((ref) {
 final selectedCourseByIdProvider =
     FutureProvider.family<MyCourseItem, int>((ref, id) async {
   final response = await ref.read(coursesRepositoryProvider).myCourses(
-        enrichMissingModuleCounts: false,
+        
       );
 
   for (final course in response.items) {

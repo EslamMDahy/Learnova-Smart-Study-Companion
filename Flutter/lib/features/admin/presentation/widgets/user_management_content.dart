@@ -81,7 +81,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
       if (_orgId.isEmpty) {
         // Show warning only after a brief delay to allow AdminDashboardController
         // to finish its own loading — avoids false warnings for users who do have an org.
-        await Future.delayed(Duration(milliseconds: 400));
+        await Future.delayed(const Duration(milliseconds: 400));
         if (!mounted || _orgId.isNotEmpty) return;
         AppToast.warning(
           context,
@@ -120,15 +120,15 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
           child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppSectionHeader(
+                  const AppSectionHeader(
                     title: 'User Management',
                     subtitle:
                         'Manage student and instructor accounts, roles, and permissions.',
                   ),
-                  SizedBox(height: 24),
+                  const SizedBox(height: 24),
 
                   _StatsRow(isNarrow: isNarrow, users: state.users),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   FigmaUmFiltersBar(
                     controller: _search,
@@ -138,7 +138,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                     onSearchChanged: (v) {
                       ref.read(userManagementControllerProvider.notifier).search(v);
                       _searchDebounce?.cancel();
-                      _searchDebounce = Timer(Duration(milliseconds: 280), () {
+                      _searchDebounce = Timer(const Duration(milliseconds: 280), () {
                         if (!mounted) return;
                         setState(() {});
                       });
@@ -159,7 +159,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
                             .refresh(),
                   ),
 
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
 
                   _UsersTableFigma(
                     isNarrow: isNarrow,
@@ -248,7 +248,7 @@ class _StatsRow extends StatelessWidget {
         value: '$total',
         subtitle: '+12% from last month',
         subtitleColor: AppColors.successText,
-        iconBg: Color(0x1A137FEC),
+        iconBg: const Color(0x1A137FEC),
         icon: Icons.people_alt_outlined,
         iconColor: AppColors.primary,
       ),
@@ -289,11 +289,11 @@ class _StatsRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(child: updated[0]),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(child: updated[1]),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(child: updated[2]),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         SizedBox(width: 319, child: updated[3]),
       ],
     );
@@ -341,7 +341,7 @@ class _UsersTableFigma extends StatelessWidget {
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.cBorder),
         boxShadow: [
-          BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
+          const BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
         ],
       ),
       clipBehavior: Clip.antiAlias,
@@ -363,7 +363,7 @@ class _UsersTableFigma extends StatelessWidget {
             onRetry: onRetry,
             child: ListView.separated(
               shrinkWrap: true,
-              physics: NeverScrollableScrollPhysics(),
+              physics: const NeverScrollableScrollPhysics(),
               itemCount: users.length,
               separatorBuilder: (_, __) =>
                   Divider(height: 1, color: AppColors.cBorderSoft),
@@ -418,7 +418,7 @@ class _UserRowFigma extends StatelessWidget {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
               ),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 16),
 
             Expanded(
               flex: 5,
@@ -437,7 +437,7 @@ class _UserRowFigma extends StatelessWidget {
                       alignment: Alignment.center,
                       child: Text(
                         _initials(user.fullName),
-                        style: TextStyle(
+                        style: const TextStyle(
                           fontFamily: 'Inter',
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
@@ -446,7 +446,7 @@ class _UserRowFigma extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(width: 12),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -463,7 +463,7 @@ class _UserRowFigma extends StatelessWidget {
                               color: AppColors.cText,
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
                             user.email,
                             overflow: TextOverflow.ellipsis,
@@ -475,7 +475,7 @@ class _UserRowFigma extends StatelessWidget {
                               color: AppColors.cGray500,
                             ),
                           ),
-                          SizedBox(height: 2),
+                          const SizedBox(height: 2),
                           Text(
                             'ID: —',
                             style: TextStyle(
@@ -509,7 +509,7 @@ class _UserRowFigma extends StatelessWidget {
               Expanded(
                 flex: 3,
                 child: Padding(
-                  padding: EdgeInsets.only(left: _kCellLeftPad),
+                  padding: const EdgeInsets.only(left: _kCellLeftPad),
                   child: Text(
                     '—',
                     overflow: TextOverflow.ellipsis,
@@ -528,7 +528,7 @@ class _UserRowFigma extends StatelessWidget {
               Expanded(
                 flex: 2,
                 child: Padding(
-                  padding: EdgeInsets.only(left: _kCellLeftPad),
+                  padding: const EdgeInsets.only(left: _kCellLeftPad),
                   child: Text(
                     '—',
                     overflow: TextOverflow.ellipsis,
@@ -558,7 +558,7 @@ class _UserRowFigma extends StatelessWidget {
                 child: SizedBox(
                   width: 28,
                   height: 28,
-                  child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+                  child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                     onTap: onActionTap,
                     borderRadius: BorderRadius.circular(9999),
                     child: Icon(

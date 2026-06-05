@@ -79,12 +79,12 @@ class AppDialogSurface extends StatelessWidget {
             BoxShadow(
               color: AppColors.shadowSoft,
               blurRadius: 32,
-              offset: Offset(0, 16),
+              offset: const Offset(0, 16),
             ),
             BoxShadow(
               color: AppColors.shadowSoft,
               blurRadius: 8,
-              offset: Offset(0, 2),
+              offset: const Offset(0, 2),
             ),
           ],
         ),

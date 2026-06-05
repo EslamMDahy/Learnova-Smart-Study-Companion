@@ -71,7 +71,7 @@ class TopHeaderWidget extends StatelessWidget {
                     Scaffold.of(context).openDrawer();
                   },
             ),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
           ],
 
           if (!collapseSearch)
@@ -90,7 +90,7 @@ class TopHeaderWidget extends StatelessWidget {
               onTap: () => _openSearchDialog(context),
             ),
 
-          Spacer(),
+          const Spacer(),
 
           Row(
             mainAxisSize: MainAxisSize.min,
@@ -99,9 +99,9 @@ class TopHeaderWidget extends StatelessWidget {
                 hasBadge: notificationsCount > 0,
                 onTap: onNotificationsTap,
               ),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
               Container(width: 1, height: 24, color: _divider),
-              SizedBox(width: 16),
+              const SizedBox(width: 16),
 
               _ModernHeaderProfileMenu(
                 name: userName,
@@ -127,7 +127,7 @@ class TopHeaderWidget extends StatelessWidget {
       builder: (ctx) {
         return AlertDialog(
           insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          title: Text('Search'),
+          title: const Text('Search'),
           content: ConstrainedBox(
             constraints: BoxConstraints(maxWidth: maxDialogWidth),
             child: TextField(
@@ -135,7 +135,7 @@ class TopHeaderWidget extends StatelessWidget {
               autofocus: true,
               decoration: InputDecoration(
                 hintText: searchHint,
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: const Icon(Icons.search),
               ),
               onChanged: onSearchChanged ?? (_) {},
             ),
@@ -143,7 +143,7 @@ class TopHeaderWidget extends StatelessWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(ctx).pop(),
-              child: Text('Close'),
+              child: const Text('Close'),
             ),
           ],
         );
@@ -311,7 +311,7 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
               width: 28,
               height: 28,
               decoration: BoxDecoration(
-                color: Color(0xFF1677FF),
+                color: const Color(0xFF1677FF),
                 borderRadius: BorderRadius.circular(999),
               ),
               clipBehavior: Clip.antiAlias,
@@ -321,13 +321,13 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
                       key: ValueKey(widget.avatarUrl),
                       fit: BoxFit.cover,
                       errorBuilder: (_, __, ___) =>
-                          Icon(Icons.person, size: 16, color: Colors.white),
+                          const Icon(Icons.person, size: 16, color: Colors.white),
                     )
-                  : Icon(Icons.person, size: 16, color: Colors.white),
+                  : const Icon(Icons.person, size: 16, color: Colors.white),
             ),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 180),
+              constraints: const BoxConstraints(maxWidth: 180),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
@@ -343,7 +343,7 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
                       height: 1.05,
                     ),
                   ),
-                  SizedBox(height: 2),
+                  const SizedBox(height: 2),
                   Text(
                     widget.subtitle,
                     maxLines: 1,
@@ -358,7 +358,7 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
                 ],
               ),
             ),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 18,

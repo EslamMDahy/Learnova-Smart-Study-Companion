@@ -25,7 +25,7 @@ class SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ac = AnimationController(
     vsync: this,
-    duration: Duration(milliseconds: 380),
+    duration: const Duration(milliseconds: 380),
   );
 
   late final Animation<double> _fade = Tween<double>(begin: 1, end: 0).animate(
@@ -69,7 +69,7 @@ class SplashScreenState extends State<SplashScreen>
                       cacheWidth: (72 * dpr).round(),
                     ),
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   // Brand name
                   Text(
                     'Learnova',
@@ -80,7 +80,7 @@ class SplashScreenState extends State<SplashScreen>
                       letterSpacing: -0.5,
                     ),
                   ),
-                  SizedBox(height: 6),
+                  const SizedBox(height: 6),
                   Text(
                     'Smart Study Companion',
                     style: TextStyle(
@@ -95,7 +95,7 @@ class SplashScreenState extends State<SplashScreen>
             ),
 
             // ── Bottom progress bar (Facebook-style) ──────────────────────
-            Positioned(
+            const Positioned(
               bottom: 0,
               left: 0,
               right: 0,
@@ -121,7 +121,7 @@ class _BottomBarState extends State<_BottomBar>
     with SingleTickerProviderStateMixin {
   late final AnimationController _ac = AnimationController(
     vsync: this,
-    duration: Duration(milliseconds: 1200),
+    duration: const Duration(milliseconds: 1200),
   )..repeat();
 
   late final Animation<double> _progress = CurvedAnimation(
@@ -142,7 +142,7 @@ class _BottomBarState extends State<_BottomBar>
       children: [
         // Learnova copyright tiny text
         Padding(
-          padding: EdgeInsets.only(bottom: 10),
+          padding: const EdgeInsets.only(bottom: 10),
           child: Text(
             'from Learnova',
             style: TextStyle(

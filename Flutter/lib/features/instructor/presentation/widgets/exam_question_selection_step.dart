@@ -35,9 +35,9 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildAIQuestionGenerator(),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               _buildFiltersBar(),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               Text(
                 'AVAILABLE QUESTIONS',
                 style: TextStyle(
@@ -47,14 +47,14 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
                   letterSpacing: 1.1,
                 ),
               ),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               _buildQuestionsList(),
-              SizedBox(height: 24),
+              const SizedBox(height: 24),
               _buildPagination(),
             ],
           ),
         ),
-        SizedBox(width: 32),
+        const SizedBox(width: 32),
         Expanded(child: _buildQuizSummaryCard()),
       ],
     );
@@ -76,9 +76,9 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
               color: AppColors.cardBg,
               shape: BoxShape.circle,
             ),
-            child: Icon(Icons.auto_awesome, color: AppColors.primary, size: 20),
+            child: const Icon(Icons.auto_awesome, color: AppColors.primary, size: 20),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,7 +109,7 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
             ),
-            child: Text(
+            child: const Text(
               'Generate Questions',
               style: TextStyle(color: AppColors.primary, fontWeight: FontWeight.bold),
             ),
@@ -126,7 +126,7 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
           child: TextField(
             decoration: InputDecoration(
               hintText: 'Search questions by keyword',
-              prefixIcon: Icon(Icons.search, size: 20, color: Colors.grey),
+              prefixIcon: const Icon(Icons.search, size: 20, color: Colors.grey),
               filled: true,
               fillColor: AppColors.cardBg,
               contentPadding: const EdgeInsets.symmetric(),
@@ -141,11 +141,11 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
             ),
           ),
         ),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         _buildDropdownFilter('All Topics'),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         _buildDropdownFilter('Any Difficulty'),
-        SizedBox(width: 12),
+        const SizedBox(width: 12),
         _buildDropdownFilter('All Types'),
       ],
     );
@@ -162,7 +162,7 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
       child: Row(
         children: [
           Text(label, style: TextStyle(fontSize: 13, color: AppColors.textGray)),
-          Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey),
+          const Icon(Icons.keyboard_arrow_down, size: 18, color: Colors.grey),
         ],
       ),
     );
@@ -172,11 +172,11 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
     return Column(
       children: [
         _buildQuestionCard('What is the time complexity of a binary search algorithm in the worst case?', 'Algorithms', 'Multiple Choice', 'Used 3 times', 'Easy', Colors.green),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         _buildQuestionCard('Explain the difference between SQL and NoSQL databases, providing examples for each.', 'Databases', 'Essay', 'Used 1 time', 'Medium', Colors.orange),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         _buildQuestionCard('In Python, which of the following is NOT a mutable data type?', 'Programming', 'Multiple Choice', 'New', 'Easy', Colors.green),
-        SizedBox(height: 16),
+        const SizedBox(height: 16),
         _buildQuestionCard('Describe the CAP theorem and its implications for distributed system design.', 'System Design', 'Essay', 'Used 5 times', 'Hard', Colors.red),
       ],
     );
@@ -213,13 +213,13 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
               },
             ),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textGray)),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 8,
                   runSpacing: 8,
@@ -232,7 +232,7 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
               ],
             ),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
             decoration: BoxDecoration(
@@ -293,12 +293,12 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Quiz Summary', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
-          SizedBox(height: 18),
+          const Text('Quiz Summary', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+          const SizedBox(height: 18),
           _summaryRow('Total Questions', '${_selectedQuestions.length}'),
           _summaryRow('Selected Targets', '${widget.topicTargets.length}'),
           _summaryRow('Difficulty', 'Medium'),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           if (widget.onAddQuestion != null)
             SizedBox(
               width: double.infinity,
@@ -308,7 +308,7 @@ class _ExamQuestionSelectionStepState extends State<ExamQuestionSelectionStep> {
                   backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                 ),
-                child: Text('Add New Question'),
+                child: const Text('Add New Question'),
               ),
             ),
         ],

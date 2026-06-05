@@ -35,12 +35,12 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage>
 
   late final AnimationController _ac = AnimationController(
     vsync: this,
-    duration: Duration(milliseconds: 450),
+    duration: const Duration(milliseconds: 450),
   )..forward();
   late final Animation<double> _fade =
       CurvedAnimation(parent: _ac, curve: Curves.easeOut);
   late final Animation<Offset> _slide = Tween<Offset>(
-    begin: Offset(0, 0.06),
+    begin: const Offset(0, 0.06),
     end: Offset.zero,
   ).animate(CurvedAnimation(parent: _ac, curve: Curves.easeOut));
 
@@ -79,7 +79,7 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage>
   }
 
   void _startRedirectCountdown() {
-    _redirectTimer = Timer.periodic(Duration(seconds: 1), (t) {
+    _redirectTimer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (!mounted) {
         t.cancel();
         return;
@@ -112,7 +112,7 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage>
           ),
 
           // ── Footer ──────────────────────────────────────────────────
-          Positioned(
+          const Positioned(
             bottom: 0,
             left: 0,
             right: 0,
@@ -180,7 +180,7 @@ class _TopBar extends StatelessWidget {
       child: Row(
         children: [
           Image.asset('assets/logo.webp', height: 32, cacheWidth: (32 * MediaQuery.of(context).devicePixelRatio).round()),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Text(
             'Learnova',
             style: TextStyle(
@@ -271,11 +271,11 @@ class _LoadingState extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        CircularProgressIndicator(
+        const CircularProgressIndicator(
           color: AppColors.primary,
           strokeWidth: 3,
         ),
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
         Text(
           'Verifying your email...',
           style: TextStyle(
@@ -284,7 +284,7 @@ class _LoadingState extends StatelessWidget {
             color: AppColors.textTitle,
           ),
         ),
-        SizedBox(height: 10),
+        const SizedBox(height: 10),
         Text(
           'Please wait a moment.',
           style: TextStyle(fontSize: 15, color: AppColors.textGray500),
@@ -323,7 +323,7 @@ class _SuccessState extends StatelessWidget {
             color: AppColors.successText,
           ),
         ),
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
         Text(
           'Email verified!',
           textAlign: TextAlign.center,
@@ -333,7 +333,7 @@ class _SuccessState extends StatelessWidget {
             color: AppColors.textTitle,
           ),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         Text(
           'Your email has been confirmed successfully.\nYou\'ll be redirected to login in ${redirectSecs}s.',
           textAlign: TextAlign.center,
@@ -343,7 +343,7 @@ class _SuccessState extends StatelessWidget {
             height: 1.55,
           ),
         ),
-        SizedBox(height: 36),
+        const SizedBox(height: 36),
         SizedBox(
           height: 48,
           child: ElevatedButton(
@@ -353,10 +353,10 @@ class _SuccessState extends StatelessWidget {
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 32),
               shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
+                  borderRadius: BorderRadius.circular(10),),
             ),
             onPressed: onGoLogin,
-            child: Text(
+            child: const Text(
               'Go to Login',
               style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
             ),
@@ -401,7 +401,7 @@ class _FailureState extends StatelessWidget {
             color: AppColors.dangerText,
           ),
         ),
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
         Text(
           'Verification failed',
           textAlign: TextAlign.center,
@@ -411,9 +411,9 @@ class _FailureState extends StatelessWidget {
             color: AppColors.textTitle,
           ),
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 360),
+          constraints: const BoxConstraints(maxWidth: 360),
           child: Text(
             error,
             textAlign: TextAlign.center,
@@ -424,7 +424,7 @@ class _FailureState extends StatelessWidget {
             ),
           ),
         ),
-        SizedBox(height: 36),
+        const SizedBox(height: 36),
         Wrap(
           spacing: 12,
           runSpacing: 10,
@@ -439,10 +439,10 @@ class _FailureState extends StatelessWidget {
                   elevation: 0,
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),),
                 ),
                 onPressed: onGoLogin,
-                child: Text(
+                child: const Text(
                   'Return to Login',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
                 ),
@@ -457,10 +457,10 @@ class _FailureState extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   backgroundColor: AppColors.cardBg,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(10)),
+                      borderRadius: BorderRadius.circular(10),),
                 ),
                 onPressed: onGoSignup,
-                child: Text(
+                child: const Text(
                   'Create New Account',
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
                 ),

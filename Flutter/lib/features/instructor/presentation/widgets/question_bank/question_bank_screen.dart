@@ -19,25 +19,25 @@ class QuestionBankScreen extends StatelessWidget {
         child: Align(
           alignment: Alignment.topCenter,
           child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: 1280),
+            constraints: const BoxConstraints(maxWidth: 1280),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildHeader(),
-                SizedBox(height: 28),
-                QuestionBankStatsSection(),
-                SizedBox(height: 32),
+                const SizedBox(height: 28),
+                const QuestionBankStatsSection(),
+                const SizedBox(height: 32),
                 _buildSearchAndFilterRow(),
-                SizedBox(height: 16),
-                QuestionBankTable(),
-                SizedBox(height: 24),
+                const SizedBox(height: 16),
+                const QuestionBankTable(),
+                const SizedBox(height: 24),
                 _buildPagination(),
               ],
             ),
           ),
         ),
       );
-    });
+    },);
   }
 
   Widget _buildHeader() {
@@ -49,7 +49,7 @@ class QuestionBankScreen extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              "Question Bank",
+              'Question Bank',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w800,
@@ -57,9 +57,9 @@ class QuestionBankScreen extends StatelessWidget {
                 color: AppColors.textGray,
               ),
             ),
-            SizedBox(height: 4),
+            const SizedBox(height: 4),
             Text(
-              "Manage assessments, grades, and analytics for CS101: Intro to AI.",
+              'Manage assessments, grades, and analytics for CS101: Intro to AI.',
               style: TextStyle(
                 color: Colors.grey.shade500,
                 fontSize: 14,
@@ -70,10 +70,10 @@ class QuestionBankScreen extends StatelessWidget {
         ),
         ElevatedButton.icon(
           onPressed: () {},
-          icon: Icon(Icons.add_rounded, size: 18),
-          label: Text("Create Question Bank"),
+          icon: const Icon(Icons.add_rounded, size: 18),
+          label: const Text('Create Question Bank'),
           style: ElevatedButton.styleFrom(
-            backgroundColor: Color(0xFF4F46E5),
+            backgroundColor: const Color(0xFF4F46E5),
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -97,21 +97,21 @@ class QuestionBankScreen extends StatelessWidget {
             ),
             child: TextField(
               decoration: InputDecoration(
-                hintText: "Search quizzes, topics...",
+                hintText: 'Search quizzes, topics...',
                 hintStyle: TextStyle(color: AppColors.textHint, fontSize: 14),
                 prefixIcon: Icon(Icons.search_rounded, size: 20, color: AppColors.textHint),
                 border: InputBorder.none,
-                contentPadding: EdgeInsets.symmetric(vertical: 10),
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
               ),
             ),
           ),
         ),
-        SizedBox(width: 12),
-        _buildIconButton(Icons.filter_list_rounded, "Filter"),
-        Spacer(),
-        Text("SORT BY: ", style: TextStyle(fontSize: 11, color: Colors.grey.shade400, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
-        Text("Due Date", style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textGray)),
-        Icon(Icons.keyboard_arrow_down_rounded, size: 18),
+        const SizedBox(width: 12),
+        _buildIconButton(Icons.filter_list_rounded, 'Filter'),
+        const Spacer(),
+        Text('SORT BY: ', style: TextStyle(fontSize: 11, color: Colors.grey.shade400, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
+        Text('Due Date', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textGray)),
+        const Icon(Icons.keyboard_arrow_down_rounded, size: 18),
       ],
     );
   }
@@ -127,7 +127,7 @@ class QuestionBankScreen extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, size: 18, color: AppColors.textGray),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(label, style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.textGray, fontSize: 13)),
         ],
       ),
@@ -139,13 +139,13 @@ class QuestionBankScreen extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.end,
       children: [
         Text('Rows per page:', style: TextStyle(color: Colors.grey.shade500, fontSize: 13)),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         _buildPageSelect(),
-        SizedBox(width: 24),
-        Text("1-4 of 12", style: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w500)),
-        SizedBox(width: 16),
+        const SizedBox(width: 24),
+        Text('1-4 of 12', style: TextStyle(color: Colors.grey.shade500, fontSize: 13, fontWeight: FontWeight.w500)),
+        const SizedBox(width: 16),
         Icon(Icons.chevron_left_rounded, color: Colors.grey.shade400),
-        SizedBox(width: 8),
+        const SizedBox(width: 8),
         Icon(Icons.chevron_right_rounded, color: Colors.grey.shade400),
       ],
     );
@@ -158,7 +158,7 @@ class QuestionBankScreen extends StatelessWidget {
         border: Border.all(color: AppColors.border),
         borderRadius: BorderRadius.circular(6),
       ),
-      child: Row(children: [Text("10", style: TextStyle(fontWeight: FontWeight.w600)), Icon(Icons.arrow_drop_down)]),
+      child: const Row(children: [Text('10', style: TextStyle(fontWeight: FontWeight.w600)), Icon(Icons.arrow_drop_down)]),
     );
   }
 }
@@ -171,18 +171,17 @@ class QuestionBankStatsSection extends StatelessWidget {
     Theme.of(context);
     return Row(
       children: [
-        Expanded(child: _statCard("Active Quizzes", "3", "↗ +1 this week", AppColors.primary, Icons.assignment_rounded)),
-        SizedBox(width: 20),
-        Expanded(child: _statCard("Pending Grading", "45", "12 manual reviews", AppColors.warningText, Icons.fact_check_rounded)),
-        SizedBox(width: 20),
-        Expanded(child: _statCard("Avg. Score", "82%", "↗ +2.4% vs last", AppColors.successDot, Icons.trending_up_rounded)),
+        Expanded(child: _statCard('Active Quizzes', '3', '↗ +1 this week', AppColors.primary, Icons.assignment_rounded)),
+        const SizedBox(width: 20),
+        Expanded(child: _statCard('Pending Grading', '45', '12 manual reviews', AppColors.warningText, Icons.fact_check_rounded)),
+        const SizedBox(width: 20),
+        Expanded(child: _statCard('Avg. Score', '82%', '↗ +2.4% vs last', AppColors.successDot, Icons.trending_up_rounded)),
       ],
     );
   }
 
   Widget _statCard(String title, String value, String sub, Color color, IconData icon) {
     return AppCard(
-      padding: const EdgeInsets.all(20),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -191,9 +190,9 @@ class QuestionBankStatsSection extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(title, style: TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w600)),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(value, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(sub, style: TextStyle(color: color, fontSize: 12, fontWeight: FontWeight.w700)),
               ],
             ),
@@ -220,13 +219,13 @@ class QuestionBankTable extends StatelessWidget {
       child: Column(
         children: [
           _buildTableHeader(),
-          _buildRow("Midterm Exam - AI Ethics", "Ethics, Bias, Safety", "Exam", "Published", AppColors.successDot, "Oct 12, 2023", 0.9, "45/50", "85%"),
+          _buildRow('Midterm Exam - AI Ethics', 'Ethics, Bias, Safety', 'Exam', 'Published', AppColors.successDot, 'Oct 12, 2023', 0.9, '45/50', '85%'),
           _divider(),
-          _buildRow("Week 3 Pop Quiz", "Neural Networks", "Quiz", "Draft", Colors.grey, "Not scheduled", 0, "-", "-", isAi: true),
+          _buildRow('Week 3 Pop Quiz', 'Neural Networks', 'Quiz', 'Draft', Colors.grey, 'Not scheduled', 0, '-', '-', isAi: true),
           _divider(),
-          _buildRow("Intro to Python", "Syntax, Variables", "Quiz", "Closed", Colors.redAccent, "Sep 20, 2023", 1.0, "50/50", "92%"),
+          _buildRow('Intro to Python', 'Syntax, Variables', 'Quiz', 'Closed', Colors.redAccent, 'Sep 20, 2023', 1.0, '50/50', '92%'),
           _divider(),
-          _buildRow("Machine Learning Basics", "ML, Algorithms", "Exam", "Published", AppColors.successDot, "Oct 15, 2023", 0.16, "8/50", "-", isAi: true),
+          _buildRow('Machine Learning Basics', 'ML, Algorithms', 'Exam', 'Published', AppColors.successDot, 'Oct 15, 2023', 0.16, '8/50', '-', isAi: true),
         ],
       ),
     );
@@ -237,16 +236,16 @@ class QuestionBankTable extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
         color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
       ),
       child: Row(
         children: [
-          Expanded(flex: 4, child: _headerText("QUIZ TITLE & TOPIC")),
-          Expanded(flex: 2, child: _headerText("STATUS")),
-          Expanded(flex: 2, child: _headerText("DUE DATE")),
-          Expanded(flex: 4, child: _headerText("COMPLETION")), // flex 4 لزيادة التباعد
-          Expanded(flex: 1, child: _headerText("AVG. SCORE")),
-          SizedBox(width: 40),
+          Expanded(flex: 4, child: _headerText('QUIZ TITLE & TOPIC')),
+          Expanded(flex: 2, child: _headerText('STATUS')),
+          Expanded(flex: 2, child: _headerText('DUE DATE')),
+          Expanded(flex: 4, child: _headerText('COMPLETION')), // flex 4 لزيادة التباعد
+          Expanded(child: _headerText('AVG. SCORE')),
+          const SizedBox(width: 40),
         ],
       ),
     );
@@ -266,26 +265,26 @@ class QuestionBankTable extends StatelessWidget {
             children: [
               Row(children: [
                 Text(title, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: AppColors.textGray)),
-                if (isAi) Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.auto_awesome, size: 14, color: Color(0xFF6366F1))),
-              ]),
-              SizedBox(height: 4),
-              Text("Topic: $topic", style: TextStyle(color: AppColors.textHint, fontSize: 12)),
+                if (isAi) const Padding(padding: EdgeInsets.only(left: 6), child: Icon(Icons.auto_awesome, size: 14, color: Color(0xFF6366F1))),
+              ],),
+              const SizedBox(height: 4),
+              Text('Topic: $topic', style: TextStyle(color: AppColors.textHint, fontSize: 12)),
             ],
-          )),
+          ),),
           // Status Badge width fix
           Expanded(flex: 2, child: Row(
             mainAxisSize: MainAxisSize.min, 
             children: [_badge(status, color)],
-          )),
+          ),),
           Expanded(flex: 2, child: Text(date, style: TextStyle(fontSize: 13, color: AppColors.textGray, fontWeight: FontWeight.w500))),
           // Completion & Avg Score spacing fix
           Expanded(flex: 4, child: Row(children: [
             if (progress > 0) Expanded(child: ClipRRect(borderRadius: BorderRadius.circular(10), child: LinearProgressIndicator(value: progress, minHeight: 6, backgroundColor: AppColors.headerBg, color: color))),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text(label, style: TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-            SizedBox(width: 24), // مسافة تفصل النتائج عن بعضها
-          ])),
-          Expanded(flex: 1, child: Text(score, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textGray))),
+            const SizedBox(width: 24), // مسافة تفصل النتائج عن بعضها
+          ],),),
+          Expanded(child: Text(score, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 14, color: AppColors.textGray))),
           SizedBox(width: 40, child: Icon(Icons.more_horiz_rounded, color: AppColors.textHint)),
         ],
       ),

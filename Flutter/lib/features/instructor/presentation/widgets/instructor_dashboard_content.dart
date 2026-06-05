@@ -357,7 +357,7 @@ class _DashboardHeader extends StatelessWidget {
                   ),
                   const SizedBox(width: 6),
                   Icon(Icons.chevron_right_rounded,
-                      size: 14, color: AppColors.hint),
+                      size: 14, color: AppColors.hint,),
                   const SizedBox(width: 6),
                   Text(
                     'Dashboard',
@@ -419,7 +419,7 @@ class _DateBadge extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(Icons.calendar_today_outlined,
-              size: 14, color: AppColors.textMuted),
+              size: 14, color: AppColors.textMuted,),
           const SizedBox(width: 7),
           Text(
             label,
@@ -663,7 +663,7 @@ class _ActivityTileState extends State<_ActivityTile> {
                     ),
                     alignment: Alignment.center,
                     child: Icon(widget.activity.icon,
-                        size: 16, color: AppColors.primary),
+                        size: 16, color: AppColors.primary,),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
@@ -973,7 +973,7 @@ class _QuickActionsPanel extends StatelessWidget {
     final firstCourse = snapshot.courses.isEmpty ? null : snapshot.courses.first;
 
     final actions = <_QuickAction>[
-      _QuickAction(
+      const _QuickAction(
         icon: Icons.add_circle_outline_rounded,
         label: 'Create or manage courses',
         sub: 'Open course workspace',
@@ -997,7 +997,7 @@ class _QuickActionsPanel extends StatelessWidget {
             : Routes.courseQuestionBank(firstCourse.slug),
         course: firstCourse?.course,
       ),
-      _QuickAction(
+      const _QuickAction(
         icon: Icons.assignment_outlined,
         label: 'Build quizzes',
         sub: 'Open quizzes workspace',
@@ -1316,7 +1316,7 @@ class _ReadinessRing extends StatelessWidget {
               value: value,
               strokeWidth: 7,
               backgroundColor: AppColors.headerBg,
-              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.primary),
             ),
           ),
           Text(
@@ -1384,7 +1384,7 @@ class _EmptyDashboardState extends StatelessWidget {
               color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: Icon(Icons.school_outlined, color: AppColors.primary),
+            child: const Icon(Icons.school_outlined, color: AppColors.primary),
           ),
           const SizedBox(width: 16),
           Expanded(
@@ -1437,9 +1437,9 @@ class _DashboardLoadingView extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _Skeleton(width: 260, height: 28),
+              const _Skeleton(width: 260, height: 28),
               const SizedBox(height: 10),
-              _Skeleton(width: 360, height: 14),
+              const _Skeleton(width: 360, height: 14),
               const SizedBox(height: 26),
               LayoutBuilder(
                 builder: (context, constraints) {
@@ -1456,9 +1456,9 @@ class _DashboardLoadingView extends StatelessWidget {
                 },
               ),
               const SizedBox(height: 22),
-              Row(
+              const Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
+                children: [
                   Expanded(
                     flex: 7,
                     child: _Skeleton(width: double.infinity, height: 330),
@@ -1498,7 +1498,7 @@ class _DashboardErrorView extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.error_outline_rounded,
-                  size: 42, color: AppColors.dangerText),
+                  size: 42, color: AppColors.dangerText,),
               const SizedBox(height: 14),
               Text(
                 'Dashboard could not load',

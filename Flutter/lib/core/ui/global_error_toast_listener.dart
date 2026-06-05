@@ -91,7 +91,7 @@ class _GlobalErrorToastListenerState
             type: errorType,
             message: next.message,
             errorId: errorId,
-          ));
+          ),);
           return;
         }
 
@@ -146,19 +146,19 @@ class _GlobalErrorToastListenerState
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.lock_outline_rounded,
-                color: AppColors.primary, size: 22),
-            SizedBox(width: 10),
+            const Icon(Icons.lock_outline_rounded,
+                color: AppColors.primary, size: 22,),
+            const SizedBox(width: 10),
             Text(AppFailurePresenter.title(f)),
           ],
         ),
-        content: Text(
+        content: const Text(
           'Your session has expired. Please log in again.',
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(ctx, rootNavigator: true).pop(),
-            child: Text('OK'),
+            child: const Text('OK'),
           ),
         ],
       ),

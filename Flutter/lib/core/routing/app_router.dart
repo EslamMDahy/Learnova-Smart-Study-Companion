@@ -23,6 +23,7 @@ import '../../features/admin/presentation/pages/admin_route_pages.dart';
 import '../../features/instructor/presentation/pages/instructor_shell.dart';
 import '../../features/instructor/presentation/pages/instructor_route_pages.dart';
 import '../../features/instructor/presentation/pages/course_details/course_details_page.dart';
+import '../../features/instructor/presentation/pages/exam_correction_page.dart';
 import '../../features/instructor/presentation/widgets/Quizzes/quiz_screen.dart';
 import '../../features/instructor/presentation/controllers/selected_course_provider.dart';
 import '../../features/instructor/presentation/course_route_identity.dart';
@@ -63,6 +64,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     final cached = SelectedCourseCache.value;
     if (cached != null && slugMatchesCourse(slug, cached)) {
       return NoTransitionPage(
+        key: ValueKey<String>('course-details-$slug'),
         child: CourseDetailsPage(
           courseSlug: slug,
           cachedCourse: cached,
@@ -76,6 +78,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
     // does not carry a parseable course id.
     final courseId = routeCourseId ?? SelectedCourseCache.cachedCourseId;
     return NoTransitionPage(
+      key: ValueKey<String>('course-details-$slug'),
       child: CourseDetailsPage(
         courseSlug: slug,
         cachedCourse: null,
@@ -332,6 +335,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 courseDetailsPage(state, CourseDetailsTab.questionBank),
           ),
           GoRoute(
+            path: Routes.instructorCourseTemplates,
+            name: RouteNames.instructorCourseTemplates,
+            pageBuilder: (_, state) =>
+                courseDetailsPage(state, CourseDetailsTab.templates),
+          ),
+          GoRoute(
             path: Routes.instructorCourseStudents,
             name: RouteNames.instructorCourseStudents,
             pageBuilder: (_, state) =>
@@ -361,6 +370,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 description:
                     'Build, organise and reuse questions across all your courses. Coming soon.',
               ),
+            ),
+          ),
+          GoRoute(
+            path: Routes.instructorExamCorrection,
+            name: RouteNames.instructorExamCorrection,
+            pageBuilder: (_, __) => const NoTransitionPage(
+              child: ExamCorrectionPage(),
             ),
           ),
           GoRoute(
@@ -529,6 +545,7 @@ class RouteNames {
   static const instructorCourses     = 'instructorCourses';
   static const instructorCourseDetails = 'instructorCourseDetails';
   static const instructorQuestionBank  = 'instructorQuestionBank';
+  static const instructorExamCorrection = 'instructorExamCorrection';
   static const instructorQuizzes       = 'instructorQuizzes';
   static const instructorSettings      = 'instructorSettings';
   static const instructorHelp          = 'instructorHelp';
@@ -547,5 +564,6 @@ class RouteNames {
   static const instructorCourseStudents     = 'instructorCourseStudents';
   static const instructorCourseAnalytics    = 'instructorCourseAnalytics';
   static const instructorCourseQuestionBank = 'instructorCourseQuestionBank';
+  static const instructorCourseTemplates    = 'instructorCourseTemplates';
   static const instructorCourseQuizzes      = 'instructorCourseQuizzes';
 }

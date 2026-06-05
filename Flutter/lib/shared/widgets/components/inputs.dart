@@ -128,7 +128,7 @@ class _AppLabeledTextFieldState extends State<AppLabeledTextField> {
             decoration: InputDecoration(
               hintText: widget.hint,
               hintStyle: AppText.hint.copyWith(
-                  height: widget.expands ? 20 / 14 : null),
+                  height: widget.expands ? 20 / 14 : null,),
               suffixIcon: widget.suffix,
               isCollapsed: true,
               contentPadding: EdgeInsets.zero,
@@ -145,7 +145,7 @@ class _AppLabeledTextFieldState extends State<AppLabeledTextField> {
         if (hasError) ...[
           AppSpacing.gap4,
           Text(widget.errorText!,
-              style: AppText.mutedSmall.copyWith(color: AppColors.dangerText)),
+              style: AppText.mutedSmall.copyWith(color: AppColors.dangerText),),
         ] else if (widget.helper != null) ...[
           AppSpacing.gap6,
           Text(widget.helper!, style: AppText.mutedSmall),
@@ -185,7 +185,7 @@ class FigmaUmSearch40 extends StatelessWidget {
     Theme.of(context);
     return Theme(
       data: Theme.of(context).copyWith(
-        inputDecorationTheme: InputDecorationTheme(
+        inputDecorationTheme: const InputDecorationTheme(
           border: InputBorder.none,
           enabledBorder: InputBorder.none,
           focusedBorder: InputBorder.none,
@@ -199,9 +199,9 @@ class FigmaUmSearch40 extends StatelessWidget {
         child: SizedBox(
           height: 40,
           child: Row(children: [
-            SizedBox(width: 14),
+            const SizedBox(width: 14),
             Icon(Icons.search, size: 18, color: _muted),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Expanded(
               child: TextField(
                 controller: controller,
@@ -232,7 +232,7 @@ class FigmaUmSearch40 extends StatelessWidget {
                 ),
               ),
             ),
-          ]),
+          ],),
         ),
       ),
     );
@@ -271,22 +271,22 @@ class AppReadOnlyInput extends StatelessWidget {
             border: Border.all(color: AppColors.borderSoft),
           ),
           child: Row(children: [
-            SizedBox(width: 14),
+            const SizedBox(width: 14),
             Icon(icon, size: 18, color: AppColors.muted),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 value,
                 style: AppText.input.copyWith(
-                    fontWeight: FontWeight.w500, color: AppColors.muted),
+                    fontWeight: FontWeight.w500, color: AppColors.muted,),
               ),
             ),
             if (rightTag != null) ...[
               Text(rightTag!.toUpperCase(), style: AppText.mutedSmall.copyWith(
-                  fontWeight: FontWeight.w700, letterSpacing: 0.3)),
-              SizedBox(width: 14),
+                  fontWeight: FontWeight.w700, letterSpacing: 0.3,),),
+              const SizedBox(width: 14),
             ],
-          ]),
+          ],),
         ),
       ],
     );

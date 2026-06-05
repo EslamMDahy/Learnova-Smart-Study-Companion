@@ -127,7 +127,7 @@ Future<void> _scrollTo(GlobalKey key) async {
   if (ctx == null) return;
   await Scrollable.ensureVisible(
     ctx,
-    duration: Duration(milliseconds: 450),
+    duration: const Duration(milliseconds: 450),
     curve: Curves.easeInOut,
     alignment: 0.02, // small top padding
   );
@@ -178,7 +178,7 @@ void _onNavSelect(int i) {
       'Sep',
       'Oct',
       'Nov',
-      'Dec'
+      'Dec',
     ];
     return '${months[d.month - 1]}, ${d.year}';
   }
@@ -399,18 +399,18 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
   final res = await showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
-      title: Text('Discard changes?'),
-      content: Text(
+      title: const Text('Discard changes?'),
+      content: const Text(
         'You have unsaved changes. If you leave now, your changes will be lost.',
       ),
       actions: [
         TextButton(
           onPressed: () => Navigator.of(ctx).pop(false),
-          child: Text('Stay'),
+          child: const Text('Stay'),
         ),
         ElevatedButton(
           onPressed: () => Navigator.of(ctx).pop(true),
-          child: Text('Discard'),
+          child: const Text('Discard'),
         ),
       ],
     ),
@@ -429,8 +429,8 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
         body: SafeArea(
           child: Center(
             child: ConstrainedBox(
-              constraints: BoxConstraints(maxWidth: 1200),
-              child: Padding(
+              constraints: const BoxConstraints(maxWidth: 1200),
+              child: const Padding(
                 padding: AppSpacing.page,
                 child: _SettingsSkeleton(),
               ),
@@ -471,12 +471,12 @@ Future<bool> _confirmDiscardDialog(BuildContext context) async {
 
       if (err != null && err.trim().isNotEmpty) {
         _toast(context,
-            title: 'Error', message: err, icon: Icons.error_outline_rounded);
+            title: 'Error', message: err, icon: Icons.error_outline_rounded,);
       } else if (ok != null && ok.trim().isNotEmpty) {
         _toast(context,
             title: 'Done',
             message: ok,
-            icon: Icons.check_circle_outline_rounded);
+            icon: Icons.check_circle_outline_rounded,);
 
         
         WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -516,7 +516,7 @@ return PopScope(
       height: double.infinity,
       child: Center(
         child: ConstrainedBox(
-          constraints: BoxConstraints(maxWidth: 1200),
+          constraints: const BoxConstraints(maxWidth: 1200),
           child: Padding(
             padding: AppSpacing.page,
             child: Column(
@@ -531,7 +531,7 @@ return PopScope(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text('Account Settings', style: AppText.h1),
-                          SizedBox(height: 6),
+                          const SizedBox(height: 6),
                           Text(
                             'Manage your personal information, security credentials, and system preferences.',
                             style: AppText.subtitle,
@@ -539,7 +539,7 @@ return PopScope(
                         ],
                       ),
                     ),
-                    SizedBox(width: 16),
+                    const SizedBox(width: 16),
                     Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
@@ -568,7 +568,7 @@ return PopScope(
                             borderColor: AppColors.borderSoft,
                           ),
                         ),
-                        SizedBox(width: 10),
+                        const SizedBox(width: 10),
                         SizedBox(
                           width: 160,
                           child: AppPrimaryLoadingButton(
@@ -612,7 +612,7 @@ return PopScope(
                   ],
                 ),
 
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 // Main (scrollable content). Sidebar stays sticky on wide screens.
                 Expanded(
@@ -633,7 +633,7 @@ return PopScope(
                             uploadingAvatar: st.uploadingAvatar,
                             onUploadAvatar: () => _pickAndUploadAvatar(),
                           ),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           _NavCard(
                             selectedIndex: _sectionIndex,
                             onSelect: (i) => _onNavSelect(i),
@@ -644,15 +644,15 @@ return PopScope(
                       final right = Column(
                         children: [
                           _buildPersonalInfoCard(),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           _buildSecurityCard(st),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           _buildPreferencesCard(),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           _buildNotificationsCard(),
-                          SizedBox(height: 16),
+                          const SizedBox(height: 16),
                           _buildDangerZone(st),
-                          SizedBox(height: 24),
+                          const SizedBox(height: 24),
                         ],
                       );
 
@@ -662,7 +662,7 @@ return PopScope(
                           child: Column(
                             children: [
                               left,
-                              SizedBox(height: 16),
+                              const SizedBox(height: 16),
                               right,
                             ],
                           ),

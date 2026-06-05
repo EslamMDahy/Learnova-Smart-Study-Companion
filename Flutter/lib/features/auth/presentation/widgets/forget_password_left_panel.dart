@@ -39,8 +39,8 @@ class ForgetPasswordLeftPanel extends StatelessWidget {
             Row(
               children: [
                 Image.asset('assets/logo.webp', height: 40, cacheWidth: (40 * MediaQuery.of(context).devicePixelRatio).round()),
-                SizedBox(width: 10),
-                Text(
+                const SizedBox(width: 10),
+                const Text(
                   'Learnova',
                   style: TextStyle(
                     color: Colors.white,
@@ -51,7 +51,7 @@ class ForgetPasswordLeftPanel extends StatelessWidget {
               ],
             ),
 
-            SizedBox(height: 40),
+            const SizedBox(height: 40),
 
             /// Title
             Text(
@@ -65,13 +65,13 @@ class ForgetPasswordLeftPanel extends StatelessWidget {
                   Shadow(
                     blurRadius: 10,
                     color: AppColors.textMuted,
-                    offset: Offset(0, 4),
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
             ),
 
-            SizedBox(height: 20),
+            const SizedBox(height: 20),
 
             /// Subtitle
             Text(
@@ -84,13 +84,13 @@ class ForgetPasswordLeftPanel extends StatelessWidget {
                   Shadow(
                     blurRadius: 8,
                     color: AppColors.textHint,
-                    offset: Offset(0, 3),
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
             ),
 
-            SizedBox(height: 60),
+            const SizedBox(height: 60),
           ],
         ),
       ),

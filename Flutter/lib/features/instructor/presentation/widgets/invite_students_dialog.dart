@@ -17,7 +17,6 @@ class InviteStudentsDialog extends ConsumerStatefulWidget {
 class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
   bool _loading = false;
   PlatformFile? _pickedFile;
-  bool _sendAfterUpload = true;
 
   // ألوان التصميم الجديد
   Color get _accentColor => AppColors.primary;
@@ -29,15 +28,14 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
     AppToast.info(
       context,
       title: 'Template format',
-      message: 'Use a spreadsheet with one column named email.',
+      message: 'Use an .xlsx spreadsheet with one column named email.',
     );
   }
 
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['xlsx', 'xls', 'csv'],
-      allowMultiple: false,
+      allowedExtensions: const ['xlsx'],
       withData: true,
     );
 
@@ -45,15 +43,13 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
 
     final file = result.files.single;
     final name = file.name.toLowerCase();
-    final valid = name.endsWith('.xlsx') ||
-        name.endsWith('.xls') ||
-        name.endsWith('.csv');
+    final valid = name.endsWith('.xlsx');
 
     if (!valid) {
       AppToast.error(
         context,
         title: 'Invalid file',
-        message: 'Please choose an Excel or CSV file.',
+        message: 'Please choose a valid .xlsx file.',
       );
       return;
     }
@@ -69,7 +65,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
       AppToast.error(
         context,
         title: 'No file selected',
-        message: 'Choose an Excel or CSV file before uploading.',
+        message: 'Choose a valid .xlsx file before uploading.',
       );
       return;
     }
@@ -84,17 +80,11 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
         filename: file.name,
       );
 
-      if (_sendAfterUpload) {
-        await repo.sendInvitations(courseId: widget.courseId.toString());
-      }
-
       if (!mounted) return;
       AppToast.success(
         context,
         title: 'Invitations ready',
-        message: _sendAfterUpload
-            ? 'Students were uploaded and invitations were sent.'
-            : 'Students were uploaded successfully.',
+        message: 'Students were uploaded and invitations were sent.',
       );
       Navigator.pop(context, true);
     } catch (e) {
@@ -123,7 +113,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
             BoxShadow(
               color: Colors.black.withOpacity(0.1),
               blurRadius: 40,
-              offset: Offset(0, 20),
+              offset: const Offset(0, 20),
             ),
           ],
         ),
@@ -138,11 +128,11 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     _buildTemplateSection(),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     _buildUploadZone(),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
                     _buildSettingsToggle(),
-                    SizedBox(height: 32),
+                    const SizedBox(height: 32),
                     _buildActions(),
                   ],
                 ),
@@ -172,7 +162,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
             ),
             child: Icon(Icons.group_add_rounded, color: _accentColor, size: 28),
           ),
-          SizedBox(width: 16),
+          const SizedBox(width: 16),
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -181,19 +171,19 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
                 style: TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF1E293B),
+                  color: AppColors.textTitle,
                 ),
               ),
               Text(
-                'Import your student list via Excel/CSV',
-                style: TextStyle(fontSize: 13, color: Colors.grey[600]),
+                'Import your student list via .xlsx',
+                style: TextStyle(fontSize: 13, color: AppColors.textMuted),
               ),
             ],
           ),
-          Spacer(),
+          const Spacer(),
           IconButton(
             onPressed: () => Navigator.pop(context),
-            icon: Icon(Icons.close_rounded),
+            icon: const Icon(Icons.close_rounded),
           ),
         ],
       ),
@@ -210,22 +200,22 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
       ),
       child: Row(
         children: [
-          Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
-          SizedBox(width: 12),
+          const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
+          const SizedBox(width: 12),
           Expanded(
             child: Text(
               'Please use our official template for a smooth import.',
               style: TextStyle(
                 fontSize: 13,
                 fontWeight: FontWeight.w500,
-                color: Color(0xFF92400E),
+                color: AppColors.textTitle,
               ),
             ),
           ),
           TextButton.icon(
             onPressed: _downloadTemplate,
-            icon: Icon(Icons.download_rounded, size: 18),
-            label: Text('Download'),
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: const Text('Download'),
             style: TextButton.styleFrom(foregroundColor: Colors.amber[900]),
           ),
         ],
@@ -234,7 +224,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
   }
 
   Widget _buildUploadZone() {
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       onTap: _pickFile,
       borderRadius: BorderRadius.circular(20),
       child: Container(
@@ -260,7 +250,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
               size: 48,
               color: _pickedFile != null ? _accentColor : Colors.grey[400],
             ),
-            SizedBox(height: 16),
+            const SizedBox(height: 16),
             Text(
               _pickedFile != null
                   ? _pickedFile!.name
@@ -270,14 +260,14 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
                 fontWeight: FontWeight.w700,
                 color: _pickedFile != null
                     ? _accentColor
-                    : Color(0xFF475569),
+                    : AppColors.textMuted,
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 8),
             Text(
               _pickedFile != null
                   ? '${(_pickedFile!.size / 1024).toStringAsFixed(1)} KB'
-                  : 'Supports .xlsx, .xls, .csv up to 10MB',
+                  : 'Supports .xlsx files with an email column',
               style: TextStyle(fontSize: 12, color: Colors.grey[500]),
             ),
           ],
@@ -296,47 +286,27 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
       ),
       child: Row(
         children: [
-          Icon(Icons.mark_email_read_outlined, color: AppColors.textMuted),
-          SizedBox(width: 12),
+          const Icon(Icons.mark_email_read_outlined, color: AppColors.primary),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  'Send Invitations',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
+                  'Automatic email sending',
+                  style: TextStyle(
+                    color: AppColors.textTitle,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
                 ),
+                const SizedBox(height: 4),
                 Text(
-                  'Notify students via email after upload',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  'The backend sends invitations automatically after a successful upload.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                 ),
               ],
             ),
-          ),
-          Switch(
-            value: _sendAfterUpload,
-            onChanged: (v) => setState(() => _sendAfterUpload = v),
-
-            // لون الدائرة (الـ Thumb)
-            thumbColor: WidgetStateProperty.resolveWith<Color>((states) {
-              if (states.contains(WidgetState.selected)) {
-                return Colors.white; // لما يكون شغال تكون الدائرة بيضاء واضحة
-              }
-              return Colors.white;
-            }),
-
-            // لون المسار (الـ Track)
-            trackColor: WidgetStateProperty.resolveWith<Color>((states) {
-              if (states.contains(WidgetState.selected)) {
-                return Color(
-                  0xFF137FEC,
-                ); // أزرق مريح للعين لما يكون Active
-              }
-              return AppColors.border; // رمادي فاتح جداً لما يكون المطفي
-            }),
-
-            // إخفاء الحدود الخارجية المزعجة
-            trackOutlineColor: WidgetStateProperty.all(Colors.transparent),
           ),
         ],
       ),
@@ -355,13 +325,13 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
                 borderRadius: BorderRadius.circular(12),
               ),
             ),
-            child: Text(
+            child: const Text(
               'Cancel',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
           ),
         ),
-        SizedBox(width: 16),
+        const SizedBox(width: 16),
         Expanded(
           flex: 2,
           child: ElevatedButton(
@@ -384,7 +354,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
                       strokeWidth: 2,
                     ),
                   )
-                : Text(
+                : const Text(
                     'Upload & Continue',
                     style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
                   ),

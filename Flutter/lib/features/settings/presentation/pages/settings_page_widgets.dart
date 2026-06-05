@@ -64,7 +64,7 @@ class _ProfileCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             blurRadius: 2,
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
             color: AppColors.shadowSoft,
           ),
         ],
@@ -92,7 +92,7 @@ class _ProfileCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(9999),
                           border: Border.all(color: AppColors.cardBg, width: 4),
                           boxShadow: [
-                            BoxShadow(
+                            const BoxShadow(
                               blurRadius: 6,
                               offset: Offset(0, 4),
                               color: Color(0x1A000000),
@@ -123,7 +123,7 @@ class _ProfileCard extends StatelessWidget {
                             color: Colors.black38,
                             borderRadius: BorderRadius.circular(9999),
                           ),
-                          child: Center(
+                          child: const Center(
                             child: CircularProgressIndicator(
                               strokeWidth: 2.5,
                               color: Colors.white,
@@ -142,13 +142,13 @@ class _ProfileCard extends StatelessWidget {
                               shape: BoxShape.circle,
                               border: Border.all(color: AppColors.cardBg, width: 2),
                             ),
-                            child: Icon(Icons.camera_alt, size: 15, color: Colors.white),
+                            child: const Icon(Icons.camera_alt, size: 15, color: Colors.white),
                           ),
                         ),
                     ],
                   ),
                 ),
-                SizedBox(height: 12),
+                const SizedBox(height: 12),
                 Text(
                   name,
                   style: TextStyle(
@@ -158,7 +158,7 @@ class _ProfileCard extends StatelessWidget {
                     color: AppColors.title,
                   ),
                 ),
-                SizedBox(height: 6),
+                const SizedBox(height: 6),
                 Text(
                   subtitle,
                   style: TextStyle(
@@ -168,7 +168,7 @@ class _ProfileCard extends StatelessWidget {
                     color: AppColors.muted,
                   ),
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
                   decoration: BoxDecoration(
@@ -178,8 +178,8 @@ class _ProfileCard extends StatelessWidget {
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _Dot(color: AppColors.successDot),
-                      SizedBox(width: 6),
+                      const _Dot(color: AppColors.successDot),
+                      const SizedBox(width: 6),
                       Text(
                         'Active Status',
                         style: TextStyle(
@@ -207,7 +207,7 @@ class _ProfileCard extends StatelessWidget {
               child: Column(
                 children: [
                   _TwoColRow(left: 'Member since', right: memberSince),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   _TwoColRow(left: 'Last login', right: lastLogin),
                 ],
               ),
@@ -295,7 +295,7 @@ class _NavCard extends StatelessWidget {
         boxShadow: [
           BoxShadow(
             blurRadius: 2,
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
             color: AppColors.shadowSoft,
           ),
         ],
@@ -352,7 +352,7 @@ class _NavItem extends StatelessWidget {
     final color = selected ? AppColors.primary : AppColors.muted;
     final weight = selected ? FontWeight.w700 : FontWeight.w500;
 
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), 
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
       onTap: onTap,
       child: Container(
         height: 56,
@@ -362,7 +362,7 @@ class _NavItem extends StatelessWidget {
         child: Row(
           children: [
             Icon(icon, color: color),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text(
               label,
               style: TextStyle(
@@ -407,7 +407,7 @@ class _SettingsSkeleton extends StatelessWidget {
           boxShadow: [
             BoxShadow(
               blurRadius: 2,
-              offset: Offset(0, 1),
+              offset: const Offset(0, 1),
               color: AppColors.shadowSoft,
             ),
           ],
@@ -419,13 +419,13 @@ class _SettingsSkeleton extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _line(h: 16, w: 180),
-              SizedBox(height: 10),
+              const SizedBox(height: 10),
               _line(h: 12, w: 300),
-              SizedBox(height: 16),
+              const SizedBox(height: 16),
               _line(h: 44),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               _line(h: 44),
-              SizedBox(height: 12),
+              const SizedBox(height: 12),
               _line(h: 44),
             ],
           ),
@@ -448,23 +448,23 @@ class _SettingsSkeleton extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _line(h: 22, w: 220),
-                  SizedBox(height: 8),
+                  const SizedBox(height: 8),
                   _line(w: 520),
                 ],
               ),
             ),
-            SizedBox(width: 16),
+            const SizedBox(width: 16),
             Column(
               children: [
                 _line(h: 40, w: 120),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _line(h: 40, w: 160),
               ],
             ),
           ],
         ),
 
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
 
         // Body skeleton
         Expanded(
@@ -472,13 +472,13 @@ class _SettingsSkeleton extends StatelessWidget {
             child: Column(
               children: [
                 _card(minH: 260),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 _card(minH: 260),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 _card(minH: 240),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 _card(minH: 280),
-                SizedBox(height: 16),
+                const SizedBox(height: 16),
                 Container(
                   height: 90,
                   width: double.infinity,
@@ -488,7 +488,7 @@ class _SettingsSkeleton extends StatelessWidget {
                     border: Border.all(color: AppColors.dangerBorder),
                   ),
                 ),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
               ],
             ),
           ),

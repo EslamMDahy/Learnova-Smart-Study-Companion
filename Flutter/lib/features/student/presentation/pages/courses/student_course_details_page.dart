@@ -32,7 +32,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        "Course Content",
+                        'Course Content',
                         style: TextStyle(
                           fontWeight: FontWeight.w800,
                           fontSize: 18,
@@ -41,13 +41,13 @@ class StudentCourseDetailsPage extends StatelessWidget {
                       ),
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 10, vertical: 5),
+                            horizontal: 10, vertical: 5,),
                         decoration: BoxDecoration(
                           color: AppColors.infoBg,
                           borderRadius: BorderRadius.circular(8),
                         ),
-                        child: Text(
-                          "CS-101",
+                        child: const Text(
+                          'CS-101',
                           style: TextStyle(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w700,
@@ -58,7 +58,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
                     ],
                   ),
                 ),
-                SizedBox(height: 24),
+                const SizedBox(height: 24),
 
                 /// نظام Modules (Accordion)
                 Expanded(
@@ -70,53 +70,51 @@ class StudentCourseDetailsPage extends StatelessWidget {
                       children: [
                         /// Module 1
                         _buildModuleExpansionTile(
-                          title: "Module 1: Core Fundamentals",
+                          title: 'Module 1: Core Fundamentals',
                           isInitiallyExpanded: true,
                           children: [
                             _buildContentItem(
-                                "1.1 Course Introduction", "12:45",
-                                isCompleted: true, isCurrent: false),
+                                '1.1 Course Introduction', '12:45',
+                                isCompleted: true, isCurrent: false,),
                             _buildContentItem(
-                                "1.2 Setting Up Environment", "18:20",
-                                isCompleted: true, isCurrent: true),
+                                '1.2 Setting Up Environment', '18:20',
+                                isCompleted: true, isCurrent: true,),
                             _buildContentItem(
-                                "1.3 First Code Architecture", "25:10",
-                                isCompleted: false, isCurrent: false),
+                                '1.3 First Code Architecture', '25:10',
+                                isCompleted: false, isCurrent: false,),
                           ],
                         ),
-                        SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
                         /// Module 2
                         _buildModuleExpansionTile(
-                          title: "Module 2: Advanced Data Flow",
+                          title: 'Module 2: Advanced Data Flow',
                           isInitiallyExpanded: true,
                           children: [
                             _buildContentItem(
-                                "2.1 Understanding State", "20:15",
-                                isCompleted: false, isCurrent: false),
+                                '2.1 Understanding State', '20:15',
+                                isCompleted: false, isCurrent: false,),
                             _buildContentItem(
-                                "2.2 Async Operations & APIs", "32:40",
-                                isCompleted: false, isCurrent: false),
+                                '2.2 Async Operations & APIs', '32:40',
+                                isCompleted: false, isCurrent: false,),
                             _buildContentItem(
-                                "2.3 Streams and Observers", "15:10",
-                                isCompleted: false, isCurrent: false),
+                                '2.3 Streams and Observers', '15:10',
+                                isCompleted: false, isCurrent: false,),
                             // 2. تمرير الـ context هنا كأول متغير لتفعيل التوجيه والربط
-                            _buildQuizItem(context, "2.4 Module Quiz", "10 Qs",
-                                isLocked: false),
+                            _buildQuizItem(context, '2.4 Module Quiz', '10 Qs',),
                           ],
                         ),
-                        SizedBox(height: 12),
+                        const SizedBox(height: 12),
 
                         /// Module 3
                         _buildModuleExpansionTile(
-                          title: "Module 3: Production Deployment",
-                          isInitiallyExpanded: false,
+                          title: 'Module 3: Production Deployment',
                           children: [
-                            _buildContentItem("3.1 CI/CD Pipelines", "45:00",
-                                isCompleted: false, isCurrent: false),
+                            _buildContentItem('3.1 CI/CD Pipelines', '45:00',
+                                isCompleted: false, isCurrent: false,),
                             _buildContentItem(
-                                "3.2 Cloud Orchestration", "28:15",
-                                isCompleted: false, isCurrent: false),
+                                '3.2 Cloud Orchestration', '28:15',
+                                isCompleted: false, isCurrent: false,),
                           ],
                         ),
                       ],
@@ -142,7 +140,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
                       width: double.infinity,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(16),
-                        gradient: LinearGradient(
+                        gradient: const LinearGradient(
                           colors: [Color(0xff1E1B4B), Color(0xff312E81)],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -151,15 +149,15 @@ class StudentCourseDetailsPage extends StatelessWidget {
                           BoxShadow(
                             color: Colors.black.withOpacity(0.06),
                             blurRadius: 20,
-                            offset: Offset(0, 8),
-                          )
+                            offset: const Offset(0, 8),
+                          ),
                         ],
                       ),
                       child: Center(
                         child: CircleAvatar(
                           radius: 36,
                           backgroundColor: AppColors.cardBg.withOpacity(0.9),
-                          child: Icon(
+                          child: const Icon(
                             Icons.play_arrow_rounded,
                             size: 44,
                             color: AppColors.primary,
@@ -167,52 +165,52 @@ class StudentCourseDetailsPage extends StatelessWidget {
                         ),
                       ),
                     ),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
                     /// TITLE & INSTRUCTOR INFO
                     Text(
-                      "1.2 Setting Up Your Production Environment",
+                      '1.2 Setting Up Your Production Environment',
                       style: TextStyle(
                         fontSize: 24,
                         fontWeight: FontWeight.w800,
                         color: AppColors.textTitle,
                       ),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 8),
                     Text(
-                      "In this lesson, we will explore the industrial standards for setting up scalable architectures.",
+                      'In this lesson, we will explore the industrial standards for setting up scalable architectures.',
                       style: TextStyle(color: AppColors.textMuted, fontSize: 14),
                     ),
-                    SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
                     /// NAVIGATION TABS
                     Row(
                       children: [
-                        _buildTabItem("Overview", false),
-                        _buildTabItem("Notes & Code", true),
-                        _buildTabItem("Discussions", false),
-                        _buildTabItem("AI Resources", false),
+                        _buildTabItem('Overview', false),
+                        _buildTabItem('Notes & Code', true),
+                        _buildTabItem('Discussions', false),
+                        _buildTabItem('AI Resources', false),
                       ],
                     ),
                     Divider(color: AppColors.border, height: 1),
-                    SizedBox(height: 28),
+                    const SizedBox(height: 28),
 
                     /// TIMELINE / LESSON OBJECTIVES
                     Text(
-                      "Lesson Timeline",
+                      'Lesson Timeline',
                       style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textTitle),
+                          color: AppColors.textTitle,),
                     ),
-                    SizedBox(height: 16),
-                    _buildTimelineItem("02:15",
-                        "Introduction and setup overview of required SDKs."),
-                    _buildTimelineItem("08:45",
-                        "Configuration of terminal variables and global paths.",
-                        isSelected: true),
-                    _buildTimelineItem("14:20",
-                        "Testing the environment with dummy server compilation."),
+                    const SizedBox(height: 16),
+                    _buildTimelineItem('02:15',
+                        'Introduction and setup overview of required SDKs.',),
+                    _buildTimelineItem('08:45',
+                        'Configuration of terminal variables and global paths.',
+                        isSelected: true,),
+                    _buildTimelineItem('14:20',
+                        'Testing the environment with dummy server compilation.',),
                   ],
                 ),
               ),
@@ -233,40 +231,40 @@ class StudentCourseDetailsPage extends StatelessWidget {
               children: [
                 Row(
                   children: [
-                    Icon(Icons.auto_awesome,
-                        color: AppColors.primary, size: 20),
-                    SizedBox(width: 8),
+                    const Icon(Icons.auto_awesome,
+                        color: AppColors.primary, size: 20,),
+                    const SizedBox(width: 8),
                     Text(
-                      "AI Learning Tutor",
+                      'AI Learning Tutor',
                       style: TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
                         color: AppColors.textTitle,
                       ),
                     ),
-                    Spacer(),
+                    const Spacer(),
                     CircleAvatar(
                       radius: 4,
                       backgroundColor: Colors.green.shade500,
                     ),
-                    SizedBox(width: 6),
-                    Text("Online",
+                    const SizedBox(width: 6),
+                    Text('Online',
                         style:
-                            TextStyle(fontSize: 12, color: AppColors.textMuted)),
+                            TextStyle(fontSize: 12, color: AppColors.textMuted),),
                   ],
                 ),
-                SizedBox(height: 20),
+                const SizedBox(height: 20),
 
                 /// CHAT MESSAGES AREA
                 Expanded(
                   child: ListView(
                     children: [
                       _buildChatMessage(false,
-                          "Hello Alex! I am your AI assistant. Ask me anything about the current lesson on Environment Setup."),
+                          'Hello Alex! I am your AI assistant. Ask me anything about the current lesson on Environment Setup.',),
                       _buildChatMessage(true,
-                          "What is the purpose of configuring global paths at 08:45?"),
+                          'What is the purpose of configuring global paths at 08:45?',),
                       _buildChatMessage(false,
-                          "Configuring global paths ensures that your terminal can call the compiled binaries from any working directory instantly."),
+                          'Configuring global paths ensures that your terminal can call the compiled binaries from any working directory instantly.',),
                     ],
                   ),
                 ),
@@ -285,9 +283,9 @@ class StudentCourseDetailsPage extends StatelessWidget {
                       Expanded(
                         child: TextField(
                           decoration: InputDecoration(
-                            hintText: "Ask AI a question...",
+                            hintText: 'Ask AI a question...',
                             hintStyle: TextStyle(
-                                color: AppColors.textHint, fontSize: 13),
+                                color: AppColors.textHint, fontSize: 13,),
                             border: InputBorder.none,
                             isDense: true,
                           ),
@@ -295,10 +293,10 @@ class StudentCourseDetailsPage extends StatelessWidget {
                       ),
                       IconButton(
                         onPressed: () {},
-                        icon: Icon(Icons.send_rounded,
-                            color: AppColors.primary, size: 18),
+                        icon: const Icon(Icons.send_rounded,
+                            color: AppColors.primary, size: 18,),
                         padding: EdgeInsets.zero,
-                        constraints: BoxConstraints(),
+                        constraints: const BoxConstraints(),
                       ),
                     ],
                   ),
@@ -350,7 +348,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
 
   /// عناصر الدروس العادية
   Widget _buildContentItem(String title, String duration,
-      {required bool isCompleted, required bool isCurrent}) {
+      {required bool isCompleted, required bool isCurrent,}) {
     return Container(
       margin: const EdgeInsets.symmetric(vertical: 2),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -376,7 +374,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
                     : AppColors.textHint),
             size: 16,
           ),
-          SizedBox(width: 10),
+          const SizedBox(width: 10),
           Expanded(
             child: Text(
               title,
@@ -408,14 +406,14 @@ class StudentCourseDetailsPage extends StatelessWidget {
   /// 3. دالة الـ Module Quiz المحدثة بالكامل لتقوم بالربط والانتقال بنجاح لصفحة الـ QuizResult
   Widget _buildQuizItem(
       BuildContext context, String title, String questionsCount,
-      {bool isLocked = false}) {
+      {bool isLocked = false,}) {
     return GestureDetector(
       onTap: () {
         if (!isLocked) {
           Navigator.push(
             context,
             MaterialPageRoute(
-                builder: (context) => StudentQuizResultPage()),
+                builder: (context) => const StudentQuizResultPage(),),
           );
         }
       },
@@ -435,7 +433,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
                   isLocked ? AppColors.textHint : AppColors.warningText,
               size: 16,
             ),
-            SizedBox(width: 10),
+            const SizedBox(width: 10),
             Expanded(
               child: Text(
                 title,
@@ -495,7 +493,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
   }
 
   Widget _buildTimelineItem(String time, String text,
-      {bool isSelected = false}) {
+      {bool isSelected = false,}) {
     return Container(
       margin: const EdgeInsets.only(bottom: 4),
       padding: const EdgeInsets.all(12),
@@ -512,7 +510,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
             width: 60,
             child: Text(
               time,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppColors.primary,
                 fontWeight: FontWeight.w700,
                 fontSize: 13,
@@ -540,7 +538,7 @@ class StudentCourseDetailsPage extends StatelessWidget {
       child: Container(
         margin: const EdgeInsets.only(bottom: 16),
         padding: const EdgeInsets.all(12),
-        constraints: BoxConstraints(maxWidth: 260),
+        constraints: const BoxConstraints(maxWidth: 260),
         decoration: BoxDecoration(
           color: isUser ? AppColors.primary : AppColors.headerBg,
           borderRadius: BorderRadius.only(

@@ -149,7 +149,7 @@ class _PdfReviewerWorkspaceState extends State<_PdfReviewerWorkspace> {
                   urlLoading: widget.urlLoading,
                   onRefreshUrl: widget.onRefreshUrl,
                 ),
-                SizedBox(height: 18),
+                const SizedBox(height: 18),
                 if (compact)
                   Column(
                     children: [
@@ -161,7 +161,7 @@ class _PdfReviewerWorkspaceState extends State<_PdfReviewerWorkspace> {
                         previewInteractive: pdfPreviewActive,
                         height: stageHeight,
                       ),
-                      SizedBox(height: 18),
+                      const SizedBox(height: 18),
                       _ReviewerSidePanel(
                         material: widget.material,
                         topics: widget.topics,
@@ -189,7 +189,7 @@ class _PdfReviewerWorkspaceState extends State<_PdfReviewerWorkspace> {
                           height: stageHeight,
                         ),
                       ),
-                      SizedBox(width: 18),
+                      const SizedBox(width: 18),
                       SizedBox(
                         width: 430,
                         child: _ReviewerSidePanel(
@@ -244,130 +244,328 @@ class _ReviewerShellHeader extends StatelessWidget {
     final status = _materialStatusLabel(material);
     final statusColor = _materialStatusColor(material);
     final fileName = (material.fileName ?? '').trim();
-    final subtitle = [
-      if (fileName.isNotEmpty) fileName,
-      module.title,
-    ].join('  •  ');
+    final parentTopics = topics.where((t) => t.parentTopicId == null).length;
+    final subTopics = topics.length - parentTopics;
+    final fileMeta = material.pageCount != null
+        ? '${material.pageCount} pages'
+        : material.fileSize != null
+            ? _MetaStripW._fmt(material.fileSize!)
+            : material.type.toUpperCase();
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 16),
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 22),
       decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.borderGray),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF145CCB), AppColors.primary, Color(0xFF4CB5FF)],
+        ),
+        borderRadius: BorderRadius.circular(26),
         boxShadow: [
           BoxShadow(
-            color: AppColors.shadowSoft,
+            color: AppColors.primary.withOpacity(0.18),
             blurRadius: 28,
-            offset: Offset(0, 14),
+            offset: const Offset(0, 14),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Container(
-            width: 58,
-            height: 58,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF147EF5), Color(0xFF5B8CFF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: Color(0x33147EF5),
-                  blurRadius: 18,
-                  offset: Offset(0, 8),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 980;
+          final titleBlock = Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 62,
+                height: 62,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.16),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.18)),
                 ),
-              ],
-            ),
-            child: Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 28),
-          ),
-          SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+                child: Icon(
+                  material.type == 'video'
+                      ? Icons.play_circle_fill_rounded
+                      : material.type == 'audio'
+                          ? Icons.headphones_rounded
+                          : material.type == 'link'
+                              ? Icons.link_rounded
+                              : Icons.picture_as_pdf_rounded,
+                  color: Colors.white,
+                  size: 30,
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _TinyBadge(
-                      label: 'PDF Reviewer',
-                      color: AppColors.primary,
-                      background: AppColors.infoBg,
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _GradientHeaderPill(label: material.type.toUpperCase()),
+                        _GradientHeaderPill(label: status, dotColor: statusColor),
+                        if (fileName.isNotEmpty) _GradientHeaderPill(label: fileName),
+                      ],
                     ),
-                    SizedBox(width: 8),
-                    _TinyBadge(
-                      label: status,
-                      color: statusColor,
-                      background: statusColor.withOpacity(0.10),
+                    const SizedBox(height: 13),
+                    Text(
+                      material.displayTitle,
+                      maxLines: compact ? 2 : 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: compact ? 25 : 32,
+                        height: 1.04,
+                        letterSpacing: -0.5,
+                        fontWeight: FontWeight.w900,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${module.title}  •  Material → Topics → Subtopics',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 13.5,
+                        height: 1.45,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white.withOpacity(0.82),
+                      ),
                     ),
                   ],
                 ),
-                SizedBox(height: 9),
-                Text(
-                  material.displayTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 24,
-                    height: 1.1,
-                    letterSpacing: -0.4,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textTitle,
-                  ),
-                ),
-                SizedBox(height: 5),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-                ),
-              ],
-            ),
-          ),
-          SizedBox(width: 14),
-          Wrap(
+              ),
+            ],
+          );
+
+          final statsBlock = Wrap(
             spacing: 10,
             runSpacing: 10,
-            alignment: WrapAlignment.end,
-            crossAxisAlignment: WrapCrossAlignment.center,
+            alignment: compact ? WrapAlignment.start : WrapAlignment.end,
             children: [
-              _ReviewerStatPill(
-                icon: Icons.account_tree_outlined,
-                label: 'Topics',
-                value: '${topics.length}',
-                helper: '$readyTopics ready',
-              ),
-              _ReviewerStatPill(
+              _GradientHeaderMetric(icon: Icons.topic_outlined, label: 'Topics', value: '$parentTopics'),
+              _GradientHeaderMetric(icon: Icons.account_tree_outlined, label: 'Subtopics', value: '$subTopics'),
+              _GradientHeaderMetric(
                 icon: Icons.flag_outlined,
                 label: 'Outcomes',
                 value: totalOutcomeCount == 0 ? '—' : '$mappedOutcomeCount/$totalOutcomeCount',
-                helper: totalOutcomeCount == 0 ? 'no outcomes' : 'mapped',
               ),
-              _ReviewerStatPill(
-                icon: Icons.storage_rounded,
-                label: material.pageCount != null ? 'Pages' : 'Size',
-                value: material.pageCount != null
-                    ? '${material.pageCount}'
-                    : material.fileSize != null
-                        ? _MetaStripW._fmt(material.fileSize!)
-                        : '—',
-                helper: 'document',
-              ),
-              _HeaderIconButton(
+              _GradientHeaderMetric(icon: Icons.storage_rounded, label: material.pageCount != null ? 'Pages' : 'Size', value: fileMeta),
+            ],
+          );
+
+          final actions = Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _GradientHeaderIconButton(
                 tooltip: 'Refresh preview URL',
                 icon: urlLoading ? null : Icons.refresh_rounded,
                 loading: urlLoading,
                 onTap: urlLoading ? null : onRefreshUrl,
               ),
-              if (downloadUrl != null && downloadUrl!.isNotEmpty)
-                _OpenDocumentButton(url: downloadUrl!),
+              if (downloadUrl != null && downloadUrl!.isNotEmpty) ...[
+                const SizedBox(width: 10),
+                _GradientHeaderOpenButton(url: downloadUrl!),
+              ],
             ],
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                titleBlock,
+                const SizedBox(height: 20),
+                statsBlock,
+                const SizedBox(height: 16),
+                actions,
+              ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: titleBlock),
+              const SizedBox(width: 22),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 540),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [statsBlock, const SizedBox(height: 14), actions],
+                ),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _GradientHeaderPill extends StatelessWidget {
+  final String label;
+  final Color? dotColor;
+
+  const _GradientHeaderPill({required this.label, this.dotColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (dotColor != null) ...[
+            Container(
+              width: 7,
+              height: 7,
+              decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+            ),
+            const SizedBox(width: 7),
+          ],
+          ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 190),
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11.5,
+                fontWeight: FontWeight.w900,
+                color: Colors.white.withOpacity(0.92),
+              ),
+            ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _GradientHeaderMetric extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _GradientHeaderMetric({required this.icon, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 122,
+      padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.15),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(icon, size: 15, color: Colors.white.withOpacity(0.82)),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w800,
+                    color: Colors.white.withOpacity(0.72),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: Colors.white, height: 1.0),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GradientHeaderIconButton extends StatelessWidget {
+  final String tooltip;
+  final IconData? icon;
+  final bool loading;
+  final VoidCallback? onTap;
+
+  const _GradientHeaderIconButton({required this.tooltip, required this.icon, required this.loading, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.white.withOpacity(0.14),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            width: 46,
+            height: 46,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.white.withOpacity(0.18)),
+            ),
+            child: loading
+                ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                : Icon(icon, size: 19, color: Colors.white),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _GradientHeaderOpenButton extends StatelessWidget {
+  final String url;
+
+  const _GradientHeaderOpenButton({required this.url});
+
+  Future<void> _open() async {
+    final uri = Uri.tryParse(url);
+    if (uri != null && await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 46,
+      child: ElevatedButton.icon(
+        onPressed: _open,
+        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+        label: const Text('Open file'),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.primary,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+        ),
       ),
     );
   }
@@ -393,96 +591,166 @@ class _DocumentStage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final viewerStateLabel = previewInteractive ? 'Live preview' : 'Editor safe mode';
+
     return Container(
       height: height,
       decoration: BoxDecoration(
-        color: AppColors.documentStageBg,
-        borderRadius: BorderRadius.circular(26),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadowSoft,
-            blurRadius: 30,
-            offset: Offset(0, 18),
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: AppColors.borderGray),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        children: [
+          Container(
+            height: 58,
+            padding: const EdgeInsets.symmetric(horizontal: 14),
+            color: AppColors.cardBg,
+            child: Row(
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.picture_as_pdf_rounded, color: Colors.white, size: 17),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'PDF preview',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w900, color: AppColors.textTitle),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        _documentMetaLine(material),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 10),
+                _ViewerToolbarChip(
+                  icon: previewInteractive ? Icons.visibility_rounded : Icons.lock_outline_rounded,
+                  label: viewerStateLabel,
+                  highlighted: previewInteractive,
+                ),
+                const SizedBox(width: 8),
+                _ViewerIconButton(
+                  tooltip: 'Refresh preview URL',
+                  icon: urlLoading ? null : Icons.refresh_rounded,
+                  loading: urlLoading,
+                  onTap: urlLoading ? null : onRefreshUrl,
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: Container(
+              width: double.infinity,
+              decoration: BoxDecoration(
+                color: AppColors.cardBg,
+                border: Border(top: BorderSide(color: AppColors.borderGray)),
+              ),
+              child: _FilePreviewWidget(
+                material: material,
+                downloadUrl: downloadUrl,
+                loading: urlLoading,
+                onRefresh: onRefreshUrl,
+                interactive: previewInteractive,
+              ),
+            ),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(26),
-        child: Column(
-          children: [
-            Container(
-              height: 58,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppColors.documentStageHeaderStart, AppColors.documentStageHeaderEnd],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.cardBg.withOpacity(0.10)),
-                    ),
-                    child: Icon(Icons.auto_stories_rounded, color: Colors.white, size: 18),
-                  ),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Document canvas',
-                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: Colors.white),
-                        ),
-                        SizedBox(height: 2),
-                        Text(
-                          _documentMetaLine(material),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.58)),
-                        ),
-                      ],
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  _DarkToolbarChip(icon: Icons.remove_red_eye_outlined, label: previewInteractive ? 'Live preview' : 'Dialog mode'),
-                  SizedBox(width: 8),
-                  _DarkToolbarChip(icon: Icons.lock_outline_rounded, label: 'Source file'),
-                ],
-              ),
+    );
+  }
+}
+
+class _ViewerToolbarChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final bool highlighted;
+
+  const _ViewerToolbarChip({
+    required this.icon,
+    required this.label,
+    this.highlighted = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final color = highlighted ? AppColors.primary : AppColors.textMuted;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: highlighted ? AppColors.primarySoft : AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: highlighted ? AppColors.primary.withOpacity(0.22) : AppColors.borderGray),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: color),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ViewerIconButton extends StatelessWidget {
+  final String tooltip;
+  final IconData? icon;
+  final bool loading;
+  final VoidCallback? onTap;
+
+  const _ViewerIconButton({
+    required this.tooltip,
+    required this.icon,
+    required this.loading,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(14),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Container(
+            width: 40,
+            height: 40,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.borderGray),
             ),
-            Expanded(
-              child: Container(
-                color: AppColors.textTitle,
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.text,
-                    borderRadius: BorderRadius.circular(18),
-                    border: Border.all(color: AppColors.cardBg.withOpacity(0.08)),
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(17),
-                    child: _FilePreviewWidget(
-                      material: material,
-                      downloadUrl: downloadUrl,
-                      loading: urlLoading,
-                      onRefresh: onRefreshUrl,
-                      interactive: previewInteractive,
-                    ),
-                  ),
-                ),
-              ),
-            ),
-          ],
+            child: loading
+                ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                : Icon(icon, size: 18, color: AppColors.textMuted),
+          ),
         ),
       ),
     );
@@ -519,27 +787,399 @@ class _ReviewerSidePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    return Column(
+    return _MaterialSideDeck(
+      material: material,
+      topics: topics,
+      topicsLoading: topicsLoading,
+      outcomes: outcomes,
+      mappedOutcomeIds: mappedOutcomeIds,
+      readyTopics: readyTopics,
+      onTopicTap: onTopicTap,
+      onCreateTopicManual: onCreateTopicManual,
+      onReviewerDialogOpenChanged: onReviewerDialogOpenChanged,
+    );
+  }
+}
+
+class _MaterialSideDeck extends StatelessWidget {
+  final MaterialItem material;
+  final List<TopicItem> topics;
+  final bool topicsLoading;
+  final List<LearningOutcome> outcomes;
+  final Set<int> mappedOutcomeIds;
+  final int readyTopics;
+  final void Function(TopicItem) onTopicTap;
+  final Future<bool> Function(
+    String title,
+    String? description,
+    List<int> learningOutcomeIds,
+  ) onCreateTopicManual;
+  final ValueChanged<bool> onReviewerDialogOpenChanged;
+
+  const _MaterialSideDeck({
+    required this.material,
+    required this.topics,
+    required this.topicsLoading,
+    required this.outcomes,
+    required this.mappedOutcomeIds,
+    required this.readyTopics,
+    required this.onTopicTap,
+    required this.onCreateTopicManual,
+    required this.onReviewerDialogOpenChanged,
+  });
+
+  Future<void> _openCaptureTopicDialog(BuildContext context) async {
+    onReviewerDialogOpenChanged(true);
+    await WidgetsBinding.instance.endOfFrame;
+    if (!context.mounted) {
+      onReviewerDialogOpenChanged(false);
+      return;
+    }
+
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierColor: AppColors.overlayStrong,
+        builder: (dialogContext) {
+          return _CaptureTopicDialog(
+            onCreate: onCreateTopicManual,
+          );
+        },
+      );
+    } finally {
+      onReviewerDialogOpenChanged(false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final parentTopics = topics.where((t) => t.parentTopicId == null).toList()
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    final childrenByParent = <int, List<TopicItem>>{};
+    for (final topic in topics.where((t) => t.parentTopicId != null)) {
+      childrenByParent.putIfAbsent(topic.parentTopicId!, () => <TopicItem>[]).add(topic);
+    }
+    for (final children in childrenByParent.values) {
+      children.sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    }
+    final subtopicCount = topics.length - parentTopics.length;
+    final topicProgress = topics.isEmpty ? 0.0 : readyTopics / topics.length;
+    final outcomeProgress = outcomes.isEmpty ? 0.0 : mappedOutcomeIds.length / outcomes.length;
+    final visibleTopics = parentTopics.take(5).toList();
+
+    return _PremiumPanel(
+      padding: EdgeInsets.zero,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.fromLTRB(18, 17, 18, 15),
+            decoration: BoxDecoration(
+              border: Border(bottom: BorderSide(color: AppColors.borderGray)),
+            ),
+            child: Row(
+              children: [
+                const _SoftIcon(icon: Icons.account_tree_rounded, color: AppColors.primary),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'File structure',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textTitle),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        'This file only contains topics and subtopics inside its module.',
+                        style: TextStyle(fontSize: 12.3, color: AppColors.textMuted, height: 1.35),
+                      ),
+                    ],
+                  ),
+                ),
+                _TinyBadge(
+                  label: _materialStatusLabel(material),
+                  color: _materialStatusColor(material),
+                  background: _materialStatusColor(material).withOpacity(0.10),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _MaterialPathSummary(
+                  topicCount: parentTopics.length,
+                  subtopicCount: subtopicCount,
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _openCaptureTopicDialog(context),
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                    label: const Text('Add topic to this file'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+                      textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(child: _MaterialMetricTile(label: 'Topics', value: '${parentTopics.length}', caption: '$readyTopics ready')),
+                    const SizedBox(width: 10),
+                    Expanded(child: _MaterialMetricTile(label: 'Subtopics', value: '$subtopicCount', caption: 'nested items')),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(child: _MaterialMetricTile(label: 'Outcomes', value: outcomes.isEmpty ? '—' : '${mappedOutcomeIds.length}/${outcomes.length}', caption: 'mapped')),
+                    const SizedBox(width: 10),
+                    Expanded(child: _MaterialMetricTile(label: 'Source', value: material.type.toUpperCase(), caption: material.pageCount != null ? '${material.pageCount} pages' : 'file')),
+                  ],
+                ),
+                const SizedBox(height: 18),
+                _ProgressInsightRow(
+                  label: 'Topic review',
+                  value: topics.isEmpty ? '0' : '$readyTopics/${topics.length}',
+                  progress: topicProgress,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(height: 12),
+                _ProgressInsightRow(
+                  label: 'Outcome mapping',
+                  value: outcomes.isEmpty ? '—' : '${mappedOutcomeIds.length}/${outcomes.length}',
+                  progress: outcomeProgress,
+                  color: AppColors.purpleText,
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Topics in this file',
+                        style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: AppColors.textTitle),
+                      ),
+                    ),
+                    _CountBadge(value: '${topics.length}'),
+                  ],
+                ),
+                const SizedBox(height: 11),
+                if (topicsLoading)
+                  Container(
+                    height: 150,
+                    alignment: Alignment.center,
+                    child: const CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else if (topics.isEmpty)
+                  const _EmptyTopicMap()
+                else ...[
+                  for (var i = 0; i < visibleTopics.length; i++) ...[
+                    _MaterialCompactTopicTile(
+                      topic: visibleTopics[i],
+                      index: i,
+                      children: childrenByParent[visibleTopics[i].id] ?? const <TopicItem>[],
+                      onTopicTap: onTopicTap,
+                    ),
+                    if (i != visibleTopics.length - 1) const SizedBox(height: 9),
+                  ],
+                  if (parentTopics.length > visibleTopics.length) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      '+ ${parentTopics.length - visibleTopics.length} more topic${parentTopics.length - visibleTopics.length == 1 ? '' : 's'} in the structure tree',
+                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+                    ),
+                  ],
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MaterialPathSummary extends StatelessWidget {
+  final int topicCount;
+  final int subtopicCount;
+
+  const _MaterialPathSummary({required this.topicCount, required this.subtopicCount});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.borderGray),
+      ),
+      child: Column(
+        children: [
+          const _MaterialPathStep(icon: Icons.insert_drive_file_rounded, title: 'Material file', value: 'current'),
+          const _MaterialPathConnector(),
+          _MaterialPathStep(icon: Icons.topic_rounded, title: 'Topics', value: '$topicCount'),
+          const _MaterialPathConnector(),
+          _MaterialPathStep(icon: Icons.subdirectory_arrow_right_rounded, title: 'Subtopics', value: '$subtopicCount'),
+        ],
+      ),
+    );
+  }
+}
+
+class _MaterialPathStep extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String value;
+
+  const _MaterialPathStep({required this.icon, required this.title, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
       children: [
-        _ReviewerActionsPanel(
-          outcomes: outcomes,
-          onCreateTopicManual: onCreateTopicManual,
-          onReviewerDialogOpenChanged: onReviewerDialogOpenChanged,
+        Container(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
+          child: Icon(icon, size: 17, color: AppColors.primary),
         ),
-        SizedBox(height: 14),
-        _CoveragePanel(
-          topics: topics,
-          readyTopics: readyTopics,
-          outcomes: outcomes,
-          mappedOutcomeIds: mappedOutcomeIds,
+        const SizedBox(width: 11),
+        Expanded(
+          child: Text(
+            title,
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.textTitle),
+          ),
         ),
-        SizedBox(height: 14),
-        _TopicRoadmapPanel(
-          topics: topics,
-          topicsLoading: topicsLoading,
-          onTopicTap: onTopicTap,
+        Text(
+          value,
+          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textMuted),
         ),
       ],
+    );
+  }
+}
+
+class _MaterialPathConnector extends StatelessWidget {
+  const _MaterialPathConnector();
+
+  @override
+  Widget build(BuildContext context) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Container(
+        width: 1.5,
+        height: 14,
+        margin: const EdgeInsets.only(left: 16.25),
+        color: AppColors.borderGray,
+      ),
+    );
+  }
+}
+
+class _MaterialMetricTile extends StatelessWidget {
+  final String label;
+  final String value;
+  final String caption;
+
+  const _MaterialMetricTile({required this.label, required this.value, required this.caption});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(13, 12, 13, 12),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900, color: AppColors.textMuted)),
+          const SizedBox(height: 5),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textTitle, height: 1.0)),
+          const SizedBox(height: 5),
+          Text(caption, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11, color: AppColors.textMuted)),
+        ],
+      ),
+    );
+  }
+}
+
+class _MaterialCompactTopicTile extends StatelessWidget {
+  final TopicItem topic;
+  final int index;
+  final List<TopicItem> children;
+  final void Function(TopicItem) onTopicTap;
+
+  const _MaterialCompactTopicTile({required this.topic, required this.index, required this.children, required this.onTopicTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = topic.readiness == TopicReadiness.ready || topic.isReviewed;
+    return Material(
+      color: AppColors.surfaceBg,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: () => onTopicTap(topic),
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.fromLTRB(12, 11, 12, 11),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.borderGray),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 30,
+                height: 30,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Text('${index + 1}', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(topic.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+                    const SizedBox(height: 4),
+                    Text(
+                      children.isEmpty ? 'No subtopics yet' : '${children.length} subtopic${children.length == 1 ? '' : 's'}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11.5, color: AppColors.textMuted),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              _TinyBadge(
+                label: ready ? 'Ready' : 'Draft',
+                color: ready ? _K.green : _K.amber,
+                background: ready ? _K.greenSoft : _K.amberSoft,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -575,7 +1215,6 @@ class _ReviewerActionsPanel extends StatelessWidget {
         barrierColor: AppColors.overlayStrong,
         builder: (dialogContext) {
           return _CaptureTopicDialog(
-            outcomes: outcomes,
             onCreate: onCreateTopicManual,
           );
         },
@@ -595,8 +1234,8 @@ class _ReviewerActionsPanel extends StatelessWidget {
         children: [
           Row(
             children: [
-              _SoftIcon(icon: Icons.edit_note_rounded, color: AppColors.primary),
-              SizedBox(width: 12),
+              const _SoftIcon(icon: Icons.edit_note_rounded, color: AppColors.primary),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -605,7 +1244,7 @@ class _ReviewerActionsPanel extends StatelessWidget {
                       'Reviewer actions',
                       style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textTitle),
                     ),
-                    SizedBox(height: 3),
+                    const SizedBox(height: 3),
                     Text(
                       'Keep the workspace clean. Add topics only when you need them.',
                       style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.35),
@@ -615,24 +1254,24 @@ class _ReviewerActionsPanel extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           SizedBox(
             width: double.infinity,
             height: 50,
             child: ElevatedButton.icon(
               onPressed: () => _openCaptureTopicDialog(context),
-              icon: Icon(Icons.add_rounded, size: 20),
-              label: Text('Capture topic from PDF'),
+              icon: const Icon(Icons.add_rounded, size: 20),
+              label: const Text('Capture topic from PDF'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                textStyle: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900),
+                textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900),
               ),
             ),
           ),
-          SizedBox(height: 11),
+          const SizedBox(height: 11),
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
@@ -643,7 +1282,7 @@ class _ReviewerActionsPanel extends StatelessWidget {
             child: Row(
               children: [
                 Icon(Icons.info_outline_rounded, size: 17, color: AppColors.textMuted),
-                SizedBox(width: 9),
+                const SizedBox(width: 9),
                 Expanded(
                   child: Text(
                     'The topic form opens as a focused popup, so the PDF canvas stays clean.',
@@ -660,7 +1299,6 @@ class _ReviewerActionsPanel extends StatelessWidget {
 }
 
 class _CaptureTopicDialog extends StatelessWidget {
-  final List<LearningOutcome> outcomes;
   final Future<bool> Function(
     String title,
     String? description,
@@ -668,7 +1306,6 @@ class _CaptureTopicDialog extends StatelessWidget {
   ) onCreate;
 
   const _CaptureTopicDialog({
-    required this.outcomes,
     required this.onCreate,
   });
 
@@ -688,7 +1325,6 @@ class _CaptureTopicDialog extends StatelessWidget {
           children: [
             SingleChildScrollView(
               child: _CaptureTopicPanel(
-                outcomes: outcomes,
                 onCreate: onCreate,
                 onSaved: () => Navigator.of(context).pop(),
               ),
@@ -723,7 +1359,6 @@ class _CaptureTopicDialog extends StatelessWidget {
 }
 
 class _CaptureTopicPanel extends StatefulWidget {
-  final List<LearningOutcome> outcomes;
   final Future<bool> Function(
     String title,
     String? description,
@@ -732,7 +1367,6 @@ class _CaptureTopicPanel extends StatefulWidget {
   final VoidCallback? onSaved;
 
   const _CaptureTopicPanel({
-    required this.outcomes,
     required this.onCreate,
     this.onSaved,
   });
@@ -745,7 +1379,6 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
   final _titleCtrl = TextEditingController();
   final _pageCtrl = TextEditingController();
   final _noteCtrl = TextEditingController();
-  final Set<int> _selectedOutcomeIds = <int>{};
   bool _saving = false;
   bool _submitted = false;
 
@@ -773,7 +1406,7 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
     final ok = await widget.onCreate(
       title,
       descriptionParts.isEmpty ? null : descriptionParts.join('\n\n'),
-      _selectedOutcomeIds.toList(),
+      const <int>[],
     );
     if (!mounted) return;
     setState(() => _saving = false);
@@ -784,7 +1417,6 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
     _noteCtrl.clear();
     setState(() {
       _submitted = false;
-      _selectedOutcomeIds.clear();
     });
     widget.onSaved?.call();
   }
@@ -804,8 +1436,8 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
             ),
             child: Row(
               children: [
-                _SoftIcon(icon: Icons.add_task_rounded, color: AppColors.primary),
-                SizedBox(width: 12),
+                const _SoftIcon(icon: Icons.add_task_rounded, color: AppColors.primary),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -814,9 +1446,9 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                         'Capture a topic',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textTitle),
                       ),
-                      SizedBox(height: 3),
+                      const SizedBox(height: 3),
                       Text(
-                        'Turn the part you are reviewing into a structured lesson point.',
+                        'Create a parent topic under this material. Outcomes are mapped later through subtopics.',
                         style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.35),
                       ),
                     ],
@@ -839,7 +1471,7 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                   errorText: _submitted && _titleCtrl.text.trim().isEmpty ? 'Topic name is required' : null,
                   onSubmitted: (_) => _submit(),
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _CleanTextField(
                   controller: _pageCtrl,
                   enabled: !_saving,
@@ -848,7 +1480,7 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                   icon: Icons.bookmark_border_rounded,
                   onSubmitted: (_) => _submit(),
                 ),
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 _CleanTextField(
                   controller: _noteCtrl,
                   enabled: !_saving,
@@ -858,73 +1490,59 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                   minLines: 3,
                   maxLines: 4,
                 ),
-                if (widget.outcomes.isNotEmpty) ...[
-                  SizedBox(height: 16),
-                  Row(
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(13),
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: AppColors.primary.withOpacity(0.18)),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(Icons.flag_outlined, size: 16, color: AppColors.textMuted),
-                      SizedBox(width: 7),
+                      const Icon(Icons.account_tree_outlined, size: 18, color: AppColors.primary),
+                      const SizedBox(width: 10),
                       Expanded(
-                        child: Text(
-                          'Map learning outcomes',
-                          style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textMuted),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Outcome mapping belongs to subtopics',
+                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textTitle),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Create the parent topic first. If it has subtopics, map each subtopic to its learning outcomes so the topic inherits coverage from its children.',
+                              style: TextStyle(fontSize: 12.2, color: AppColors.textMuted, height: 1.4),
+                            ),
+                          ],
                         ),
                       ),
-                      if (_selectedOutcomeIds.isNotEmpty)
-                        Text(
-                          '${_selectedOutcomeIds.length} selected',
-                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.primary),
-                        ),
                     ],
                   ),
-                  SizedBox(height: 9),
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxHeight: 210),
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: [
-                          for (final outcome in widget.outcomes) ...[
-                            _OutcomeSelectTile(
-                              outcome: outcome,
-                              selected: _selectedOutcomeIds.contains(outcome.id),
-                              enabled: !_saving,
-                              onTap: () {
-                                if (_saving) return;
-                                setState(() {
-                                  if (!_selectedOutcomeIds.add(outcome.id)) {
-                                    _selectedOutcomeIds.remove(outcome.id);
-                                  }
-                                });
-                              },
-                            ),
-                            if (outcome != widget.outcomes.last) SizedBox(height: 8),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-                SizedBox(height: 16),
+                ),
+                const SizedBox(height: 16),
                 SizedBox(
                   width: double.infinity,
                   height: 46,
                   child: ElevatedButton.icon(
                     onPressed: _saving ? null : _submit,
                     icon: _saving
-                        ? SizedBox(
+                        ? const SizedBox(
                             width: 16,
                             height: 16,
                             child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                           )
-                        : Icon(Icons.add_rounded, size: 19),
-                    label: Text(_saving ? 'Saving topic...' : 'Save topic to this PDF'),
+                        : const Icon(Icons.add_rounded, size: 19),
+                    label: Text(_saving ? 'Saving topic...' : 'Save topic'),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
                       disabledBackgroundColor: AppColors.primary.withOpacity(0.55),
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                      textStyle: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900),
+                      textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900),
                     ),
                   ),
                 ),
@@ -963,7 +1581,7 @@ class _CoveragePanel extends StatelessWidget {
           Row(
             children: [
               _SoftIcon(icon: Icons.insights_rounded, color: AppColors.purpleText),
-              SizedBox(width: 12),
+              const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   'Review coverage',
@@ -972,21 +1590,21 @@ class _CoveragePanel extends StatelessWidget {
               ),
             ],
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           _ProgressInsightRow(
             label: 'Topics reviewed',
             value: topics.isEmpty ? '0' : '$readyTopics/${topics.length}',
             progress: topicProgress,
             color: AppColors.primary,
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           _ProgressInsightRow(
             label: 'Outcomes mapped',
             value: outcomes.isEmpty ? '—' : '${mappedOutcomeIds.length}/${outcomes.length}',
             progress: outcomeProgress,
             color: AppColors.purpleText,
           ),
-          SizedBox(height: 14),
+          const SizedBox(height: 14),
           Container(
             padding: const EdgeInsets.all(13),
             decoration: BoxDecoration(
@@ -997,7 +1615,7 @@ class _CoveragePanel extends StatelessWidget {
             child: Row(
               children: [
                 Icon(Icons.tips_and_updates_outlined, size: 18, color: AppColors.warningText),
-                SizedBox(width: 10),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(
                     _coverageHint,
@@ -1053,8 +1671,8 @@ class _TopicRoadmapPanel extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
             child: Row(
               children: [
-                _SoftIcon(icon: Icons.route_rounded, color: Color(0xFF0F766E)),
-                SizedBox(width: 12),
+                const _SoftIcon(icon: Icons.route_rounded, color: Color(0xFF0F766E)),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -1063,7 +1681,7 @@ class _TopicRoadmapPanel extends StatelessWidget {
                         'Topic map',
                         style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textTitle),
                       ),
-                      SizedBox(height: 3),
+                      const SizedBox(height: 3),
                       Text(
                         'Open any topic to review or generate questions.',
                         style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
@@ -1077,15 +1695,15 @@ class _TopicRoadmapPanel extends StatelessWidget {
           ),
           Divider(height: 1, color: AppColors.borderGray),
           if (topicsLoading)
-            SizedBox(
+            const SizedBox(
               height: 190,
               child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
             )
           else if (topics.isEmpty)
-            _EmptyTopicMap()
+            const _EmptyTopicMap()
           else
             ConstrainedBox(
-              constraints: BoxConstraints(maxHeight: 420),
+              constraints: const BoxConstraints(maxHeight: 420),
               child: ListView.builder(
                 padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
                 shrinkWrap: true,
@@ -1156,10 +1774,10 @@ class _RoadmapTopicTile extends StatelessWidget {
                     ),
                     child: Text(
                       '${index + 1}',
-                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary),
+                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary),
                     ),
                   ),
-                  SizedBox(width: 10),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       topic.title,
@@ -1168,18 +1786,18 @@ class _RoadmapTopicTile extends StatelessWidget {
                       style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: AppColors.textTitle),
                     ),
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   _TinyBadge(
                     label: ready ? 'Ready' : 'Draft',
                     color: ready ? _K.green : _K.amber,
                     background: ready ? _K.greenSoft : _K.amberSoft,
                   ),
-                  SizedBox(width: 4),
+                  const SizedBox(width: 4),
                   Icon(Icons.chevron_right_rounded, size: 20, color: AppColors.textMuted),
                 ],
               ),
               if ((topic.description ?? '').trim().isNotEmpty) ...[
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
                   topic.description!.trim(),
                   maxLines: 2,
@@ -1188,7 +1806,7 @@ class _RoadmapTopicTile extends StatelessWidget {
                 ),
               ],
               if (children.isNotEmpty) ...[
-                SizedBox(height: 10),
+                const SizedBox(height: 10),
                 Wrap(
                   spacing: 7,
                   runSpacing: 7,
@@ -1208,9 +1826,9 @@ class _RoadmapTopicTile extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(Icons.subdirectory_arrow_right_rounded, size: 13, color: AppColors.textMuted),
-                              SizedBox(width: 5),
+                              const SizedBox(width: 5),
                               ConstrainedBox(
-                                constraints: BoxConstraints(maxWidth: 170),
+                                constraints: const BoxConstraints(maxWidth: 170),
                                 child: Text(
                                   child.title,
                                   maxLines: 1,
@@ -1286,7 +1904,7 @@ class _CleanTextField extends StatelessWidget {
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(15),
-          borderSide: BorderSide(color: AppColors.primary, width: 1.4),
+          borderSide: const BorderSide(color: AppColors.primary, width: 1.4),
         ),
       ),
     );
@@ -1324,7 +1942,7 @@ class _OutcomeSelectTile extends StatelessWidget {
           child: Row(
             children: [
               AnimatedContainer(
-                duration: Duration(milliseconds: 160),
+                duration: const Duration(milliseconds: 160),
                 width: 22,
                 height: 22,
                 decoration: BoxDecoration(
@@ -1332,18 +1950,18 @@ class _OutcomeSelectTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: selected ? AppColors.primary : AppColors.borderSoft),
                 ),
-                child: selected ? Icon(Icons.check_rounded, size: 15, color: Colors.white) : null,
+                child: selected ? const Icon(Icons.check_rounded, size: 15, color: Colors.white) : null,
               ),
-              SizedBox(width: 10),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       outcome.code.isNotEmpty ? outcome.code : 'LO',
-                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: AppColors.primary),
+                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: AppColors.primary),
                     ),
-                    SizedBox(height: 2),
+                    const SizedBox(height: 2),
                     Text(
                       outcome.title,
                       maxLines: 2,
@@ -1388,7 +2006,7 @@ class _ProgressInsightRow extends StatelessWidget {
             Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
           ],
         ),
-        SizedBox(height: 8),
+        const SizedBox(height: 8),
         ClipRRect(
           borderRadius: BorderRadius.circular(999),
           child: LinearProgressIndicator(
@@ -1426,7 +2044,7 @@ class _PremiumPanel extends StatelessWidget {
           BoxShadow(
             color: AppColors.shadowSoft,
             blurRadius: 24,
-            offset: Offset(0, 12),
+            offset: const Offset(0, 12),
           ),
         ],
       ),
@@ -1462,13 +2080,13 @@ class _ReviewerStatPill extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, size: 18, color: AppColors.primary),
-          SizedBox(width: 9),
+          const SizedBox(width: 9),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: AppColors.textMuted)),
-                SizedBox(height: 2),
+                const SizedBox(height: 2),
                 Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
                 Text(helper, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
               ],
@@ -1526,7 +2144,7 @@ class _CountBadge extends StatelessWidget {
       ),
       child: Text(
         value,
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary),
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary),
       ),
     );
   }
@@ -1573,7 +2191,7 @@ class _DarkToolbarChip extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, size: 14, color: Colors.white.withOpacity(0.76)),
-          SizedBox(width: 6),
+          const SizedBox(width: 6),
           Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.76))),
         ],
       ),
@@ -1614,7 +2232,7 @@ class _HeaderIconButton extends StatelessWidget {
               border: Border.all(color: AppColors.borderGray),
             ),
             child: loading
-                ? SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2))
+                ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2))
                 : Icon(icon, size: 19, color: AppColors.textMuted),
           ),
         ),
@@ -1642,15 +2260,15 @@ class _OpenDocumentButton extends StatelessWidget {
       height: 46,
       child: ElevatedButton.icon(
         onPressed: _open,
-        icon: Icon(Icons.open_in_new_rounded, size: 16),
-        label: Text('Open PDF'),
+        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+        label: const Text('Open PDF'),
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.textTitle,
           foregroundColor: Colors.white,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 15),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          textStyle: TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
         ),
       ),
     );
@@ -1674,14 +2292,14 @@ class _EmptyTopicMap extends StatelessWidget {
               color: AppColors.infoBg,
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Icon(Icons.route_outlined, color: AppColors.primary, size: 28),
+            child: const Icon(Icons.route_outlined, color: AppColors.primary, size: 28),
           ),
-          SizedBox(height: 13),
+          const SizedBox(height: 13),
           Text(
             'No topic map yet',
             style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textTitle),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text(
             'Capture topics while reading the PDF. They will appear here as a clean review map.',
             textAlign: TextAlign.center,
@@ -1727,7 +2345,7 @@ class _FilePreviewWidget extends StatelessWidget {
   final bool loading; final VoidCallback onRefresh;
   final bool interactive;
   const _FilePreviewWidget({required this.material, required this.downloadUrl,
-      required this.loading, required this.onRefresh, required this.interactive});
+      required this.loading, required this.onRefresh, required this.interactive,});
 
   _PK get _kind {
     final t = material.type.toLowerCase(); final m = (material.mimeType ?? '').toLowerCase();
@@ -1744,21 +2362,21 @@ class _FilePreviewWidget extends StatelessWidget {
     Theme.of(context);
     if (loading) return _LoaderW(label: 'Loading preview…');
     if (material.isProcessing && material.status != 'uploaded') {
-      return _PlaceholderW(icon: Icons.hourglass_top_rounded,
+      return const _PlaceholderW(icon: Icons.hourglass_top_rounded,
         iconColor: _K.amber, iconBg: _K.amberSoft, title: 'Processing…',
-        sub: 'Your file is being processed. Preview will be available shortly.');
+        sub: 'Your file is being processed. Preview will be available shortly.',);
     }
     if (material.isError && material.status != 'uploaded') {
       return _PlaceholderW(icon: Icons.error_outline_rounded,
         iconColor: AppColors.dangerText, iconBg: _K.redSoft, title: 'Processing failed',
         sub: 'Something went wrong processing this file.',
-        actionLabel: 'Retry', onAction: onRefresh);
+        actionLabel: 'Retry', onAction: onRefresh,);
     }
     if (downloadUrl == null || downloadUrl!.isEmpty) {
       return _PlaceholderW(icon: Icons.link_off_rounded, iconColor: AppColors.textMuted,
           iconBg: _K.bg, title: 'Preview unavailable',
           sub: 'Could not load a URL for this file.',
-          actionLabel: 'Retry', onAction: onRefresh);
+          actionLabel: 'Retry', onAction: onRefresh,);
     }
 
     final url = downloadUrl!;
@@ -1826,32 +2444,32 @@ class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
         onAction: () async {
           final uri = Uri.tryParse(widget.url);
           if (uri != null) {
-            await launchUrl(uri, mode: LaunchMode.platformDefault);
+            await launchUrl(uri);
           }
         },
       );
     }
     return ClipRRect(
-      borderRadius: const BorderRadius.vertical(bottom: Radius.circular(13)),
+      borderRadius: BorderRadius.circular(20),
       child: HtmlElementView(viewType: _viewId),
     );
   }
 }
 
 class _ImagePreviewWidget extends StatelessWidget {
-  final String url; _ImagePreviewWidget({required this.url});
+  final String url; const _ImagePreviewWidget({required this.url});
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
     child: Container(decoration: BoxDecoration(color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div)),
+        borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div),),
       child: ClipRRect(borderRadius: BorderRadius.circular(13), child: Stack(children: [
         Container(color: AppColors.surfaceBg),
         Center(child: Image.network(url, fit: BoxFit.contain,
             errorBuilder: (_, __, ___) => _FallbackWidget(url: url, material: null),
             loadingBuilder: (_, child, p) => p == null ? child :
-                Center(child: CircularProgressIndicator(strokeWidth: 2)))),
+                const Center(child: CircularProgressIndicator(strokeWidth: 2)),),),
         Positioned(top: 12, right: 12, child: _OBtn(url: url)),
-      ]))));
+      ],),),),);
 }
 
 class _VideoPreviewWidget extends StatelessWidget {
@@ -1864,39 +2482,39 @@ class _VideoPreviewWidget extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _MetaStripW(material: material), SizedBox(height: 14),
+      _MetaStripW(material: material), const SizedBox(height: 14),
       Expanded(child: Container(
         decoration: BoxDecoration(color: AppColors.documentCanvasBg,
-            borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div)),
+            borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div),),
         child: ClipRRect(borderRadius: BorderRadius.circular(13),
             child: Stack(alignment: Alignment.center, children: [
           Container(decoration: BoxDecoration(gradient: RadialGradient(
-              colors: [AppColors.documentCanvasRadial, AppColors.documentCanvasBg]))),
+              colors: [AppColors.documentCanvasRadial, AppColors.documentCanvasBg],),),),
           Column(mainAxisSize: MainAxisSize.min, children: [
             Container(width: 80, height: 80,
                 decoration: BoxDecoration(color: Colors.white.withOpacity(0.1),
-                    shape: BoxShape.circle, border: Border.all(color: AppColors.cardBg.withOpacity(0.2))),
-                child: Icon(Icons.play_arrow_rounded, size: 44, color: Colors.white)),
-            SizedBox(height: 16),
-            Text(material.displayTitle, style: TextStyle(fontSize: 16,
-                fontWeight: FontWeight.w700, color: Colors.white)),
+                    shape: BoxShape.circle, border: Border.all(color: AppColors.cardBg.withOpacity(0.2)),),
+                child: const Icon(Icons.play_arrow_rounded, size: 44, color: Colors.white),),
+            const SizedBox(height: 16),
+            Text(material.displayTitle, style: const TextStyle(fontSize: 16,
+                fontWeight: FontWeight.w700, color: Colors.white,),),
             if (material.durationSeconds != null) ...[
-              SizedBox(height: 4),
+              const SizedBox(height: 4),
               Text(_fmt(material.durationSeconds!),
-                  style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.55))),
+                  style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.55)),),
             ],
-            SizedBox(height: 22),
+            const SizedBox(height: 22),
             ElevatedButton.icon(onPressed: () {},
-                icon: Icon(Icons.open_in_new_rounded, size: 14),
-                label: Text('Open Video'),
+                icon: const Icon(Icons.open_in_new_rounded, size: 14),
+                label: const Text('Open Video'),
                 style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.cardBg.withOpacity(0.15),
                     foregroundColor: Colors.white, elevation: 0,
                     side: BorderSide(color: Colors.white.withOpacity(0.25)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)))),
-          ]),
-        ])))),
-    ]));
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),),),
+          ],),
+        ],),),),),
+    ],),);
 }
 
 class _AudioPreviewWidget extends StatelessWidget {
@@ -1906,43 +2524,43 @@ class _AudioPreviewWidget extends StatelessWidget {
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
     child: Container(padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _K.div)),
+          border: Border.all(color: _K.div),),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Container(width: 80, height: 80, decoration: BoxDecoration(
-            color: _K.greenSoft, borderRadius: BorderRadius.circular(22)),
-            child: Icon(Icons.headphones_rounded, size: 40, color: _K.green)),
-        SizedBox(height: 18),
+            color: _K.greenSoft, borderRadius: BorderRadius.circular(22),),
+            child: Icon(Icons.headphones_rounded, size: 40, color: _K.green),),
+        const SizedBox(height: 18),
         Text(material.displayTitle, textAlign: TextAlign.center, style: TextStyle(
-            fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+            fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle,),),
         if (material.durationSeconds != null) ...[
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text('Duration: ${material.durationSeconds! ~/ 60}m ${material.durationSeconds! % 60}s',
-              style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted),),
         ],
-        SizedBox(height: 24),
+        const SizedBox(height: 24),
         _OBtn(url: url, big: true),
-      ])));
+      ],),),);
 }
 
 class _LinkPreviewWidget extends StatelessWidget {
-  final String url; _LinkPreviewWidget({required this.url});
+  final String url; const _LinkPreviewWidget({required this.url});
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
     child: Container(padding: const EdgeInsets.all(32),
       decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _K.div)),
+          border: Border.all(color: _K.div),),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Container(width: 72, height: 72, decoration: BoxDecoration(
-            color: _K.blueSoft, borderRadius: BorderRadius.circular(18)),
-            child: Icon(Icons.link_rounded, size: 34, color: AppColors.primary)),
-        SizedBox(height: 16),
+            color: _K.blueSoft, borderRadius: BorderRadius.circular(18),),
+            child: const Icon(Icons.link_rounded, size: 34, color: AppColors.primary),),
+        const SizedBox(height: 16),
         Text('External Link', style: TextStyle(fontSize: 17,
-            fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-        SizedBox(height: 8),
+            fontWeight: FontWeight.w800, color: AppColors.textTitle,),),
+        const SizedBox(height: 8),
         Text(url, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-        SizedBox(height: 20), _OBtn(url: url, big: true),
-      ])));
+            style: TextStyle(fontSize: 13, color: AppColors.textMuted),),
+        const SizedBox(height: 20), _OBtn(url: url, big: true),
+      ],),),);
 }
 
 class _FallbackWidget extends StatelessWidget {
@@ -1952,43 +2570,43 @@ class _FallbackWidget extends StatelessWidget {
   Widget build(BuildContext context) => _PlaceholderW(icon: Icons.insert_drive_file_rounded,
       iconColor: AppColors.textMuted, iconBg: _K.bg, title: 'Preview not available',
       sub: material != null ? 'This file type (${material!.type}) cannot be previewed inline.'
-          : 'Preview not available.', actionLabel: 'Open / Download', onAction: () {});
+          : 'Preview not available.', actionLabel: 'Open / Download', onAction: () {},);
 }
 
 class _LoaderW extends StatelessWidget {
-  final String label; _LoaderW({required this.label});
+  final String label; const _LoaderW({required this.label});
   @override
   Widget build(BuildContext context) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-    CircularProgressIndicator(strokeWidth: 2), SizedBox(height: 12),
-    Text(label, style: TextStyle(fontSize: 13, color: AppColors.textMuted))]));
+    const CircularProgressIndicator(strokeWidth: 2), const SizedBox(height: 12),
+    Text(label, style: TextStyle(fontSize: 13, color: AppColors.textMuted)),],),);
 }
 
 class _PlaceholderW extends StatelessWidget {
   final IconData icon; final Color iconColor, iconBg;
   final String title, sub; final String? actionLabel; final VoidCallback? onAction;
   const _PlaceholderW({required this.icon, required this.iconColor, required this.iconBg,
-      required this.title, required this.sub, this.actionLabel, this.onAction});
+      required this.title, required this.sub, this.actionLabel, this.onAction,});
   @override
   Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(32),
     child: Column(mainAxisSize: MainAxisSize.min, children: [
       Container(width: 70, height: 70,
           decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(18)),
-          child: Icon(icon, size: 32, color: iconColor)),
-      SizedBox(height: 16),
+          child: Icon(icon, size: 32, color: iconColor),),
+      const SizedBox(height: 16),
       Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-      SizedBox(height: 6),
+      const SizedBox(height: 6),
       Text(sub, style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
-          textAlign: TextAlign.center),
+          textAlign: TextAlign.center,),
       if (actionLabel != null && onAction != null) ...[
-        SizedBox(height: 20),
+        const SizedBox(height: 20),
         ElevatedButton.icon(onPressed: onAction,
-            icon: Icon(Icons.open_in_new_rounded, size: 14), label: Text(actionLabel!)),
+            icon: const Icon(Icons.open_in_new_rounded, size: 14), label: Text(actionLabel!),),
       ],
-    ])));
+    ],),),);
 }
 
 class _MetaStripW extends StatelessWidget {
-  final MaterialItem material; _MetaStripW({required this.material});
+  final MaterialItem material; const _MetaStripW({required this.material});
   static String _fmt(int b) {
     if (b < 1024) return '$b B';
     if (b < 1024 * 1024) return '${(b / 1024).toStringAsFixed(1)} KB';
@@ -2007,14 +2625,14 @@ class _MetaStripW extends StatelessWidget {
     if (items.isEmpty) return const SizedBox.shrink();
     return Wrap(spacing: 14, runSpacing: 5, children: items.map((it) =>
         Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(it.$1, size: 12, color: AppColors.textHint), SizedBox(width: 4),
+          Icon(it.$1, size: 12, color: AppColors.textHint), const SizedBox(width: 4),
           Text(it.$2, style: TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
-        ])).toList());
+        ],),).toList(),);
   }
 }
 
 class _OBtn extends StatelessWidget {
-  final String url; final bool big; _OBtn({required this.url, this.big = false});
+  final String url; final bool big; const _OBtn({required this.url, this.big = false});
 
   Future<void> _open() async {
     final uri = Uri.tryParse(url);
@@ -2028,19 +2646,19 @@ class _OBtn extends StatelessWidget {
     Theme.of(context);
     if (big) {
       return ElevatedButton.icon(onPressed: _open,
-        icon: Icon(Icons.open_in_new_rounded, size: 14), label: Text('Open'),
+        icon: const Icon(Icons.open_in_new_rounded, size: 14), label: const Text('Open'),
         style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary,
             foregroundColor: Colors.white, elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))));
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),),);
     }
     return Material(color: AppColors.primary, borderRadius: BorderRadius.circular(7),
-        child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: WidgetStatePropertyAll(Colors.transparent), onTap: _open, borderRadius: BorderRadius.circular(7),
-            child: Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), onTap: _open, borderRadius: BorderRadius.circular(7),
+            child: const Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                 child: Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.open_in_new_rounded, size: 12, color: Colors.white),
                   SizedBox(width: 5),
                   Text('Open', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white)),
-                ]))));
+                ],),),),);
   }
 }
 
