@@ -209,8 +209,6 @@ def list_learning_outcomes(*, course_id: int, db: Session, current_user: dict,):
     if not course_id or course_id <= 0:
         raise HTTPException(status_code=422, detail="Invalid course_id")
 
-    role = (current_user.get("system_role") or "").strip().lower()
-
     try:
         # =========================
         # 2) Validate course exists
@@ -229,42 +227,7 @@ def list_learning_outcomes(*, course_id: int, db: Session, current_user: dict,):
             raise HTTPException(status_code=404, detail="Course not found")
 
         # =========================
-        # 3) Authorization
-        # =========================
-        if role == "instructor":
-            if int(course_row["created_by"]) != int(user_id):
-                raise HTTPException(
-                    status_code=403,
-                    detail="You can only view learning outcomes for your own course"
-                )
-
-        elif role == "student":
-            enrollment_row = db.execute(
-                text("""
-                    SELECT 1
-                    FROM course_enrollments
-                    WHERE course_id = :course_id
-                      AND student_id = :student_id
-                      AND status IN ('active', 'completed')
-                    LIMIT 1
-                """),
-                {
-                    "course_id": course_id,
-                    "student_id": user_id,
-                },
-            ).first()
-
-            if not enrollment_row:
-                raise HTTPException(
-                    status_code=403,
-                    detail="You are not allowed to access learning outcomes for this course"
-                )
-
-        else:
-            raise HTTPException(status_code=403, detail="Access denied")
-
-        # =========================
-        # 4) Fetch learning outcomes
+        # 3) Fetch learning outcomes
         # =========================
         learning_outcome_rows = db.execute(
             text("""

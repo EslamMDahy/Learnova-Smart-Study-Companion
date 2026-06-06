@@ -24,11 +24,10 @@ from .schemas import (CourseCreateRequest,
 from app.core.config import settings
 from app.core.security import hmac_sha256_hex
 from app.core.excel_utils import extract_emails_from_xlsx
-from app.core.emailer import send_email  # <-- عدّل المسار حسب مشروعك
+from app.core.emailer import send_email  
 
 from .schemas import CourseInvitesSendRequest, CourseInvitesSendResponse
 
-# الأفضل تخليها في config.py بعدين (زي ما اتفقنا)
 COMMON_EMAIL_HEADERS = (
     "email",
     "e-mail",
