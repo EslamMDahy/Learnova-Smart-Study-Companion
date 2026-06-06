@@ -258,3 +258,27 @@ class CourseAutocompleteResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CourseSearchResult(BaseModel):
+    id: int
+    title: str
+    description: str | None
+    category: str | None
+    tags: list | None
+    cover_image_key: str | None
+    banner_image_key: str | None
+    enrollment_count: int
+    average_rating: float | None
+    requires_enrollment_approval: bool
+
+    model_config = ConfigDict(from_attributes=True)
+
+class CourseSearchResponse(BaseModel):
+    total: int
+    limit: int
+    offset: int
+    results: list[CourseSearchResult]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+

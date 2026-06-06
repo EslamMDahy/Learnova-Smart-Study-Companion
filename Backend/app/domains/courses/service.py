@@ -1434,4 +1434,98 @@ def course_autocomplete(*, q: str, db: Session, current_user: dict,):
 
 
 
+def course_search(*, q: str, limit: int, offset: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # =========================
+    # 2) Validate query
+    # =========================
+    q = (q or "").strip()
+    if len(q) < 1:
+        raise HTTPException(status_code=422, detail="Search query is too short")
+    if len(q) > 100:
+        raise HTTPException(status_code=422, detail="Search query is too long")
+
+    if limit < 1 or limit > 50:
+        raise HTTPException(status_code=422, detail="limit must be between 1 and 50")
+    if offset < 0:
+        raise HTTPException(status_code=422, detail="offset must be 0 or greater")
+
+    try:
+        # =========================
+        # 3) Count total results
+        # =========================
+        count_row = db.execute(
+            text("""
+                SELECT COUNT(*) AS total
+                FROM courses
+                WHERE status                = 'published'
+                  AND visibility_level      = 'public'
+                  AND is_open_for_enrollment = TRUE
+                  AND search_vector         @@ plainto_tsquery('english', :query)
+            """),
+            {"query": q},
+        ).mappings().first()
+
+        if not count_row:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to count search results",
+            )
+
+        total = int(count_row["total"])
+
+        # =========================
+        # 4) Fetch paginated results
+        # =========================
+        result_rows = db.execute(
+            text("""
+                SELECT
+                    id,
+                    title,
+                    description,
+                    category,
+                    tags,
+                    cover_image_key,
+                    banner_image_key,
+                    enrollment_count,
+                    average_rating,
+                    requires_enrollment_approval,
+                    ts_rank(search_vector, plainto_tsquery('english', :query)) AS rank
+                FROM courses
+                WHERE status                = 'published'
+                  AND visibility_level      = 'public'
+                  AND is_open_for_enrollment = TRUE
+                  AND search_vector         @@ plainto_tsquery('english', :query)
+                ORDER BY rank DESC
+                LIMIT  :limit
+                OFFSET :offset
+            """),
+            {
+                "query":  q,
+                "limit":  limit,
+                "offset": offset,
+            },
+        ).mappings().all()
+
+        results = [dict(row) for row in result_rows]
+
+        return {
+            "total":   total,
+            "limit":   limit,
+            "offset":  offset,
+            "results": results,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
 
