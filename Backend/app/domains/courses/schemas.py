@@ -214,5 +214,14 @@ class CourseInvitationsListResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class CourseEnrollResponse(BaseModel):
+    enrollment_id: int
+    course_id: int
+    status: str
+    enrollment_type: str
+    enrolled_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
 
 

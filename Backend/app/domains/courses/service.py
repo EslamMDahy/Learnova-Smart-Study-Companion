@@ -631,7 +631,6 @@ def send_course_invitations(*, course_id: int,
 
 
 
-
 def accept_course_invitation(*, payload: CourseInviteAcceptRequest, db: Session,
                                 current_user: dict,) -> CourseInviteAcceptResponse:
     # =========================
@@ -834,7 +833,6 @@ def accept_course_invitation(*, payload: CourseInviteAcceptRequest, db: Session,
 
 
 
-
 def get_my_courses(*, db: Session, current_user: dict):
     user_id = current_user.get("id")
     role = (current_user.get("system_role") or "").strip().lower()
@@ -940,7 +938,6 @@ def get_my_courses(*, db: Session, current_user: dict):
 
 
 
-
 def list_course_invitations(*,course_id: int, limit: int, offset: int,db: Session,
                             current_user: dict,) -> CourseInvitationsListResponse:
 
@@ -1043,4 +1040,141 @@ def list_course_invitations(*,course_id: int, limit: int, offset: int,db: Sessio
         total=int(total),
         items=items,
     )
+
+
+
+def enroll_in_course(*, course_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "student":
+        raise HTTPException(status_code=403, detail="Only students can enroll in courses")
+
+    student_id = current_user.get("id")
+    if not student_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + is published + is open for enrollment
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, status, is_open_for_enrollment, requires_enrollment_approval
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if course_row["status"] != "published":
+            raise HTTPException(status_code=403, detail="Course is not available for enrollment")
+
+        if not course_row["is_open_for_enrollment"]:
+            raise HTTPException(status_code=403, detail="Course is not open for enrollment")
+
+        # =========================
+        # 3) Check for existing enrollment
+        # =========================
+        existing_enrollment = db.execute(
+            text("""
+                SELECT id, status
+                FROM course_enrollments
+                WHERE course_id  = :course_id
+                  AND student_id = :student_id
+                LIMIT 1
+            """),
+            {
+                "course_id":  course_id,
+                "student_id": student_id,
+            },
+        ).mappings().first()
+
+        if existing_enrollment:
+            if existing_enrollment["status"] == "active":
+                raise HTTPException(status_code=409, detail="You are already enrolled in this course")
+            if existing_enrollment["status"] == "pending":
+                raise HTTPException(status_code=409, detail="Your enrollment request is already pending")
+            if existing_enrollment["status"] == "suspended":
+                raise HTTPException(status_code=403, detail="Your enrollment has been suspended")
+
+        # =========================
+        # 4) Create enrollment
+        # =========================
+        requires_approval = course_row["requires_enrollment_approval"]
+        enrollment_status = "pending" if requires_approval else "active"
+        now               = datetime.now(timezone.utc)
+
+        enrollment_row = db.execute(
+            text("""
+                INSERT INTO course_enrollments (
+                    student_id, course_id,
+                    status, enrollment_type,
+                    enrolled_at, completed_at
+                )
+                VALUES (
+                    :student_id, :course_id,
+                    :status, 'self',
+                    :enrolled_at, NULL
+                )
+                ON CONFLICT (student_id, course_id)
+                DO UPDATE SET
+                    status          = EXCLUDED.status,
+                    enrollment_type = EXCLUDED.enrollment_type,
+                    enrolled_at     = EXCLUDED.enrolled_at,
+                    completed_at    = NULL
+                WHERE course_enrollments.status IN ('dropped', 'completed')
+                RETURNING id, student_id, course_id, status, enrollment_type, enrolled_at
+            """),
+            {
+                "student_id":  student_id,
+                "course_id":   course_id,
+                "status":      enrollment_status,
+                "enrolled_at": now,
+            },
+        ).mappings().first()
+
+        if not enrollment_row:
+            raise HTTPException(status_code=500, detail="Failed to create enrollment")
+
+        # =========================
+        # 5) Increment enrollment_count if active
+        # =========================
+        if not requires_approval:
+            db.execute(
+                text("""
+                    UPDATE courses
+                    SET enrollment_count = enrollment_count + 1,
+                        updated_at       = NOW()
+                    WHERE id = :course_id
+                """),
+                {"course_id": course_id},
+            )
+
+        db.commit()
+
+        return {
+            "enrollment_id":   int(enrollment_row["id"]),
+            "course_id":       int(enrollment_row["course_id"]),
+            "status":          enrollment_row["status"],
+            "enrollment_type": enrollment_row["enrollment_type"],
+            "enrolled_at":     enrollment_row["enrolled_at"],
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
 
