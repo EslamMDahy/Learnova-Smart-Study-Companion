@@ -13,7 +13,10 @@ from .schemas import (CourseCreateRequest,
                       CourseInviteAcceptResponse,
                       MyCoursesResponse,
                       CourseInvitationsListResponse,
-                      CourseEnrollResponse)
+                      CourseEnrollResponse,
+                      CourseEnrollmentRequestsResponse,
+                      EnrollmentRequestUpdateRequest,
+                      EnrollmentRequestUpdateResponse)
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
 
@@ -61,13 +64,18 @@ def accept_course_invitation(
     payload: CourseInviteAcceptRequest,
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):# لو مش logged in => 401
-    return service.accept_course_invitation(payload=payload, db=db, current_user=current_user)
+    return service.accept_course_invitation(
+        payload=payload, 
+        db=db, 
+        current_user=current_user)
 
 @router.get("/my", response_model=MyCoursesResponse, status_code=status.HTTP_200_OK,)
 def get_my_courses(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):
-    return service.get_my_courses(db=db, current_user=current_user)
+    return service.get_my_courses(
+        db=db, 
+        current_user=current_user)
 
 @router.get("/{course_id}/invitations", response_model=CourseInvitationsListResponse)
 def list_course_invitations(
@@ -90,6 +98,30 @@ def enroll_in_course_endpoint(
     current_user: dict = Depends(get_current_user),):
     return service.enroll_in_course(
         course_id=course_id,
+        db=db,
+        current_user=current_user,)
+
+@router.get("/{course_id}/enrollment-requests", response_model=CourseEnrollmentRequestsResponse, status_code=status.HTTP_200_OK,)
+def list_enrollment_requests_endpoint(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.list_enrollment_requests(
+        course_id=course_id,
+        db=db,
+        current_user=current_user,)
+
+@router.patch("/{course_id}/enrollment-requests/{enrollment_id}", response_model=EnrollmentRequestUpdateResponse, status_code=status.HTTP_200_OK,)
+def update_enrollment_request_endpoint(
+    course_id: int,
+    enrollment_id: int,
+    payload: EnrollmentRequestUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.update_enrollment_request(
+        course_id=course_id,
+        enrollment_id=enrollment_id,
+        payload=payload,
         db=db,
         current_user=current_user,)
 

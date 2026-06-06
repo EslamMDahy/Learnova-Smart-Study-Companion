@@ -9,8 +9,10 @@ from sqlalchemy import (
     JSON,
     Enum as SQLEnum,
     Index,
-    CheckConstraint
+    CheckConstraint,
+    event,
 )
+from sqlalchemy.dialects.postgresql import TSVECTOR
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 
@@ -148,10 +150,23 @@ class Course(Base):
         onupdate=datetime.utcnow
     )
 
+    # Full-text search vector — auto-maintained by DB trigger
+    search_vector: Mapped[None] = mapped_column(
+        TSVECTOR,
+        nullable=True
+    )
+
     __table_args__ = (
         # indexes from schema
         Index("ix_courses_org_id_title", "organization_id", "title"),
         Index("ix_courses_created_by_course_type", "created_by", "course_type"),
+
+        # GIN index for full-text search
+        Index(
+            "ix_courses_search_vector",
+            "search_vector",
+            postgresql_using="gin",
+        ),
 
         # consistency: organization course must have organization_id, individual must not
         CheckConstraint(

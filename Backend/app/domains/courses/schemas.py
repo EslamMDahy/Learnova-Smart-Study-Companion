@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Optional, List
+from typing import Literal, Optional, List
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import datetime
 from app.models.enums import CourseStatus
@@ -220,6 +220,34 @@ class CourseEnrollResponse(BaseModel):
     status: str
     enrollment_type: str
     enrolled_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EnrollmentRequestItem(BaseModel):
+    enrollment_id: int
+    student_id: int
+    full_name: str
+    email: str
+    status: str
+    enrolled_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+class CourseEnrollmentRequestsResponse(BaseModel):
+    course_id: int
+    total: int
+    requests: list[EnrollmentRequestItem]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class EnrollmentRequestUpdateRequest(BaseModel):
+    status: Literal["approved", "declined"]
+
+class EnrollmentRequestUpdateResponse(BaseModel):
+    enrollment_id: int
+    status: str
 
     model_config = ConfigDict(from_attributes=True)
 

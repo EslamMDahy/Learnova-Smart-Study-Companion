@@ -12,13 +12,13 @@ import hashlib
 import secrets
 
 from .schemas import (CourseCreateRequest,
-                      CourseInvitesUploadResponse,  # اللي عملناه
+                      CourseInvitesUploadResponse,  
                       CourseInvitesSendRequest,  
                       CourseInvitesSendResponse,
                       CourseInviteAcceptRequest, 
                       CourseInviteAcceptResponse,
                       CourseInvitationsListResponse, 
-                      CourseInviteStatus)
+                      EnrollmentRequestUpdateRequest)
 
 
 from app.core.config import settings
@@ -1176,5 +1176,185 @@ def enroll_in_course(*, course_id: int, db: Session, current_user: dict,):
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
 
+
+
+def list_enrollment_requests(*, course_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can view enrollment requests")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(status_code=403, detail="You can only view enrollment requests for your own course")
+
+        # =========================
+        # 3) Fetch pending enrollment requests
+        # =========================
+        request_rows = db.execute(
+            text("""
+                SELECT
+                    ce.id          AS enrollment_id,
+                    ce.student_id,
+                    ce.status,
+                    ce.enrolled_at,
+                    u.full_name,
+                    u.email
+                FROM course_enrollments ce
+                JOIN users u
+                  ON u.id = ce.student_id
+                WHERE ce.course_id = :course_id
+                  AND ce.status    = 'pending'
+                ORDER BY ce.enrolled_at ASC
+            """),
+            {"course_id": course_id},
+        ).mappings().all()
+
+        requests = [dict(row) for row in request_rows]
+
+        return {
+            "course_id": course_id,
+            "total":     len(requests),
+            "requests":  requests,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+    
+
+
+def update_enrollment_request(*, course_id: int, enrollment_id: int, payload: EnrollmentRequestUpdateRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can update enrollment requests")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not enrollment_id or enrollment_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid enrollment_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(status_code=403, detail="You can only manage enrollment requests for your own course")
+
+        # =========================
+        # 3) Validate enrollment exists + belongs to course + is pending
+        # =========================
+        enrollment_row = db.execute(
+            text("""
+                SELECT id, course_id, student_id, status
+                FROM course_enrollments
+                WHERE id        = :enrollment_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {
+                "enrollment_id": enrollment_id,
+                "course_id":     course_id,
+            },
+        ).mappings().first()
+
+        if not enrollment_row:
+            raise HTTPException(status_code=404, detail="Enrollment request not found")
+
+        if enrollment_row["status"] != "pending":
+            raise HTTPException(status_code=409, detail="Enrollment request is no longer pending")
+
+        # =========================
+        # 4) Update enrollment status
+        # =========================
+        new_status = "active" if payload.status == "approved" else "dropped"
+
+        db.execute(
+            text("""
+                UPDATE course_enrollments
+                SET status = :status
+                WHERE id = :enrollment_id
+            """),
+            {
+                "enrollment_id": enrollment_id,
+                "status":        new_status,
+            },
+        )
+
+        # =========================
+        # 5) Increment enrollment_count if approved
+        # =========================
+        if new_status == "active":
+            db.execute(
+                text("""
+                    UPDATE courses
+                    SET enrollment_count = enrollment_count + 1,
+                        updated_at       = NOW()
+                    WHERE id = :course_id
+                """),
+                {"course_id": course_id},
+            )
+
+        db.commit()
+
+        return {
+            "enrollment_id": enrollment_id,
+            "status":        payload.status,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
 
 
