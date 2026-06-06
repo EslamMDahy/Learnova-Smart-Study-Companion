@@ -252,4 +252,9 @@ class EnrollmentRequestUpdateResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
 
+class CourseAutocompleteResponse(BaseModel):
+    suggestions: list[str]
+
+    model_config = ConfigDict(from_attributes=True)
+
 

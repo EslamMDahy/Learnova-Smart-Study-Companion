@@ -1358,3 +1358,80 @@ def update_enrollment_request(*, course_id: int, enrollment_id: int, payload: En
         raise HTTPException(status_code=500, detail="Database error") from e
 
 
+
+def course_autocomplete(*, q: str, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # =========================
+    # 2) Validate query
+    # =========================
+    q = (q or "").strip()
+    if len(q) < 1:
+        return {"suggestions": []}
+    if len(q) > 100:
+        raise HTTPException(status_code=422, detail="Search query is too long")
+
+    try:
+        # =========================
+        # 3) Fetch tag suggestions
+        # =========================
+        tag_rows = db.execute(
+            text("""
+                SELECT DISTINCT value AS suggestion
+                FROM courses, json_array_elements_text(tags) AS value
+                WHERE status           = 'published'
+                  AND visibility_level = 'public'
+                  AND tags             IS NOT NULL
+                  AND value ILIKE :query
+                LIMIT 4
+            """),
+            {"query": f"{q}%"},
+        ).mappings().all()
+
+        tag_suggestions = [row["suggestion"] for row in tag_rows]
+
+        # =========================
+        # 4) Fetch title suggestions
+        # =========================
+        title_rows = db.execute(
+            text("""
+                SELECT DISTINCT title AS suggestion
+                FROM courses
+                WHERE status           = 'published'
+                  AND visibility_level = 'public'
+                  AND title ILIKE :query
+                LIMIT 4
+            """),
+            {"query": f"{q}%"},
+        ).mappings().all()
+
+        title_suggestions = [row["suggestion"] for row in title_rows]
+
+        # =========================
+        # 5) Merge + deduplicate (tags first)
+        # =========================
+        seen:        set[str] = set()
+        suggestions: list[str] = []
+
+        for suggestion in tag_suggestions + title_suggestions:
+            normalized = suggestion.strip().lower()
+            if normalized not in seen:
+                seen.add(normalized)
+                suggestions.append(suggestion)
+
+        return {"suggestions": suggestions[:8]}
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+

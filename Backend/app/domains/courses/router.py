@@ -16,7 +16,8 @@ from .schemas import (CourseCreateRequest,
                       CourseEnrollResponse,
                       CourseEnrollmentRequestsResponse,
                       EnrollmentRequestUpdateRequest,
-                      EnrollmentRequestUpdateResponse)
+                      EnrollmentRequestUpdateResponse,
+                      CourseAutocompleteResponse)
 
 router = APIRouter(prefix="/courses", tags=["Courses"])
 
@@ -124,4 +125,16 @@ def update_enrollment_request_endpoint(
         payload=payload,
         db=db,
         current_user=current_user,)
+
+@router.get("/search/autocomplete", response_model=CourseAutocompleteResponse, status_code=status.HTTP_200_OK,)
+def course_autocomplete_endpoint(
+    q: str,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.course_autocomplete(
+        q=q,
+        db=db,
+        current_user=current_user,)
+
+
 
