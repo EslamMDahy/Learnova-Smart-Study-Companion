@@ -68,19 +68,55 @@ def render_multi_choice_question(*, question: dict, context: dict):
 
 def render_true_false_question(*, question: dict, context: dict):
     # =========================
-    # 1) Render true/false question
+    # 1) Extract display settings
     # =========================
-    question_header_html = _render_question_header(
-        question=question,
-        context=context,
-        suffix_html="<span class='true-false-box'>( &nbsp;&nbsp;&nbsp; )</span>",
-    )
+    display = context.get("display", {})
+    include_ocr_support = bool(display.get("include_ocr_support"))
+    include_points = bool(display.get("include_points"))
+
+    # =========================
+    # 2) Render standard mode
+    # =========================
+    if not include_ocr_support:
+        question_header_html = _render_question_header(
+            question=question,
+            context=context,
+            suffix_html="<span class='true-false-box'>( &nbsp;&nbsp;&nbsp; )</span>",
+        )
+        return f"""
+        <div class="question-block">
+            {question_header_html}
+        </div>
+        """
+
+    # =========================
+    # 3) Render OCR mode
+    # =========================
+    question_number = html.escape(str(question.get("question_number") or ""))
+    question_text = html.escape(str(question.get("question_text") or ""))
+    points_html = _render_points(question=question) if include_points else ""
 
     return f"""
     <div class="question-block">
-        {question_header_html}
+        <div class="question-title">
+            <span class="tf-ocr-question-main">{question_number}) {question_text}</span>
+            <span class="question-side-tf-ocr">
+                <span class="tf-ocr-inline">
+                    <span class="tf-ocr-option-inline">
+                        <span class="tf-ocr-label">True</span>
+                        <span class="ocr-bubble"></span>
+                    </span>
+                    <span class="tf-ocr-option-inline">
+                        <span class="tf-ocr-label">False</span>
+                        <span class="ocr-bubble"></span>
+                    </span>
+                {points_html}
+                </span>
+            </span>
+        </div>
     </div>
     """
+
 
 
 def render_short_answer_question(*, question: dict, context: dict):
@@ -135,7 +171,12 @@ def _render_choice_question(*, question: dict, context: dict):
     # =========================
     # 2) Render options
     # =========================
-    options_html = _render_options(
+    display = context.get("display", {})
+    include_ocr_support = bool(display.get("include_ocr_support"))
+
+    options_html = _render_ocr_options(
+        options=question.get("options"),
+    ) if include_ocr_support else _render_options(
         options=question.get("options"),
     )
 
@@ -169,8 +210,12 @@ def _render_written_question(*, question: dict, context: dict, line_count: int):
     # =========================
     answer_lines_html = ""
     if include_answer_space:
-        answer_lines_html = _render_answer_lines(line_count=line_count)
-
+        if display.get("include_ocr_support"):
+            css_class = "ocr-answer-box-essay" if line_count == 8 else "ocr-answer-box-short"
+            answer_lines_html = f'<div class="{css_class}"></div>'
+        else:
+            answer_lines_html = _render_answer_lines(line_count=line_count)
+            
     return f"""
     <div class="question-block">
         {question_header_html}
@@ -326,3 +371,32 @@ def _is_multi_answer_question(question: dict):
         return isinstance(answers, list) and len(answers) > 1
 
     return False
+
+
+def _render_ocr_options(*, options: Any):
+    # =========================
+    # 1) Validate options shape
+    # =========================
+    if not isinstance(options, list) or not options:
+        return "<div class='option'>No options provided</div>"
+
+    # =========================
+    # 2) Render OCR bubbles
+    # =========================
+    rendered_options = []
+
+    for index, option in enumerate(options):
+        option_text = _extract_option_text(option=option)
+        option_label = _render_option_label(index=index)
+
+        rendered_options.append(
+            f"""
+            <div class="option">
+                <span class="ocr-option-label">{option_label}.</span>
+                <span class="ocr-bubble"></span>
+                <span class="ocr-option-text">{html.escape(option_text)}</span>
+            </div>
+            """
+        )
+
+    return "\n".join(rendered_options)
