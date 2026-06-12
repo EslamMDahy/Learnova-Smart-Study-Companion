@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from io import BytesIO
+import logging
 import random
 import json as _json
 
@@ -31,6 +32,8 @@ from .helpers import (build_exam_export_context,
                       convert_html_to_pdf)
 
 
+
+logger = logging.getLogger(__name__)
 
 ALLOWED_EXAM_TYPES = {"quiz", "midterm", "final", "practice"}
 
@@ -2180,14 +2183,18 @@ def publish_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
                     snapshot_topic_id = q.topic_id,
                     snapshot_question_text = q.question_text,
                     snapshot_explanation = q.explanation,
-                    snapshot_options = q.options,
+                    -- The live DB currently stores snapshot_* JSON columns as json,
+                    -- while questions.* are JSONB in the SQLAlchemy model.
+                    -- Cast explicitly to avoid PostgreSQL jsonb -> json assignment errors
+                    -- during publish.
+                    snapshot_options = q.options::json,
                     snapshot_type = q.type::text,
                     snapshot_difficulty = q.difficulty::text,
-                    snapshot_expected_answer = q.expected_answer,
-                    snapshot_grading_rubric = q.grading_rubric,
+                    snapshot_expected_answer = q.expected_answer::json,
+                    snapshot_grading_rubric = q.grading_rubric::json,
                     snapshot_max_score = q.max_score,
                     snapshot_auto_gradable = q.auto_gradable,
-                    snapshot_tags = q.tags,
+                    snapshot_tags = q.tags::json,
                     snapshot_source_question_updated_at = q.updated_at,
                     snapshot_created_at = NOW()
                 FROM questions q
@@ -2307,7 +2314,18 @@ def publish_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
 
     except SQLAlchemyError as e:
         db.rollback()
-        raise HTTPException(status_code=500, detail="Database error") from e
+        original_error = str(getattr(e, "orig", e))
+        logger.exception(
+            "Publish exam database error | course_id=%s exam_id=%s instructor_id=%s | %s",
+            course_id,
+            exam_id,
+            instructor_id,
+            original_error,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Database error while publishing exam: {original_error}",
+        ) from e
 
 
 
