@@ -23,8 +23,6 @@ from sqlalchemy.orm import Session
 
 
 
-
-
 def build_exam_export_context(*, exam_row: dict, course_row: dict, section_rows: list[dict], question_rows: list[dict],
                               include_learnova_logo: bool, include_course_title: bool, include_course_code: bool, include_exam_metadata: bool,
                               include_instructions: bool, include_section_descriptions: bool, include_points: bool, include_student_info_fields: bool,
@@ -144,7 +142,6 @@ def build_exam_export_context(*, exam_row: dict, course_row: dict, section_rows:
     }
 
 
-
 def render_exam_pdf_html(context: dict):
     # =========================
     # 1) Extract context
@@ -237,7 +234,7 @@ def render_exam_pdf_html(context: dict):
             </div>
         </div>
         """
-    
+
     ocr_mode_class = "ocr-mode" if display.get("include_ocr_support") else ""
 
     instructions_html = ""
@@ -404,6 +401,10 @@ def render_exam_pdf_html(context: dict):
                 padding: 0;
             }}
 
+            /* ========================= */
+            /* Header                    */
+            /* ========================= */
+
             .exam-header {{
                 width: 100%;
                 display: table;
@@ -493,6 +494,10 @@ def render_exam_pdf_html(context: dict):
                 height: 12px;
             }}
 
+            /* ========================= */
+            /* Separators                */
+            /* ========================= */
+
             .thick-separator {{
                 border-top: 2px solid #111111;
                 margin: 8px 0 8px;
@@ -503,8 +508,31 @@ def render_exam_pdf_html(context: dict):
                 margin: 8px 0 10px;
             }}
 
+            /* ========================= */
+            /* Instructions              */
+            /* ========================= */
+
+            .instructions {{
+                margin: 0 0 8px;
+            }}
+
+            .section-title {{
+                font-weight: bold;
+                margin-bottom: 3px;
+            }}
+
+            .instructions-text {{
+                white-space: pre-line;
+                font-size: 11px;
+            }}
+
+            /* ========================= */
+            /* OCR Section               */
+            /* ========================= */
+
             .ocr-section {{
                 margin: 10px 0;
+                page-break-after: always;
             }}
 
             .ocr-top-row {{
@@ -531,7 +559,7 @@ def render_exam_pdf_html(context: dict):
                 font-weight: bold;
                 font-size: 11px;
                 margin-bottom: 4px;
-                text-align: left
+                text-align: left;
             }}
 
             .ocr-id-grid {{
@@ -549,6 +577,19 @@ def render_exam_pdf_html(context: dict):
                 font-size: 11px;
                 font-weight: bold;
                 color: #111111;
+            }}
+
+            .id-write-row {{
+                display: flex;
+                margin-bottom: 4px;
+            }}
+
+            .id-write-box {{
+                width: 20px;
+                height: 20px;
+                border: 1px solid #111111;
+                margin-right: 4px;
+                display: inline-block;
             }}
 
             .id-digit-row {{
@@ -607,40 +648,9 @@ def render_exam_pdf_html(context: dict):
                 vertical-align: middle;
             }}
 
-            .ocr-section {{
-                page-break-after: always;
-            }}
-
-            .id-write-row {{
-                display: flex;
-                margin-bottom: 4px;
-            }}
-
-            .id-write-box {{
-                width: 20px;
-                height: 20px;
-                border: 1px solid #111111;
-                margin-right: 4px;
-                display: inline-block;
-            }}
-
-            .instructions {{
-                margin: 0 0 8px;
-            }}
-
-            .exam-section-title-row {{
-                page-break-after: avoid;
-            }}
-
-            .section-title {{
-                font-weight: bold;
-                margin-bottom: 3px;
-            }}
-
-            .instructions-text {{
-                white-space: pre-line;
-                font-size: 11px;
-            }}
+            /* ========================= */
+            /* Exam Sections             */
+            /* ========================= */
 
             .questions-area {{
                 margin-top: 0;
@@ -665,6 +675,7 @@ def render_exam_pdf_html(context: dict):
                 font-size: 13px;
                 padding-bottom: 0px;
                 margin-bottom: 0px;
+                page-break-after: avoid;
             }}
 
             .exam-section-main {{
@@ -692,6 +703,10 @@ def render_exam_pdf_html(context: dict):
                 margin-left: 4mm;
                 padding-left: 1mm;
             }}
+
+            /* ========================= */
+            /* Questions                 */
+            /* ========================= */
 
             .question-wrapper {{
                 padding: 6px 0 7px;
@@ -735,11 +750,9 @@ def render_exam_pdf_html(context: dict):
                 font-weight: bold;
             }}
 
-            .true-false-box {{
-                display: inline-block;
-                margin-right: 8px;
-                font-weight: normal;
-            }}
+            /* ========================= */
+            /* Standard Options          */
+            /* ========================= */
 
             .options-list {{
                 margin-top: 3px;
@@ -761,19 +774,32 @@ def render_exam_pdf_html(context: dict):
                 display: table-cell;
             }}
 
-            .ocr-answer-box-short {{
-                border: 1px solid #111111;
+            /* ========================= */
+            /* Standard Answer Lines     */
+            /* ========================= */
+
+            .answer-lines {{
                 margin-top: 8px;
-                height: 150px;
-                width: 100%;
             }}
 
-            .ocr-answer-box-essay {{
-                border: 1px solid #111111;
-                margin-top: 8px;
-                height: 240px;
-                width: 100%;
+            .answer-line {{
+                height: 16px;
+                border-bottom: 1px dotted #555555;
             }}
+
+            /* ========================= */
+            /* True / False              */
+            /* ========================= */
+
+            .true-false-box {{
+                display: inline-block;
+                margin-right: 8px;
+                font-weight: normal;
+            }}
+
+            /* ========================= */
+            /* OCR Questions             */
+            /* ========================= */
 
             .ocr-bubble {{
                 display: inline-block;
@@ -796,7 +822,21 @@ def render_exam_pdf_html(context: dict):
                 display: inline;
                 vertical-align: middle;
             }}
-            
+
+            .ocr-answer-box-short {{
+                border: 1px solid #111111;
+                margin-top: 8px;
+                height: 150px;
+                width: 100%;
+            }}
+
+            .ocr-answer-box-essay {{
+                border: 1px solid #111111;
+                margin-top: 8px;
+                height: 240px;
+                width: 100%;
+            }}
+
             .tf-ocr-question-main {{
                 display: table-cell;
                 vertical-align: top;
@@ -829,15 +869,6 @@ def render_exam_pdf_html(context: dict):
                 font-size: 10px;
                 font-weight: bold;
             }}
-
-            .answer-lines {{
-                margin-top: 8px;
-            }}
-
-            .answer-line {{
-                height: 16px;
-                border-bottom: 1px dotted #555555;
-            }}
         </style>
     </head>
     <body>
@@ -866,7 +897,7 @@ def render_exam_pdf_html(context: dict):
         </header>
 
         <div class="thick-separator"></div>
-        
+
         {ocr_section_html}
 
         {instructions_html}
@@ -888,7 +919,7 @@ def convert_html_to_pdf(html_content: str):
 
 def _format_question_type_label(*, question_type):
     # =========================
-    # 1) Format section question type for exam paper display
+    # 1) Format section question type for display
     # =========================
     normalized_type = str(question_type or "").strip().lower()
 
@@ -901,7 +932,6 @@ def _format_question_type_label(*, question_type):
     }
 
     return labels.get(normalized_type, normalized_type.replace("_", " ").title())
-
 
 
 def _render_ocr_section(*, exam: dict, course: dict):
@@ -969,9 +999,9 @@ def _render_ocr_section(*, exam: dict, course: dict):
             </div>
             <div class="ocr-id-section">
                 <div class="ocr-id-grid">
-                <div class="ocr-id-label">Student ID</div>
+                    <div class="ocr-id-label">Student ID</div>
                     <div class="id-columns-row">
-                        {"".join(f'<span class="id-col-header">{i+1}</span>' for i in range(10))}
+                        {"".join(f'<span class="id-col-header">{i + 1}</span>' for i in range(10))}
                     </div>
                     {id_grid_html}
                 </div>
@@ -1012,6 +1042,9 @@ def _render_ocr_section(*, exam: dict, course: dict):
     </div>
     <div class="thick-separator"></div>
     """
+
+
+
 
 def save_ai_exam_grading_results(*, db: Session, attempt_id: int, exam_id: int, results: list[dict],) -> dict:
     try:
