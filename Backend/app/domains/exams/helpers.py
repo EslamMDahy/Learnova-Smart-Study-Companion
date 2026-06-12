@@ -2,9 +2,15 @@ from __future__ import annotations
 
 import html
 import random
+import qrcode
+import base64
+import qrcode.image.svg
+
 from typing import Any
 
 from weasyprint import HTML
+
+from io import BytesIO
 
 from app.core.config import settings
 from .handler import render_question_handler
@@ -20,7 +26,7 @@ from sqlalchemy.orm import Session
 def build_exam_export_context(*, exam_row: dict, course_row: dict, section_rows: list[dict], question_rows: list[dict],
                               include_learnova_logo: bool, include_course_title: bool, include_course_code: bool, include_exam_metadata: bool,
                               include_instructions: bool, include_section_descriptions: bool, include_points: bool, include_student_info_fields: bool,
-                              include_answer_space: bool, effective_shuffle_questions: bool, effective_shuffle_options: bool,) -> dict:
+                              include_answer_space: bool, include_ocr_support: bool, effective_shuffle_questions: bool, effective_shuffle_options: bool,) -> dict:
     # =========================
     # 1) Prepare sections
     # =========================
@@ -127,13 +133,13 @@ def build_exam_export_context(*, exam_row: dict, course_row: dict, section_rows:
             "include_points": include_points,
             "include_student_info_fields": include_student_info_fields,
             "include_answer_space": include_answer_space,
+            "include_ocr_support": include_ocr_support,
             "shuffle_questions": effective_shuffle_questions,
             "shuffle_options": effective_shuffle_options,
         },
         "sections": sections,
         "questions": flat_questions,
     }
-
 
 
 def render_exam_pdf_html(context: dict):
@@ -211,7 +217,7 @@ def render_exam_pdf_html(context: dict):
         """
 
     student_info_html = ""
-    if display.get("include_student_info_fields"):
+    if display.get("include_student_info_fields") and not display.get("include_ocr_support"):
         student_info_html = """
         <div class="student-fields">
             <div class="student-line">
@@ -229,6 +235,8 @@ def render_exam_pdf_html(context: dict):
         </div>
         """
 
+    ocr_mode_class = "ocr-mode" if display.get("include_ocr_support") else ""
+
     instructions_html = ""
     if display.get("include_instructions") and exam.get("instructions"):
         instructions_html = f"""
@@ -238,6 +246,13 @@ def render_exam_pdf_html(context: dict):
         </section>
         <div class="thin-separator"></div>
         """
+
+    ocr_section_html = ""
+    if display.get("include_ocr_support"):
+        ocr_section_html = _render_ocr_section(
+            exam=exam,
+            course=course,
+        )
 
     # =========================
     # 3) Render questions / sections
@@ -386,6 +401,10 @@ def render_exam_pdf_html(context: dict):
                 padding: 0;
             }}
 
+            /* ========================= */
+            /* Header                    */
+            /* ========================= */
+
             .exam-header {{
                 width: 100%;
                 display: table;
@@ -396,20 +415,25 @@ def render_exam_pdf_html(context: dict):
             .header-cell {{
                 display: table-cell;
                 vertical-align: top;
-                padding-right: 6px;
+                padding-right: 10px;
             }}
 
             .logo-cell {{
-                width: 10%;
+                width: 65px;
             }}
 
             .course-column {{
-                width: 36%;
-                padding-left: 0;
+                width: 29%;
+                padding-left: 18px;
             }}
 
             .stats-cell {{
-                width: 27%;
+                width: 29%;
+            }}
+
+            .stats-cell.ocr-mode {{
+                width: 54%;
+                padding-left: 130px;
             }}
 
             .stats-column {{
@@ -470,6 +494,10 @@ def render_exam_pdf_html(context: dict):
                 height: 12px;
             }}
 
+            /* ========================= */
+            /* Separators                */
+            /* ========================= */
+
             .thick-separator {{
                 border-top: 2px solid #111111;
                 margin: 8px 0 8px;
@@ -479,6 +507,10 @@ def render_exam_pdf_html(context: dict):
                 border-top: 1px solid #777777;
                 margin: 8px 0 10px;
             }}
+
+            /* ========================= */
+            /* Instructions              */
+            /* ========================= */
 
             .instructions {{
                 margin: 0 0 8px;
@@ -493,6 +525,132 @@ def render_exam_pdf_html(context: dict):
                 white-space: pre-line;
                 font-size: 11px;
             }}
+
+            /* ========================= */
+            /* OCR Section               */
+            /* ========================= */
+
+            .ocr-section {{
+                margin: 10px 0;
+                page-break-after: always;
+            }}
+
+            .ocr-top-row {{
+                display: table;
+                width: 100%;
+                margin-bottom: 8px;
+            }}
+
+            .ocr-student-info {{
+                display: table-cell;
+                vertical-align: top;
+                width: 40%;
+                padding-right: 10px;
+            }}
+
+            .ocr-id-section {{
+                display: table-cell;
+                vertical-align: top;
+                width: 60%;
+                text-align: right;
+            }}
+
+            .ocr-id-label {{
+                font-weight: bold;
+                font-size: 11px;
+                margin-bottom: 4px;
+                text-align: left;
+            }}
+
+            .ocr-id-grid {{
+                display: inline-block;
+            }}
+
+            .id-columns-row {{
+                display: flex;
+                margin-bottom: 2px;
+            }}
+
+            .id-col-header {{
+                width: 24px;
+                text-align: center;
+                font-size: 11px;
+                font-weight: bold;
+                color: #111111;
+            }}
+
+            .id-write-row {{
+                display: flex;
+                margin-bottom: 4px;
+            }}
+
+            .id-write-box {{
+                width: 20px;
+                height: 20px;
+                border: 1px solid #111111;
+                margin-right: 4px;
+                display: inline-block;
+            }}
+
+            .id-digit-row {{
+                display: flex;
+                margin-bottom: 2px;
+            }}
+
+            .id-bubble {{
+                width: 20px;
+                height: 20px;
+                border: 1px solid #111111;
+                border-radius: 50%;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                font-size: 9px;
+                margin-right: 4px;
+                text-align: center;
+            }}
+
+            .ocr-instructions {{
+                margin: 8px 0;
+            }}
+
+            .ocr-instructions-list {{
+                margin: 4px 0 0 0;
+                padding-left: 16px;
+                font-size: 11px;
+            }}
+
+            .ocr-instructions-list li {{
+                margin-bottom: 3px;
+            }}
+
+            .ocr-bottom-row {{
+                display: table;
+                width: 100%;
+                margin-top: 8px;
+            }}
+
+            .ocr-qr-block {{
+                display: table-cell;
+                vertical-align: middle;
+                width: 80px;
+                padding-right: 12px;
+            }}
+
+            .qr-image {{
+                width: 75px;
+                height: 75px;
+                display: block;
+            }}
+
+            .ocr-exam-data {{
+                display: table-cell;
+                vertical-align: middle;
+            }}
+
+            /* ========================= */
+            /* Exam Sections             */
+            /* ========================= */
 
             .questions-area {{
                 margin-top: 0;
@@ -517,6 +675,7 @@ def render_exam_pdf_html(context: dict):
                 font-size: 13px;
                 padding-bottom: 0px;
                 margin-bottom: 0px;
+                page-break-after: avoid;
             }}
 
             .exam-section-main {{
@@ -544,6 +703,10 @@ def render_exam_pdf_html(context: dict):
                 margin-left: 4mm;
                 padding-left: 1mm;
             }}
+
+            /* ========================= */
+            /* Questions                 */
+            /* ========================= */
 
             .question-wrapper {{
                 padding: 6px 0 7px;
@@ -587,11 +750,9 @@ def render_exam_pdf_html(context: dict):
                 font-weight: bold;
             }}
 
-            .true-false-box {{
-                display: inline-block;
-                margin-right: 8px;
-                font-weight: normal;
-            }}
+            /* ========================= */
+            /* Standard Options          */
+            /* ========================= */
 
             .options-list {{
                 margin-top: 3px;
@@ -613,6 +774,10 @@ def render_exam_pdf_html(context: dict):
                 display: table-cell;
             }}
 
+            /* ========================= */
+            /* Standard Answer Lines     */
+            /* ========================= */
+
             .answer-lines {{
                 margin-top: 8px;
             }}
@@ -620,6 +785,89 @@ def render_exam_pdf_html(context: dict):
             .answer-line {{
                 height: 16px;
                 border-bottom: 1px dotted #555555;
+            }}
+
+            /* ========================= */
+            /* True / False              */
+            /* ========================= */
+
+            .true-false-box {{
+                display: inline-block;
+                margin-right: 8px;
+                font-weight: normal;
+            }}
+
+            /* ========================= */
+            /* OCR Questions             */
+            /* ========================= */
+
+            .ocr-bubble {{
+                display: inline-block;
+                width: 14px;
+                height: 14px;
+                border: 1px solid #111111;
+                border-radius: 50%;
+                margin-right: 6px;
+                vertical-align: middle;
+            }}
+
+            .ocr-option-label {{
+                display: table-cell;
+                width: 14px;
+                font-weight: bold;
+                padding-right: 4px;
+            }}
+
+            .ocr-option-text {{
+                display: inline;
+                vertical-align: middle;
+            }}
+
+            .ocr-answer-box-short {{
+                border: 1px solid #111111;
+                margin-top: 8px;
+                height: 150px;
+                width: 100%;
+            }}
+
+            .ocr-answer-box-essay {{
+                border: 1px solid #111111;
+                margin-top: 8px;
+                height: 240px;
+                width: 100%;
+            }}
+
+            .tf-ocr-question-main {{
+                display: table-cell;
+                vertical-align: top;
+                padding-right: 10px;
+                width: 500px;
+            }}
+
+            .question-side-tf-ocr {{
+                display: table-cell;
+                vertical-align: top;
+                width: 100px;
+                text-align: right;
+                white-space: nowrap;
+            }}
+
+            .tf-ocr-inline {{
+                display: inline-flex;
+                gap: 10px;
+                vertical-align: middle;
+            }}
+
+            .tf-ocr-option-inline {{
+                display: inline-flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 2px;
+            }}
+
+            .tf-ocr-label {{
+                font-size: 10px;
+                font-weight: bold;
             }}
         </style>
     </head>
@@ -639,7 +887,7 @@ def render_exam_pdf_html(context: dict):
                 <div class="exam-title">{title}</div>
             </div>
 
-            <div class="header-cell stats-cell">
+            <div class="header-cell stats-cell {ocr_mode_class}">
                 {metadata_html}
             </div>
 
@@ -649,6 +897,8 @@ def render_exam_pdf_html(context: dict):
         </header>
 
         <div class="thick-separator"></div>
+
+        {ocr_section_html}
 
         {instructions_html}
 
@@ -669,7 +919,7 @@ def convert_html_to_pdf(html_content: str):
 
 def _format_question_type_label(*, question_type):
     # =========================
-    # 1) Format section question type for exam paper display
+    # 1) Format section question type for display
     # =========================
     normalized_type = str(question_type or "").strip().lower()
 
@@ -682,6 +932,116 @@ def _format_question_type_label(*, question_type):
     }
 
     return labels.get(normalized_type, normalized_type.replace("_", " ").title())
+
+
+def _render_ocr_section(*, exam: dict, course: dict):
+    # =========================
+    # 1) Prepare data
+    # =========================
+    exam_id = str(exam.get("id") or "")
+    course_id = str(course.get("id") or "")
+    course_title = html.escape(str(course.get("title") or ""))
+    exam_title = html.escape(str(exam.get("title") or ""))
+    duration_minutes = exam.get("duration_minutes")
+    time_allowed = (
+        f"{html.escape(str(duration_minutes))} minutes"
+        if duration_minutes
+        else "Not limited"
+    )
+
+    # =========================
+    # 2) Generate QR code as base64 image
+    # =========================
+    qr_data = f"exam_id:{exam_id},course_id:{course_id}"
+    qr = qrcode.QRCode(box_size=4, border=2)
+    qr.add_data(qr_data)
+    qr.make(fit=True)
+    qr_image = qr.make_image(fill_color="black", back_color="white")
+    buffer = BytesIO()
+    qr_image.save(buffer)
+    qr_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+    qr_img_html = f'<img src="data:image/png;base64,{qr_b64}" class="qr-image" alt="QR Code">'
+
+    # =========================
+    # 3) Generate student ID bubble grid (10 digits, 0-9 each)
+    # =========================
+    write_row = "".join(
+        f'<span class="id-write-box"></span>'
+        for _ in range(10)
+    )
+
+    digit_rows = []
+    for digit in range(10):
+        bubbles = "".join(
+            f'<span class="id-bubble">{digit}</span>'
+            for _ in range(10)
+        )
+        digit_rows.append(f'<div class="id-digit-row">{bubbles}</div>')
+
+    id_grid_html = f'<div class="id-write-row">{write_row}</div>' + "\n".join(digit_rows)
+
+    # =========================
+    # 4) Render full OCR section
+    # =========================
+    return f"""
+    <div class="ocr-section">
+
+        <div class="ocr-top-row">
+            <div class="ocr-student-info" style="padding-top: 30px;">
+                <div class="student-line">
+                    <span class="label">Student Name:</span>
+                    <span class="blank-line"></span>
+                </div>
+                <div class="student-line" style="margin-top: 6px;">
+                    <span class="label">Date:</span>
+                    <span class="blank-line"></span>
+                </div>
+            </div>
+            <div class="ocr-id-section">
+                <div class="ocr-id-grid">
+                    <div class="ocr-id-label">Student ID</div>
+                    <div class="id-columns-row">
+                        {"".join(f'<span class="id-col-header">{i + 1}</span>' for i in range(10))}
+                    </div>
+                    {id_grid_html}
+                </div>
+            </div>
+        </div>
+
+        <div class="thin-separator"></div>
+
+        <div class="ocr-instructions">
+            <span class="label">Instructions: </span>
+            <ul class="ocr-instructions-list">
+                <li>Use a dark pen or pencil only. Do not use light-colored or erasable pens.</li>
+                <li>Fill each bubble completely and darkly. Partially filled bubbles may not be read correctly.</li>
+                <li>To fix a mistake, erase completely before filling another bubble.</li>
+                <li>Fill your Student ID from left to right using one bubble per column. Fill remaining columns with zero.</li>
+                <li>For Multiple Choice questions: fill only one bubble per question.</li>
+                <li>For Multi-Select questions: fill all correct answer bubbles.</li>
+                <li>For written questions: write clearly inside the answer box only. Do not write outside the borders.</li>
+                <li>Do not fold, tear, or damage this paper in any way.</li>
+                <li>Do not write anything outside the designated areas.</li>
+                <li>Make sure the QR code at the bottom of this page is not covered or damaged.</li>
+            </ul>
+        </div>
+
+        <div class="thin-separator"></div>
+
+        <div class="ocr-bottom-row">
+            <div class="ocr-qr-block">
+                {qr_img_html}
+            </div>
+            <div class="ocr-exam-data">
+                <div class="info-line"><span class="label">Course:</span> {course_title}</div>
+                <div class="info-line"><span class="label">Exam:</span> {exam_title}</div>
+                <div class="info-line"><span class="label">Duration:</span> {time_allowed}</div>
+            </div>
+        </div>
+
+    </div>
+    <div class="thick-separator"></div>
+    """
 
 
 

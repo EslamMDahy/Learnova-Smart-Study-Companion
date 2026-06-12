@@ -28,7 +28,7 @@ from .schemas import (ExamCreateRequest,
 from app.core.ai_service_integration.ai_transport import send_ai_request
 from .helpers import (build_exam_export_context,
                       render_exam_pdf_html,
-                      convert_html_to_pdf,)
+                      convert_html_to_pdf)
 
 
 
@@ -2621,7 +2621,8 @@ def export_exam_pdf(*, course_id: int, exam_id: int, include_learnova_logo: bool
                     include_course_title: bool, include_course_code: bool,
                     include_exam_metadata: bool, include_instructions: bool,
                     include_section_descriptions: bool, include_points: bool,
-                    include_student_info_fields: bool, include_answer_space: bool, 
+                    include_student_info_fields: bool, include_answer_space: bool,
+                    include_ocr_support: bool,
                     shuffle_questions: bool | None, shuffle_options: bool | None, 
                     db: Session, current_user: dict,):
     # =========================
@@ -2853,6 +2854,7 @@ def export_exam_pdf(*, course_id: int, exam_id: int, include_learnova_logo: bool
             include_points=include_points,
             include_student_info_fields=include_student_info_fields,
             include_answer_space=include_answer_space,
+            include_ocr_support=include_ocr_support,
             effective_shuffle_questions=effective_shuffle_questions,
             effective_shuffle_options=effective_shuffle_options,
         )

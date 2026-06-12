@@ -11,13 +11,7 @@ def render_question_handler(*, question: dict, context: dict):
     question_type = str(question.get("type") or "").strip().lower()
 
     if question_type in ("multiple_choice", "multi_select"):
-        if question_type == "multi_select" or _is_multi_answer_question(question):
-            return render_multi_choice_question(
-                question=question,
-                context=context,
-            )
-
-        return render_single_choice_question(
+        return _render_choice_question(
             question=question,
             context=context,
         )
@@ -46,39 +40,54 @@ def render_question_handler(*, question: dict, context: dict):
     )
 
 
-def render_single_choice_question(*, question: dict, context: dict):
-    # =========================
-    # 1) Render single-choice question
-    # =========================
-    return _render_choice_question(
-        question=question,
-        context=context,
-    )
-
-
-def render_multi_choice_question(*, question: dict, context: dict):
-    # =========================
-    # 1) Render multi-choice question
-    # =========================
-    return _render_choice_question(
-        question=question,
-        context=context,
-    )
-
-
 def render_true_false_question(*, question: dict, context: dict):
     # =========================
-    # 1) Render true/false question
+    # 1) Extract display settings
     # =========================
-    question_header_html = _render_question_header(
-        question=question,
-        context=context,
-        suffix_html="<span class='true-false-box'>( &nbsp;&nbsp;&nbsp; )</span>",
-    )
+    display = context.get("display", {})
+    include_ocr_support = bool(display.get("include_ocr_support"))
+    include_points = bool(display.get("include_points"))
+
+    # =========================
+    # 2) Render standard mode
+    # =========================
+    if not include_ocr_support:
+        question_header_html = _render_question_header(
+            question=question,
+            context=context,
+            suffix_html="<span class='true-false-box'>( &nbsp;&nbsp;&nbsp; )</span>",
+        )
+        return f"""
+        <div class="question-block">
+            {question_header_html}
+        </div>
+        """
+
+    # =========================
+    # 3) Render OCR mode
+    # =========================
+    question_number = html.escape(str(question.get("question_number") or ""))
+    question_text = html.escape(str(question.get("question_text") or ""))
+    points_html = _render_points(question=question) if include_points else ""
 
     return f"""
     <div class="question-block">
-        {question_header_html}
+        <div class="question-title">
+            <span class="tf-ocr-question-main">{question_number}) {question_text}</span>
+            <span class="question-side-tf-ocr">
+                <span class="tf-ocr-inline">
+                    <span class="tf-ocr-option-inline">
+                        <span class="tf-ocr-label">True</span>
+                        <span class="ocr-bubble"></span>
+                    </span>
+                    <span class="tf-ocr-option-inline">
+                        <span class="tf-ocr-label">False</span>
+                        <span class="ocr-bubble"></span>
+                    </span>
+                    {points_html}
+                </span>
+            </span>
+        </div>
     </div>
     """
 
@@ -135,8 +144,12 @@ def _render_choice_question(*, question: dict, context: dict):
     # =========================
     # 2) Render options
     # =========================
+    display = context.get("display", {})
+    include_ocr_support = bool(display.get("include_ocr_support"))
+
     options_html = _render_options(
         options=question.get("options"),
+        ocr_mode=include_ocr_support,
     )
 
     return f"""
@@ -155,6 +168,7 @@ def _render_written_question(*, question: dict, context: dict, line_count: int):
     # =========================
     display = context.get("display", {})
     include_answer_space = bool(display.get("include_answer_space"))
+    include_ocr_support = bool(display.get("include_ocr_support"))
 
     # =========================
     # 2) Render question header
@@ -165,16 +179,20 @@ def _render_written_question(*, question: dict, context: dict, line_count: int):
     )
 
     # =========================
-    # 3) Render answer lines
+    # 3) Render answer space
     # =========================
-    answer_lines_html = ""
+    answer_space_html = ""
     if include_answer_space:
-        answer_lines_html = _render_answer_lines(line_count=line_count)
+        if include_ocr_support:
+            css_class = "ocr-answer-box-essay" if line_count == 8 else "ocr-answer-box-short"
+            answer_space_html = f'<div class="{css_class}"></div>'
+        else:
+            answer_space_html = _render_answer_lines(line_count=line_count)
 
     return f"""
     <div class="question-block">
         {question_header_html}
-        {answer_lines_html}
+        {answer_space_html}
     </div>
     """
 
@@ -187,7 +205,7 @@ def _render_question_header(*, question: dict, context: dict, suffix_html: str =
     include_points = bool(display.get("include_points"))
 
     # =========================
-    # 2) Render question header
+    # 2) Build side content
     # =========================
     question_number = html.escape(str(question.get("question_number") or ""))
     question_text = html.escape(str(question.get("question_text") or ""))
@@ -206,7 +224,7 @@ def _render_question_header(*, question: dict, context: dict, suffix_html: str =
     """
 
 
-def _render_options(*, options: Any):
+def _render_options(*, options: Any, ocr_mode: bool = False):
     # =========================
     # 1) Validate options shape
     # =========================
@@ -222,14 +240,25 @@ def _render_options(*, options: Any):
         option_text = _extract_option_text(option=option)
         option_label = _render_option_label(index=index)
 
-        rendered_options.append(
-            f"""
-            <div class="option">
-                <span class="option-label">{option_label}.</span>
-                <span class="option-text">{html.escape(option_text)}</span>
-            </div>
-            """
-        )
+        if ocr_mode:
+            rendered_options.append(
+                f"""
+                <div class="option">
+                    <span class="ocr-option-label">{option_label}.</span>
+                    <span class="ocr-bubble"></span>
+                    <span class="ocr-option-text">{html.escape(option_text)}</span>
+                </div>
+                """
+            )
+        else:
+            rendered_options.append(
+                f"""
+                <div class="option">
+                    <span class="option-label">{option_label}.</span>
+                    <span class="option-text">{html.escape(option_text)}</span>
+                </div>
+                """
+            )
 
     return "\n".join(rendered_options)
 
@@ -252,7 +281,7 @@ def _render_answer_lines(*, line_count: int):
 
 def _render_option_label(*, index: int):
     # =========================
-    # 1) Render option label
+    # 1) Map index to letter label
     # =========================
     if 0 <= index < 26:
         return chr(ord("A") + index)
@@ -277,13 +306,16 @@ def _extract_option_text(*, option: Any):
 
 def _render_points(*, question: dict):
     # =========================
-    # 1) Render question points
+    # 1) Resolve points value
     # =========================
     points = question.get("points")
 
     if points is None:
         points = question.get("max_score")
 
+    # =========================
+    # 2) Format and return
+    # =========================
     formatted_points = _format_points(points=points)
     label = "mark" if formatted_points == "1" else "marks"
 
@@ -292,7 +324,7 @@ def _render_points(*, question: dict):
 
 def _format_points(*, points: Any):
     # =========================
-    # 1) Format points for exam paper display
+    # 1) Format points for display
     # =========================
     if points is None:
         return "0"
@@ -306,23 +338,3 @@ def _format_points(*, points: Any):
         return str(int(numeric_points))
 
     return str(numeric_points)
-
-
-def _is_multi_answer_question(question: dict):
-    # =========================
-    # 1) Detect multi-answer multiple choice
-    # =========================
-    expected_answer = question.get("expected_answer")
-
-    if isinstance(expected_answer, list):
-        return True
-
-    if isinstance(expected_answer, dict):
-        answers = (
-            expected_answer.get("answers")
-            or expected_answer.get("correct_answers")
-            or expected_answer.get("correct_option_ids")
-        )
-        return isinstance(answers, list) and len(answers) > 1
-
-    return False
