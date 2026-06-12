@@ -108,7 +108,7 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
         "visibility_level": payload.visibility_level.value,
         "requires_enrollment_approval": payload.requires_enrollment_approval,
         "category": payload.category,
-        "tags": payload.tags,
+        "tags": payload.tags or [],
         "course_type": payload.course_type.value,
         "status": status_value,  # ✅ هنا التغيير
     }
@@ -178,7 +178,7 @@ def upload_course_invitations_excel(*, course_id: int, file: UploadFile, sheet_n
         text("""
             SELECT invited_email
             FROM course_invitations
-            WHERE id = :course_id
+            WHERE course_id = :course_id
               AND invited_email = ANY(:emails)
         """),
         {"course_id": course_id, "emails": emails},
@@ -811,7 +811,7 @@ def accept_course_invitation(*, payload: CourseInviteAcceptRequest, db: Session,
                 SET
                     enrollment_count = enrollment_count + 1,
                     updated_at = NOW()
-                WHERE course_id = :course_id
+                WHERE id = :course_id
                 """),
             {"course_id": course_id},
         )
