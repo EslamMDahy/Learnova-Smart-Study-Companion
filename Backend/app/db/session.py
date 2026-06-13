@@ -1,7 +1,9 @@
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-DATABASE_URL = "postgresql+psycopg://postgres@localhost:5432/learnova"
+from .url import build_db_url
+
+DATABASE_URL = build_db_url(driver="postgresql+psycopg")
 
 engine = create_engine(DATABASE_URL)
 

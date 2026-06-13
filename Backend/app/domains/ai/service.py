@@ -17,13 +17,15 @@ from app.core.ai_service_integration.ai_request_tracking import (
 
 from .handlers import (handle_content_structure_generation,
                        handle_question_generation,
-                       handle_exam_grading )
+                       handle_exam_grading,
+                       handle_rag_chat,)
 
 
 _HANDLER_REGISTRY = {
     "content_structure_generation": handle_content_structure_generation,
     "question_generation": handle_question_generation,
     "exam_grading": handle_exam_grading,
+    "rag_chat": handle_rag_chat,
 }
 
 

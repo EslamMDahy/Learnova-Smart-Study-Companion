@@ -10,6 +10,7 @@ from . import service
 from .schemas import (SessionCreateRequest,
                       CreateSessionResponse,
                       SessionListResponse,
+                      MessageResponse,
                       SessionWithMessagesResponse)
 
 
@@ -47,6 +48,20 @@ def get_session_endpoint(
     return service.get_session(
         course_id=course_id,
         session_id=session_id,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/sessions/{session_id}/messages", response_model=MessageResponse, status_code=status.HTTP_201_CREATED,)
+def send_message_endpoint(
+    course_id: int,
+    session_id: int,
+    payload: SessionCreateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.send_message(
+        course_id=course_id,
+        session_id=session_id,
+        payload=payload,
         db=db,
         current_user=current_user,)
 

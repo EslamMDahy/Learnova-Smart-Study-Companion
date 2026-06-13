@@ -1,5 +1,6 @@
 import asyncpg
 from app.core.config import settings
+from app.db.url import build_db_url
 
 # =========================
 # 1) Module-level connection pool
@@ -13,11 +14,10 @@ _pool: asyncpg.Pool | None = None
 async def init_event_bus() -> None:
     global _pool
     _pool = await asyncpg.create_pool(
-        dsn=settings.database_url,
+        dsn=build_db_url(driver="postgresql"),
         min_size=1,
         max_size=5,
     )
-
 
 async def close_event_bus() -> None:
     global _pool

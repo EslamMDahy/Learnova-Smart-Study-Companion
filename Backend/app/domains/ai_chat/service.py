@@ -128,12 +128,14 @@ def create_session(*, course_id: int, payload: SessionCreateRequest, db: Session
                     session_id,
                     message_type,
                     content,
+                    status,
                     created_at
                 )
                 VALUES (
                     :session_id,
                     'user',
                     :content,
+                    'pending',
                     NOW()
                 )
                 RETURNING
@@ -198,6 +200,7 @@ def create_session(*, course_id: int, payload: SessionCreateRequest, db: Session
 
     except IntegrityError as e:
         db.rollback()
+        print(e)
         raise HTTPException(status_code=409, detail="Conflict while creating session") from e
 
     except HTTPException:
@@ -269,6 +272,8 @@ def list_sessions(*, course_id: int, db: Session, current_user: dict,):
             text("""
                 SELECT
                     id,
+                    course_id,
+                    is_active,
                     session_title,
                     started_at,
                     last_message_at
@@ -531,12 +536,14 @@ def send_message(*, course_id: int, session_id: int, payload: SessionCreateReque
                     session_id,
                     message_type,
                     content,
+                    status,
                     created_at
                 )
                 VALUES (
                     :session_id,
                     'user',
                     :content,
+                    'pending',
                     NOW()
                 )
                 RETURNING

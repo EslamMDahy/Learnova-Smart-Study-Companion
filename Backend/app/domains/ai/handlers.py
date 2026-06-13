@@ -4,11 +4,13 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.core.ai_service_integration.ai_callback_verifier import VerifiedAICallbackRequest
+from app.core.event_bus.publish import publish_sync
 
 from app.domains.topics.helpers import bulk_insert_ai_topics
 from app.domains.learningOutcomes.helpers import bulk_insert_ai_learning_outcomes
 from app.domains.questions.helpers import validate_and_prepare_ai_generated_questions, insert_ai_generated_questions
 from app.domains.exams.helpers import save_ai_exam_grading_results
+from app.domains.ai_chat.helpers import save_rag_chat_response
 from app.domains.ai.helpers import (
     insert_topic_learning_outcome_relations,
     mark_material_ai_processing_completed,)
@@ -349,6 +351,113 @@ def handle_exam_grading(*, db: Session, verified_callback: VerifiedAICallbackReq
         exam_id=exam_id,
         results=results,
     )
+
+
+
+def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest, request_log: dict,) -> dict:
+    payload = verified_callback.payload
+    body = _extract_callback_body(payload)
+
+    # =========================
+    # 1) Validate callback status
+    # =========================
+    callback_status = _extract_required_str(
+        payload,
+        "status",
+        "Missing status in callback payload",
+    ).lower()
+
+    if callback_status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="rag_chat callback status must be 'completed'",
+        )
+
+    # =========================
+    # 2) Validate course_id matches request log
+    # =========================
+    course_id = _extract_required_positive_int(
+        payload,
+        "course_id",
+        "Missing or invalid course_id in callback payload",
+    )
+
+    request_log_course_id = request_log.get("course_id")
+    if request_log_course_id is None or int(request_log_course_id) != course_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback course_id does not match AI request log",
+        )
+
+    # =========================
+    # 3) Validate primary entity in request log
+    # =========================
+    request_log_entity_type = (
+        request_log.get("primary_entity_type") or ""
+    ).strip().lower()
+
+    if request_log_entity_type != "session":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="AI request log primary_entity_type must be 'session'",
+        )
+
+    # =========================
+    # 4) Validate session_id + message_id from body
+    # =========================
+    session_id = _extract_required_positive_int(
+        body,
+        "session_id",
+        "Missing or invalid session_id in callback body",
+    )
+
+    message_id = _extract_required_positive_int(
+        body,
+        "message_id",
+        "Missing or invalid message_id in callback body",
+    )
+
+    request_log_entity_id = request_log.get("primary_entity_id")
+    if request_log_entity_id is None or int(request_log_entity_id) != session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback session_id does not match AI request log",
+        )
+
+    # =========================
+    # 5) Validate content
+    # =========================
+    content = _extract_required_str(
+        body,
+        "content",
+        "Missing or empty content in callback body",
+    )
+
+    # =========================
+    # 6) Extract optional sources
+    # =========================
+    sources = body.get("sources")
+
+    if sources is not None and not isinstance(sources, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="sources must be a list or null",
+        )
+
+    # =========================
+    # 7) Save response and publish event
+    # =========================
+    result = save_rag_chat_response(
+        db=db,
+        session_id=session_id,
+        user_message_id=message_id,
+        content=content,
+        sources=sources,
+    )
+
+    publish_sync(channel=f"chat_{message_id}", payload="ready")
+
+    return result
 
 
 
