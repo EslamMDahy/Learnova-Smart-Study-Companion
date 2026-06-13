@@ -3,6 +3,8 @@ load_dotenv()
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+from app.core.event_bus.connections import init_event_bus, close_event_bus
 
 from app.core.config import settings
 from app.domains.auth.router                    import router as auth_router
@@ -17,7 +19,14 @@ from app.domains.organizations.router           import router as organizations_r
 from app.domains.settings.router                import router as settings_router
 from app.domains.ai.router                      import router as ai_router
 
-app = FastAPI()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await init_event_bus()
+    yield
+    await close_event_bus()
+
+app = FastAPI(lifespan=lifespan)
 
 origins = [
     "http://localhost:5173",

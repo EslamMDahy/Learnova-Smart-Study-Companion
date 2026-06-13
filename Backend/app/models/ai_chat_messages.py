@@ -48,16 +48,6 @@ class AIChatMessage(Base):
         nullable=True
     )
 
-    model_used: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True
-    )
-
-    credits_used: Mapped[int] = mapped_column(
-        Integer,
-        default=0
-    )
-
     token_count: Mapped[int | None] = mapped_column(
         Integer,
         nullable=True

@@ -34,12 +34,7 @@ def upgrade() -> None:
             setweight(to_tsvector('english', coalesce(category, '')), 'B') ||
             setweight(to_tsvector('english', coalesce(description, '')), 'C') ||
             setweight(to_tsvector('english', coalesce(
-                CASE
-                    WHEN jsonb_typeof(tags::jsonb) = 'array' THEN
-                        (SELECT string_agg(tag_value, ' ')
-                         FROM jsonb_array_elements_text(tags::jsonb) AS tag(tag_value))
-                    ELSE ''
-                END, ''
+                (SELECT string_agg(value, ' ') FROM json_array_elements_text(tags)), ''
             )), 'C')
     """)
 
@@ -54,12 +49,7 @@ def upgrade() -> None:
                 setweight(to_tsvector('english', coalesce(NEW.category, '')), 'B') ||
                 setweight(to_tsvector('english', coalesce(NEW.description, '')), 'C') ||
                 setweight(to_tsvector('english', coalesce(
-                    CASE
-                        WHEN jsonb_typeof(NEW.tags::jsonb) = 'array' THEN
-                            (SELECT string_agg(tag_value, ' ')
-                             FROM jsonb_array_elements_text(NEW.tags::jsonb) AS tag(tag_value))
-                        ELSE ''
-                    END, ''
+                    (SELECT string_agg(value, ' ') FROM json_array_elements_text(NEW.tags)), ''
                 )), 'C');
             RETURN NEW;
         END;
