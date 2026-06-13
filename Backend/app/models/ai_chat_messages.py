@@ -3,13 +3,12 @@ from sqlalchemy import (
     Integer,
     Text,
     ForeignKey,
-    JSON,
-    String,
     Enum as SQLEnum,
     Index
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.db.base import Base
 from app.models.enums import AIChatMessageType
@@ -43,23 +42,13 @@ class AIChatMessage(Base):
         nullable=False
     )
 
-    sources: Mapped[dict | None] = mapped_column(
-        JSON,
+    sources: Mapped[list | None] = mapped_column(
+        JSONB,
         nullable=True
     )
 
-    token_count: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True
-    )
-
-    prompt_tokens: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True
-    )
-
-    completion_tokens: Mapped[int | None] = mapped_column(
-        Integer,
+    user_message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ai_chat_messages.id", ondelete="SET NULL"),
         nullable=True
     )
 
