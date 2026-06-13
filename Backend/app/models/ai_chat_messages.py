@@ -1,6 +1,7 @@
 from sqlalchemy import (
     DateTime,
     Integer,
+    String,
     Text,
     ForeignKey,
     Enum as SQLEnum,
@@ -50,6 +51,12 @@ class AIChatMessage(Base):
     user_message_id: Mapped[int | None] = mapped_column(
         ForeignKey("ai_chat_messages.id", ondelete="SET NULL"),
         nullable=True
+    )
+
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="pending"
     )
 
     created_at: Mapped[datetime] = mapped_column(

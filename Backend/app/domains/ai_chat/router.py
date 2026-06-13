@@ -50,4 +50,17 @@ def get_session_endpoint(
         db=db,
         current_user=current_user,)
 
+@router.get("/sessions/{session_id}/messages/{message_id}/stream",)
+async def stream_message_endpoint(
+    course_id: int,
+    session_id: int,
+    message_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return await service.stream_message(
+        course_id=course_id,
+        session_id=session_id,
+        message_id=message_id,
+        db=db,
+        current_user=current_user,)
 

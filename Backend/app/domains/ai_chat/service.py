@@ -1,14 +1,21 @@
 from __future__ import annotations
 
-from typing import Any
+import json
 
+from fastapi.responses import StreamingResponse
 from fastapi import HTTPException
+
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 
+from typing import Any
+
+from app.db.session import SessionLocal
+from app.core.event_bus.subscribe import subscribe
 from app.core.ai_service_integration.ai_transport import send_ai_request
-from .schemas import SessionCreateRequest, CreateSessionResponse
+
+from .schemas import SessionCreateRequest
 
 
 def create_session(*, course_id: int, payload: SessionCreateRequest, db: Session, current_user: dict,):
@@ -166,7 +173,7 @@ def create_session(*, course_id: int, payload: SessionCreateRequest, db: Session
             send_ai_request(
                 db,
                 operation_type="rag_chat",
-                endpoint_path="/api/v1/courses/{project_id}/rag/answer",
+                endpoint_path="/api/v1/courses/rag/answer",
                 course_id=course_id,
                 primary_entity_type="session",
                 primary_entity_id=int(session_row["id"]),
@@ -390,6 +397,7 @@ def get_session(*, course_id: int, session_id: int, db: Session, current_user: d
                     created_at
                 FROM ai_chat_messages
                 WHERE session_id = :session_id
+                 AND status = 'completed'
                 ORDER BY created_at ASC
             """),
             {"session_id": session_id},
@@ -405,3 +413,430 @@ def get_session(*, course_id: int, session_id: int, db: Session, current_user: d
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def send_message(*, course_id: int, session_id: int, payload: SessionCreateRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role not in ("instructor", "student"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not session_id or session_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid session_id")
+
+    content = payload.content.strip()
+    if not content:
+        raise HTTPException(status_code=422, detail="Message content is required")
+
+    try:
+        # =========================
+        # 2) Validate course exists + access
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if role == "instructor":
+            if int(course_row["created_by"]) != int(user_id):
+                raise HTTPException(status_code=403, detail="You can only chat within your own courses")
+
+        if role == "student":
+            enrollment_row = db.execute(
+                text("""
+                    SELECT id
+                    FROM course_enrollments
+                    WHERE course_id = :course_id
+                      AND student_id = :student_id
+                      AND status = 'active'
+                    LIMIT 1
+                """),
+                {"course_id": course_id, "student_id": user_id},
+            ).mappings().first()
+
+            if not enrollment_row:
+                raise HTTPException(status_code=403, detail="You are not enrolled in this course")
+
+        # =========================
+        # 3) Validate session ownership + is_active
+        # =========================
+        session_row = db.execute(
+            text("""
+                SELECT id, is_active
+                FROM ai_chat_sessions
+                WHERE id = :session_id
+                  AND course_id = :course_id
+                  AND user_id = :user_id
+                LIMIT 1
+            """),
+            {
+                "session_id": session_id,
+                "course_id": course_id,
+                "user_id": user_id,
+            },
+        ).mappings().first()
+
+        if not session_row:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        if not session_row["is_active"]:
+            raise HTTPException(status_code=400, detail="Session is no longer active")
+
+        # =========================
+        # 4) Fetch chat history
+        # =========================
+        history_rows = db.execute(
+            text("""
+                SELECT message_type, content
+                FROM ai_chat_messages
+                WHERE session_id = :session_id
+                 AND status = 'completed'
+                ORDER BY created_at ASC
+            """),
+            {"session_id": session_id},
+        ).mappings().all()
+
+        history = [
+            {
+                "role": "user" if row["message_type"] == "user" else "assistant",
+                "content": row["content"],
+            }
+            for row in history_rows
+        ]
+
+        # =========================
+        # 5) Save user message
+        # =========================
+        message_row = db.execute(
+            text("""
+                INSERT INTO ai_chat_messages (
+                    session_id,
+                    message_type,
+                    content,
+                    created_at
+                )
+                VALUES (
+                    :session_id,
+                    'user',
+                    :content,
+                    NOW()
+                )
+                RETURNING
+                    id,
+                    session_id,
+                    message_type,
+                    content,
+                    sources,
+                    created_at
+            """),
+            {
+                "session_id": session_id,
+                "content": content,
+            },
+        ).mappings().first()
+
+        if not message_row:
+            db.rollback()
+            raise HTTPException(status_code=503, detail="Failed to save message")
+
+        # =========================
+        # 6) Update session last_message_at
+        # =========================
+        db.execute(
+            text("""
+                UPDATE ai_chat_sessions
+                SET last_message_at = NOW()
+                WHERE id = :session_id
+            """),
+            {"session_id": session_id},
+        )
+
+        # =========================
+        # 7) Send AI request
+        # =========================
+        try:
+            send_ai_request(
+                db,
+                operation_type="rag_chat",
+                endpoint_path="/api/v1/courses/rag/answer",
+                course_id=course_id,
+                primary_entity_type="session",
+                primary_entity_id=session_id,
+                body={
+                    "session_id": session_id,
+                    "message_id": int(message_row["id"]),
+                    "user_role": role,
+                    "message": content,
+                    "history": history,
+                },
+            )
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=503, detail="Failed to send AI request")
+
+        db.commit()
+
+        return dict(message_row)
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while sending message") from e
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+async def stream_message(*, course_id: int, session_id: int, message_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role not in ("instructor", "student"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not session_id or session_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid session_id")
+
+    if not message_id or message_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid message_id")
+
+    # =========================
+    # 2) Validate course exists + access
+    # =========================
+    course_row = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if role == "instructor":
+        if int(course_row["created_by"]) != int(user_id):
+            raise HTTPException(status_code=403, detail="You can only chat within your own courses")
+
+    if role == "student":
+        enrollment_row = db.execute(
+            text("""
+                SELECT id
+                FROM course_enrollments
+                WHERE course_id = :course_id
+                  AND student_id = :student_id
+                  AND status = 'active'
+                LIMIT 1
+            """),
+            {"course_id": course_id, "student_id": user_id},
+        ).mappings().first()
+
+        if not enrollment_row:
+            raise HTTPException(status_code=403, detail="You are not enrolled in this course")
+
+    # =========================
+    # 3) Validate session ownership
+    # =========================
+    session_row = db.execute(
+        text("""
+            SELECT id
+            FROM ai_chat_sessions
+            WHERE id = :session_id
+              AND course_id = :course_id
+              AND user_id = :user_id
+            LIMIT 1
+        """),
+        {
+            "session_id": session_id,
+            "course_id": course_id,
+            "user_id": user_id,
+        },
+    ).mappings().first()
+
+    if not session_row:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # =========================
+    # 4) Validate message exists
+    # =========================
+    message_row = db.execute(
+        text("""
+            SELECT id, status
+            FROM ai_chat_messages
+            WHERE id = :message_id
+              AND session_id = :session_id
+              AND message_type = 'user'
+            LIMIT 1
+        """),
+        {
+            "message_id": message_id,
+            "session_id": session_id,
+        },
+    ).mappings().first()
+
+    if not message_row:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    if message_row["status"] == "failed":
+        raise HTTPException(status_code=400, detail="Message processing failed")
+
+    if message_row["status"] == "completed":
+        assistant_row = db.execute(
+            text("""
+                SELECT
+                    id,
+                    session_id,
+                    message_type,
+                    content,
+                    sources,
+                    created_at
+                FROM ai_chat_messages
+                WHERE user_message_id = :message_id
+                  AND status = 'completed'
+                LIMIT 1
+            """),
+            {"message_id": message_id},
+        ).mappings().first()
+
+        if not assistant_row:
+            raise HTTPException(status_code=404, detail="Assistant message not found")
+
+        assistant_data = dict(assistant_row)
+
+        db.close()
+
+        async def completed_generator():
+            data = json.dumps({
+                "id": assistant_data["id"],
+                "session_id": assistant_data["session_id"],
+                "message_type": assistant_data["message_type"],
+                "content": assistant_data["content"],
+                "sources": assistant_data["sources"],
+                "created_at": assistant_data["created_at"].isoformat(),
+            })
+            yield f"event: message\ndata: {data}\n\n"
+
+        return StreamingResponse(
+            completed_generator(),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "X-Accel-Buffering": "no",
+            },
+        )
+    
+    # =========================
+    # 6) Stream response
+    # =========================
+    async def event_generator():
+        async for payload in subscribe(channel=f"chat_{message_id}"):
+            if not payload:
+                # =========================
+                # 7) Timeout — mark message as failed
+                # =========================
+                local_db = SessionLocal()
+                try:
+                    local_db.execute(
+                        text("""
+                            UPDATE ai_chat_messages
+                            SET status = 'failed'
+                            WHERE id = :message_id
+                        """),
+                        {"message_id": message_id},
+                    )
+                    local_db.commit()
+                except SQLAlchemyError:
+                    local_db.rollback()
+                finally:
+                    local_db.close()
+
+                yield "event: timeout\ndata: {\"detail\": \"AI response timed out\"}\n\n"
+                return
+
+            # =========================
+            # 8) Fetch assistant message and send to frontend
+            # =========================
+            local_db = SessionLocal()
+            try:
+                assistant_row = local_db.execute(
+                    text("""
+                        SELECT
+                            id,
+                            session_id,
+                            message_type,
+                            content,
+                            sources,
+                            created_at
+                        FROM ai_chat_messages
+                        WHERE user_message_id = :message_id
+                          AND status = 'completed'
+                        LIMIT 1
+                    """),
+                    {"message_id": message_id},
+                ).mappings().first()
+
+                if not assistant_row:
+                    yield "event: error\ndata: {\"detail\": \"Assistant message not found\"}\n\n"
+                    return
+
+                data = json.dumps({
+                    "id": assistant_row["id"],
+                    "session_id": assistant_row["session_id"],
+                    "message_type": assistant_row["message_type"],
+                    "content": assistant_row["content"],
+                    "sources": assistant_row["sources"],
+                    "created_at": assistant_row["created_at"].isoformat(),
+                })
+
+                yield f"event: message\ndata: {data}\n\n"
+
+            except SQLAlchemyError:
+                yield "event: error\ndata: {\"detail\": \"Database error\"}\n\n"
+
+            finally:
+                local_db.close()
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+
