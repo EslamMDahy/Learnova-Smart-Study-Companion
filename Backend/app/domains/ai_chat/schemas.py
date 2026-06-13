@@ -8,15 +8,19 @@ from pydantic import BaseModel, ConfigDict, Field
 from app.models.enums import AIChatMessageType, AIChatContextType
 
 
-class SourceItem(BaseModel):
-    title: str
-    page: Optional[int] = None
-    model_config = ConfigDict(extra="forbid")
 
 
 class SessionCreateRequest(BaseModel):
     content: str = Field(..., min_length=1, max_length=2000)
+    
     model_config = ConfigDict(extra="forbid")
+
+class CreateSessionResponse(BaseModel):
+    session: SessionResponse
+    message: MessageResponse
+    
+    model_config = ConfigDict(extra="forbid")
+
 
 
 class SessionResponse(BaseModel):
@@ -28,6 +32,19 @@ class SessionResponse(BaseModel):
     last_message_at: Optional[datetime]
     model_config = ConfigDict(extra="forbid")
 
+class SessionListResponse(BaseModel):
+    course_id: int
+    total: int
+    sessions: List[SessionResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+
+class SourceItem(BaseModel):
+    title: str
+    page: Optional[int] = None
+    model_config = ConfigDict(extra="forbid")
 
 class MessageResponse(BaseModel):
     id: int
@@ -37,7 +54,6 @@ class MessageResponse(BaseModel):
     sources: Optional[List[SourceItem]]
     created_at: datetime
     model_config = ConfigDict(extra="forbid")
-
 
 class SessionWithMessagesResponse(BaseModel):
     id: int
@@ -51,7 +67,8 @@ class SessionWithMessagesResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class CreateSessionResponse(BaseModel):
-    session: SessionResponse
-    message: MessageResponse
-    model_config = ConfigDict(extra="forbid")
+
+
+
+
+

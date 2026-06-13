@@ -203,4 +203,205 @@ def create_session(*, course_id: int, payload: SessionCreateRequest, db: Session
 
 
 
+def list_sessions(*, course_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role not in ("instructor", "student"):
+        raise HTTPException(status_code=403, detail="Access denied")
 
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + access
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if role == "instructor":
+            if int(course_row["created_by"]) != int(user_id):
+                raise HTTPException(status_code=403, detail="You can only chat within your own courses")
+
+        if role == "student":
+            enrollment_row = db.execute(
+                text("""
+                    SELECT id
+                    FROM course_enrollments
+                    WHERE course_id = :course_id
+                      AND student_id = :student_id
+                      AND status = 'active'
+                    LIMIT 1
+                """),
+                {"course_id": course_id, "student_id": user_id},
+            ).mappings().first()
+
+            if not enrollment_row:
+                raise HTTPException(status_code=403, detail="You are not enrolled in this course")
+
+        # =========================
+        # 3) Fetch sessions
+        # =========================
+        session_rows = db.execute(
+            text("""
+                SELECT
+                    id,
+                    session_title,
+                    started_at,
+                    last_message_at
+                FROM ai_chat_sessions
+                WHERE course_id = :course_id
+                  AND user_id = :user_id
+                ORDER BY last_message_at DESC
+            """),
+            {
+                "course_id": course_id,
+                "user_id": user_id,
+            },
+        ).mappings().all()
+
+        sessions = [dict(row) for row in session_rows]
+
+        return {
+            "course_id": course_id,
+            "total": len(sessions),
+            "sessions": sessions,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def get_session(*, course_id: int, session_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role not in ("instructor", "student"):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not session_id or session_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid session_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + access
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if role == "instructor":
+            if int(course_row["created_by"]) != int(user_id):
+                raise HTTPException(status_code=403, detail="You can only chat within your own courses")
+
+        if role == "student":
+            enrollment_row = db.execute(
+                text("""
+                    SELECT id
+                    FROM course_enrollments
+                    WHERE course_id = :course_id
+                      AND student_id = :student_id
+                      AND status = 'active'
+                    LIMIT 1
+                """),
+                {"course_id": course_id, "student_id": user_id},
+            ).mappings().first()
+
+            if not enrollment_row:
+                raise HTTPException(status_code=403, detail="You are not enrolled in this course")
+
+        # =========================
+        # 3) Validate session ownership
+        # =========================
+        session_row = db.execute(
+            text("""
+                SELECT
+                    id,
+                    course_id,
+                    context_type,
+                    session_title,
+                    is_active,
+                    started_at,
+                    last_message_at
+                FROM ai_chat_sessions
+                WHERE id = :session_id
+                  AND course_id = :course_id
+                  AND user_id = :user_id
+                LIMIT 1
+            """),
+            {
+                "session_id": session_id,
+                "course_id": course_id,
+                "user_id": user_id,
+            },
+        ).mappings().first()
+
+        if not session_row:
+            raise HTTPException(status_code=404, detail="Session not found")
+
+        # =========================
+        # 4) Fetch messages
+        # =========================
+        message_rows = db.execute(
+            text("""
+                SELECT
+                    id,
+                    session_id,
+                    message_type,
+                    content,
+                    sources,
+                    created_at
+                FROM ai_chat_messages
+                WHERE session_id = :session_id
+                ORDER BY created_at ASC
+            """),
+            {"session_id": session_id},
+        ).mappings().all()
+
+        return {
+            **dict(session_row),
+            "messages": [dict(row) for row in message_rows],
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e

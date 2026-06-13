@@ -8,7 +8,9 @@ from app.core.deps import get_current_user
 
 from . import service
 from .schemas import (SessionCreateRequest,
-                      CreateSessionResponse,)
+                      CreateSessionResponse,
+                      SessionListResponse,
+                      SessionWithMessagesResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}/ai-chat", tags=["AI Chat"],)
@@ -25,3 +27,27 @@ def create_session_endpoint(
         payload=payload,
         db=db,
         current_user=current_user,)
+
+@router.get("/sessions", response_model=SessionListResponse,)
+def list_sessions_endpoint(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.list_sessions(
+        course_id=course_id,
+        db=db,
+        current_user=current_user,)
+
+@router.get("/sessions/{session_id}", response_model=SessionWithMessagesResponse,)
+def get_session_endpoint(
+    course_id: int,
+    session_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.get_session(
+        course_id=course_id,
+        session_id=session_id,
+        db=db,
+        current_user=current_user,)
+
+
