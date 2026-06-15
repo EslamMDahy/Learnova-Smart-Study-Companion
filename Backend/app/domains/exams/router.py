@@ -41,7 +41,9 @@ from .schemas import (ExamCreateRequest,
                       StudentAttemptExamResponse,
                       StudentSubmitAnswerResponse,
                       StudentExamListResponse,
-                      StudentSubmitExamResponse)
+                      StudentSubmitExamResponse,
+                      StudentExamResultResponse,
+                      StudentExamAttemptsListResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}/exams", tags=["Exams"],)
@@ -418,5 +420,31 @@ def submit_exam_endpoint(
         exam_id=exam_id,
         attempt_id=attempt_id,
         payload=payload,
+        db=db,
+        current_user=current_user,)
+
+@router.get("/{exam_id}/attempts", response_model=StudentExamAttemptsListResponse,)
+def list_exam_attempts_endpoint(
+    course_id: int,
+    exam_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.list_exam_attempts(
+        course_id=course_id,
+        exam_id=exam_id,
+        db=db,
+        current_user=current_user,)
+
+@router.get("/{exam_id}/attempt/{attempt_id}/result", response_model=StudentExamResultResponse,)
+def get_exam_attempt_result_endpoint(
+    course_id: int,
+    exam_id: int,
+    attempt_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.get_exam_attempt_result(
+        course_id=course_id,
+        exam_id=exam_id,
+        attempt_id=attempt_id,
         db=db,
         current_user=current_user,)

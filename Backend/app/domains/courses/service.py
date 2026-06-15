@@ -12,6 +12,7 @@ import hashlib
 import secrets
 
 from .schemas import (CourseCreateRequest,
+                      CourseUpdateRequest,
                       CourseInvitesUploadResponse,  
                       CourseInvitesSendRequest,  
                       CourseInvitesSendResponse,
@@ -125,6 +126,64 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def update_course(*, course_id: int, payload: CourseUpdateRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can update exams")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+    
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only update your own course",
+            )
+        
+        # =========================
+        # 3) Build dynamic update fields
+        # =========================
+        update_fields = {}
+        
+        if payload.title is not None:
+            title = payload.title.strip()
+            if not title:
+                raise HTTPException(status_code=422, detail="Invalid exam_title")
+            update_fields["title"] = title
+
+
+
+    except HTTPException:
+        db.rollback()
+        raise
+
 
 
 
@@ -937,8 +996,92 @@ def get_my_courses(*, db: Session, current_user: dict):
 
 
 
-def list_course_invitations(*,course_id: int, limit: int, offset: int,db: Session,
-                            current_user: dict,) -> CourseInvitationsListResponse:
+def publish_course(*, course_id, db: Session, current_user: dict):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can publish coruse")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+    
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by, status
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only publish your own course",
+            )
+        
+        if course_row["status"] != "draft":
+            raise HTTPException(
+                status_code=409,
+                detail="Only draft courses can be published",
+            )
+        
+        # =========================
+        # 3) Publish course
+        # =========================
+        publish_row = db.execute(
+            text("""
+                UPDATE courses
+                SET
+                    status = 'published',
+                    published_at = NOW(),
+                    updated_at = NOW()
+                WHERE id = :course_id
+                RETURNING
+                    id,
+                    status
+            """),
+            {"course_id": course_id,},
+        ).mappings().first()
+
+        if not publish_row:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Coures could not be published")
+
+        db.commit()
+
+        return {
+            "id": int(publish_row["id"]),
+            "status": publish_row["status"],
+            "message": "Course published successfully",
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while publishing course") from e
+        
+
+
+def list_course_invitations(*, course_id: int, limit: int, offset: int,db: Session, current_user: dict,) -> CourseInvitationsListResponse:
 
     # 1) Auth: instructor only
     role = (current_user.get("system_role") or "").strip().lower()
@@ -1039,7 +1182,7 @@ def list_course_invitations(*,course_id: int, limit: int, offset: int,db: Sessio
         total=int(total),
         items=items,
     )
-
+    
 
 
 def enroll_in_course(*, course_id: int, db: Session, current_user: dict,):

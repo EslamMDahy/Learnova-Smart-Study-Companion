@@ -26,6 +26,7 @@ class CourseInviteStatus(str, Enum):
 
 
 
+
 class CourseCreateRequest(BaseModel):
     course_type: CourseType = Field(..., description="organization | individual")
     organization_id: Optional[int] = Field(default=None, description="Required if course_type=organization")
@@ -73,6 +74,21 @@ class CourseCreateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", use_enum_values=True)
 
 
+class CourseUpdateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = None
+    
+    category: Optional[str] = Field(default=None, max_length=50)
+    course_code: Optional[str] = Field(default=None, max_length=50)
+
+    is_open_for_enrollment: Optional[bool] = None
+    requires_enrollment_approval: Optional[bool] = None
+    visibility_level: Optional[CourseVisibilityLevel] = None
+
+    tags: Optional[list[str]] = None
+
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class CourseInvitesUploadResponse(BaseModel):
@@ -182,6 +198,14 @@ class MyCoursesResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+
+
+class PublishCourseResponse(BaseModel):
+    id: int
+    status: str
+    message: str
+
+    model_config = ConfigDict(extra="forbid")
 
 
 

@@ -6,12 +6,15 @@ from app.core.deps import get_current_user
 from . import service
 from .schemas import (CourseCreateRequest,
                       CourseCreateResponse,
+                      CourseUpdateRequest,
+                      MyCourseItem,
                       CourseInvitesUploadResponse,
                       CourseInvitesSendRequest, 
                       CourseInvitesSendResponse,
                       CourseInviteAcceptRequest,
                       CourseInviteAcceptResponse,
                       MyCoursesResponse,
+                      PublishCourseResponse,
                       CourseInvitationsListResponse,
                       CourseEnrollResponse,
                       CourseEnrollmentRequestsResponse,
@@ -31,6 +34,18 @@ def create_course(
         payload=payload, 
         db=db, 
         current_user=current_user)
+
+@router.patch("/{course_id}", response_model=MyCourseItem,)
+def update_course(
+    course_id: int,
+    payload: CourseUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.update_course(
+        course_id=course_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
 
 @router.post("/{course_id}/invitations/upload", response_model=CourseInvitesUploadResponse,status_code=status.HTTP_201_CREATED,)
 def upload_course_invitations_excel(
@@ -65,7 +80,7 @@ def send_course_invitations(
 def accept_course_invitation(
     payload: CourseInviteAcceptRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),):# لو مش logged in => 401
+    current_user: dict = Depends(get_current_user),):
     return service.accept_course_invitation(
         payload=payload, 
         db=db, 
@@ -76,6 +91,16 @@ def get_my_courses(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):
     return service.get_my_courses(
+        db=db, 
+        current_user=current_user)
+
+@router.post("/{course_id}/publish",response_model=PublishCourseResponse,status_code=status.HTTP_200_OK,)
+def publish_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.publish_course(
+        course_id=course_id, 
         db=db, 
         current_user=current_user)
 

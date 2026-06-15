@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -605,4 +605,92 @@ class StudentSubmitExamResponse(BaseModel):
     submitted_at: datetime
 
     model_config = ConfigDict(extra="forbid")
+
+
+
+class StudentExamAttemptSummaryResponse(BaseModel):
+    attempt_id: int
+    attempt_number: int
+    status: str
+    started_at: datetime
+    submitted_at: Optional[datetime]
+    graded_at: Optional[datetime]
+    total_score: float
+    earned_score: Optional[float]
+    percentage_score: Optional[float]
+    is_passed: Optional[bool]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentExamAttemptsListResponse(BaseModel):
+    exam_id: int
+    attempts: List[StudentExamAttemptSummaryResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+
+class StudentAnswerDetail(BaseModel):
+    selected_option_index: Optional[int]
+    selected_option_indices: Optional[List[int]]
+    answer_text: Optional[str]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentExamResultQuestionResponse(BaseModel):
+    exam_question_id: int
+    question_id: int
+    order_index: int
+    question_text: str
+    type: str
+    difficulty: str
+    points: float
+    options: Optional[List[StudentExamQuestionOptionResponse]]
+    explanation: Optional[str]
+    student_answer: StudentAnswerDetail
+    correct_answer: Optional[Union[str, List[str]]]
+    is_correct: Optional[bool]
+    points_earned: Optional[float]
+    teacher_feedback: Optional[str]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentExamResultSectionResponse(BaseModel):
+    id: int
+    title: str
+    order_index: int
+    section_score: float
+    questions: List[StudentExamResultQuestionResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class StudentExamResultResponse(BaseModel):
+    exam_id: int
+    attempt_id: int
+    attempt_number: int
+    status: str
+    is_fully_graded: bool
+    started_at: datetime
+    submitted_at: Optional[datetime]
+    graded_at: Optional[datetime]
+    time_spent_seconds: int
+    total_score: float
+    earned_score: Optional[float]
+    percentage_score: Optional[float]
+    is_passed: Optional[bool]
+    correct_count: Optional[int]
+    incorrect_count: Optional[int]
+    unanswered_count: Optional[int]
+    sections: List[StudentExamResultSectionResponse]
+
+    model_config = ConfigDict(extra="forbid")
+
+
+
+    
+
 
