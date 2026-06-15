@@ -4674,12 +4674,24 @@ def list_student_exams(*, course_id: int, db: Session, current_user: dict,):
         # 5) Calculate is_available
         # =========================
         now = datetime.now(timezone.utc)
+
         exams = []
         for row in exam_rows:
             exam = dict(row)
-            exam["is_available"] = (
-                row["available_from"] <= now <= row["available_to"]
-            )
+
+            available_from = row["available_from"]
+            available_to = row["available_to"]
+
+            if available_from is not None and available_to is not None:
+                is_available = available_from <= now <= available_to
+            elif available_from is None and available_to is not None:
+                is_available = now <= available_to
+            elif available_from is not None and available_to is None:
+                is_available = available_from <= now
+            else:
+                is_available = True  # أو False حسب الـ business logic
+
+            exam["is_available"] = is_available
             exams.append(exam)
 
         return {
@@ -4791,10 +4803,15 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
 
         now = datetime.now(timezone.utc)
 
-        if exam_row["available_from"] > now:
+        available_from = exam_row["available_from"]
+        available_to = exam_row["available_to"]
+
+        # Check start time
+        if available_from is not None and available_from > now:
             raise HTTPException(status_code=403, detail="Exam is not available yet")
 
-        if exam_row["available_to"] < now:
+        # Check end time
+        if available_to is not None and available_to < now:
             raise HTTPException(status_code=403, detail="Exam availability has ended")
 
         # =========================
@@ -4878,8 +4895,19 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
 
             questions_by_section_map: dict[int, dict] = {}
             for row in question_rows:
-                q = dict(row)
-                sid = int(q["section_id"])
+                sid = int(row["section_id"])
+
+                q = {
+                    "exam_question_id": row["exam_question_id"],
+                    "question_id": row["question_id"],
+                    "order_index": row["order_index"],
+                    "points": row["points"],
+                    "question_text": row["question_text"],
+                    "options": row["options"],
+                    "type": row["type"],
+                    "difficulty": row["difficulty"],
+                    "auto_gradable": row["auto_gradable"],
+                }
                 questions_by_section_map.setdefault(sid, {})
                 questions_by_section_map[sid][q["exam_question_id"]] = q
 
@@ -5068,7 +5096,7 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
                 "student_id": student_id,
                 "exam_id": exam_id,
                 "attempt_number": attempt_number,
-                "session_data": json.dumps(session_data),
+                "session_data": _json.dumps(session_data),
             },
         ).mappings().first()
 
@@ -5237,7 +5265,7 @@ def submit_answer(*, course_id: int, exam_id: int, attempt_id: int, payload: Stu
                 "attempt_id": attempt_id,
                 "exam_question_id": payload.exam_question_id,
                 "selected_option_index": payload.selected_option_index,
-                "selected_option_indices": json.dumps(payload.selected_option_indices) if payload.selected_option_indices else None,
+                "selected_option_indices": _json.dumps(payload.selected_option_indices) if payload.selected_option_indices else None,
                 "answer_text": payload.answer_text,
                 "time_taken_seconds": payload.time_taken_seconds,
             },
@@ -5379,7 +5407,7 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                         "attempt_id": attempt_id,
                         "exam_question_id": answer.exam_question_id,
                         "selected_option_index": answer.selected_option_index,
-                        "selected_option_indices": json.dumps(answer.selected_option_indices) if answer.selected_option_indices else None,
+                        "selected_option_indices": _json.dumps(answer.selected_option_indices) if answer.selected_option_indices else None,
                         "answer_text": answer.answer_text,
                         "time_taken_seconds": answer.time_taken_seconds,
                     },
