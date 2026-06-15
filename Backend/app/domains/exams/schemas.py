@@ -514,7 +514,6 @@ class StudentExamQuestionOptionResponse(BaseModel):
 class StudentExamQuestionResponse(BaseModel):
     exam_question_id: int
     question_id: int
-    section_id: Optional[int] = None
     order_index: int
     points: float
     question_text: str
