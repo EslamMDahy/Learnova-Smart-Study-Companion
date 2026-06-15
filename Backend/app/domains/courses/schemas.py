@@ -26,6 +26,7 @@ class CourseInviteStatus(str, Enum):
 
 
 
+
 class CourseCreateRequest(BaseModel):
     course_type: CourseType = Field(..., description="organization | individual")
     organization_id: Optional[int] = Field(default=None, description="Required if course_type=organization")
@@ -71,8 +72,6 @@ class CourseCreateResponse(BaseModel):
     published_at: Optional[datetime] = None
 
     model_config = ConfigDict(extra="forbid", use_enum_values=True)
-
-
 
 
 class CourseInvitesUploadResponse(BaseModel):
@@ -182,6 +181,14 @@ class MyCoursesResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
+
+
+class PublishCourseResponse(BaseModel):
+    id: int
+    status: str
+    message: str
+
+    model_config = ConfigDict(extra="forbid")
 
 
 

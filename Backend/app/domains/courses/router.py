@@ -12,6 +12,7 @@ from .schemas import (CourseCreateRequest,
                       CourseInviteAcceptRequest,
                       CourseInviteAcceptResponse,
                       MyCoursesResponse,
+                      PublishCourseResponse,
                       CourseInvitationsListResponse,
                       CourseEnrollResponse,
                       CourseEnrollmentRequestsResponse,
@@ -65,7 +66,7 @@ def send_course_invitations(
 def accept_course_invitation(
     payload: CourseInviteAcceptRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user),):# لو مش logged in => 401
+    current_user: dict = Depends(get_current_user),):
     return service.accept_course_invitation(
         payload=payload, 
         db=db, 
@@ -76,6 +77,16 @@ def get_my_courses(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):
     return service.get_my_courses(
+        db=db, 
+        current_user=current_user)
+
+@router.post("/{course_id}/publish",response_model=PublishCourseResponse,status_code=status.HTTP_200_OK,)
+def publish_course(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.publish_course(
+        course_id=course_id, 
         db=db, 
         current_user=current_user)
 
