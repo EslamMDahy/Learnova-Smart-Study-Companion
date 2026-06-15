@@ -38,6 +38,22 @@ logger = logging.getLogger(__name__)
 ALLOWED_EXAM_TYPES = {"quiz", "midterm", "final", "practice"}
 
 
+def _normalize_utc(value):
+    if value is None:
+        return None
+    if getattr(value, "tzinfo", None) is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _exam_is_available(*, available_from, available_to, now):
+    available_from = _normalize_utc(available_from)
+    available_to = _normalize_utc(available_to)
+    starts_ok = available_from is None or available_from <= now
+    ends_ok = available_to is None or now <= available_to
+    return starts_ok and ends_ok
+
+
 def create_exam(*, course_id: int, payload: ExamCreateRequest, db: Session, current_user: dict,):
     # =========================
     # 1) Authorization
@@ -4677,8 +4693,10 @@ def list_student_exams(*, course_id: int, db: Session, current_user: dict,):
         exams = []
         for row in exam_rows:
             exam = dict(row)
-            exam["is_available"] = (
-                row["available_from"] <= now <= row["available_to"]
+            exam["is_available"] = _exam_is_available(
+                available_from=row["available_from"],
+                available_to=row["available_to"],
+                now=now,
             )
             exams.append(exam)
 
@@ -4790,11 +4808,13 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
             raise HTTPException(status_code=403, detail="Exam is not published")
 
         now = datetime.now(timezone.utc)
+        available_from = _normalize_utc(exam_row["available_from"])
+        available_to = _normalize_utc(exam_row["available_to"])
 
-        if exam_row["available_from"] > now:
+        if available_from is not None and available_from > now:
             raise HTTPException(status_code=403, detail="Exam is not available yet")
 
-        if exam_row["available_to"] < now:
+        if available_to is not None and available_to < now:
             raise HTTPException(status_code=403, detail="Exam availability has ended")
 
         # =========================
@@ -5068,7 +5088,7 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
                 "student_id": student_id,
                 "exam_id": exam_id,
                 "attempt_number": attempt_number,
-                "session_data": json.dumps(session_data),
+                "session_data": _json.dumps(session_data),
             },
         ).mappings().first()
 
@@ -5237,7 +5257,7 @@ def submit_answer(*, course_id: int, exam_id: int, attempt_id: int, payload: Stu
                 "attempt_id": attempt_id,
                 "exam_question_id": payload.exam_question_id,
                 "selected_option_index": payload.selected_option_index,
-                "selected_option_indices": json.dumps(payload.selected_option_indices) if payload.selected_option_indices else None,
+                "selected_option_indices": _json.dumps(payload.selected_option_indices) if payload.selected_option_indices else None,
                 "answer_text": payload.answer_text,
                 "time_taken_seconds": payload.time_taken_seconds,
             },
@@ -5379,7 +5399,7 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                         "attempt_id": attempt_id,
                         "exam_question_id": answer.exam_question_id,
                         "selected_option_index": answer.selected_option_index,
-                        "selected_option_indices": json.dumps(answer.selected_option_indices) if answer.selected_option_indices else None,
+                        "selected_option_indices": _json.dumps(answer.selected_option_indices) if answer.selected_option_indices else None,
                         "answer_text": answer.answer_text,
                         "time_taken_seconds": answer.time_taken_seconds,
                     },
