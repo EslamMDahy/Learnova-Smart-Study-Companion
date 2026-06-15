@@ -12,6 +12,7 @@ import hashlib
 import secrets
 
 from .schemas import (CourseCreateRequest,
+                      CourseUpdateRequest,
                       CourseInvitesUploadResponse,  
                       CourseInvitesSendRequest,  
                       CourseInvitesSendResponse,
@@ -125,6 +126,64 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def update_course(*, course_id: int, payload: CourseUpdateRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can update exams")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+    
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(
+                status_code=403,
+                detail="You can only update your own course",
+            )
+        
+        # =========================
+        # 3) Build dynamic update fields
+        # =========================
+        update_fields = {}
+        
+        if payload.title is not None:
+            title = payload.title.strip()
+            if not title:
+                raise HTTPException(status_code=422, detail="Invalid exam_title")
+            update_fields["title"] = title
+
+
+
+    except HTTPException:
+        db.rollback()
+        raise
+
 
 
 
@@ -976,10 +1035,10 @@ def publish_course(*, course_id, db: Session, current_user: dict):
                 detail="You can only publish your own course",
             )
         
-        if str(course_row["status"]) == "published":
+        if course_row["status"] != "draft":
             raise HTTPException(
                 status_code=409,
-                detail="Course is allredy published",
+                detail="Only draft courses can be published",
             )
         
         # =========================
@@ -1016,9 +1075,9 @@ def publish_course(*, course_id, db: Session, current_user: dict):
         db.rollback()
         raise
 
-    except IntegrityError as e:
+    except SQLAlchemyError as e:
         db.rollback()
-        raise HTTPException(status_code=409, detail="Conflict while publishing exam") from e
+        raise HTTPException(status_code=409, detail="Conflict while publishing course") from e
         
 
 

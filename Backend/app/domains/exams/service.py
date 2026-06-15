@@ -5716,6 +5716,420 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
 
 
 
+def list_exam_attempts(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "student":
+        raise HTTPException(status_code=403, detail="Only students can view exam attempts")
+
+    student_id = current_user.get("id")
+    if not student_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not exam_id or exam_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    try:
+        # =========================
+        # 2) Validate exam exists under course
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT id, total_score
+                FROM exams
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {"exam_id": exam_id, "course_id": course_id},
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=404, detail="Exam not found")
+
+        # =========================
+        # 3) Fetch student attempts for this exam
+        # =========================
+        attempt_rows = db.execute(
+            text("""
+                SELECT
+                    id AS attempt_id,
+                    attempt_number,
+                    status,
+                    started_at,
+                    submitted_at,
+                    graded_at,
+                    total_score,
+                    percentage_score,
+                    is_passed
+                FROM student_exam_attempts
+                WHERE exam_id = :exam_id
+                  AND student_id = :student_id
+                ORDER BY attempt_number ASC
+            """),
+            {"exam_id": exam_id, "student_id": student_id},
+        ).mappings().all()
+
+        # =========================
+        # 4) Build response
+        # =========================
+        exam_total_score = float(exam_row["total_score"])
+
+        attempts = []
+        for row in attempt_rows:
+            if row["total_score"] is None:
+                earned_score = None
+            else:
+                earned_score = float(row["total_score"])
+
+            if row["percentage_score"] is None:
+                percentage_score = None
+            else:
+                percentage_score = float(row["percentage_score"])
+
+            if row["is_passed"] is None:
+                is_passed = None
+            else:
+                is_passed = bool(row["is_passed"])
+
+            attempts.append({
+                "attempt_id": int(row["attempt_id"]),
+                "attempt_number": int(row["attempt_number"]),
+                "status": row["status"],
+                "started_at": row["started_at"],
+                "submitted_at": row["submitted_at"],
+                "graded_at": row["graded_at"],
+                "total_score": exam_total_score,
+                "earned_score": earned_score,
+                "percentage_score": percentage_score,
+                "is_passed": is_passed,
+            })
+
+        return {
+            "exam_id": exam_id,
+            "attempts": attempts,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def get_exam_attempt_result(*, course_id: int, exam_id: int, attempt_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "student":
+        raise HTTPException(status_code=403, detail="Only students can view exam results")
+
+    student_id = current_user.get("id")
+    if not student_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not exam_id or exam_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid exam_id")
+
+    if not attempt_id or attempt_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid attempt_id")
+
+    try:
+        # =========================
+        # 2) Validate exam exists under course
+        # =========================
+        exam_row = db.execute(
+            text("""
+                SELECT id, total_score
+                FROM exams
+                WHERE id = :exam_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {"exam_id": exam_id, "course_id": course_id},
+        ).mappings().first()
+
+        if not exam_row:
+            raise HTTPException(status_code=404, detail="Exam not found")
+
+        # =========================
+        # 3) Validate attempt exists + ownership + status
+        # =========================
+        attempt_row = db.execute(
+            text("""
+                SELECT
+                    id,
+                    student_id,
+                    exam_id,
+                    attempt_number,
+                    status,
+                    started_at,
+                    submitted_at,
+                    graded_at,
+                    time_spent_seconds,
+                    total_score,
+                    percentage_score,
+                    is_passed,
+                    correct_count,
+                    incorrect_count,
+                    unanswered_count,
+                    session_data
+                FROM student_exam_attempts
+                WHERE id = :attempt_id
+                  AND exam_id = :exam_id
+                  AND student_id = :student_id
+                LIMIT 1
+            """),
+            {
+                "attempt_id": attempt_id,
+                "exam_id": exam_id,
+                "student_id": student_id,
+            },
+        ).mappings().first()
+
+        if not attempt_row:
+            raise HTTPException(status_code=404, detail="Attempt not found")
+
+        if attempt_row["status"] == "in_progress":
+            raise HTTPException(status_code=403, detail="Attempt is still in progress")
+
+        # =========================
+        # 4) Fetch exam sections
+        # =========================
+        section_rows = db.execute(
+            text("""
+                SELECT
+                    id,
+                    title,
+                    order_index,
+                    section_score
+                FROM exam_sections
+                WHERE exam_id = :exam_id
+                ORDER BY order_index ASC, id ASC
+            """),
+            {"exam_id": exam_id},
+        ).mappings().all()
+
+        if not section_rows:
+            raise HTTPException(status_code=404, detail="Exam sections not found")
+
+        # =========================
+        # 5) Fetch exam questions (snapshots)
+        # =========================
+        question_rows = db.execute(
+            text("""
+                SELECT
+                    eq.id AS exam_question_id,
+                    eq.question_id,
+                    eq.section_id,
+                    eq.points,
+                    eq.snapshot_question_text AS question_text,
+                    eq.snapshot_options AS options,
+                    eq.snapshot_type AS type,
+                    eq.snapshot_difficulty AS difficulty,
+                    eq.snapshot_explanation AS explanation,
+                    eq.snapshot_expected_answer AS expected_answer,
+                    eq.snapshot_auto_gradable AS auto_gradable
+                FROM exam_questions eq
+                WHERE eq.exam_id = :exam_id
+            """),
+            {"exam_id": exam_id},
+        ).mappings().all()
+
+        if not question_rows:
+            raise HTTPException(status_code=404, detail="Exam questions not found")
+
+        # =========================
+        # 6) Fetch student answers for this attempt
+        # =========================
+        answer_rows = db.execute(
+            text("""
+                SELECT
+                    exam_question_id,
+                    selected_option_index,
+                    selected_option_indices,
+                    answer_text,
+                    is_correct,
+                    points_earned,
+                    auto_graded,
+                    teacher_feedback
+                FROM student_answers
+                WHERE attempt_id = :attempt_id
+            """),
+            {"attempt_id": attempt_id},
+        ).mappings().all()
+
+        # =========================
+        # 7) Build lookup maps
+        # =========================
+        questions_by_section_map: dict[int, dict] = {}
+        for row in question_rows:
+            q = dict(row)
+            sid = int(q["section_id"])
+            questions_by_section_map.setdefault(sid, {})
+            questions_by_section_map[sid][int(q["exam_question_id"])] = q
+
+        answers_by_question_map: dict[int, dict] = {}
+        for row in answer_rows:
+            a = dict(row)
+            answers_by_question_map[int(a["exam_question_id"])] = a
+
+        session_data = attempt_row["session_data"] or {}
+        question_order = session_data.get("question_order", {})
+
+        is_fully_graded = attempt_row["status"] == "graded"
+
+        # =========================
+        # 8) Build sections with questions in attempt order
+        # =========================
+        sections = []
+        for section_row in section_rows:
+            sid = int(section_row["id"])
+            ordered_ids = question_order.get(str(sid), [])
+            section_questions = []
+
+            for idx, qid in enumerate(ordered_ids, start=1):
+                question = questions_by_section_map.get(sid, {}).get(int(qid))
+                if not question:
+                    continue
+
+                answer = answers_by_question_map.get(int(question["exam_question_id"]))
+
+                if answer:
+                    student_answer = {
+                        "selected_option_index": answer["selected_option_index"],
+                        "selected_option_indices": answer["selected_option_indices"],
+                        "answer_text": answer["answer_text"],
+                    }
+
+                    if answer["is_correct"] is None:
+                        is_correct = None
+                    else:
+                        is_correct = bool(answer["is_correct"])
+
+                    if answer["points_earned"] is None:
+                        points_earned = 0.0
+                    else:
+                        points_earned = float(answer["points_earned"])
+
+                    teacher_feedback = answer["teacher_feedback"]
+                else:
+                    student_answer = {
+                        "selected_option_index": None,
+                        "selected_option_indices": None,
+                        "answer_text": None,
+                    }
+
+                    if question["auto_gradable"]:
+                        is_correct = False
+                    else:
+                        is_correct = None
+
+                    points_earned = 0.0
+                    teacher_feedback = None
+
+                if question["auto_gradable"]:
+                    correct_answer = question["expected_answer"]
+                else:
+                    if is_fully_graded:
+                        correct_answer = question["expected_answer"]
+                    else:
+                        correct_answer = None
+
+                section_questions.append({
+                    "exam_question_id": int(question["exam_question_id"]),
+                    "question_id": int(question["question_id"]),
+                    "order_index": idx,
+                    "question_text": question["question_text"],
+                    "type": question["type"],
+                    "difficulty": question["difficulty"],
+                    "points": float(question["points"]),
+                    "options": question["options"],
+                    "explanation": question["explanation"],
+                    "student_answer": student_answer,
+                    "correct_answer": correct_answer,
+                    "is_correct": is_correct,
+                    "points_earned": points_earned,
+                    "teacher_feedback": teacher_feedback,
+                })
+
+            sections.append({
+                "id": sid,
+                "title": section_row["title"],
+                "order_index": section_row["order_index"],
+                "section_score": float(section_row["section_score"]),
+                "questions": section_questions,
+            })
+
+        # =========================
+        # 9) Build final response
+        # =========================
+        if attempt_row["total_score"] is None:
+            earned_score = None
+        else:
+            earned_score = float(attempt_row["total_score"])
+
+        if attempt_row["percentage_score"] is None:
+            percentage_score = None
+        else:
+            percentage_score = float(attempt_row["percentage_score"])
+
+        if attempt_row["is_passed"] is None:
+            is_passed = None
+        else:
+            is_passed = bool(attempt_row["is_passed"])
+
+        if attempt_row["correct_count"] is None:
+            correct_count = None
+        else:
+            correct_count = int(attempt_row["correct_count"])
+
+        if attempt_row["incorrect_count"] is None:
+            incorrect_count = None
+        else:
+            incorrect_count = int(attempt_row["incorrect_count"])
+
+        if attempt_row["unanswered_count"] is None:
+            unanswered_count = None
+        else:
+            unanswered_count = int(attempt_row["unanswered_count"])
+
+        return {
+            "exam_id": exam_id,
+            "attempt_id": int(attempt_row["id"]),
+            "attempt_number": int(attempt_row["attempt_number"]),
+            "status": attempt_row["status"],
+            "is_fully_graded": is_fully_graded,
+            "started_at": attempt_row["started_at"],
+            "submitted_at": attempt_row["submitted_at"],
+            "graded_at": attempt_row["graded_at"],
+            "time_spent_seconds": int(attempt_row["time_spent_seconds"]),
+            "total_score": float(exam_row["total_score"]),
+            "earned_score": earned_score,
+            "percentage_score": percentage_score,
+            "is_passed": is_passed,
+            "correct_count": correct_count,
+            "incorrect_count": incorrect_count,
+            "unanswered_count": unanswered_count,
+            "sections": sections,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
 
 
 

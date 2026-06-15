@@ -74,6 +74,23 @@ class CourseCreateResponse(BaseModel):
     model_config = ConfigDict(extra="forbid", use_enum_values=True)
 
 
+class CourseUpdateRequest(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=255)
+    description: Optional[str] = None
+    
+    category: Optional[str] = Field(default=None, max_length=50)
+    course_code: Optional[str] = Field(default=None, max_length=50)
+
+    is_open_for_enrollment: Optional[bool] = None
+    requires_enrollment_approval: Optional[bool] = None
+    visibility_level: Optional[CourseVisibilityLevel] = None
+
+    tags: Optional[list[str]] = None
+
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class CourseInvitesUploadResponse(BaseModel):
     course_id: int
 

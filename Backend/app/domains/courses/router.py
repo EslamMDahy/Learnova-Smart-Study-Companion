@@ -6,6 +6,8 @@ from app.core.deps import get_current_user
 from . import service
 from .schemas import (CourseCreateRequest,
                       CourseCreateResponse,
+                      CourseUpdateRequest,
+                      MyCourseItem,
                       CourseInvitesUploadResponse,
                       CourseInvitesSendRequest, 
                       CourseInvitesSendResponse,
@@ -32,6 +34,18 @@ def create_course(
         payload=payload, 
         db=db, 
         current_user=current_user)
+
+@router.patch("/{course_id}", response_model=MyCourseItem,)
+def update_course(
+    course_id: int,
+    payload: CourseUpdateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.update_course(
+        course_id=course_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
 
 @router.post("/{course_id}/invitations/upload", response_model=CourseInvitesUploadResponse,status_code=status.HTTP_201_CREATED,)
 def upload_course_invitations_excel(
