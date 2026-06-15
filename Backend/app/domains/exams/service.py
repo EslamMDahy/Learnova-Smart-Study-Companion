@@ -38,6 +38,22 @@ logger = logging.getLogger(__name__)
 ALLOWED_EXAM_TYPES = {"quiz", "midterm", "final", "practice"}
 
 
+def _normalize_utc(value):
+    if value is None:
+        return None
+    if getattr(value, "tzinfo", None) is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _exam_is_available(*, available_from, available_to, now):
+    available_from = _normalize_utc(available_from)
+    available_to = _normalize_utc(available_to)
+    starts_ok = available_from is None or available_from <= now
+    ends_ok = available_to is None or now <= available_to
+    return starts_ok and ends_ok
+
+
 def create_exam(*, course_id: int, payload: ExamCreateRequest, db: Session, current_user: dict,):
     # =========================
     # 1) Authorization
@@ -4674,24 +4690,14 @@ def list_student_exams(*, course_id: int, db: Session, current_user: dict,):
         # 5) Calculate is_available
         # =========================
         now = datetime.now(timezone.utc)
-
         exams = []
         for row in exam_rows:
             exam = dict(row)
-
-            available_from = row["available_from"]
-            available_to = row["available_to"]
-
-            if available_from is not None and available_to is not None:
-                is_available = available_from <= now <= available_to
-            elif available_from is None and available_to is not None:
-                is_available = now <= available_to
-            elif available_from is not None and available_to is None:
-                is_available = available_from <= now
-            else:
-                is_available = True  # أو False حسب الـ business logic
-
-            exam["is_available"] = is_available
+            exam["is_available"] = _exam_is_available(
+                available_from=row["available_from"],
+                available_to=row["available_to"],
+                now=now,
+            )
             exams.append(exam)
 
         return {
@@ -4802,15 +4808,12 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
             raise HTTPException(status_code=403, detail="Exam is not published")
 
         now = datetime.now(timezone.utc)
+        available_from = _normalize_utc(exam_row["available_from"])
+        available_to = _normalize_utc(exam_row["available_to"])
 
-        available_from = exam_row["available_from"]
-        available_to = exam_row["available_to"]
-
-        # Check start time
         if available_from is not None and available_from > now:
             raise HTTPException(status_code=403, detail="Exam is not available yet")
 
-        # Check end time
         if available_to is not None and available_to < now:
             raise HTTPException(status_code=403, detail="Exam availability has ended")
 
@@ -4895,19 +4898,8 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
 
             questions_by_section_map: dict[int, dict] = {}
             for row in question_rows:
-                sid = int(row["section_id"])
-
-                q = {
-                    "exam_question_id": row["exam_question_id"],
-                    "question_id": row["question_id"],
-                    "order_index": row["order_index"],
-                    "points": row["points"],
-                    "question_text": row["question_text"],
-                    "options": row["options"],
-                    "type": row["type"],
-                    "difficulty": row["difficulty"],
-                    "auto_gradable": row["auto_gradable"],
-                }
+                q = dict(row)
+                sid = int(q["section_id"])
                 questions_by_section_map.setdefault(sid, {})
                 questions_by_section_map[sid][q["exam_question_id"]] = q
 
