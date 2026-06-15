@@ -568,8 +568,8 @@ class StudentAttemptExamResponse(BaseModel):
 
 class StudentSubmitAnswerRequest(BaseModel):
     exam_question_id: int
-    selected_option_index: Optional[int] = None
-    selected_option_indices: Optional[List[int]] = None
+    selected_option_index: Optional[str] = None
+    selected_option_indices: Optional[List[str]] = None
     answer_text: Optional[str] = None
     time_taken_seconds: Optional[int] = None
 

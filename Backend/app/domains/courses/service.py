@@ -6,9 +6,8 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from datetime import datetime, timedelta, timezone
-from typing import Iterable, Any, Optional
+from typing import Optional
 from openpyxl import load_workbook
-import hashlib
 import secrets
 
 from .schemas import (CourseCreateRequest,
@@ -27,7 +26,6 @@ from app.core.security import hmac_sha256_hex
 from app.core.excel_utils import extract_emails_from_xlsx
 from app.core.emailer import send_email  
 
-from .schemas import CourseInvitesSendRequest, CourseInvitesSendResponse
 
 COMMON_EMAIL_HEADERS = (
     "email",
@@ -129,13 +127,13 @@ def create_course(*, payload: CourseCreateRequest, db: Session, current_user: di
 
 
 
-def update_course(*, course_id: int, payload: CourseUpdateRequest, db: Session, current_user: dict,):
+def update_course(*, course_id: int, payload: CourseUpdateRequest, db: Session, current_user: dict):
     # =========================
     # 1) Authorization
     # =========================
     role = (current_user.get("system_role") or "").strip().lower()
     if role != "instructor":
-        raise HTTPException(status_code=403, detail="Only instructors can update exams")
+        raise HTTPException(status_code=403, detail="Only instructors can update courses")
 
     instructor_id = current_user.get("id")
     if not instructor_id:
@@ -143,7 +141,7 @@ def update_course(*, course_id: int, payload: CourseUpdateRequest, db: Session, 
 
     if not course_id or course_id <= 0:
         raise HTTPException(status_code=422, detail="Invalid course_id")
-    
+
     try:
         # =========================
         # 2) Validate course exists + ownership
@@ -162,27 +160,113 @@ def update_course(*, course_id: int, payload: CourseUpdateRequest, db: Session, 
             raise HTTPException(status_code=404, detail="Course not found")
 
         if int(course_row["created_by"]) != int(instructor_id):
-            raise HTTPException(
-                status_code=403,
-                detail="You can only update your own course",
-            )
-        
+            raise HTTPException(status_code=403, detail="You can only update your own courses")
+
         # =========================
         # 3) Build dynamic update fields
         # =========================
         update_fields = {}
-        
+
         if payload.title is not None:
             title = payload.title.strip()
             if not title:
-                raise HTTPException(status_code=422, detail="Invalid exam_title")
+                raise HTTPException(status_code=422, detail="Title cannot be empty")
             update_fields["title"] = title
 
+        if payload.description is not None:
+            description = payload.description.strip()
+            update_fields["description"] = description if description else None
 
+        if payload.category is not None:
+            category = payload.category.strip()
+            update_fields["category"] = category if category else None
+
+        if payload.course_code is not None:
+            course_code = payload.course_code.strip()
+            update_fields["course_code"] = course_code if course_code else None
+
+        if payload.is_open_for_enrollment is not None:
+            update_fields["is_open_for_enrollment"] = payload.is_open_for_enrollment
+
+        if payload.requires_enrollment_approval is not None:
+            update_fields["requires_enrollment_approval"] = payload.requires_enrollment_approval
+
+        if payload.visibility_level is not None:
+            update_fields["visibility_level"] = payload.visibility_level.value
+
+        if payload.tags is not None:
+            update_fields["tags"] = payload.tags
+
+        if not update_fields:
+            raise HTTPException(status_code=400, detail="No updatable fields provided")
+
+        # =========================
+        # 4) Update course
+        # =========================
+        set_clauses = []
+        params = {"course_id": course_id}
+
+        for col in [
+            "title",
+            "description",
+            "category",
+            "course_code",
+            "is_open_for_enrollment",
+            "requires_enrollment_approval",
+            "visibility_level",
+            "tags",
+        ]:
+            if col in update_fields:
+                if col == "tags":
+                    set_clauses.append("tags = :tags::json")
+                else:
+                    set_clauses.append(f"{col} = :{col}")
+                params[col] = update_fields[col]
+
+        set_clauses.append("updated_at = NOW()")
+
+        updated_row = db.execute(
+            text(f"""
+                UPDATE courses
+                SET {", ".join(set_clauses)}
+                WHERE id = :course_id
+                RETURNING
+                    id,
+                    title,
+                    course_code,
+                    course_type,
+                    organization_id,
+                    is_open_for_enrollment,
+                    visibility_level,
+                    status,
+                    category,
+                    created_by,
+                    created_at,
+                    updated_at,
+                    enrollment_count
+            """),
+            params,
+        ).mappings().first()
+
+        if not updated_row:
+            raise HTTPException(status_code=409, detail="Course could not be updated")
+
+        db.commit()
+
+        return dict(updated_row)
 
     except HTTPException:
         db.rollback()
         raise
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while updating course") from e
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        print(e)
+        raise HTTPException(status_code=500, detail="Database error") from e
 
 
 
