@@ -4,6 +4,7 @@ from enum import Enum
 from typing import Literal, Optional, List
 from pydantic import BaseModel, Field, ConfigDict, model_validator
 from datetime import datetime
+
 from app.models.enums import CourseStatus
 
 
@@ -182,26 +183,33 @@ class CourseInviteAcceptResponse(BaseModel):
 
 class MyCourseItem(BaseModel):
     id: int
+    
     title: str
+    description: Optional[str] = None
+
+    instructor_name: Optional[str] = None
+    instructor_avatar_url: Optional[str] = None
 
     course_code: Optional[str] = None
 
-    course_type: str  # أو CourseType
+    cover_url: Optional[str] = None
+
+    course_type: str 
     organization_id: Optional[int] = None
 
-    is_open_for_enrollment: bool
-    visibility_level: str  # أو CourseVisibilityLevel
     status: str
+    visibility_level: str  
+    is_open_for_enrollment: bool
 
-    # cover_image_url: Optional[str] = None
-    # banner_image_url: Optional[str] = None
     category: Optional[str] = None
+    tags: Optional[list[str]] = None
 
     created_by: int
     created_at: datetime
     updated_at: datetime
 
-    # Useful counts for dashboard (اختياري، لو مش هتجيبهم دلوقتي خليهم None)
+    average_rating: Optional[float]
+    total_ratings: Optional[int] = None
     enrollment_count: Optional[int] = None
     pending_invites: Optional[int] = None
 

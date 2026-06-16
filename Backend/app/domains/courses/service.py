@@ -1211,92 +1211,123 @@ def get_my_courses(*, db: Session, current_user: dict):
     if not user_id:
         raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # =========================
-    # Instructor: courses created by me
-    # =========================
-    if role == "instructor":
-        rows = db.execute(
-            text("""
-                SELECT
-                    c.id,
-                    c.title,
-                    c.course_code,
-                    c.course_type::text AS course_type,
-                    c.organization_id,
-                    c.is_open_for_enrollment,
-                    c.visibility_level::text AS visibility_level,
-                    c.status::text AS status,
-                    c.category,
-                    c.created_by,
-                    c.created_at,
-                    c.updated_at,
-                    c.enrollment_count,
-                    COALESCE(inv.pending_invites, 0) AS pending_invites
-                FROM courses c
-                LEFT JOIN (
-                    SELECT course_id, COUNT(*)::int AS pending_invites
-                    FROM course_invitations
-                    WHERE status = 'pending'
-                    GROUP BY course_id
-                ) inv ON inv.course_id = c.id
-                WHERE c.created_by = :uid
-                ORDER BY c.created_at DESC
-            """),
-            {"uid": user_id},
-        ).mappings().all()
-
-    # =========================
-    # Student: courses I'm enrolled in
-    # =========================
-    elif role == "student":
-        rows = db.execute(
-            text("""
-                SELECT
-                    c.id,
-                    c.title,
-                    c.course_code,
-                    c.course_type::text AS course_type,
-                    c.organization_id,
-                    c.is_open_for_enrollment,
-                    c.visibility_level::text AS visibility_level,
-                    c.status::text AS status,
-                    c.category,
-                    c.created_by,
-                    c.created_at,
-                    c.updated_at,
-                    c.enrollment_count,
-                    NULL::int AS pending_invites
-                FROM course_enrollments e
-                JOIN courses c ON c.id = e.course_id
-                WHERE e.student_id = :uid
-                  AND e.status IN ('active', 'pending', 'suspended', 'completed')
-                ORDER BY e.enrolled_at DESC
-            """),
-            {"uid": user_id},
-        ).mappings().all()
-
-    else:
-        # لو عندك assistant/owner، ممكن تعمل logic هنا
+    if role not in ("instructor", "student"):
         raise HTTPException(status_code=403, detail="Unsupported role for this endpoint")
+
+    bucket = settings.supabase_public_bucket
+
+    try:
+        # =========================
+        # Instructor: courses created by me
+        # =========================
+        if role == "instructor":
+            rows = db.execute(
+                text("""
+                    SELECT
+                        c.id,
+                        c.title,
+                        u.full_name AS instructor_name,
+                        u.avatar_key AS instructor_avatar_key,
+                        c.course_code,
+                        c.description,
+                        c.cover_image_key,
+                        c.course_type::text AS course_type,
+                        c.organization_id,
+                        c.is_open_for_enrollment,
+                        c.visibility_level::text AS visibility_level,
+                        c.status::text AS status,
+                        c.category,
+                        c.tags,
+                        c.created_by,
+                        c.created_at,
+                        c.updated_at,
+                        c.average_rating,
+                        c.total_ratings,
+                        c.enrollment_count,
+                        COALESCE(inv.pending_invites, 0) AS pending_invites
+                    FROM courses c
+                    LEFT JOIN (
+                        SELECT course_id, COUNT(*)::int AS pending_invites
+                        FROM course_invitations
+                        WHERE status = 'pending'
+                        GROUP BY course_id
+                    ) inv ON inv.course_id = c.id
+                    LEFT JOIN users u ON u.id = c.created_by
+                    WHERE c.created_by = :uid
+                    ORDER BY c.created_at DESC
+                """),
+                {"uid": user_id},
+            ).mappings().all()
+
+        # =========================
+        # Student: courses I'm enrolled in
+        # =========================
+        else:
+            rows = db.execute(
+                text("""
+                    SELECT
+                        c.id,
+                        c.title,
+                        c.description,
+                        u.full_name AS instructor_name,
+                        u.avatar_key AS instructor_avatar_key,
+                        c.course_code,
+                        c.cover_image_key,
+                        c.course_type::text AS course_type,
+                        c.organization_id,
+                        c.is_open_for_enrollment,
+                        c.visibility_level::text AS visibility_level,
+                        c.status::text AS status,
+                        c.category,
+                        c.tags,
+                        c.created_by,
+                        c.created_at,
+                        c.updated_at,
+                        c.average_rating,
+                        c.total_ratings,
+                        c.enrollment_count,
+                        NULL::int AS pending_invites
+                    FROM course_enrollments e
+                    JOIN courses c ON c.id = e.course_id
+                    LEFT JOIN users u ON u.id = c.created_by
+                    WHERE e.student_id = :uid
+                      AND e.status IN ('active', 'pending', 'suspended', 'completed')
+                    ORDER BY e.enrolled_at DESC
+                """),
+                {"uid": user_id},
+            ).mappings().all()
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
 
     items = []
     for r in rows:
+        cover_key = r.get("cover_image_key")
+        cover_url = supabase.storage.from_(bucket).get_public_url(cover_key) if cover_key else None
+        instructor_avatar_key = r.get("instructor_avatar_key")
+        instructor_avatar_url = supabase.storage.from_(bucket).get_public_url(instructor_avatar_key) if instructor_avatar_key else None
+        
         items.append(
             {
                 "id": r["id"],
                 "title": r["title"],
+                "description": r.get("description"),
+                "instructor_name": r["instructor_name"],
+                "instructor_avatar_url": instructor_avatar_url,
                 "course_code": r.get("course_code"),
+                "cover_url": cover_url,
                 "course_type": r["course_type"],
                 "organization_id": r["organization_id"],
-                "is_open_for_enrollment": r["is_open_for_enrollment"],
-                "visibility_level": r["visibility_level"],
                 "status": r["status"],
-                # "cover_image_url": r["cover_image_url"],
-                # "banner_image_url": r["banner_image_url"],
+                "visibility_level": r["visibility_level"],
+                "is_open_for_enrollment": r["is_open_for_enrollment"],
                 "category": r["category"],
+                "tags": r.get("tags") or [],
                 "created_by": r["created_by"],
                 "created_at": r["created_at"],
                 "updated_at": r["updated_at"],
+                "average_rating": r["average_rating"],
+                "total_ratings": r["total_ratings"],
                 "enrollment_count": r["enrollment_count"],
                 "pending_invites": r["pending_invites"],
             }
