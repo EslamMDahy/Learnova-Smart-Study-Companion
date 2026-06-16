@@ -91,6 +91,20 @@ class CourseUpdateRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class CourseAssetUploadRequest(BaseModel):
+    content_type: str
+    file_size_bytes: int
+
+    model_config = ConfigDict(extra="forbid")
+
+
+class CourseCoverConfirmResponse(BaseModel):
+    cover_url: str
+    updated_at: str
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class CourseInvitesUploadResponse(BaseModel):
     course_id: int
 
@@ -163,6 +177,7 @@ class CourseInviteAcceptResponse(BaseModel):
     accepted_at: datetime | None = None
 
     model_config = ConfigDict(extra="forbid")
+
 
 
 class MyCourseItem(BaseModel):

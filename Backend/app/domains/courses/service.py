@@ -10,6 +10,8 @@ from typing import Optional
 from openpyxl import load_workbook
 import secrets
 
+import supabase
+
 from .schemas import (CourseCreateRequest,
                       CourseUpdateRequest,
                       CourseInvitesUploadResponse,  
@@ -22,9 +24,11 @@ from .schemas import (CourseCreateRequest,
 
 
 from app.core.config import settings
+from app.core.supabase_client import supabase
 from app.core.security import hmac_sha256_hex
-from app.core.excel_utils import extract_emails_from_xlsx
 from app.core.emailer import send_email  
+from app.core.storage_utils import split_object_key
+from app.core.excel_utils import extract_emails_from_xlsx
 
 
 COMMON_EMAIL_HEADERS = (
@@ -268,6 +272,231 @@ def update_course(*, course_id: int, payload: CourseUpdateRequest, db: Session, 
         print(e)
         raise HTTPException(status_code=500, detail="Database error") from e
 
+
+
+def initiate_course_cover_upload(*, course_id: int, payload, db: Session, current_user: dict):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can upload course cover images")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    # =========================
+    # 2) Validate payload
+    # =========================
+    content_type = (getattr(payload, "content_type", None) or "").strip().lower()
+    file_size_bytes = getattr(payload, "file_size_bytes", None)
+
+    _ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/jpg"}
+    _COVER_MAX_BYTES = 5 * 1024 * 1024
+
+    if not content_type:
+        raise HTTPException(status_code=400, detail="content_type is required")
+
+    if content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid content_type. Allowed: image/png, image/jpeg, image/jpg")
+
+    if file_size_bytes is None:
+        raise HTTPException(status_code=400, detail="file_size_bytes is required")
+
+    try:
+        file_size_bytes = int(file_size_bytes)
+    except Exception:
+        raise HTTPException(status_code=400, detail="file_size_bytes must be an integer")
+
+    if file_size_bytes <= 0:
+        raise HTTPException(status_code=400, detail="file_size_bytes must be greater than 0")
+
+    if file_size_bytes > _COVER_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="Cover image is too large (max 5MB)")
+
+    try:
+        # =========================
+        # 3) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(status_code=403, detail="You can only upload cover images for your own courses")
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+    # =========================
+    # 4) Build storage key + create signed upload URL
+    # =========================
+    bucket = settings.supabase_public_bucket
+    storage_key = f"courses/{course_id}/assets/cover"
+
+    try:
+        signed = supabase.storage.from_(bucket).create_signed_upload_url(storage_key)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Failed to create signed upload url: {str(e)}")
+
+    data = None
+    error = None
+
+    if isinstance(signed, dict):
+        error = signed.get("error")
+        if signed.get("signedUrl") or signed.get("signed_url") or signed.get("url"):
+            data = signed
+    else:
+        data = getattr(signed, "data", None)
+        error = getattr(signed, "error", None)
+
+    if error:
+        msg = error.get("message") if isinstance(error, dict) else str(error)
+        raise HTTPException(status_code=400, detail=f"Failed to create signed upload url: {msg}")
+
+    if not data:
+        raise HTTPException(status_code=400, detail="Failed to create signed upload url")
+
+    upload_url = data.get("signedUrl") or data.get("signed_url") or data.get("url")
+
+    if not upload_url:
+        raise HTTPException(status_code=400, detail="Signed upload URL is missing from response")
+
+    return {
+        "upload_url": upload_url,
+        "storage_key": storage_key,
+        "content_type": content_type,
+        "max_bytes": _COVER_MAX_BYTES,
+    }
+
+
+
+def confirm_course_cover_upload(*, course_id: int, db: Session, current_user: dict):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can confirm course cover uploads")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(status_code=403, detail="You can only confirm cover uploads for your own courses")
+
+        # =========================
+        # 3) Verify file exists in storage
+        # =========================
+        bucket = settings.supabase_public_bucket
+        storage_key = f"courses/{course_id}/assets/cover"
+        folder, expected_filename = split_object_key(storage_key)
+
+        try:
+            items = supabase.storage.from_(bucket).list(path=folder)
+        except Exception:
+            items = None
+
+        exists = False
+        if isinstance(items, list):
+            for it in items:
+                if isinstance(it, dict) and it.get("name") == expected_filename:
+                    exists = True
+                    break
+
+        if not exists:
+            raise HTTPException(
+                status_code=400,
+                detail="Cover image not found in storage. Upload the file first, then confirm.",
+            )
+
+        # =========================
+        # 4) Save key to DB
+        # =========================
+        updated_row = db.execute(
+            text("""
+                UPDATE courses
+                SET
+                    cover_image_key = :storage_key,
+                    updated_at = NOW()
+                WHERE id = :course_id
+                RETURNING updated_at
+            """),
+            {"storage_key": storage_key, "course_id": course_id},
+        ).first()
+
+        if not updated_row:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Course could not be updated")
+
+        db.commit()
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+    # =========================
+    # 5) Build public URL + return
+    # =========================
+    updated_at = updated_row[0]
+
+    base_url = supabase.storage.from_(bucket).get_public_url(storage_key)
+
+    try:
+        dt = updated_at if isinstance(updated_at, datetime) else datetime.fromisoformat(str(updated_at).replace("Z", "+00:00"))
+        v = int(dt.timestamp())
+    except Exception:
+        v = int(datetime.now(timezone.utc).timestamp())
+
+    cover_url = f"{base_url}?v={v}"
+    updated_at_iso = updated_at.isoformat() if hasattr(updated_at, "isoformat") else str(updated_at)
+
+    return {
+        "cover_url": cover_url,
+        "updated_at": updated_at_iso,
+    }
 
 
 

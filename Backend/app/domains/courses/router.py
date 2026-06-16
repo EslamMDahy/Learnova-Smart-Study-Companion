@@ -7,6 +7,8 @@ from . import service
 from .schemas import (CourseCreateRequest,
                       CourseCreateResponse,
                       CourseUpdateRequest,
+                      CourseAssetUploadRequest,
+                      CourseCoverConfirmResponse,
                       MyCourseItem,
                       CourseInvitesUploadResponse,
                       CourseInvitesSendRequest, 
@@ -44,6 +46,28 @@ def update_course(
     return service.update_course(
         course_id=course_id,
         payload=payload,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/courses/{course_id}/cover/initiate", status_code=200)
+def initiate_course_cover_upload_route(
+    course_id: int,
+    payload: CourseAssetUploadRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.initiate_course_cover_upload(
+        course_id=course_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/courses/{course_id}/cover/confirm", status_code=200, response_model=CourseCoverConfirmResponse)
+def confirm_course_cover_upload_route(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.confirm_course_cover_upload(
+        course_id=course_id,
         db=db,
         current_user=current_user,)
 
