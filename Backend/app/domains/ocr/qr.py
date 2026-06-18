@@ -59,19 +59,62 @@ def decode_payload(raw: str | None) -> dict[str, Any] | None:
         except Exception:
             return None
     else:
+        # Newer templates use signed JSON. Older exported OCR templates in this
+        # project used a plain string: "exam_id:12,course_id:3". Support both so
+        # already-printed sheets remain scannable.
         try:
             payload = json.loads(value)
         except Exception:
-            return None
+            payload = _decode_legacy_key_value_payload(value)
 
     if not isinstance(payload, dict):
         return None
     return payload
 
 
+def _decode_legacy_key_value_payload(value: str) -> dict[str, Any] | None:
+    pairs: dict[str, str] = {}
+    for chunk in value.split(','):
+        if ':' not in chunk:
+            continue
+        key, raw_val = chunk.split(':', 1)
+        key = key.strip().lower()
+        raw_val = raw_val.strip()
+        if key:
+            pairs[key] = raw_val
+
+    exam_id = _safe_int(pairs.get('exam_id') or pairs.get('exam'))
+    course_id = _safe_int(pairs.get('course_id') or pairs.get('course'))
+    if not exam_id and not course_id:
+        return None
+
+    return {
+        "exam_id": exam_id,
+        "course_id": course_id,
+        "template_version": pairs.get("template_version") or "legacy_v1",
+        "source": "learnova_legacy_exam_qr",
+        "signature": None,
+    }
+
+
+def _safe_int(value: Any) -> int | None:
+    try:
+        if value is None or value == "":
+            return None
+        return int(str(value).strip())
+    except (TypeError, ValueError):
+        return None
+
 def verify_payload(payload: dict[str, Any] | None) -> bool:
     if not payload:
         return False
+
+    # Backward compatibility for PDFs that were generated before signed QR
+    # payloads were added. The endpoint is instructor-only, and the exam/course
+    # ownership is validated against the authenticated instructor later.
+    if payload.get("source") == "learnova_legacy_exam_qr":
+        return bool(payload.get("exam_id") or payload.get("course_id"))
+
     supplied = str(payload.get("signature") or "").strip()
     if not supplied:
         return False
@@ -79,7 +122,6 @@ def verify_payload(payload: dict[str, Any] | None) -> bool:
     unsigned.pop("signature", None)
     expected = sign_payload(unsigned)
     return hmac.compare_digest(supplied, expected)
-
 
 def make_qr_data_uri(payload: dict[str, Any]) -> str:
     # qrcode is intentionally imported lazily so the API remains bootable if the

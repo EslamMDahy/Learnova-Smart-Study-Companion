@@ -606,6 +606,9 @@ def analyze_exam_scan_files(
     if exam_id and not course_id:
         course_id = _lookup_course_id_for_exam(db=db, exam_id=exam_id)
 
+    if course_id:
+        _assert_instructor_owns_course(db=db, course_id=course_id, current_user=current_user)
+
     exam_payload = _load_exam_payload(db=db, exam_id=exam_id, course_id=course_id) if exam_id and course_id else {}
     questions = _load_exam_questions_for_scan(db=db, exam_id=exam_id, course_id=course_id) if exam_id and course_id else []
 
@@ -694,6 +697,23 @@ def analyze_exam_scan_files(
             })
 
     answers = _dedupe_answers(all_objective_answers + all_written_answers)
+
+    # Best-effort AI grading for written answers during analysis. If the AI
+    # service only accepts async jobs or is unavailable, answers remain
+    # reviewable and submit can still send the saved attempt to the async AI
+    # grading flow.
+    from .ai_grading import grade_written_answers_with_ai
+
+    answers, ai_warnings = grade_written_answers_with_ai(
+        db=db,
+        course_id=course_id,
+        exam_id=exam_id,
+        scan_id=scan_id,
+        answers=answers,
+        questions=questions,
+    )
+    warnings.extend(ai_warnings)
+
     grade_preview = _build_scan_grade_preview(answers=answers, questions=questions, exam_payload=exam_payload)
 
     page_responses = [
@@ -709,7 +729,13 @@ def analyze_exam_scan_files(
         for page in page_payloads
     ]
 
-    scan_status = "ready" if answers and grade_preview["needs_review"] == 0 and detected_student and detected_student.get("user_id") else "needs_review"
+    scan_status = "ready" if (
+        answers
+        and grade_preview["needs_review"] == 0
+        and grade_preview.get("ai_pending", 0) == 0
+        and detected_student
+        and detected_student.get("user_id")
+    ) else "needs_review"
     return {
         "scan_id": scan_id,
         "status": scan_status,
@@ -739,7 +765,7 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
 
     exam_row = db.execute(
         text("""
-            SELECT e.id, e.course_id, e.passing_score, e.created_by
+            SELECT e.id, e.course_id, e.passing_score, e.total_score, e.created_by
             FROM exams e
             JOIN courses c ON c.id = e.course_id
             WHERE e.id = :exam_id
@@ -752,6 +778,10 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
     if int(exam_row["created_by"]) != int(instructor_id):
         raise HTTPException(status_code=403, detail="You can only submit scans for your own exams")
 
+    answers_need_ai = [answer for answer in payload.answers if _answer_needs_ai_grading(answer)]
+    has_ai_grading = bool(answers_need_ai)
+    attempt_status = "submitted" if has_ai_grading else "graded"
+
     try:
         next_attempt = db.execute(
             text("""
@@ -762,19 +792,20 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
             {"student_id": payload.student_id, "exam_id": payload.exam_id},
         ).mappings().first()
         attempt_number = int(next_attempt["attempt_number"] if next_attempt else 1)
+
         total_score = float(payload.total_score or 0)
         percentage_score = payload.percentage_score
+        max_total = float(exam_row["total_score"] or 0)
         if percentage_score is None:
-            exam_total = db.execute(
-                text("SELECT COALESCE(total_score, 0) AS total_score FROM exams WHERE id = :exam_id"),
-                {"exam_id": payload.exam_id},
-            ).mappings().first()
-            max_total = float(exam_total["total_score"] or 0) if exam_total else 0
             percentage_score = round((total_score / max_total) * 100, 2) if max_total else None
 
         is_passed = None
-        if percentage_score is not None and exam_row.get("passing_score") is not None:
+        if not has_ai_grading and percentage_score is not None and exam_row.get("passing_score") is not None:
             is_passed = float(percentage_score) >= float(exam_row["passing_score"])
+
+        correct_count = sum(1 for answer in payload.answers if answer.is_correct is True)
+        incorrect_count = sum(1 for answer in payload.answers if answer.is_correct is False)
+        unanswered_count = sum(1 for answer in payload.answers if answer.is_correct is None)
 
         attempt = db.execute(
             text("""
@@ -782,23 +813,34 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
                     student_id, exam_id, attempt_number, status,
                     started_at, submitted_at, graded_at,
                     total_score, percentage_score, is_passed,
+                    correct_count, incorrect_count, unanswered_count,
                     teacher_feedback, teacher_reviewed_at, session_data
                 ) VALUES (
-                    :student_id, :exam_id, :attempt_number, 'graded',
-                    NOW(), NOW(), NOW(),
+                    :student_id, :exam_id, :attempt_number, :status,
+                    NOW(), NOW(), CASE WHEN :status = 'graded' THEN NOW() ELSE NULL END,
                     :total_score, :percentage_score, :is_passed,
-                    :teacher_feedback, NOW(), CAST(:session_data AS JSON)
+                    :correct_count, :incorrect_count, :unanswered_count,
+                    :teacher_feedback, CASE WHEN :status = 'graded' THEN NOW() ELSE NULL END,
+                    CAST(:session_data AS JSONB)
                 ) RETURNING id
             """),
             {
                 "student_id": payload.student_id,
                 "exam_id": payload.exam_id,
                 "attempt_number": attempt_number,
+                "status": attempt_status,
                 "total_score": total_score,
                 "percentage_score": percentage_score,
                 "is_passed": is_passed,
+                "correct_count": correct_count,
+                "incorrect_count": incorrect_count,
+                "unanswered_count": unanswered_count,
                 "teacher_feedback": payload.teacher_feedback,
-                "session_data": json.dumps({"source": "learnova_exam_scan", "scan_id": payload.scan_id}),
+                "session_data": json.dumps({
+                    "source": "learnova_exam_scan",
+                    "scan_id": payload.scan_id,
+                    "ai_grading_required": has_ai_grading,
+                }),
             },
         ).mappings().first()
         attempt_id = int(attempt["id"])
@@ -815,7 +857,7 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
                         :attempt_id, :exam_question_id, :selected_option_index,
                         CAST(:selected_option_indices AS JSON), :answer_text, :is_correct,
                         :points_earned, :auto_graded, :teacher_feedback,
-                        NOW(), NOW(), NOW()
+                        CASE WHEN :teacher_reviewed THEN NOW() ELSE NULL END, NOW(), NOW()
                     )
                 """),
                 {
@@ -828,16 +870,40 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
                     "points_earned": answer.points_earned,
                     "auto_graded": bool(answer.auto_graded),
                     "teacher_feedback": answer.teacher_feedback,
+                    "teacher_reviewed": bool(answer.teacher_feedback or answer.is_correct is not None),
                 },
             )
 
         db.commit()
+
+        ai_request_id: str | None = None
+        ai_error: str | None = None
+        response_status = "graded"
+
+        if has_ai_grading:
+            try:
+                ai_request_id = _send_ocr_submit_ai_grading_request(
+                    db=db,
+                    attempt_id=attempt_id,
+                    exam_id=int(payload.exam_id),
+                    course_id=int(exam_row["course_id"]),
+                )
+                db.commit()
+                response_status = "ai_grading_requested"
+            except Exception as exc:
+                db.rollback()
+                ai_error = str(exc)
+                response_status = "ai_grading_failed"
+
         return {
             "attempt_id": attempt_id,
             "exam_id": int(payload.exam_id),
             "student_id": int(payload.student_id),
             "answer_count": len(payload.answers),
-            "status": "graded",
+            "status": response_status,
+            "ai_grading_requested": ai_request_id is not None,
+            "ai_request_id": ai_request_id,
+            "ai_error": ai_error,
         }
     except HTTPException:
         db.rollback()
@@ -845,6 +911,97 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to submit scan correction") from exc
+
+
+
+
+def _answer_needs_ai_grading(answer: Any) -> bool:
+    answer_type = str(getattr(answer, "type", "") or "").strip().lower()
+    if answer_type not in {"short_answer", "essay"}:
+        return False
+    if bool(getattr(answer, "auto_graded", False)):
+        return False
+    return bool(str(getattr(answer, "answer_text", "") or "").strip())
+
+
+def _send_ocr_submit_ai_grading_request(*, db: Any, attempt_id: int, exam_id: int, course_id: int) -> str | None:
+    from sqlalchemy import text
+    from app.core.ai_service_integration.ai_transport import send_ai_request
+
+    rows = db.execute(
+        text("""
+            SELECT
+                eq.id AS exam_question_id,
+                COALESCE(eq.snapshot_question_text, q.question_text) AS question_text,
+                COALESCE(eq.snapshot_type, q.type::text) AS question_type,
+                COALESCE(eq.snapshot_expected_answer, q.expected_answer) AS expected_answer,
+                COALESCE(eq.snapshot_grading_rubric, q.grading_rubric) AS grading_rubric,
+                COALESCE(eq.points, eq.snapshot_max_score, q.max_score, 0) AS max_score,
+                sa.answer_text
+            FROM student_answers sa
+            JOIN exam_questions eq ON eq.id = sa.exam_question_id
+            LEFT JOIN questions q ON q.id = eq.question_id
+            WHERE sa.attempt_id = :attempt_id
+              AND eq.exam_id = :exam_id
+              AND COALESCE(eq.snapshot_type, q.type::text) IN ('essay', 'short_answer')
+              AND NULLIF(BTRIM(COALESCE(sa.answer_text, '')), '') IS NOT NULL
+        """),
+        {"attempt_id": attempt_id, "exam_id": exam_id},
+    ).mappings().all()
+
+    if not rows:
+        return None
+
+    questions = [
+        {
+            "exam_question_id": int(row["exam_question_id"]),
+            "question_text": row["question_text"],
+            "type": row["question_type"],
+            "expected_answer": row["expected_answer"],
+            "grading_rubric": row["grading_rubric"],
+            "max_score": float(row["max_score"] or 0),
+            "student_answer": row["answer_text"],
+        }
+        for row in rows
+    ]
+
+    return send_ai_request(
+        db,
+        operation_type="exam_grading",
+        endpoint_path=getattr(settings, "ocr_ai_grading_endpoint_path", "/api/v1/courses/grading/evaluate"),
+        course_id=course_id,
+        primary_entity_type="attempt",
+        primary_entity_id=attempt_id,
+        body={
+            "attempt_id": attempt_id,
+            "exam_id": exam_id,
+            "questions": questions,
+            "source": "learnova_ocr_scan",
+        },
+    )
+
+
+
+def _assert_instructor_owns_course(*, db: Any, course_id: int, current_user: dict) -> None:
+    from sqlalchemy import text
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    row = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+    if not row:
+        raise HTTPException(status_code=404, detail="Course not found")
+    if int(row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only scan exams for your own courses")
 
 
 def _lookup_course_id_for_exam(*, db: Any, exam_id: int) -> int | None:
@@ -1036,7 +1193,9 @@ def _build_scan_grade_preview(*, answers: list[dict[str, Any]], questions: list[
         "detected_questions": sum(1 for answer in answers if answer.get("status") == "detected"),
         "written_questions": sum(1 for answer in answers if str(answer.get("type") or "").lower() in {"short_answer", "essay"}),
         "needs_review": sum(1 for answer in answers if answer.get("status") == "needs_review"),
-        "ai_ready": sum(1 for answer in answers if answer.get("status") == "ai_ready"),
+        "ai_ready": sum(1 for answer in answers if answer.get("status") == "ai_ready" or answer.get("ai_status") == "ai_ready"),
+        "ai_graded": sum(1 for answer in answers if answer.get("status") == "ai_graded" or answer.get("ai_status") == "completed"),
+        "ai_pending": sum(1 for answer in answers if answer.get("ai_status") in {"pending", "sent"}),
     }
 
 

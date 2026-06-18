@@ -123,6 +123,9 @@ class ExamScanAnswer(BaseModel):
     answer_region: Optional[dict] = None
     ai_grading_payload: Optional[dict] = None
     ai_score: Optional[float] = None
+    ai_status: Optional[str] = None
+    ai_feedback: Optional[str] = None
+    ai_request_id: Optional[str] = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -135,6 +138,8 @@ class ExamScanGradePreview(BaseModel):
     written_questions: int = 0
     needs_review: int = 0
     ai_ready: int = 0
+    ai_graded: int = 0
+    ai_pending: int = 0
 
     model_config = ConfigDict(extra="forbid")
 
@@ -185,5 +190,8 @@ class ExamScanSubmitResponse(BaseModel):
     student_id: int
     answer_count: int
     status: str
+    ai_grading_requested: bool = False
+    ai_request_id: Optional[str] = None
+    ai_error: Optional[str] = None
 
     model_config = ConfigDict(extra="forbid")

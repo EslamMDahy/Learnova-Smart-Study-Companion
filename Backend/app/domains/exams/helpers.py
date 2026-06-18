@@ -950,17 +950,36 @@ def _render_ocr_section(*, exam: dict, course: dict):
     )
 
     # =========================
-    # 2) Generate QR code as base64 image
+    # 2) Generate signed QR code as base64 image
     # =========================
-    qr_data = f"exam_id:{exam_id},course_id:{course_id}"
-    qr = qrcode.QRCode(box_size=4, border=2)
-    qr.add_data(qr_data)
-    qr.make(fit=True)
-    qr_image = qr.make_image(fill_color="black", back_color="white")
-    buffer = BytesIO()
-    qr_image.save(buffer)
-    qr_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    qr_img_html = f'<img src="data:image/png;base64,{qr_b64}" class="qr-image" alt="QR Code">'
+    qr_img_data_uri = ""
+    try:
+        from app.domains.ocr.qr import build_exam_qr_payload, make_qr_data_uri
+
+        qr_payload = build_exam_qr_payload(
+            exam_id=int(exam_id),
+            course_id=int(course_id),
+            template_version="v1",
+        )
+        qr_img_data_uri = make_qr_data_uri(qr_payload)
+    except Exception:
+        qr_img_data_uri = ""
+
+    if not qr_img_data_uri:
+        # Backward compatible fallback. domains.ocr.qr.decode_payload also
+        # accepts this legacy format, so OCR still works if QR signing/rendering
+        # dependencies are unavailable.
+        qr_data = f"exam_id:{exam_id},course_id:{course_id}"
+        qr = qrcode.QRCode(box_size=4, border=2)
+        qr.add_data(qr_data)
+        qr.make(fit=True)
+        qr_image = qr.make_image(fill_color="black", back_color="white")
+        buffer = BytesIO()
+        qr_image.save(buffer)
+        qr_b64 = base64.b64encode(buffer.getvalue()).decode("utf-8")
+        qr_img_data_uri = f"data:image/png;base64,{qr_b64}"
+
+    qr_img_html = f'<img src="{qr_img_data_uri}" class="qr-image" alt="QR Code">'
 
     # =========================
     # 3) Generate student ID bubble grid (10 digits, 0-9 each)
