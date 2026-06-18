@@ -84,7 +84,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
       AppToast.success(
         context,
         title: 'Invitations ready',
-        message: 'Students were uploaded and invitations were sent.',
+        message: 'Student emails were uploaded and the invitation flow was triggered.',
       );
       Navigator.pop(context, true);
     } catch (e) {
@@ -302,7 +302,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'The backend sends invitations automatically after a successful upload.',
+                  'After upload, the backend prepares and sends course invitations automatically.',
                   style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                 ),
               ],
@@ -335,7 +335,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
         Expanded(
           flex: 2,
           child: ElevatedButton(
-            onPressed: _loading ? null : _submit,
+            onPressed: _loading || _pickedFile == null ? null : _submit,
             style: ElevatedButton.styleFrom(
               backgroundColor: _accentColor,
               foregroundColor: Colors.white,

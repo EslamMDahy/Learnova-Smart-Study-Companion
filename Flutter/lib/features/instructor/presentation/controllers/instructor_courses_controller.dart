@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -31,7 +33,6 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
     try {
       final res = await _ref.read(coursesRepositoryProvider).myCourses(
         cancelToken: _cancel,
-        enrichMissingModuleCounts: true,
       );
       state = state.copyWith(loading: false, items: res.items);
     } catch (e) {
@@ -77,6 +78,78 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
         loading: false,
         error: failure.message,
       );
+      rethrow;
+    }
+  }
+
+
+  Future<MyCourseItem> uploadCourseCover({
+    required MyCourseItem course,
+    required List<int> bytes,
+    required String? contentType,
+    required String filename,
+  }) async {
+    _cancel?.cancel();
+    _cancel = CancelToken();
+
+    final previousItems = state.items;
+    state = state.copyWith(loading: true);
+
+    try {
+      final result = await _ref.read(coursesRepositoryProvider).uploadCourseCover(
+            courseId: course.id,
+            bytes: Uint8List.fromList(bytes),
+            contentType: contentType,
+            filename: filename,
+            cancelToken: _cancel,
+          );
+
+      final updated = course.copyWith(
+        coverImageUrl: result.coverUrl,
+        updatedAt: result.updatedAt ?? DateTime.now(),
+      );
+
+      state = state.copyWith(
+        loading: false,
+        items: previousItems
+            .map((item) => item.id == updated.id ? updated : item)
+            .toList(growable: false),
+      );
+
+      return updated;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+
+      state = state.copyWith(
+        loading: false,
+        error: failure.message,
+        items: previousItems,
+      );
+      rethrow;
+    }
+  }
+
+  Future<CourseCoverConfirmResponse> uploadCourseCoverById({
+    required int courseId,
+    required List<int> bytes,
+    required String? contentType,
+    required String filename,
+  }) async {
+    _cancel?.cancel();
+    _cancel = CancelToken();
+
+    try {
+      return await _ref.read(coursesRepositoryProvider).uploadCourseCover(
+            courseId: courseId,
+            bytes: Uint8List.fromList(bytes),
+            contentType: contentType,
+            filename: filename,
+            cancelToken: _cancel,
+          );
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
       rethrow;
     }
   }

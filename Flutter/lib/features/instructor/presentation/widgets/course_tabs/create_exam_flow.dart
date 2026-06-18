@@ -27,6 +27,7 @@ Future<bool?> showCreateExamFlowDialog({
   int? initialScopeOutcomeId,
   Set<int> initialScopeTopicIds = const <int>{},
   Set<int> initialScopeOutcomeIds = const <int>{},
+  String? initialTitle,
   VoidCallback? onCancel,
   VoidCallback? onCreated,
 }) {
@@ -45,6 +46,7 @@ Future<bool?> showCreateExamFlowDialog({
         initialScopeOutcomeId: initialScopeOutcomeId,
         initialScopeTopicIds: initialScopeTopicIds,
         initialScopeOutcomeIds: initialScopeOutcomeIds,
+        initialTitle: initialTitle,
         onCancel: onCancel,
         onCreated: onCreated,
       ),
@@ -63,6 +65,7 @@ class CreateExamFlow extends ConsumerStatefulWidget {
   final int? initialScopeOutcomeId;
   final Set<int> initialScopeTopicIds;
   final Set<int> initialScopeOutcomeIds;
+  final String? initialTitle;
   final VoidCallback? onCancel;
   final VoidCallback? onCreated;
 
@@ -78,6 +81,7 @@ class CreateExamFlow extends ConsumerStatefulWidget {
     this.initialScopeOutcomeId,
     this.initialScopeTopicIds = const <int>{},
     this.initialScopeOutcomeIds = const <int>{},
+    this.initialTitle,
     this.onCancel,
     this.onCreated,
   });
@@ -126,7 +130,10 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
     if (widget.initialScopeTopicId != null) _scopeTopicIds.add(widget.initialScopeTopicId!);
     _scopeOutcomeIds.addAll(widget.initialScopeOutcomeIds);
     if (widget.initialScopeOutcomeId != null) _scopeOutcomeIds.add(widget.initialScopeOutcomeId!);
-    _titleCtrl.text = '${widget.course.title} ${_selectedTemplate.name}';
+    final initialTitle = widget.initialTitle?.trim();
+    _titleCtrl.text = initialTitle != null && initialTitle.isNotEmpty
+        ? initialTitle
+        : '${widget.course.title} ${_selectedTemplate.name}';
     _applyTemplateModel(_selectedTemplate, updateTitle: true);
     for (final id in widget.initialSelectedQuestionIds) {
       if (!_selectedQuestionIds.contains(id) && _questionById(id) != null) {
@@ -345,6 +352,28 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
     for (final section in activeSections) {
       final type = _questionTypeFromTemplateSection(section.questionType);
       if (type == null) continue;
+      final difficultyCounts = section.difficultyDistribution.entries.where((entry) => entry.value > 0).toList();
+
+      if (difficultyCounts.isNotEmpty) {
+        for (final entry in difficultyCounts) {
+          final difficulty = _questionDifficultyFromTemplateKey(entry.key);
+          final candidates = scoped.where((question) {
+            final id = question.remoteId;
+            if (id == null || used.contains(id)) return false;
+            if (question.type != type) return false;
+            if (question.difficulty != difficulty) return false;
+            return true;
+          }).toList();
+
+          for (final question in candidates.take(entry.value)) {
+            final id = question.remoteId;
+            if (id == null || !used.add(id)) continue;
+            ids.add(id);
+          }
+        }
+        continue;
+      }
+
       final candidates = scoped.where((question) {
         final id = question.remoteId;
         if (id == null || used.contains(id)) return false;
@@ -395,8 +424,26 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
         return QuestionType.essay;
       case 'multi_select':
         return QuestionType.multiSelect;
+      case 'fill_in_the_blank':
+      case 'fill_in_blank':
+        return QuestionType.fillInTheBlank;
+      case 'numeric':
+        return QuestionType.numeric;
+      case 'code':
+        return QuestionType.code;
       default:
         return null;
+    }
+  }
+
+  QuestionDifficulty _questionDifficultyFromTemplateKey(String raw) {
+    switch (raw.trim().toLowerCase()) {
+      case 'easy':
+        return QuestionDifficulty.easy;
+      case 'hard':
+        return QuestionDifficulty.hard;
+      default:
+        return QuestionDifficulty.medium;
     }
   }
 

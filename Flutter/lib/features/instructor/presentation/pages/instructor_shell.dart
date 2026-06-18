@@ -58,7 +58,8 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
     if (path.startsWith(Routes.instructorDashboard)) return InstructorTabs.dashboard;
     if (path.startsWith(Routes.instructorCourses)) return InstructorTabs.course;
     if (path.startsWith(Routes.instructorExamCorrection)) return InstructorTabs.examCorrection;
-    if (path.startsWith(Routes.instructorQuizzes)) return InstructorTabs.quizzes;
+    if (path.startsWith(Routes.instructorQuizzes) ||
+        path.startsWith(Routes.instructorQuizzesLegacy)) return InstructorTabs.quizzes;
     if (path.startsWith(Routes.instructorSettings)) return InstructorTabs.settings;
     if (path.startsWith(Routes.instructorHelp)) return InstructorTabs.help;
 
@@ -121,7 +122,7 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
           header: TopHeaderWidget(
             searchController: _search,
             onSearchChanged: (_) => setState(() {}),
-            searchHint: 'Search your courses, lessons, or students...',
+            searchHint: 'Search your courses, exams, or students...',
             userName: _displayName(),
             userSubtitle: _displaySubtitle(),
             avatarUrl: UserStorage.avatarUrl,

@@ -4,8 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../shared/widgets/app_ui_components.dart';
 import '../../../data/courses_models.dart';
 import '../../../data/exam_templates_storage.dart';
-import '../../../data/question_models.dart';
-import '../../../data/question_vocabulary.dart';
 
 class CourseExamTemplatesTab extends ConsumerStatefulWidget {
   final MyCourseItem course;
@@ -307,7 +305,7 @@ class _TemplateRowState extends State<_TemplateRow> {
                       children: [
                         Text(t.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textTitle, fontSize: 14, fontWeight: FontWeight.w900)),
                         const SizedBox(height: 3),
-                        Text(t.description.isEmpty ? 'No description' : t.description, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w700)),
+                        Text(_templateRowSubtitle(t), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w700)),
                       ],
                     ),
                   ),
@@ -321,14 +319,13 @@ class _TemplateRowState extends State<_TemplateRow> {
                 runSpacing: 6,
                 children: [
                   ..._distributionBadges(t),
-                  if (t.preferredDifficulty != null) _MiniBadge(t.preferredDifficulty!.label),
                 ],
               ),
             ),
             Expanded(
               flex: 24,
               child: Text(
-                '${t.durationMinutes} min • ${t.maxAttempts} attempt${t.maxAttempts == 1 ? '' : 's'} • ${t.passingScore.toStringAsFixed(0)}% pass • ${t.publishAfterSave ? 'Publish' : 'Draft'}',
+                '${t.durationMinutes} min • ${t.maxAttempts} attempt${t.maxAttempts == 1 ? '' : 's'} • ${t.passingScore.toStringAsFixed(0)}% pass • ${t.shuffleQuestions ? 'shuffle Q' : 'fixed Q'} • ${t.shuffleAnswers ? 'shuffle answers' : 'fixed answers'}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w800),
@@ -377,6 +374,7 @@ class _MiniBadge extends StatelessWidget {
   }
 }
 
+
 class _ExamTemplateEditorDialog extends StatefulWidget {
   final int courseId;
   final ExamTemplateModel? template;
@@ -389,20 +387,18 @@ class _ExamTemplateEditorDialog extends StatefulWidget {
 
 class _ExamTemplateEditorDialogState extends State<_ExamTemplateEditorDialog> {
   late final TextEditingController _nameCtrl;
-  late final TextEditingController _descriptionCtrl;
   late final TextEditingController _durationCtrl;
   late final TextEditingController _attemptsCtrl;
   late final TextEditingController _passingCtrl;
-  late final TextEditingController _instructionsCtrl;
   late String _examType;
   late bool _shuffleQuestions;
   late bool _shuffleAnswers;
-  late bool _showResult;
-  late bool _allowReview;
-  late bool _publishAfterSave;
-  late QuestionDifficulty? _preferredDifficulty;
   late final List<_TemplateSectionDraft> _sectionDrafts;
   String? _error;
+
+  int get _totalQuestions => _sectionDrafts.fold<int>(0, (sum, draft) => sum + draft.questionCount);
+  double get _totalScore => _sectionDrafts.fold<double>(0, (sum, draft) => sum + draft.sectionScore);
+  int get _activeSectionCount => _sectionDrafts.where((draft) => draft.questionCount > 0).length;
 
   @override
   void initState() {
@@ -413,50 +409,49 @@ class _ExamTemplateEditorDialogState extends State<_ExamTemplateEditorDialog> {
       description: '',
     );
     _nameCtrl = TextEditingController(text: template.name == 'Custom exam' ? '' : template.name);
-    _descriptionCtrl = TextEditingController(text: template.description);
     _durationCtrl = TextEditingController(text: template.durationMinutes.toString());
     _attemptsCtrl = TextEditingController(text: template.maxAttempts.toString());
     _passingCtrl = TextEditingController(text: template.passingScore.toStringAsFixed(0));
-    _instructionsCtrl = TextEditingController(text: template.instructions);
     _examType = template.examType;
     _shuffleQuestions = template.shuffleQuestions;
     _shuffleAnswers = template.shuffleAnswers;
-    _showResult = template.showResultImmediately;
-    _allowReview = template.allowReview;
-    _publishAfterSave = template.publishAfterSave;
-    _preferredDifficulty = template.preferredDifficulty;
     _sectionDrafts = _TemplateSectionDraft.fromTemplate(template);
   }
 
   @override
   void dispose() {
     _nameCtrl.dispose();
-    _descriptionCtrl.dispose();
     _durationCtrl.dispose();
     _attemptsCtrl.dispose();
     _passingCtrl.dispose();
-    _instructionsCtrl.dispose();
     for (final draft in _sectionDrafts) {
       draft.dispose();
     }
     super.dispose();
   }
 
+  void _clearDistribution() {
+    for (final draft in _sectionDrafts) {
+      draft.setCounts(easy: 0, medium: 0, hard: 0);
+    }
+    setState(() => _error = null);
+  }
+
   void _save() {
     final name = _nameCtrl.text.trim();
     final duration = int.tryParse(_durationCtrl.text.trim()) ?? 0;
-    final attempts = int.tryParse(_attemptsCtrl.text.trim()) ?? 0;
+    final attempts = int.tryParse(_attemptsCtrl.text.trim()) ?? -1;
     final passing = double.tryParse(_passingCtrl.text.trim()) ?? -1;
     final activeSections = <ExamTemplateSectionModel>[];
     final now = DateTime.now();
 
     for (final draft in _sectionDrafts) {
-      final count = draft.questionCount;
-      final points = draft.pointsPerQuestion;
-      if (count < 0) {
-        setState(() => _error = '${draft.label} count cannot be negative.');
+      if (draft.hasNegativeDifficulty) {
+        setState(() => _error = '${draft.label} difficulty counts cannot be negative.');
         return;
       }
+      final count = draft.questionCount;
+      final points = draft.pointsPerQuestion;
       if (count > 0 && points <= 0) {
         setState(() => _error = '${draft.label} points must be greater than zero.');
         return;
@@ -472,27 +467,28 @@ class _ExamTemplateEditorDialogState extends State<_ExamTemplateEditorDialog> {
       return;
     }
     if (qCount <= 0) {
-      setState(() => _error = 'Add at least one question in the distribution.');
+      setState(() => _error = 'Add at least one question in the difficulty blueprint.');
       return;
     }
     if (duration <= 0) {
       setState(() => _error = 'Duration must be greater than zero.');
       return;
     }
-    if (attempts <= 0) {
-      setState(() => _error = 'Attempts must be greater than zero.');
+    if (attempts < 0) {
+      setState(() => _error = 'Attempts cannot be negative.');
       return;
     }
     if (passing < 0 || passing > 100) {
       setState(() => _error = 'Passing score must be between 0 and 100.');
       return;
     }
+
     final original = widget.template;
     Navigator.of(context).pop(ExamTemplateModel(
       id: original?.id ?? 'new-${now.microsecondsSinceEpoch}',
       courseId: widget.courseId,
       name: name,
-      description: _descriptionCtrl.text.trim(),
+      description: '',
       examType: _examType,
       questionCount: qCount,
       durationMinutes: duration,
@@ -500,184 +496,86 @@ class _ExamTemplateEditorDialogState extends State<_ExamTemplateEditorDialog> {
       passingScore: passing,
       shuffleQuestions: _shuffleQuestions,
       shuffleAnswers: _shuffleAnswers,
-      showResultImmediately: _showResult,
-      allowReview: _allowReview,
-      publishAfterSave: _publishAfterSave,
-      preferredDifficulty: _preferredDifficulty,
-      instructions: _instructionsCtrl.text.trim(),
+      showResultImmediately: true,
+      allowReview: true,
+      publishAfterSave: false,
+      preferredDifficulty: null,
+      instructions: '',
       createdAt: original?.createdAt ?? now,
       updatedAt: now,
       sections: activeSections,
-    ),);
+    ));
   }
 
   @override
   Widget build(BuildContext context) {
     final isEditing = widget.template != null;
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 36, vertical: 24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 22),
       backgroundColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 920, maxHeight: 820),
+        constraints: const BoxConstraints(maxWidth: 1080, maxHeight: 820),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(26),
           child: Material(
             color: AppColors.cardBg,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 14, 16),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF145CCB), Color(0xFF137FEC), Color(0xFF22C1F1)],
-                    ),
-                  ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.14),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white.withOpacity(0.2)),
-                        ),
-                        child: const Icon(Icons.description_outlined, color: Colors.white, size: 18),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              isEditing ? 'Edit Template' : 'Create Template',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 19,
-                                height: 1.1,
-                                fontWeight: FontWeight.w900,
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Define a reusable exam structure for this course.',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.80),
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded, color: Colors.white, size: 21),
-                      ),
-                    ],
-                  ),
+                _TemplateEditorHeader(
+                  isEditing: isEditing,
+                  totalQuestions: _totalQuestions,
+                  onClose: () => Navigator.of(context).pop(),
                 ),
+                Divider(height: 1, color: AppColors.borderGray),
                 Flexible(
                   child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
+                    padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         if (_error != null) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                            decoration: BoxDecoration(
-                              color: AppColors.dangerBg,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.dangerBorder),
-                            ),
-                            child: Text(
-                              _error!,
-                              style: TextStyle(
-                                color: AppColors.dangerText,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
+                          _EditorAlert(message: _error!),
+                          const SizedBox(height: 14),
                         ],
                         LayoutBuilder(
                           builder: (context, constraints) {
-                            final twoCols = constraints.maxWidth >= 660;
-                            final half = twoCols ? (constraints.maxWidth - 12) / 2 : constraints.maxWidth;
-                            final quarter = constraints.maxWidth >= 760 ? (constraints.maxWidth - 36) / 4 : (constraints.maxWidth - 12) / 2;
-                            return Column(
+                            final wide = constraints.maxWidth >= 900;
+                            final essentials = _TemplateEssentialsPanel(
+                              nameCtrl: _nameCtrl,
+                              examType: _examType,
+                              durationCtrl: _durationCtrl,
+                              attemptsCtrl: _attemptsCtrl,
+                              passingCtrl: _passingCtrl,
+                              shuffleQuestions: _shuffleQuestions,
+                              shuffleAnswers: _shuffleAnswers,
+                              onExamTypeChanged: (value) => setState(() => _examType = value),
+                              onShuffleQuestionsChanged: (value) => setState(() => _shuffleQuestions = value),
+                              onShuffleAnswersChanged: (value) => setState(() => _shuffleAnswers = value),
+                            );
+                            final blueprint = _TemplateDistributionEditor(
+                              drafts: _sectionDrafts,
+                              totalQuestions: _totalQuestions,
+                              totalScore: _totalScore,
+                              onChanged: () => setState(() => _error = null),
+                              onClear: _clearDistribution,
+                            );
+                            if (!wide) {
+                              return Column(
+                                children: [
+                                  essentials,
+                                  const SizedBox(height: 16),
+                                  blueprint,
+                                ],
+                              );
+                            }
+                            return Row(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Wrap(
-                                  spacing: 12,
-                                  runSpacing: 12,
-                                  children: [
-                                    SizedBox(width: half, child: _EditorTextField(label: 'Name', controller: _nameCtrl, hint: 'Quiz template')),
-                                    _EditorChoice<String>(
-                                      label: 'Exam type',
-                                      width: half,
-                                      value: _examType,
-                                      options: const [
-                                        _ChoiceItem(value: 'quiz', label: 'Quiz'),
-                                        _ChoiceItem(value: 'midterm', label: 'Midterm'),
-                                        _ChoiceItem(value: 'final', label: 'Final'),
-                                        _ChoiceItem(value: 'practice', label: 'Practice'),
-                                      ],
-                                      onChanged: (value) => setState(() => _examType = value),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 12),
-                                _EditorTextField(label: 'Description', controller: _descriptionCtrl, hint: 'What this template is for', maxLines: 2),
-                                const SizedBox(height: 14),
-                                Wrap(
-                                  spacing: 12,
-                                  runSpacing: 12,
-                                  children: [
-                                    SizedBox(width: quarter, child: _EditorTextField(label: 'Duration', controller: _durationCtrl, hint: '60', number: true, suffix: 'min')),
-                                    SizedBox(width: quarter, child: _EditorTextField(label: 'Attempts', controller: _attemptsCtrl, hint: '1', number: true)),
-                                    SizedBox(width: quarter, child: _EditorTextField(label: 'Passing', controller: _passingCtrl, hint: '60', number: true, suffix: '%')),
-                                    _EditorChoice<QuestionDifficulty?>(
-                                      label: 'Preferred difficulty',
-                                      width: quarter,
-                                      value: _preferredDifficulty,
-                                      options: [
-                                        const _ChoiceItem<QuestionDifficulty?>(value: null, label: 'Any difficulty'),
-                                        ...QuestionDifficulty.values.map((item) => _ChoiceItem<QuestionDifficulty?>(value: item, label: item.label)),
-                                      ],
-                                      onChanged: (value) => setState(() => _preferredDifficulty = value),
-                                    ),
-                                  ],
-                                ),
-                                const SizedBox(height: 14),
-                                _TemplateDistributionEditor(
-                                  drafts: _sectionDrafts,
-                                  totalQuestions: _sectionDrafts.fold<int>(0, (sum, draft) => sum + draft.questionCount),
-                                  onChanged: () => setState(() => _error = null),
-                                ),
-                                const SizedBox(height: 14),
-                                _EditorTextField(label: 'Default instructions', controller: _instructionsCtrl, hint: 'Student-facing rules and notes', maxLines: 3),
-                                const SizedBox(height: 14),
-                                Wrap(
-                                  spacing: 10,
-                                  runSpacing: 10,
-                                  children: [
-                                    _EditorSwitch(title: 'Shuffle questions', value: _shuffleQuestions, onChanged: (v) => setState(() => _shuffleQuestions = v)),
-                                    _EditorSwitch(title: 'Shuffle answers', value: _shuffleAnswers, onChanged: (v) => setState(() => _shuffleAnswers = v)),
-                                    _EditorSwitch(title: 'Show result immediately', value: _showResult, onChanged: (v) => setState(() => _showResult = v)),
-                                    _EditorSwitch(title: 'Allow review', value: _allowReview, onChanged: (v) => setState(() => _allowReview = v)),
-                                    _EditorSwitch(title: 'Publish after save', value: _publishAfterSave, onChanged: (v) => setState(() => _publishAfterSave = v)),
-                                  ],
-                                ),
+                                SizedBox(width: 330, child: essentials),
+                                const SizedBox(width: 16),
+                                Expanded(child: blueprint),
                               ],
                             );
                           },
@@ -687,22 +585,29 @@ class _ExamTemplateEditorDialogState extends State<_ExamTemplateEditorDialog> {
                   ),
                 ),
                 Divider(height: 1, color: AppColors.borderGray),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(22, 14, 22, 14),
+                  color: AppColors.cardBg,
                   child: Row(
                     children: [
+                      _FooterStat(label: 'Sections', value: '$_activeSectionCount'),
+                      const SizedBox(width: 10),
+                      _FooterStat(label: 'Questions', value: '$_totalQuestions'),
+                      const SizedBox(width: 10),
+                      _FooterStat(label: 'Score', value: _formatPoints(_totalScore)),
+                      const Spacer(),
                       TextButton(
                         onPressed: () => Navigator.of(context).pop(),
                         child: const Text('Cancel'),
                       ),
-                      const Spacer(),
+                      const SizedBox(width: 10),
                       FilledButton.icon(
                         onPressed: _save,
                         icon: const Icon(Icons.save_outlined, size: 17),
-                        label: const Text('Save Template'),
+                        label: Text(isEditing ? 'Update Template' : 'Save Template'),
                         style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 13),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
                       ),
                     ],
@@ -717,76 +622,265 @@ class _ExamTemplateEditorDialogState extends State<_ExamTemplateEditorDialog> {
   }
 }
 
-
-class _TemplateDistributionEditor extends StatelessWidget {
-  final List<_TemplateSectionDraft> drafts;
+class _TemplateEditorHeader extends StatelessWidget {
+  final bool isEditing;
   final int totalQuestions;
-  final VoidCallback onChanged;
+  final VoidCallback onClose;
 
-  const _TemplateDistributionEditor({
-    required this.drafts,
-    required this.totalQuestions,
-    required this.onChanged,
+  const _TemplateEditorHeader({required this.isEditing, required this.totalQuestions, required this.onClose});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 20, 18, 20),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 18, offset: const Offset(0, 8))],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(colors: [Color(0xFF137FEC), Color(0xFF22C1F1)]),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.20), blurRadius: 18, offset: const Offset(0, 8))],
+            ),
+            child: const Icon(Icons.account_tree_outlined, color: Colors.white, size: 22),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        isEditing ? 'Edit Exam Template' : 'Create Exam Template',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: AppColors.textTitle, fontSize: 22, height: 1.05, fontWeight: FontWeight.w900, letterSpacing: -0.4),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    _MiniBadge('$totalQuestions questions'),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Define backend-ready settings, supported question types, difficulty counts, and points.',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 12.5, fontWeight: FontWeight.w700),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Close',
+            onPressed: onClose,
+            icon: Icon(Icons.close_rounded, color: AppColors.textMuted, size: 22),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TemplateEssentialsPanel extends StatelessWidget {
+  final TextEditingController nameCtrl;
+  final String examType;
+  final TextEditingController durationCtrl;
+  final TextEditingController attemptsCtrl;
+  final TextEditingController passingCtrl;
+  final bool shuffleQuestions;
+  final bool shuffleAnswers;
+  final ValueChanged<String> onExamTypeChanged;
+  final ValueChanged<bool> onShuffleQuestionsChanged;
+  final ValueChanged<bool> onShuffleAnswersChanged;
+
+  const _TemplateEssentialsPanel({
+    required this.nameCtrl,
+    required this.examType,
+    required this.durationCtrl,
+    required this.attemptsCtrl,
+    required this.passingCtrl,
+    required this.shuffleQuestions,
+    required this.shuffleAnswers,
+    required this.onExamTypeChanged,
+    required this.onShuffleQuestionsChanged,
+    required this.onShuffleAnswersChanged,
   });
+
+  @override
+  Widget build(BuildContext context) {
+    return _EditorCard(
+      icon: Icons.tune_rounded,
+      title: 'Template settings',
+      subtitle: 'Saved directly in the FastAPI template endpoint: name, exam type, duration, attempts, passing, and shuffle settings.',
+      child: Column(
+        children: [
+          _EditorTextField(label: 'Template name', controller: nameCtrl, hint: 'Example: Java chapter quiz'),
+          const SizedBox(height: 12),
+          _EditorChoice<String>(
+            label: 'Exam type',
+            width: double.infinity,
+            value: examType,
+            options: const [
+              _ChoiceItem(value: 'quiz', label: 'Quiz'),
+              _ChoiceItem(value: 'midterm', label: 'Midterm'),
+              _ChoiceItem(value: 'final', label: 'Final'),
+              _ChoiceItem(value: 'practice', label: 'Practice'),
+            ],
+            onChanged: onExamTypeChanged,
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(child: _EditorTextField(label: 'Duration', controller: durationCtrl, hint: '60', number: true, suffix: 'min')),
+              const SizedBox(width: 10),
+              Expanded(child: _EditorTextField(label: 'Attempts', controller: attemptsCtrl, hint: '1', number: true)),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _EditorTextField(label: 'Passing score', controller: passingCtrl, hint: '60', number: true, suffix: '%'),
+          const SizedBox(height: 14),
+          _EditorSwitch(title: 'Shuffle questions', value: shuffleQuestions, onChanged: onShuffleQuestionsChanged),
+          const SizedBox(height: 10),
+          _EditorSwitch(title: 'Shuffle answer options', value: shuffleAnswers, onChanged: onShuffleAnswersChanged),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.borderGray),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.info_outline_rounded, color: AppColors.primary, size: 18),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Text(
+                    'Backend templates store total count and points per section. The Easy / Medium / Hard split is kept with the template locally and sent as section_difficulty_distribution when Generate Exam runs.',
+                    style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EditorAlert extends StatelessWidget {
+  final String message;
+
+  const _EditorAlert({required this.message});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
-        color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.borderGray),
+        color: AppColors.dangerBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.dangerBorder),
       ),
+      child: Row(
+        children: [
+          Icon(Icons.error_outline_rounded, color: AppColors.dangerText, size: 18),
+          const SizedBox(width: 10),
+          Expanded(child: Text(message, style: TextStyle(color: AppColors.dangerText, fontWeight: FontWeight.w800, fontSize: 12.5))),
+        ],
+      ),
+    );
+  }
+}
+
+
+class _TemplateDistributionEditor extends StatelessWidget {
+  final List<_TemplateSectionDraft> drafts;
+  final int totalQuestions;
+  final double totalScore;
+  final VoidCallback onChanged;
+  final VoidCallback onClear;
+
+  const _TemplateDistributionEditor({
+    required this.drafts,
+    required this.totalQuestions,
+    required this.totalScore,
+    required this.onChanged,
+    required this.onClear,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _EditorCard(
+      icon: Icons.grid_view_rounded,
+      title: 'Question & score plan',
+      subtitle: 'Backend-supported types only: Multiple Choice, True / False, Short Answer, Essay, and Multi-Select.',
+      trailing: _PresetChip(label: 'Clear all', danger: true, onPressed: onClear),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
             children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Question distribution',
-                      style: TextStyle(color: AppColors.textTitle, fontSize: 13.5, fontWeight: FontWeight.w900),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      'Set how many questions should be selected from each type.',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w700),
-                    ),
-                  ],
-                ),
-              ),
-              _MiniBadge('$totalQuestions Q total'),
+              _MetricTile(label: 'Questions', value: '$totalQuestions'),
+              _MetricTile(label: 'Total score', value: _formatPoints(totalScore)),
+              _MetricTile(label: 'Active types', value: '${drafts.where((draft) => draft.questionCount > 0).length}'),
             ],
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 14),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            width: double.infinity,
+            padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
             decoration: BoxDecoration(
               color: AppColors.cardBg,
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.borderGray),
             ),
             child: Column(
               children: [
-                Row(
+                const Row(
                   children: [
-                    Expanded(flex: 36, child: _DistributionHeader('Type')),
-                    const SizedBox(width: 10),
-                    SizedBox(width: 120, child: _DistributionHeader('Questions')),
+                    Expanded(flex: 34, child: _DistributionHeader('Question type')),
+                    SizedBox(width: 8),
+                    SizedBox(width: 78, child: _DistributionHeader('Easy')),
+                    SizedBox(width: 8),
+                    SizedBox(width: 78, child: _DistributionHeader('Medium')),
+                    SizedBox(width: 8),
+                    SizedBox(width: 78, child: _DistributionHeader('Hard')),
+                    SizedBox(width: 8),
+                    SizedBox(width: 82, child: _DistributionHeader('Point / Q')),
+                    SizedBox(width: 8),
+                    SizedBox(width: 72, child: _DistributionHeader('Questions')),
+                    SizedBox(width: 8),
+                    SizedBox(width: 72, child: _DistributionHeader('Score')),
                   ],
                 ),
                 const SizedBox(height: 8),
                 for (var i = 0; i < drafts.length; i++) ...[
                   _TemplateDistributionRow(draft: drafts[i], onChanged: onChanged),
-                  if (i != drafts.length - 1) const SizedBox(height: 8),
+                  if (i != drafts.length - 1) Divider(height: 14, color: AppColors.borderGray),
                 ],
               ],
             ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'How grading works: total score = questions in each active row × point per question. Generate Exam also receives the Easy / Medium / Hard percentages derived from the counts above.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, height: 1.4, fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -803,7 +897,7 @@ class _DistributionHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       label.toUpperCase(),
-      style: TextStyle(color: AppColors.textMuted, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 0.4),
+      style: TextStyle(color: AppColors.textMuted, fontSize: 10, fontWeight: FontWeight.w900, letterSpacing: 0.5),
     );
   }
 }
@@ -816,40 +910,86 @@ class _TemplateDistributionRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final active = draft.questionCount > 0;
     return Row(
       children: [
         Expanded(
-          flex: 36,
+          flex: 34,
           child: Row(
             children: [
               Container(
-                width: 28,
-                height: 28,
+                width: 30,
+                height: 30,
                 decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(8),
+                  color: active ? AppColors.primarySoft : AppColors.surfaceBg,
+                  borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: AppColors.borderGray),
                 ),
-                child: Icon(draft.icon, size: 15, color: AppColors.primary),
+                child: Icon(draft.icon, size: 16, color: active ? AppColors.primary : AppColors.textHint),
               ),
               const SizedBox(width: 10),
               Expanded(
-                child: Text(
-                  draft.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: AppColors.textTitle, fontSize: 12.5, fontWeight: FontWeight.w900),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      draft.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: AppColors.textTitle, fontSize: 12.5, fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      active ? '${draft.questionCount} questions • ${_difficultyCountsSummary(draft.difficultyCounts)}' : 'Disabled',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 10.5, fontWeight: FontWeight.w700),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
         ),
-        const SizedBox(width: 10),
-        SizedBox(
-          width: 120,
-          child: _SmallDistributionField(controller: draft.countCtrl, hint: '0', onChanged: onChanged),
-        ),
+        const SizedBox(width: 8),
+        SizedBox(width: 78, child: _SmallDistributionField(controller: draft.easyCtrl, hint: '0', onChanged: onChanged)),
+        const SizedBox(width: 8),
+        SizedBox(width: 78, child: _SmallDistributionField(controller: draft.mediumCtrl, hint: '0', onChanged: onChanged)),
+        const SizedBox(width: 8),
+        SizedBox(width: 78, child: _SmallDistributionField(controller: draft.hardCtrl, hint: '0', onChanged: onChanged)),
+        const SizedBox(width: 8),
+        SizedBox(width: 82, child: _SmallDistributionField(controller: draft.pointsCtrl, hint: '1', onChanged: onChanged, decimal: true)),
+        const SizedBox(width: 8),
+        SizedBox(width: 72, child: _ReadonlyDistributionValue(value: '${draft.questionCount}', active: active)),
+        const SizedBox(width: 8),
+        SizedBox(width: 72, child: _ReadonlyDistributionValue(value: _formatPoints(draft.sectionScore), active: active)),
       ],
+    );
+  }
+}
+
+class _ReadonlyDistributionValue extends StatelessWidget {
+  final String value;
+  final bool active;
+
+  const _ReadonlyDistributionValue({required this.value, required this.active});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 38,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: active ? AppColors.primarySoft : AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.borderGray),
+      ),
+      child: Text(
+        value,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(color: active ? AppColors.primary : AppColors.textMuted, fontSize: 12.5, fontWeight: FontWeight.w900),
+      ),
     );
   }
 }
@@ -858,26 +998,28 @@ class _SmallDistributionField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
   final VoidCallback onChanged;
+  final bool decimal;
 
-  const _SmallDistributionField({required this.controller, required this.hint, required this.onChanged});
+  const _SmallDistributionField({required this.controller, required this.hint, required this.onChanged, this.decimal = false});
 
   @override
   Widget build(BuildContext context) {
     return TextField(
       controller: controller,
-      keyboardType: TextInputType.number,
+      keyboardType: TextInputType.numberWithOptions(decimal: decimal),
       onChanged: (_) => onChanged(),
-      style: TextStyle(color: AppColors.textTitle, fontSize: 12.5, fontWeight: FontWeight.w700),
+      textAlign: TextAlign.center,
+      style: TextStyle(color: AppColors.textTitle, fontSize: 12.5, fontWeight: FontWeight.w800),
       decoration: InputDecoration(
         isDense: true,
         hintText: hint,
         filled: true,
         fillColor: AppColors.fieldBg,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         hintStyle: TextStyle(color: AppColors.textHint, fontSize: 12, fontWeight: FontWeight.w600),
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.borderGray)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide(color: AppColors.borderGray)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.borderGray)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.borderGray)),
       ),
     );
   }
@@ -889,7 +1031,9 @@ class _TemplateSectionDraft {
   final String questionType;
   final String label;
   final IconData icon;
-  final TextEditingController countCtrl;
+  final TextEditingController easyCtrl;
+  final TextEditingController mediumCtrl;
+  final TextEditingController hardCtrl;
   final TextEditingController pointsCtrl;
 
   _TemplateSectionDraft({
@@ -898,13 +1042,31 @@ class _TemplateSectionDraft {
     required this.questionType,
     required this.label,
     required this.icon,
-    required int questionCount,
+    required Map<String, int> difficultyCounts,
     required double pointsPerQuestion,
-  })  : countCtrl = TextEditingController(text: questionCount.toString()),
+  })  : easyCtrl = TextEditingController(text: _difficultyInitial(difficultyCounts, 'easy')),
+        mediumCtrl = TextEditingController(text: _difficultyInitial(difficultyCounts, 'medium')),
+        hardCtrl = TextEditingController(text: _difficultyInitial(difficultyCounts, 'hard')),
         pointsCtrl = TextEditingController(text: _formatPoints(pointsPerQuestion));
 
-  int get questionCount => int.tryParse(countCtrl.text.trim()) ?? 0;
+  int get easyCount => int.tryParse(easyCtrl.text.trim()) ?? 0;
+  int get mediumCount => int.tryParse(mediumCtrl.text.trim()) ?? 0;
+  int get hardCount => int.tryParse(hardCtrl.text.trim()) ?? 0;
+  int get questionCount => easyCount + mediumCount + hardCount;
   double get pointsPerQuestion => double.tryParse(pointsCtrl.text.trim()) ?? 0;
+  double get sectionScore => questionCount * (pointsPerQuestion > 0 ? pointsPerQuestion : 0);
+
+  bool get hasNegativeDifficulty {
+    return _isNegative(easyCtrl.text) || _isNegative(mediumCtrl.text) || _isNegative(hardCtrl.text);
+  }
+
+  Map<String, int> get difficultyCounts {
+    final counts = <String, int>{};
+    if (easyCount > 0) counts['easy'] = easyCount;
+    if (mediumCount > 0) counts['medium'] = mediumCount;
+    if (hardCount > 0) counts['hard'] = hardCount;
+    return counts;
+  }
 
   ExamTemplateSectionModel toModel({required int orderIndex, required DateTime now}) {
     final points = pointsPerQuestion > 0 ? pointsPerQuestion : 1.0;
@@ -918,13 +1080,22 @@ class _TemplateSectionDraft {
       pointsPerQuestion: points,
       sectionScore: count * points,
       orderIndex: orderIndex,
+      difficultyDistribution: difficultyCounts,
       createdAt: now,
       updatedAt: now,
     );
   }
 
+  void setCounts({required int easy, required int medium, required int hard}) {
+    easyCtrl.text = easy.toString();
+    mediumCtrl.text = medium.toString();
+    hardCtrl.text = hard.toString();
+  }
+
   void dispose() {
-    countCtrl.dispose();
+    easyCtrl.dispose();
+    mediumCtrl.dispose();
+    hardCtrl.dispose();
     pointsCtrl.dispose();
   }
 
@@ -941,13 +1112,18 @@ class _TemplateSectionDraft {
     return _supportedTemplateSectionTypes.map((spec) {
       final section = byType[spec.questionType];
       final fallbackCount = section == null && spec.questionType == 'multiple_choice' ? template.questionCount : 0;
+      final counts = section == null
+          ? _defaultDifficultyCounts(fallbackCount)
+          : section.difficultyDistribution.isNotEmpty
+              ? section.difficultyDistribution
+              : _defaultDifficultyCounts(section.questionCount);
       return _TemplateSectionDraft(
         id: section?.id,
         templateId: section?.templateId,
         questionType: spec.questionType,
         label: spec.label,
         icon: spec.icon,
-        questionCount: section?.questionCount ?? fallbackCount,
+        difficultyCounts: counts,
         pointsPerQuestion: section?.pointsPerQuestion ?? 1,
       );
     }).toList();
@@ -970,13 +1146,25 @@ const _supportedTemplateSectionTypes = <_TemplateSectionSpec>[
   _TemplateSectionSpec(questionType: 'multi_select', label: 'Multi-Select', icon: Icons.checklist_rounded),
 ];
 
+String _templateRowSubtitle(ExamTemplateModel template) {
+  final sections = template.distributionSections;
+  if (sections.isEmpty) return '${template.examType.toUpperCase()} • ${template.questionCount} questions • ${_formatPoints(template.questionCount.toDouble())} pts';
+  final types = sections.map((section) {
+    final diff = _difficultyCountsSummary(section.difficultyDistribution);
+    return '${section.questionCount} ${_shortTypeLabel(section.questionType)}${diff.isEmpty ? '' : ' ($diff)'}';
+  }).join(' / ');
+  return types;
+}
+
 List<Widget> _distributionBadges(ExamTemplateModel template) {
   final sections = template.distributionSections;
   final result = <Widget>[_MiniBadge('${template.questionCount} Q')];
-  for (final section in sections.take(3)) {
+  for (final section in sections.take(2)) {
     result.add(_MiniBadge('${section.questionCount} ${_shortTypeLabel(section.questionType)}'));
+    final summary = _difficultyCountsSummary(section.difficultyDistribution);
+    if (summary.isNotEmpty) result.add(_MiniBadge(summary));
   }
-  if (sections.length > 3) result.add(_MiniBadge('+${sections.length - 3}'));
+  if (sections.length > 2) result.add(_MiniBadge('+${sections.length - 2} types'));
   return result;
 }
 
@@ -1015,11 +1203,179 @@ String _formatPoints(double value) {
   return value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
 }
 
+String _difficultyInitial(Map<String, int> counts, String key) {
+  final value = counts[key] ?? 0;
+  return value.toString();
+}
+
+String _difficultyCountsSummary(Map<String, int> counts) {
+  if (counts.isEmpty) return '';
+  final parts = <String>[];
+  final easy = counts['easy'] ?? 0;
+  final medium = counts['medium'] ?? 0;
+  final hard = counts['hard'] ?? 0;
+  if (easy > 0) parts.add('E$easy');
+  if (medium > 0) parts.add('M$medium');
+  if (hard > 0) parts.add('H$hard');
+  return parts.join(' / ');
+}
+
+Map<String, int> _defaultDifficultyCounts(int total) {
+  if (total <= 0) return const <String, int>{};
+  final easy = (total * 0.30).round();
+  final medium = (total * 0.50).round();
+  final hard = total - easy - medium;
+  final result = <String, int>{};
+  if (easy > 0) result['easy'] = easy;
+  if (medium > 0) result['medium'] = medium;
+  if (hard > 0) result['hard'] = hard;
+  return result;
+}
+
+bool _isNegative(String raw) {
+  final parsed = int.tryParse(raw.trim());
+  return parsed != null && parsed < 0;
+}
+
 class _ChoiceItem<T> {
   final T value;
   final String label;
 
   const _ChoiceItem({required this.value, required this.label});
+}
+
+class _EditorCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget child;
+  final Widget? trailing;
+
+  const _EditorCard({required this.icon, required this.title, required this.subtitle, required this.child, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppColors.borderGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
+                child: Icon(icon, color: AppColors.primary, size: 18),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(title, style: TextStyle(color: AppColors.textTitle, fontSize: 15, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 3),
+                    Text(subtitle, style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
+              if (trailing != null) ...[
+                const SizedBox(width: 10),
+                trailing!,
+              ],
+            ],
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _PresetChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onPressed;
+  final bool danger;
+
+  const _PresetChip({required this.label, required this.onPressed, this.danger = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        decoration: BoxDecoration(
+          color: danger ? AppColors.dangerBg : AppColors.cardBg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: danger ? AppColors.dangerBorder : AppColors.borderGray),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(color: danger ? AppColors.dangerText : AppColors.textTitle, fontSize: 11.5, fontWeight: FontWeight.w900),
+        ),
+      ),
+    );
+  }
+}
+
+class _MetricTile extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _MetricTile({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 116,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.borderGray)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(value, style: TextStyle(color: AppColors.textTitle, fontSize: 16, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(color: AppColors.textMuted, fontSize: 10.5, fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
+class _FooterStat extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _FooterStat({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.borderGray)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: TextStyle(color: AppColors.textMuted, fontSize: 10.5, fontWeight: FontWeight.w900)),
+          const SizedBox(width: 7),
+          Text(value, style: TextStyle(color: AppColors.textTitle, fontSize: 12.5, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
 }
 
 class _EditorChoice<T> extends StatelessWidget {
@@ -1044,28 +1400,33 @@ class _EditorChoice<T> extends StatelessWidget {
           orElse: () => null,
         );
     final selectedLabel = selected?.label ?? (options.isEmpty ? '' : options.first.label);
-    return SizedBox(
-      width: width,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
-          FigmaUmDropdown40(
-            width: width,
-            value: selectedLabel,
-            items: options.map((item) => item.label).toList(growable: false),
-            onChanged: (selectedText) {
-              final match = options.cast<_ChoiceItem<T>?>().firstWhere(
-                    (item) => item != null && item.label == selectedText,
-                    orElse: () => null,
-                  );
-              if (match != null) onChanged(match.value);
-            },
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final effectiveWidth = width.isFinite ? width : constraints.maxWidth;
+        return SizedBox(
+          width: effectiveWidth,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(label, style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w900)),
+              const SizedBox(height: 6),
+              FigmaUmDropdown40(
+                width: effectiveWidth,
+                value: selectedLabel,
+                items: options.map((item) => item.label).toList(growable: false),
+                onChanged: (selectedText) {
+                  final match = options.cast<_ChoiceItem<T>?>().firstWhere(
+                        (item) => item != null && item.label == selectedText,
+                        orElse: () => null,
+                      );
+                  if (match != null) onChanged(match.value);
+                },
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -1082,7 +1443,7 @@ class _EditorTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final radius = BorderRadius.circular(8);
+    final radius = BorderRadius.circular(12);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
@@ -1093,16 +1454,16 @@ class _EditorTextField extends StatelessWidget {
           controller: controller,
           maxLines: maxLines,
           keyboardType: number ? TextInputType.number : TextInputType.text,
-          style: TextStyle(color: AppColors.textTitle, fontSize: 13, fontWeight: FontWeight.w600),
+          style: TextStyle(color: AppColors.textTitle, fontSize: 13, fontWeight: FontWeight.w700),
           decoration: InputDecoration(
             isDense: true,
             hintText: hint,
             suffixText: suffix,
             filled: true,
             fillColor: AppColors.fieldBg,
-            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: maxLines > 1 ? 12 : 11),
+            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: maxLines > 1 ? 12 : 12),
             hintStyle: TextStyle(color: AppColors.textHint, fontSize: 13, fontWeight: FontWeight.w600),
-            suffixStyle: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w700),
+            suffixStyle: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w800),
             enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: AppColors.borderGray)),
             focusedBorder: OutlineInputBorder(borderRadius: radius, borderSide: const BorderSide(color: AppColors.primary, width: 1.5)),
             border: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: AppColors.borderGray)),
@@ -1123,12 +1484,11 @@ class _EditorSwitch extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 166,
-      height: 44,
-      padding: const EdgeInsets.only(left: 12, right: 6),
+      height: 48,
+      padding: const EdgeInsets.only(left: 12, right: 8),
       decoration: BoxDecoration(
-        color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(8),
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.borderGray),
       ),
       child: Row(
@@ -1138,7 +1498,7 @@ class _EditorSwitch extends StatelessWidget {
               title,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: TextStyle(color: AppColors.textTitle, fontSize: 11.5, height: 1.1, fontWeight: FontWeight.w800),
+              style: TextStyle(color: AppColors.textTitle, fontSize: 12, height: 1.15, fontWeight: FontWeight.w800),
             ),
           ),
           Transform.scale(scale: 0.78, child: Switch(value: value, onChanged: onChanged)),

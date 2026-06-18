@@ -20,6 +20,20 @@ bool _asBool(dynamic value, {bool fallback = false}) {
   return fallback;
 }
 
+
+String? _asNullableString(dynamic value) {
+  final text = (value ?? '').toString().trim();
+  return text.isEmpty ? null : text;
+}
+
+String? _firstNonEmptyString(List<dynamic> values) {
+  for (final value in values) {
+    final text = _asNullableString(value);
+    if (text != null) return text;
+  }
+  return null;
+}
+
 int? _countFromDynamicCollection(dynamic value) {
   if (value is List) return value.length;
   if (value is Map<String, dynamic>) {
@@ -161,8 +175,16 @@ class MyCourseItem {
       ),
       visibilityLevel: parseCourseVisibility(s(json['visibility_level'])).backendValue,
       status: parseCourseLifecycleStatus(s(json['status'])).backendValue,
-      coverImageUrl: json['cover_image_url']?.toString(),
-      bannerImageUrl: json['banner_image_url']?.toString(),
+      coverImageUrl: _firstNonEmptyString([
+        json['cover_url'],
+        json['cover_image_url'],
+        json['coverImageUrl'],
+      ]),
+      bannerImageUrl: _firstNonEmptyString([
+        json['banner_url'],
+        json['banner_image_url'],
+        json['bannerImageUrl'],
+      ]),
       category: json['category']?.toString(),
       createdBy: _asInt(json['created_by']) ?? 0,
       createdAt: DateTime.tryParse((json['created_at'] ?? '').toString()) ??
@@ -192,6 +214,69 @@ class MyCoursesResponse {
     return MyCoursesResponse(
       items: items,
       total: (json['total'] as num?)?.toInt() ?? items.length,
+    );
+  }
+}
+
+
+class CourseCoverUploadInitResponse {
+  final String uploadUrl;
+  final String storageKey;
+  final String contentType;
+  final int maxBytes;
+
+  const CourseCoverUploadInitResponse({
+    required this.uploadUrl,
+    required this.storageKey,
+    required this.contentType,
+    required this.maxBytes,
+  });
+
+  factory CourseCoverUploadInitResponse.fromJson(Map<String, dynamic> json) {
+    return CourseCoverUploadInitResponse(
+      uploadUrl: _firstNonEmptyString([
+            json['upload_url'],
+            json['uploadUrl'],
+            json['signed_url'],
+            json['signedUrl'],
+            json['url'],
+          ]) ??
+          '',
+      storageKey: _firstNonEmptyString([
+            json['storage_key'],
+            json['storageKey'],
+            json['path'],
+            json['key'],
+          ]) ??
+          '',
+      contentType: _firstNonEmptyString([
+            json['content_type'],
+            json['contentType'],
+          ]) ??
+          'image/jpeg',
+      maxBytes: _asInt(json['max_bytes'] ?? json['maxBytes']) ?? 5 * 1024 * 1024,
+    );
+  }
+}
+
+class CourseCoverConfirmResponse {
+  final String coverUrl;
+  final DateTime? updatedAt;
+
+  const CourseCoverConfirmResponse({
+    required this.coverUrl,
+    required this.updatedAt,
+  });
+
+  factory CourseCoverConfirmResponse.fromJson(Map<String, dynamic> json) {
+    return CourseCoverConfirmResponse(
+      coverUrl: _firstNonEmptyString([
+            json['cover_url'],
+            json['coverImageUrl'],
+            json['cover_image_url'],
+          ]) ??
+          '',
+      updatedAt: DateTime.tryParse((json['updated_at'] ?? json['updatedAt'] ?? '').toString()),
     );
   }
 }

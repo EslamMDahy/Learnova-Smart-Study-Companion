@@ -1,5 +1,9 @@
+import 'dart:convert';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../core/storage/key_value_store.dart';
+import '../../../core/storage/key_value_store_factory.dart';
 import '../../auth/data/auth_providers.dart';
 import 'exams_api.dart';
 import 'question_models.dart';
@@ -14,6 +18,7 @@ class ExamTemplateSectionModel {
   final double pointsPerQuestion;
   final double sectionScore;
   final int orderIndex;
+  final Map<String, int> difficultyDistribution;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -26,6 +31,7 @@ class ExamTemplateSectionModel {
     required this.pointsPerQuestion,
     required this.sectionScore,
     required this.orderIndex,
+    this.difficultyDistribution = const <String, int>{},
     required this.createdAt,
     required this.updatedAt,
   });
@@ -42,6 +48,12 @@ class ExamTemplateSectionModel {
       pointsPerQuestion: pointsPerQuestion,
       sectionScore: _nullableDouble(json['section_score']) ?? questionCount * pointsPerQuestion,
       orderIndex: _nullableInt(json['order_index']) ?? 1,
+      difficultyDistribution: _parseDifficultyDistribution(
+        json['difficulty_distribution'] ??
+            json['difficultyDistribution'] ??
+            json['difficulty_counts'] ??
+            json['difficultyCounts'],
+      ),
       createdAt: _parseDate(json['created_at']),
       updatedAt: _parseDate(json['updated_at']),
     );
@@ -126,6 +138,7 @@ class ExamTemplateModel {
         pointsPerQuestion: 1,
         sectionScore: questionCount.toDouble(),
         orderIndex: 1,
+        difficultyDistribution: _balancedDifficultyCounts(questionCount),
         createdAt: now,
         updatedAt: now,
       ),
@@ -213,6 +226,8 @@ class ExamTemplateModel {
               'points_per_question': section.pointsPerQuestion,
               'section_score': section.sectionScore,
               'order_index': section.orderIndex,
+              if (section.difficultyDistribution.isNotEmpty)
+                'difficulty_distribution': section.difficultyDistribution,
               'created_at': section.createdAt.toIso8601String(),
               'updated_at': section.updatedAt.toIso8601String(),
             }).toList(),
@@ -382,13 +397,6 @@ QuestionType? _questionTypeFromBackend(String? raw) {
       return QuestionType.essay;
     case 'multi_select':
       return QuestionType.multiSelect;
-    case 'fill_in_blank':
-    case 'fill_in_the_blank':
-      return QuestionType.fillInTheBlank;
-    case 'numeric':
-      return QuestionType.numeric;
-    case 'code':
-      return QuestionType.code;
   }
   return null;
 }
@@ -406,9 +414,12 @@ QuestionDifficulty? _difficultyFromBackend(String? raw) {
 }
 
 class ExamTemplatesStorage {
-  ExamTemplatesStorage({required ExamsApi api}) : _api = api;
+  ExamTemplatesStorage({required ExamsApi api, required KeyValueStore localStore})
+      : _api = api,
+        _localStore = localStore;
 
   final ExamsApi _api;
+  final KeyValueStore _localStore;
 
   Future<List<ExamTemplateModel>> load(int courseId) async {
     final raw = await _api.listExamTemplatesRaw(courseId: courseId);
@@ -421,9 +432,9 @@ class ExamTemplatesStorage {
       if (id == null) continue;
       try {
         final details = await _api.getExamTemplateRaw(courseId: courseId, templateId: id);
-        templates.add(ExamTemplateModel.fromJson({...details, 'course_id': courseId}));
+        templates.add(_withSupplemental(courseId, ExamTemplateModel.fromJson({...details, 'course_id': courseId})));
       } catch (_) {
-        templates.add(ExamTemplateModel.fromJson({...item, 'course_id': courseId}));
+        templates.add(_withSupplemental(courseId, ExamTemplateModel.fromJson({...item, 'course_id': courseId})));
       }
     }
 
@@ -454,6 +465,9 @@ class ExamTemplatesStorage {
     final saved = ExamTemplateModel.fromJson({...rawSaved, 'course_id': courseId});
     final savedId = saved.backendId;
     if (savedId != null) {
+      _writeTemplateSupplement(courseId, template.copyWith(id: savedId.toString(), courseId: courseId));
+    }
+    if (savedId != null) {
       var currentSections = saved.sections;
       try {
         final details = await _api.getExamTemplateRaw(courseId: courseId, templateId: savedId);
@@ -475,7 +489,52 @@ class ExamTemplatesStorage {
     final id = int.tryParse(templateId);
     if (id == null) return load(courseId);
     await _api.deleteExamTemplateRaw(courseId: courseId, templateId: id);
+    _removeTemplateSupplement(courseId, id);
     return load(courseId);
+  }
+
+  Future<ExamTemplateModel> ensureBackendTemplate(int courseId, ExamTemplateModel template) async {
+    final templateId = template.backendId;
+    if (templateId != null) {
+      try {
+        final details = await _api.getExamTemplateRaw(courseId: courseId, templateId: templateId);
+        return _withSupplemental(courseId, ExamTemplateModel.fromJson({...details, 'course_id': courseId}));
+      } catch (_) {
+        return template.copyWith(courseId: courseId);
+      }
+    }
+
+    final rawSaved = await _api.createExamTemplateRaw(
+      courseId: courseId,
+      payload: template.copyWith(courseId: courseId).toBackendPayload(),
+    );
+    var saved = ExamTemplateModel.fromJson({...rawSaved, 'course_id': courseId});
+    final savedId = saved.backendId;
+    if (savedId == null) return saved;
+    _writeTemplateSupplement(courseId, template.copyWith(id: savedId.toString(), courseId: courseId));
+
+    var currentSections = saved.sections;
+    try {
+      final details = await _api.getExamTemplateRaw(courseId: courseId, templateId: savedId);
+      currentSections = ExamTemplateModel.fromJson({...details, 'course_id': courseId}).sections;
+    } catch (_) {
+      // Keep the save response sections when details are not available yet.
+    }
+
+    await _syncTemplateSections(
+      courseId: courseId,
+      templateId: savedId,
+      currentSections: currentSections,
+      desired: template.copyWith(courseId: courseId),
+    );
+
+    try {
+      final details = await _api.getExamTemplateRaw(courseId: courseId, templateId: savedId);
+      saved = _withSupplemental(courseId, ExamTemplateModel.fromJson({...details, 'course_id': courseId}));
+    } catch (_) {
+      // Returning the created template is still enough for generate-exam because it has a backend id.
+    }
+    return saved;
   }
 
   Future<void> _syncTemplateSections({
@@ -536,6 +595,99 @@ class ExamTemplatesStorage {
       );
     }
   }
+
+  ExamTemplateModel _withSupplemental(int courseId, ExamTemplateModel template) {
+    final id = template.backendId;
+    if (id == null) return template;
+    final extra = _readTemplateSupplements(courseId)['$id'];
+    if (extra is! Map) return template;
+    final map = Map<String, dynamic>.from(extra);
+
+    final rawSections = (map['sections'] as List?) ?? const [];
+    final supplementalSections = rawSections.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
+    final sections = template.sections.map((section) {
+      final match = supplementalSections.cast<Map<String, dynamic>?>().firstWhere(
+            (item) => item != null &&
+                (_nullableInt(item['id']) == section.id ||
+                    item['question_type']?.toString() == section.questionType ||
+                    item['questionType']?.toString() == section.questionType),
+            orElse: () => null,
+          );
+      if (match == null) return section;
+      final difficulty = _parseDifficultyDistribution(
+        match['difficulty_distribution'] ?? match['difficultyDistribution'] ?? match['difficulty_counts'] ?? match['difficultyCounts'],
+      );
+      if (difficulty.isEmpty) return section;
+      return ExamTemplateSectionModel(
+        id: section.id,
+        templateId: section.templateId,
+        title: section.title,
+        questionType: section.questionType,
+        questionCount: section.questionCount,
+        pointsPerQuestion: section.pointsPerQuestion,
+        sectionScore: section.sectionScore,
+        orderIndex: section.orderIndex,
+        difficultyDistribution: difficulty,
+        createdAt: section.createdAt,
+        updatedAt: section.updatedAt,
+      );
+    }).toList();
+
+    return template.copyWith(
+      description: (map['description'] ?? template.description).toString(),
+      instructions: (map['instructions'] ?? template.instructions).toString(),
+      showResultImmediately: (map['show_result_immediately'] as bool?) ?? template.showResultImmediately,
+      allowReview: (map['allow_review'] as bool?) ?? template.allowReview,
+      publishAfterSave: (map['publish_after_save'] as bool?) ?? template.publishAfterSave,
+      preferredDifficulty: _difficultyFromBackend(map['preferred_difficulty']?.toString()) ?? template.preferredDifficulty,
+      sections: sections,
+    );
+  }
+
+  Map<String, dynamic> _readTemplateSupplements(int courseId) {
+    final raw = _localStore.getString(_supplementKey(courseId));
+    if (raw == null || raw.trim().isEmpty) return <String, dynamic>{};
+    try {
+      final decoded = jsonDecode(raw);
+      if (decoded is Map) return Map<String, dynamic>.from(decoded);
+    } catch (_) {
+      // Ignore corrupted local metadata. Backend data stays authoritative.
+    }
+    return <String, dynamic>{};
+  }
+
+  void _writeTemplateSupplement(int courseId, ExamTemplateModel template) {
+    final id = template.backendId;
+    if (id == null) return;
+    final supplements = _readTemplateSupplements(courseId);
+    supplements['$id'] = {
+      'description': template.description,
+      'instructions': template.instructions,
+      'show_result_immediately': template.showResultImmediately,
+      'allow_review': template.allowReview,
+      'publish_after_save': template.publishAfterSave,
+      'preferred_difficulty': template.preferredDifficulty?.backendValue,
+      'sections': template.sections
+          .where((section) => section.questionCount > 0 && section.difficultyDistribution.isNotEmpty && _isSupportedBackendQuestionType(section.questionType))
+          .map((section) => {
+                if (section.id != null) 'id': section.id,
+                'question_type': section.questionType,
+                'difficulty_distribution': _normalizeDifficultyCounts(section.difficultyDistribution),
+              })
+          .toList(),
+    };
+    _localStore.setString(_supplementKey(courseId), jsonEncode(supplements));
+  }
+
+  void _removeTemplateSupplement(int courseId, int templateId) {
+    final supplements = _readTemplateSupplements(courseId);
+    supplements.remove('$templateId');
+    if (supplements.isEmpty) {
+      _localStore.remove(_supplementKey(courseId));
+    } else {
+      _localStore.setString(_supplementKey(courseId), jsonEncode(supplements));
+    }
+  }
 }
 
 ExamTemplateSectionModel? _matchingCurrentSection({
@@ -575,6 +727,7 @@ List<ExamTemplateSectionModel> _desiredTemplateSections(ExamTemplateModel desire
 
   for (final section in source) {
     if (section.questionCount <= 0) continue;
+    if (!_isSupportedBackendQuestionType(section.questionType)) continue;
     final questionType = _normalizeTemplateQuestionType(section.questionType);
     final pointsPerQuestion = section.pointsPerQuestion > 0 ? section.pointsPerQuestion : 1.0;
     result.add(ExamTemplateSectionModel(
@@ -586,6 +739,7 @@ List<ExamTemplateSectionModel> _desiredTemplateSections(ExamTemplateModel desire
       pointsPerQuestion: pointsPerQuestion,
       sectionScore: section.questionCount * pointsPerQuestion,
       orderIndex: result.length + 1,
+      difficultyDistribution: _normalizeDifficultyCounts(section.difficultyDistribution),
       createdAt: section.createdAt,
       updatedAt: now,
     ));
@@ -603,6 +757,7 @@ List<ExamTemplateSectionModel> _desiredTemplateSections(ExamTemplateModel desire
       pointsPerQuestion: 1,
       sectionScore: count.toDouble(),
       orderIndex: 1,
+      difficultyDistribution: _balancedDifficultyCounts(count),
       createdAt: now,
       updatedAt: now,
     ),
@@ -610,22 +765,36 @@ List<ExamTemplateSectionModel> _desiredTemplateSections(ExamTemplateModel desire
 }
 
 String _normalizeTemplateQuestionType(String raw) {
-  switch (raw.trim()) {
+  switch (raw.trim().toLowerCase()) {
     case 'true_false':
-      return 'true_false';
     case 'short_answer':
-      return 'short_answer';
     case 'essay':
-      return 'essay';
     case 'multi_select':
-      return 'multi_select';
+    case 'multiple_choice':
+      return raw.trim().toLowerCase();
     default:
       return 'multiple_choice';
   }
 }
 
+bool _isSupportedBackendQuestionType(String raw) {
+  switch (raw.trim().toLowerCase()) {
+    case 'multiple_choice':
+    case 'true_false':
+    case 'short_answer':
+    case 'essay':
+    case 'multi_select':
+      return true;
+    default:
+      return false;
+  }
+}
+
 final examTemplatesStorageProvider = Provider<ExamTemplatesStorage>((ref) {
-  return ExamTemplatesStorage(api: ExamsApi(ref.read(apiClientProvider)));
+  return ExamTemplatesStorage(
+    api: ExamsApi(ref.read(apiClientProvider)),
+    localStore: createLocalStore(),
+  );
 });
 
 String _backendTemplateQuestionType(QuestionType? type) {
@@ -643,9 +812,67 @@ String _backendTemplateQuestionType(QuestionType? type) {
     case QuestionType.fillInTheBlank:
     case QuestionType.numeric:
     case QuestionType.code:
+      return 'multiple_choice';
     case null:
       return 'multiple_choice';
   }
+}
+
+String _supplementKey(int courseId) => 'learnova.exam_templates.$courseId.supplement.v2';
+
+Map<String, int> _parseDifficultyDistribution(dynamic raw) {
+  if (raw is Map) {
+    final parsed = <String, int>{};
+    for (final entry in raw.entries) {
+      final key = _normalizeDifficultyKey(entry.key.toString());
+      if (key == null) continue;
+      final value = _nullableInt(entry.value) ?? 0;
+      if (value > 0) parsed[key] = value;
+    }
+    return _normalizeDifficultyCounts(parsed);
+  }
+  if (raw is List) {
+    final parsed = <String, int>{};
+    for (final item in raw.whereType<Map>()) {
+      final key = _normalizeDifficultyKey((item['difficulty'] ?? item['level'] ?? '').toString());
+      if (key == null) continue;
+      final value = _nullableInt(item['count'] ?? item['questions'] ?? item['value']) ?? 0;
+      if (value > 0) parsed[key] = value;
+    }
+    return _normalizeDifficultyCounts(parsed);
+  }
+  return const <String, int>{};
+}
+
+Map<String, int> _normalizeDifficultyCounts(Map<String, int> raw) {
+  final normalized = <String, int>{};
+  for (final entry in raw.entries) {
+    final key = _normalizeDifficultyKey(entry.key);
+    if (key == null || entry.value <= 0) continue;
+    normalized[key] = (normalized[key] ?? 0) + entry.value;
+  }
+  return normalized;
+}
+
+Map<String, int> _balancedDifficultyCounts(int total) {
+  if (total <= 0) return const <String, int>{};
+  return <String, int>{'medium': total};
+}
+
+String? _normalizeDifficultyKey(String raw) {
+  switch (raw.trim().toLowerCase()) {
+    case 'easy':
+    case 'e':
+      return 'easy';
+    case 'hard':
+    case 'h':
+      return 'hard';
+    case 'medium':
+    case 'med':
+    case 'm':
+      return 'medium';
+  }
+  return null;
 }
 
 String _sectionTitle(String questionType) {

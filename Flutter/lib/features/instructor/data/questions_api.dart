@@ -186,7 +186,7 @@ class UpdateQuestionPayload {
 
 
 class _MCQChoice {
-  final String id;   // e.g. "A", "B", "C", "D"
+  final String id;   // numeric option id as string: "0", "1", "2", ...
   final String text;
 
   const _MCQChoice({required this.id, required this.text});
@@ -205,7 +205,7 @@ class _MCQOptions {
 class _QuestionMCQCreate {
   final String questionText;
   final _MCQOptions options;
-  final String expectedAnswer; // Choice id of correct answer e.g. "B"
+  final String expectedAnswer; // numeric choice id as string, e.g. "1"
   final String? explanation;
   final String? difficulty; // "easy"|"medium"|"hard"|null
 
@@ -256,20 +256,118 @@ class AiQuestionGenerationRequest {
 class AiQuestionGenerationResponse {
   final String status;
   final bool aiProcessingStarted;
+  final String? requestId;
   final String? message;
-  const AiQuestionGenerationResponse({required this.status,required this.aiProcessingStarted,this.message});
+  const AiQuestionGenerationResponse({
+    required this.status,
+    required this.aiProcessingStarted,
+    this.requestId,
+    this.message,
+  });
   factory AiQuestionGenerationResponse.fromJson(Map<String,dynamic> j)=>AiQuestionGenerationResponse(
     status:(j['status']??'').toString(),
     aiProcessingStarted:j['ai_processing_started']==true,
+    requestId:j['request_id']?.toString(),
     message:j['message']?.toString(),
   );
+}
+
+class AiQuestionGenerationStatusResponse {
+  final String requestId;
+  final String status;
+  final bool aiProcessingStarted;
+  final bool callbackReceived;
+  final bool completed;
+  final bool failed;
+  final bool expired;
+  final int insertedCount;
+  final List<int> questionIds;
+  final String? message;
+  final String? errorMessage;
+
+  const AiQuestionGenerationStatusResponse({
+    required this.requestId,
+    required this.status,
+    required this.aiProcessingStarted,
+    required this.callbackReceived,
+    required this.completed,
+    required this.failed,
+    required this.expired,
+    required this.insertedCount,
+    required this.questionIds,
+    this.message,
+    this.errorMessage,
+  });
+
+  factory AiQuestionGenerationStatusResponse.fromJson(Map<String,dynamic> j) {
+    final rawIds = (j['question_ids'] as List?) ?? const <dynamic>[];
+    return AiQuestionGenerationStatusResponse(
+      requestId: (j['request_id'] ?? '').toString(),
+      status: (j['status'] ?? '').toString(),
+      aiProcessingStarted: j['ai_processing_started'] == true,
+      callbackReceived: j['callback_received'] == true,
+      completed: j['completed'] == true,
+      failed: j['failed'] == true,
+      expired: j['expired'] == true,
+      insertedCount: (j['inserted_count'] as num?)?.toInt() ?? 0,
+      questionIds: rawIds
+          .map((dynamic value) => value is num ? value.toInt() : int.tryParse(value.toString()))
+          .whereType<int>()
+          .toList(),
+      message: j['message']?.toString(),
+      errorMessage: j['error_message']?.toString(),
+    );
+  }
 }
 
 class QuestionsApi {
   final ApiClient _client;
   QuestionsApi(this._client);
 
-Future<AiQuestionGenerationResponse> generateQuestions({required int courseId, required AiQuestionGenerationRequest payload, CancelToken? cancelToken}) async { final res = await _client.post<Map<String,dynamic>>(Endpoints.aiGenerateQuestions(courseId), data: payload.toJson(), cancelToken: cancelToken); return AiQuestionGenerationResponse.fromJson(Map<String,dynamic>.from(res.data ?? const {})); }
+  Future<AiQuestionGenerationResponse> generateQuestions({
+    required int courseId,
+    required AiQuestionGenerationRequest payload,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.post<Map<String,dynamic>>(
+      Endpoints.aiGenerateQuestions(courseId),
+      data: payload.toJson(),
+      cancelToken: cancelToken,
+    );
+    return AiQuestionGenerationResponse.fromJson(
+      Map<String,dynamic>.from(res.data ?? const {}),
+    );
+  }
+
+  Future<AiQuestionGenerationStatusResponse> getAiGenerationStatus({
+    required int courseId,
+    required String requestId,
+    bool waitForCallback = false,
+    int timeoutSeconds = 600,
+    CancelToken? cancelToken,
+  }) async {
+    final int safeTimeoutSeconds = timeoutSeconds.clamp(1, 900).toInt();
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.aiGenerateQuestionsStatus(courseId, requestId),
+      queryParameters: waitForCallback
+          ? <String, dynamic>{
+              'wait': true,
+              'timeout_seconds': safeTimeoutSeconds,
+            }
+          : null,
+      options: waitForCallback
+          ? Options(
+              receiveTimeout: Duration(seconds: safeTimeoutSeconds + 30),
+              sendTimeout: const Duration(seconds: 30),
+              extra: const <String, dynamic>{'silent': true},
+            )
+          : null,
+      cancelToken: cancelToken,
+    );
+    return AiQuestionGenerationStatusResponse.fromJson(
+      Map<String, dynamic>.from(res.data ?? const {}),
+    );
+  }
 
 
 
@@ -287,6 +385,25 @@ Future<AiQuestionGenerationResponse> generateQuestions({required int courseId, r
       return CourseQuestionsResponse.fromJson(data);
     }
     throw const FormatException('Invalid response from GET /courses/{id}/questions');
+  }
+
+  Future<CourseQuestionsResponse> getTopicQuestions({
+    required int courseId,
+    required int moduleId,
+    required int materialId,
+    required int topicId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.topicQuestions(courseId, moduleId, materialId, topicId),
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return CourseQuestionsResponse.fromJson(data);
+    }
+    throw const FormatException('Invalid response from GET /courses/{id}/modules/{moduleId}/materials/{materialId}/topics/{topicId}/questions');
   }
 
 
@@ -435,7 +552,7 @@ Future<AiQuestionGenerationResponse> generateQuestions({required int courseId, r
 
     if (q.type == QuestionType.multipleChoice || q.type == QuestionType.multiSelect) {
       if (q.options.length < 2) return null;
-      final ids = List.generate(q.options.length, (i) => String.fromCharCode('A'.codeUnitAt(0) + i));
+      final ids = List.generate(q.options.length, (i) => i.toString());
       final options = List.generate(q.options.length, (i) {
         return CreateQuestionOption(id: ids[i], text: q.options[i].text);
       });
@@ -491,25 +608,31 @@ Future<AiQuestionGenerationResponse> generateQuestions({required int courseId, r
   _QuestionMCQCreate? _buildMCQPayload(QuestionModel q) {
     if (q.options.isEmpty) return null;
 
-    // Map options to backend choice ids (A, B, C …).
-    // The backend schema expects id strings like "A", "B" etc.
-    final choiceIds = List.generate(q.options.length, (i) {
-      return String.fromCharCode('A'.codeUnitAt(0) + i);
-    });
+    // Map options to backend numeric ids because exam grading compares
+    // selected_option_index against expected_answer as strings.
+    final choiceIds = List.generate(q.options.length, (i) => i.toString());
 
     final choices = List.generate(q.options.length, (i) {
       return _MCQChoice(id: choiceIds[i], text: q.options[i].text);
     });
 
-    // Map the correct option id from app format to backend letter format.
-    // App stores correctOptionId like "opt_0", "opt_1" etc.
-    String expectedAnswer = 'A'; // fallback
+    // Map the correct option id from app format to backend numeric id.
+    // App may store correctOptionId like "opt_0", "0", "A" etc.
+    String expectedAnswer = '0'; // fallback
     if (q.correctOptionId != null) {
       // Try to extract the index suffix from "opt_N"
       final suffix = q.correctOptionId!.replaceAll(RegExp(r'[^0-9]'), '');
       final idx = int.tryParse(suffix);
-      if (idx != null && idx < choiceIds.length) {
+      if (idx != null && idx >= 0 && idx < choiceIds.length) {
         expectedAnswer = choiceIds[idx];
+      } else {
+        final normalizedId = q.correctOptionId!.trim().toUpperCase();
+        if (normalizedId.isNotEmpty) {
+          final letterIndex = normalizedId.codeUnitAt(0) - 'A'.codeUnitAt(0);
+          if (letterIndex >= 0 && letterIndex < choiceIds.length) {
+            expectedAnswer = choiceIds[letterIndex];
+          }
+        }
       }
     }
 

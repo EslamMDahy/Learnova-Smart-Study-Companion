@@ -75,11 +75,13 @@ class QuestionModel {
   final String? sampleAnswer;         // short_answer / essay / fill_in_blank
   final String? explanation;
   final String? expectedAnswer;
+  final Object? gradingRubric;
   final List<String> tags;
 
   // Statistics (from backend)
   final int usageCount;
   final double? successRate;
+  final double? averageTimeSeconds;
   final int maxScore;
   final bool autoGradable;
 
@@ -92,6 +94,7 @@ class QuestionModel {
   final int? topicId;
   final String? topicName;
   final List<QuestionLearningOutcomeRef> learningOutcomes;
+  final int? createdBy;
 
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -110,9 +113,11 @@ class QuestionModel {
     this.sampleAnswer,
     this.explanation,
     this.expectedAnswer,
+    this.gradingRubric,
     this.tags = const [],
     this.usageCount = 0,
     this.successRate,
+    this.averageTimeSeconds,
     this.maxScore = 1,
     this.autoGradable = true,
     this.courseId,
@@ -123,6 +128,7 @@ class QuestionModel {
     this.topicId,
     this.topicName,
     this.learningOutcomes = const [],
+    this.createdBy,
     required this.createdAt,
     DateTime? updatedAt,
   }) : updatedAt = updatedAt ?? createdAt;
@@ -204,12 +210,14 @@ class QuestionModel {
       options: options,
       explanation: json['explanation']?.toString(),
       expectedAnswer: expectedAnswerText,
+      gradingRubric: json['grading_rubric'],
       correctOptionId: parsedType == QuestionType.multipleChoice ? expectedAnswerText : null,
       correctBool: parsedType == QuestionType.trueFalse ? expectedAnswerText?.toLowerCase() == 'true' : null,
       sampleAnswer: parsedType == QuestionType.shortAnswer || parsedType == QuestionType.essay ? expectedAnswerText : null,
       tags: rawTags.map((e) => e.toString()).toList(),
       usageCount: (json['usage_count'] as num?)?.toInt() ?? 0,
       successRate: json['success_rate'] == null ? null : (json['success_rate'] as num).toDouble(),
+      averageTimeSeconds: json['average_time_seconds'] == null ? null : (json['average_time_seconds'] as num).toDouble(),
       maxScore: (json['max_score'] as num?)?.toInt() ?? 1,
       autoGradable: (json['auto_gradable'] as bool?) ?? true,
       courseId: json['course_id'] == null ? null : (json['course_id'] as num).toInt(),
@@ -225,6 +233,7 @@ class QuestionModel {
           .whereType<Map>()
           .map((e) => QuestionLearningOutcomeRef.fromJson(Map<String, dynamic>.from(e)))
           .toList(),
+      createdBy: json['created_by'] == null ? null : (json['created_by'] as num).toInt(),
       createdAt: dt(json['created_at']),
       updatedAt: dt(json['updated_at'] ?? json['created_at']),
     );
@@ -238,10 +247,13 @@ class QuestionModel {
       if (options.isNotEmpty) 'options': options.map((o) => o.toJson()).toList(),
       if (explanation != null) 'explanation': explanation,
       if (expectedAnswer != null) 'expected_answer': expectedAnswer,
+      if (gradingRubric != null) 'grading_rubric': gradingRubric,
       if (tags.isNotEmpty) 'tags': tags,
       if (moduleId != null) 'module_id': moduleId,
       if (materialId != null) 'material_id': materialId,
       if (topicId != null) 'topic_id': topicId,
+      if (createdBy != null) 'created_by': createdBy,
+      if (averageTimeSeconds != null) 'average_time_seconds': averageTimeSeconds,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };

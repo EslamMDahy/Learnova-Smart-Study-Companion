@@ -180,9 +180,17 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
   bool _submitted = false;
   final Set<int> _selectedOutcomeIds = {};
 
+  bool get _requiresOutcome => widget.isSubtopic && widget.outcomes.isNotEmpty;
+
   String? get _titleError {
     if (!_submitted) return null;
     if (_titleCtrl.text.trim().isEmpty) return widget.isSubtopic ? 'Subtopic name is required' : 'Topic name is required';
+    return null;
+  }
+
+  String? get _outcomeError {
+    if (!_submitted || !_requiresOutcome) return null;
+    if (_selectedOutcomeIds.isEmpty) return 'Choose one learning outcome for this subtopic';
     return null;
   }
 
@@ -200,8 +208,15 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
   void _submit() {
     setState(() => _submitted = true);
     final title = _titleCtrl.text.trim();
-    if (title.isEmpty) return;
-    Navigator.pop(context, _TopicDialogResult.manual(title, learningOutcomeIds: widget.isSubtopic ? _selectedOutcomeIds.toList() : const []));
+    if (title.isEmpty || _outcomeError != null) return;
+    final ids = _selectedOutcomeIds.toList()..sort();
+    Navigator.pop(
+      context,
+      _TopicDialogResult.manual(
+        title,
+        learningOutcomeIds: widget.isSubtopic && ids.isNotEmpty ? <int>[ids.first] : const [],
+      ),
+    );
   }
 
   @override
@@ -349,10 +364,10 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
         if (outcomes.isNotEmpty) ...[
           const SizedBox(height: 18),
           Row(children: [
-            Text('Link to Learning Outcomes',
+            Text('Link to one Learning Outcome',
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted),),
             const SizedBox(width: 6),
-            Text('(optional)',
+            Text('(required)',
                 style: TextStyle(fontSize: 11, color: AppColors.textMuted.withOpacity(0.7)),),
           ],),
           const SizedBox(height: 8),
@@ -381,9 +396,11 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                   return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                     onTap: () => setState(() {
                       if (selected) {
-                        _selectedOutcomeIds.remove(lo.id);
+                        _selectedOutcomeIds.clear();
                       } else {
-                        _selectedOutcomeIds.add(lo.id);
+                        _selectedOutcomeIds
+                          ..clear()
+                          ..add(lo.id);
                       }
                     }),
                     child: Container(
@@ -396,17 +413,24 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                       ),
                       child: Row(children: [
                         Container(
-                          width: 16, height: 16,
+                          width: 16,
+                          height: 16,
                           decoration: BoxDecoration(
                             color: selected ? AppColors.primary : Colors.transparent,
-                            borderRadius: BorderRadius.circular(4),
+                            shape: BoxShape.circle,
                             border: Border.all(
                               color: selected ? AppColors.primary : AppColors.borderSoft,
                               width: 1.5,
                             ),
                           ),
                           child: selected
-                              ? const Icon(Icons.check, size: 11, color: Colors.white)
+                              ? Center(
+                                  child: Container(
+                                    width: 6,
+                                    height: 6,
+                                    decoration: const BoxDecoration(color: Colors.white, shape: BoxShape.circle),
+                                  ),
+                                )
                               : null,
                         ),
                         const SizedBox(width: 10),
@@ -440,12 +464,17 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
               ),
             ),
           ),
-          if (_selectedOutcomeIds.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text('${_selectedOutcomeIds.length} outcome${_selectedOutcomeIds.length == 1 ? '' : 's'} linked',
-                  style: const TextStyle(fontSize: 11.5, color: AppColors.primary, fontWeight: FontWeight.w600),),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Text(
+              _outcomeError ?? (_selectedOutcomeIds.isEmpty ? 'Select one outcome.' : '1 learning outcome linked'),
+              style: TextStyle(
+                fontSize: 11.5,
+                color: _outcomeError == null ? AppColors.primary : AppColors.dangerText,
+                fontWeight: FontWeight.w700,
+              ),
             ),
+          ),
         ],
         const SizedBox(height: 14),
         Container(
@@ -460,7 +489,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
             const SizedBox(width: 8),
             Expanded(child: Text(
               widget.isSubtopic
-                  ? 'Subtopics are final-level items. Map learning outcomes here, not on the parent topic.'
+                  ? 'Subtopics map to exactly one learning outcome. Pick it here before creating the item.'
                   : 'This creates a parent topic only. Add subtopics underneath it to map learning outcomes cleanly.',
               style: const TextStyle(fontSize: 13, height: 1.5,
                   color: AppColors.primary, fontWeight: FontWeight.w500,),
@@ -1112,6 +1141,7 @@ class _TopicPanelWidget extends StatelessWidget {
             topic: topic,
             subtopics: subtopics,
             inheritedOutcomes: inheritedOutcomes,
+            allOutcomes: outcomes,
             totalOutcomes: outcomes.length,
             canPop: canPop,
             onBack: onBack,
@@ -1136,6 +1166,7 @@ class _TopicWorkspacePage extends StatelessWidget {
   final TopicItem topic;
   final List<TopicItem> subtopics;
   final List<LearningOutcome> inheritedOutcomes;
+  final List<LearningOutcome> allOutcomes;
   final int totalOutcomes;
   final bool canPop;
   final VoidCallback onBack;
@@ -1152,6 +1183,7 @@ class _TopicWorkspacePage extends StatelessWidget {
     required this.topic,
     required this.subtopics,
     required this.inheritedOutcomes,
+    required this.allOutcomes,
     required this.totalOutcomes,
     required this.canPop,
     required this.onBack,
@@ -1167,110 +1199,54 @@ class _TopicWorkspacePage extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     final readySubtopics = subtopics.where((s) => s.readiness == TopicReadiness.ready || s.isReviewed).length;
-    final mappedSubtopics = subtopics.where((s) => s.learningOutcomeIds.isNotEmpty || s.linkedOutcomeIds.isNotEmpty || s.linkedOutcomeId != null).length;
+    final mappedSubtopics = subtopics.where((s) => _mappedOutcomeIdsForTopic(s).isNotEmpty).length;
     final readiness = _topicPageScore(topic: topic, subtopics: subtopics);
     final description = (topic.description?.trim().isNotEmpty ?? false)
         ? topic.description!.trim()
         : 'No summary yet. Add one concise paragraph that explains the scope of this topic before breaking it into subtopics.';
 
-    return Column(
-      children: [
-        _LearningItemTopBar(
-          canPop: canPop,
-          onBack: onBack,
-          label: 'Topic',
-          materialTitle: material.displayTitle,
-          title: topic.title,
-          actionLabel: 'Rename',
-          onAction: onRename,
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 22, 24, 42),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1340),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _TopicHeroV2(
-                      topic: topic,
-                      module: module,
-                      material: material,
-                      readiness: readiness,
-                      subtopicCount: subtopics.length,
-                      outcomeCount: inheritedOutcomes.length,
-                      onRename: onRename,
-                      onAddSubtopic: onAddSubtopic,
-                    ),
-                    const SizedBox(height: 18),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final wide = constraints.maxWidth >= 1100;
-                        final main = Column(
-                          children: [
-                            _TopicScopeCardV2(
-                              description: description,
-                              isEmpty: !(topic.description?.trim().isNotEmpty ?? false),
-                              onEditSummary: onEditSummary,
-                            ),
-                            const SizedBox(height: 16),
-                            _TopicArchitectureCardV2(
-                              module: module,
-                              material: material,
-                              topic: topic,
-                              subtopicCount: subtopics.length,
-                              inheritedOutcomeCount: inheritedOutcomes.length,
-                              totalOutcomes: totalOutcomes,
-                            ),
-                            const SizedBox(height: 16),
-                            _TopicSubtopicStudioV2(
-                              subtopics: subtopics,
-                              onOpenSubtopic: onOpenSubtopic,
-                              onAddSubtopic: onAddSubtopic,
-                            ),
-                          ],
-                        );
-                        final aside = _TopicOpsPanelV2(
-                          readiness: readiness,
-                          readySubtopics: readySubtopics,
-                          mappedSubtopics: mappedSubtopics,
-                          subtopicCount: subtopics.length,
-                          inheritedOutcomeCount: inheritedOutcomes.length,
-                          onRename: onRename,
-                          onEditSummary: onEditSummary,
-                          onEditStatus: onEditStatus,
-                          onAddSubtopic: onAddSubtopic,
-                          onDelete: onDelete,
-                        );
-                        if (!wide) {
-                          return Column(
-                            children: [
-                              aside,
-                              const SizedBox(height: 16),
-                              main,
-                            ],
-                          );
-                        }
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(child: main),
-                            const SizedBox(width: 18),
-                            SizedBox(width: 360, child: aside),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 104),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1240),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _TopicHeroV2(
+                topic: topic,
+                module: module,
+                material: material,
+                readiness: readiness,
+                subtopicCount: subtopics.length,
+                outcomeCount: inheritedOutcomes.length,
+                canPop: canPop,
+                onBack: onBack,
+                onRename: onRename,
+                onAddSubtopic: onAddSubtopic,
+                onDelete: onDelete,
               ),
-            ),
+              const SizedBox(height: 18),
+              _TopicContentPanelV2(
+                description: description,
+                isSummaryEmpty: !(topic.description?.trim().isNotEmpty ?? false),
+                subtopics: subtopics,
+                inheritedOutcomes: inheritedOutcomes,
+                allOutcomes: allOutcomes,
+                totalOutcomes: totalOutcomes,
+                readySubtopics: readySubtopics,
+                mappedSubtopics: mappedSubtopics,
+                onEditSummary: onEditSummary,
+                onOpenSubtopic: onOpenSubtopic,
+                onAddSubtopic: onAddSubtopic,
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
+
 }
 
 class _SubtopicWorkspacePage extends StatelessWidget {
@@ -1311,104 +1287,48 @@ class _SubtopicWorkspacePage extends StatelessWidget {
     final description = (topic.description?.trim().isNotEmpty ?? false)
         ? topic.description!.trim()
         : 'No subtopic explanation yet. Add the exact concept, skill, or paragraph range that this subtopic should cover.';
-    return Column(
-      children: [
-        _LearningItemTopBar(
-          canPop: canPop,
-          onBack: onBack,
-          label: 'Subtopic',
-          materialTitle: material.displayTitle,
-          title: topic.title,
-          actionLabel: 'Rename',
-          onAction: onRename,
-        ),
-        Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(24, 22, 24, 42),
-            child: Center(
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 1260),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _SubtopicHeroV2(
-                      topic: topic,
-                      parentTopicTitle: parentTopic?.title ?? 'Parent topic',
-                      mappedOutcomeCount: mappedOutcomes.length,
-                      score: score,
-                      onRename: onRename,
-                      onMapOutcomes: onMapOutcomes,
-                    ),
-                    const SizedBox(height: 18),
-                    LayoutBuilder(
-                      builder: (context, constraints) {
-                        final wide = constraints.maxWidth >= 1040;
-                        final main = Column(
-                          children: [
-                            _SubtopicBriefCardV2(
-                              description: description,
-                              isEmpty: !(topic.description?.trim().isNotEmpty ?? false),
-                              onEditSummary: onEditSummary,
-                            ),
-                            const SizedBox(height: 16),
-                            _SubtopicOutcomeCardV2(
-                              mappedOutcomes: mappedOutcomes,
-                              totalOutcomes: totalOutcomes,
-                              onMapOutcomes: onMapOutcomes,
-                            ),
-                            const SizedBox(height: 16),
-                            _SubtopicContextCardV2(
-                              module: module,
-                              material: material,
-                              parentTopic: parentTopic,
-                              subtopic: topic,
-                            ),
-                          ],
-                        );
-                        final aside = _SubtopicOpsPanelV2(
-                          score: score,
-                          mappedOutcomeCount: mappedOutcomes.length,
-                          onRename: onRename,
-                          onEditSummary: onEditSummary,
-                          onEditStatus: onEditStatus,
-                          onMapOutcomes: onMapOutcomes,
-                          onDelete: onDelete,
-                        );
-                        if (!wide) {
-                          return Column(
-                            children: [
-                              aside,
-                              const SizedBox(height: 16),
-                              main,
-                            ],
-                          );
-                        }
-                        return Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(child: main),
-                            const SizedBox(width: 18),
-                            SizedBox(width: 340, child: aside),
-                          ],
-                        );
-                      },
-                    ),
-                  ],
-                ),
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 22, 24, 104),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1240),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _SubtopicHeroV2(
+                topic: topic,
+                parentTopicTitle: parentTopic?.title ?? 'Parent topic',
+                mappedOutcomeCount: mappedOutcomes.length,
+                score: score,
+                canPop: canPop,
+                onBack: onBack,
+                onRename: onRename,
+                onMapOutcomes: onMapOutcomes,
+                onDelete: onDelete,
               ),
-            ),
+              const SizedBox(height: 18),
+              _SubtopicContentPanelV2(
+                description: description,
+                isSummaryEmpty: !(topic.description?.trim().isNotEmpty ?? false),
+                mappedOutcomes: mappedOutcomes,
+                totalOutcomes: totalOutcomes,
+                onEditSummary: onEditSummary,
+                onMapOutcomes: onMapOutcomes,
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
+
 }
 
 int _topicPageScore({required TopicItem topic, required List<TopicItem> subtopics}) {
   var score = 28;
   if (topic.description?.trim().isNotEmpty ?? false) score += 18;
   if (subtopics.isNotEmpty) score += 24;
-  if (subtopics.any((s) => s.learningOutcomeIds.isNotEmpty || s.linkedOutcomeIds.isNotEmpty || s.linkedOutcomeId != null)) score += 18;
+  if (subtopics.any((s) => _mappedOutcomeIdsForTopic(s).isNotEmpty)) score += 18;
   if (subtopics.any((s) => s.readiness == TopicReadiness.ready || s.isReviewed)) score += 12;
   return score.clamp(0, 100).toInt();
 }
@@ -1525,8 +1445,11 @@ class _TopicHeroV2 extends StatelessWidget {
   final int readiness;
   final int subtopicCount;
   final int outcomeCount;
+  final bool canPop;
+  final VoidCallback onBack;
   final VoidCallback onRename;
   final VoidCallback onAddSubtopic;
+  final VoidCallback onDelete;
 
   const _TopicHeroV2({
     required this.topic,
@@ -1535,8 +1458,11 @@ class _TopicHeroV2 extends StatelessWidget {
     required this.readiness,
     required this.subtopicCount,
     required this.outcomeCount,
+    required this.canPop,
+    required this.onBack,
     required this.onRename,
     required this.onAddSubtopic,
+    required this.onDelete,
   });
 
   @override
@@ -1545,7 +1471,7 @@ class _TopicHeroV2 extends StatelessWidget {
     return _GradientShellV2(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxWidth < 860;
+          final compact = constraints.maxWidth < 820;
           final titleBlock = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1553,48 +1479,81 @@ class _TopicHeroV2 extends StatelessWidget {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  const _WhitePillV2(icon: Icons.auto_stories_outlined, label: 'Parent topic'),
+                  const _WhitePillV2(icon: Icons.auto_stories_outlined, label: 'Topic'),
                   _WhitePillV2(icon: Icons.folder_open_outlined, label: module.title),
                   _WhitePillV2(icon: Icons.picture_as_pdf_outlined, label: material.displayTitle),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               Text(
                 topic.title,
-                style: TextStyle(fontSize: compact ? 26 : 34, height: 1.08, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.8),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: compact ? 26 : 32,
+                  height: 1.08,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: -0.7,
+                ),
               ),
               const SizedBox(height: 10),
               Text(
-                'A topic is the container. It owns subtopics; subtopics carry learning-outcome mapping.',
-                style: TextStyle(fontSize: 14, height: 1.5, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.78)),
+                'Topic content and subtopics for this uploaded material.',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 14, height: 1.5, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.80)),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 20),
               Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 9,
+                runSpacing: 9,
                 children: [
-                  _HeroActionV2.primary(icon: Icons.account_tree_outlined, label: 'Add subtopic', onTap: onAddSubtopic),
-                  _HeroActionV2.secondary(icon: Icons.drive_file_rename_outline_rounded, label: 'Rename topic', onTap: onRename),
+                  _TopicHeaderActionButton(
+                    icon: Icons.account_tree_outlined,
+                    label: 'Add subtopic',
+                    onTap: onAddSubtopic,
+                    primary: true,
+                  ),
+                  _TopicHeaderActionButton(
+                    icon: Icons.drive_file_rename_outline_rounded,
+                    label: 'Rename topic',
+                    onTap: onRename,
+                  ),
+                  _TopicHeaderActionButton(
+                    icon: Icons.delete_outline_rounded,
+                    label: 'Delete topic',
+                    onTap: onDelete,
+                    danger: true,
+                  ),
                 ],
               ),
             ],
           );
           final scoreCard = _HeroScoreCardV2(
-            label: 'Topic readiness',
+            label: 'Readiness',
             score: readiness,
             firstLabel: 'Subtopics',
             firstValue: '$subtopicCount',
-            secondLabel: 'Inherited outcomes',
+            secondLabel: 'Outcomes',
             secondValue: '$outcomeCount',
           );
           if (compact) {
             return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [titleBlock, const SizedBox(height: 18), scoreCard]);
           }
-          return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: titleBlock), const SizedBox(width: 28), SizedBox(width: 360, child: scoreCard)]);
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: titleBlock),
+              const SizedBox(width: 24),
+              SizedBox(width: 320, child: scoreCard),
+            ],
+          );
         },
       ),
     );
   }
+
 }
 
 class _SubtopicHeroV2 extends StatelessWidget {
@@ -1602,16 +1561,22 @@ class _SubtopicHeroV2 extends StatelessWidget {
   final String parentTopicTitle;
   final int mappedOutcomeCount;
   final int score;
+  final bool canPop;
+  final VoidCallback onBack;
   final VoidCallback onRename;
   final VoidCallback onMapOutcomes;
+  final VoidCallback onDelete;
 
   const _SubtopicHeroV2({
     required this.topic,
     required this.parentTopicTitle,
     required this.mappedOutcomeCount,
     required this.score,
+    required this.canPop,
+    required this.onBack,
     required this.onRename,
     required this.onMapOutcomes,
+    required this.onDelete,
   });
 
   @override
@@ -1620,7 +1585,7 @@ class _SubtopicHeroV2 extends StatelessWidget {
     return _GradientShellV2(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final compact = constraints.maxWidth < 860;
+          final compact = constraints.maxWidth < 820;
           final titleBlock = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1633,29 +1598,54 @@ class _SubtopicHeroV2 extends StatelessWidget {
                   _WhitePillV2(icon: topic.isAiGenerated ? Icons.auto_awesome_rounded : Icons.edit_note_rounded, label: topic.isAiGenerated ? 'AI sourced' : 'Manual'),
                 ],
               ),
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
               Text(
                 topic.title,
-                style: TextStyle(fontSize: compact ? 26 : 34, height: 1.08, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.8),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: compact ? 26 : 32,
+                  height: 1.08,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: -0.7,
+                ),
               ),
               const SizedBox(height: 10),
               Text(
-                'A subtopic is the final learning unit. Map outcomes here and keep the parent topic clean.',
-                style: TextStyle(fontSize: 14, height: 1.5, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.78)),
+                'Final learning unit with its own outcome mapping.',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 14, height: 1.5, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.80)),
               ),
-              const SizedBox(height: 22),
+              const SizedBox(height: 20),
               Wrap(
-                spacing: 10,
-                runSpacing: 10,
+                spacing: 9,
+                runSpacing: 9,
                 children: [
-                  _HeroActionV2.primary(icon: Icons.flag_outlined, label: 'Map outcomes', onTap: onMapOutcomes),
-                  _HeroActionV2.secondary(icon: Icons.drive_file_rename_outline_rounded, label: 'Rename subtopic', onTap: onRename),
+                  _TopicHeaderActionButton(
+                    icon: Icons.flag_outlined,
+                    label: 'Map outcomes',
+                    onTap: onMapOutcomes,
+                    primary: true,
+                  ),
+                  _TopicHeaderActionButton(
+                    icon: Icons.drive_file_rename_outline_rounded,
+                    label: 'Rename subtopic',
+                    onTap: onRename,
+                  ),
+                  _TopicHeaderActionButton(
+                    icon: Icons.delete_outline_rounded,
+                    label: 'Delete subtopic',
+                    onTap: onDelete,
+                    danger: true,
+                  ),
                 ],
               ),
             ],
           );
           final scoreCard = _HeroScoreCardV2(
-            label: 'Subtopic readiness',
+            label: 'Readiness',
             score: score,
             firstLabel: 'Mapped outcomes',
             firstValue: '$mappedOutcomeCount',
@@ -1665,11 +1655,19 @@ class _SubtopicHeroV2 extends StatelessWidget {
           if (compact) {
             return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [titleBlock, const SizedBox(height: 18), scoreCard]);
           }
-          return Row(crossAxisAlignment: CrossAxisAlignment.start, children: [Expanded(child: titleBlock), const SizedBox(width: 28), SizedBox(width: 360, child: scoreCard)]);
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: titleBlock),
+              const SizedBox(width: 24),
+              SizedBox(width: 320, child: scoreCard),
+            ],
+          );
         },
       ),
     );
   }
+
 }
 
 class _GradientShellV2 extends StatelessWidget {
@@ -1681,31 +1679,40 @@ class _GradientShellV2 extends StatelessWidget {
     Theme.of(context);
     return Container(
       width: double.infinity,
+      constraints: const BoxConstraints(minHeight: 228),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0F7BEE), Color(0xFF2446D8), Color(0xFF7C3AED)],
+          colors: [Color(0xFF137FEC), Color(0xFF0B66D7), Color(0xFF19A7F8)],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.18),
+            blurRadius: 24,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
       child: Stack(
         children: [
           Positioned(
             right: -90,
             top: -90,
-            child: Container(width: 280, height: 280, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.10))),
+            child: Container(width: 260, height: 260, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.10))),
           ),
           Positioned(
             right: 210,
-            bottom: -110,
-            child: Container(width: 260, height: 260, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.06))),
+            bottom: -120,
+            child: Container(width: 250, height: 250, decoration: BoxDecoration(shape: BoxShape.circle, color: Colors.white.withOpacity(0.06))),
           ),
-          Padding(padding: const EdgeInsets.all(26), child: child),
+          Padding(padding: const EdgeInsets.all(24), child: child),
         ],
       ),
     );
   }
+
 }
 
 class _HeroScoreCardV2 extends StatelessWidget {
@@ -1725,8 +1732,8 @@ class _HeroScoreCardV2 extends StatelessWidget {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.13),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Colors.white.withOpacity(0.16)),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white.withOpacity(0.20)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1852,6 +1859,264 @@ class _TopicSubtopicStudioV2 extends StatelessWidget {
   }
 }
 
+
+class _TopicContentPanelV2 extends StatelessWidget {
+  final String description;
+  final bool isSummaryEmpty;
+  final List<TopicItem> subtopics;
+  final List<LearningOutcome> inheritedOutcomes;
+  final List<LearningOutcome> allOutcomes;
+  final int totalOutcomes;
+  final int readySubtopics;
+  final int mappedSubtopics;
+  final VoidCallback onEditSummary;
+  final ValueChanged<TopicItem> onOpenSubtopic;
+  final VoidCallback onAddSubtopic;
+
+  const _TopicContentPanelV2({
+    required this.description,
+    required this.isSummaryEmpty,
+    required this.subtopics,
+    required this.inheritedOutcomes,
+    required this.allOutcomes,
+    required this.totalOutcomes,
+    required this.readySubtopics,
+    required this.mappedSubtopics,
+    required this.onEditSummary,
+    required this.onOpenSubtopic,
+    required this.onAddSubtopic,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final subtopicTotal = subtopics.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _StudioPanelV2(
+          icon: Icons.subject_rounded,
+          title: 'Topic content',
+          subtitle: 'Summary and learning outcome coverage.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 15,
+                  height: 1.65,
+                  fontWeight: isSummaryEmpty ? FontWeight.w600 : FontWeight.w800,
+                  color: isSummaryEmpty ? AppColors.textMuted : AppColors.textGray,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  _ContentMetricPillV2(label: 'Subtopics', value: '$subtopicTotal'),
+                  _ContentMetricPillV2(label: 'Ready', value: '$readySubtopics/$subtopicTotal'),
+                  _ContentMetricPillV2(label: 'Mapped', value: '$mappedSubtopics/$subtopicTotal'),
+                  _ContentMetricPillV2(label: 'Outcomes', value: '${inheritedOutcomes.length}/$totalOutcomes'),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 18),
+        _StudioPanelV2(
+          icon: Icons.account_tree_outlined,
+          title: 'Subtopics',
+          subtitle: 'Final learning units inside this topic. LO mapping appears on each item.',
+          child: subtopics.isEmpty
+              ? _EmptySubtopicCanvasV2(onAddSubtopic: onAddSubtopic, showAction: false)
+              : Column(
+                  children: [
+                    for (var i = 0; i < subtopics.length; i++)
+                      Padding(
+                        padding: EdgeInsets.only(bottom: i == subtopics.length - 1 ? 0 : 10),
+                        child: _SubtopicPreviewTileV2(
+                          index: i + 1,
+                          subtopic: subtopics[i],
+                          outcomes: allOutcomes,
+                          onTap: () => onOpenSubtopic(subtopics[i]),
+                        ),
+                      ),
+                  ],
+                ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SubtopicContentPanelV2 extends StatelessWidget {
+  final String description;
+  final bool isSummaryEmpty;
+  final List<LearningOutcome> mappedOutcomes;
+  final int totalOutcomes;
+  final VoidCallback onEditSummary;
+  final VoidCallback onMapOutcomes;
+
+  const _SubtopicContentPanelV2({
+    required this.description,
+    required this.isSummaryEmpty,
+    required this.mappedOutcomes,
+    required this.totalOutcomes,
+    required this.onEditSummary,
+    required this.onMapOutcomes,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return _StudioPanelV2(
+      icon: Icons.notes_rounded,
+      title: 'Subtopic content',
+      subtitle: 'Brief and learning-outcome mapping for this final unit.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            description,
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.65,
+              fontWeight: isSummaryEmpty ? FontWeight.w600 : FontWeight.w800,
+              color: isSummaryEmpty ? AppColors.textMuted : AppColors.textGray,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _ContentMetricPillV2(label: 'Mapped outcomes', value: '${mappedOutcomes.length}'),
+              _ContentMetricPillV2(label: 'Coverage', value: '${mappedOutcomes.length}/$totalOutcomes'),
+            ],
+          ),
+          const SizedBox(height: 18),
+          Text('Mapped outcomes', style: TextStyle(fontSize: 15.5, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+          const SizedBox(height: 10),
+          if (mappedOutcomes.isEmpty)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
+              child: Row(
+                children: [
+                  _MiniIconV2(icon: Icons.flag_circle_outlined, color: AppColors.warningText, bg: AppColors.warningSoftBg),
+                  const SizedBox(width: 12),
+                  Expanded(child: Text('No learning outcomes are mapped yet. Use the header action to map this subtopic.', style: TextStyle(fontSize: 13.5, height: 1.45, fontWeight: FontWeight.w800, color: AppColors.textMuted))),
+                ],
+              ),
+            )
+          else
+            Column(
+              children: [
+                for (var i = 0; i < mappedOutcomes.length; i++)
+                  Padding(
+                    padding: EdgeInsets.only(bottom: i == mappedOutcomes.length - 1 ? 0 : 10),
+                    child: _OutcomeMappingTileV2(outcome: mappedOutcomes[i], index: i + 1),
+                  ),
+              ],
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContentMetricPillV2 extends StatelessWidget {
+  final String label;
+  final String value;
+  const _ContentMetricPillV2({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(999), border: Border.all(color: AppColors.border)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textMuted)),
+          const SizedBox(width: 8),
+          Text(value, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+        ],
+      ),
+    );
+  }
+}
+
+class _HeaderBackPillV2 extends StatelessWidget {
+  final bool canPop;
+  final VoidCallback onBack;
+  const _HeaderBackPillV2({required this.canPop, required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!canPop) return const SizedBox.shrink();
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(999),
+      child: InkWell(
+        onTap: onBack,
+        borderRadius: BorderRadius.circular(999),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: const [
+              Icon(Icons.arrow_back_rounded, size: 15, color: AppColors.primary),
+              SizedBox(width: 6),
+              Text('Back', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OutcomeMappingTileV2 extends StatelessWidget {
+  final LearningOutcome outcome;
+  final int index;
+  const _OutcomeMappingTileV2({required this.outcome, required this.index});
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: AppColors.border)),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(10)),
+            child: Text('$index', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary)),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              outcome.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13.5, height: 1.35, fontWeight: FontWeight.w800, color: AppColors.textTitle),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _TopicOpsPanelV2 extends StatelessWidget {
   final int readiness;
   final int readySubtopics;
@@ -1880,41 +2145,23 @@ class _TopicOpsPanelV2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    return Column(
-      children: [
-        _StudioPanelV2(
-          icon: Icons.bolt_outlined,
-          title: 'Topic actions',
-          subtitle: 'Every button opens its own focused popup.',
-          compact: true,
-          child: Column(
-            children: [
-              _ActionTileV2(icon: Icons.drive_file_rename_outline_rounded, title: 'Rename topic', subtitle: 'Change title only.', onTap: onRename, primary: true),
-              _ActionTileV2(icon: Icons.subject_rounded, title: 'Edit summary', subtitle: 'Scope and instructor notes.', onTap: onEditSummary),
-              _ActionTileV2(icon: Icons.speed_rounded, title: 'Delivery state', subtitle: 'Difficulty and readiness.', onTap: onEditStatus),
-              _ActionTileV2(icon: Icons.account_tree_outlined, title: 'Add subtopic', subtitle: 'Create final learning units.', onTap: onAddSubtopic),
-              _ActionTileV2(icon: Icons.delete_outline_rounded, title: 'Delete topic', subtitle: 'Remove this topic branch.', onTap: onDelete, danger: true),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        _StudioPanelV2(
-          icon: Icons.analytics_outlined,
-          title: 'Topic signal',
-          subtitle: 'Health of this parent node.',
-          compact: true,
-          child: Column(
-            children: [
-              _SignalRowV2(label: 'Readiness', value: '$readiness%'),
-              _SignalRowV2(label: 'Subtopics ready', value: '$readySubtopics/$subtopicCount'),
-              _SignalRowV2(label: 'Mapped subtopics', value: '$mappedSubtopics/$subtopicCount'),
-              _SignalRowV2(label: 'Inherited outcomes', value: '$inheritedOutcomeCount'),
-            ],
-          ),
-        ),
-      ],
+    return _StudioPanelV2(
+      icon: Icons.bolt_outlined,
+      title: 'Topic actions',
+      subtitle: 'Focused controls for this topic.',
+      compact: true,
+      child: Column(
+        children: [
+          _ActionTileV2(icon: Icons.drive_file_rename_outline_rounded, title: 'Rename topic', subtitle: 'Change title only.', onTap: onRename, primary: true),
+          _ActionTileV2(icon: Icons.subject_rounded, title: 'Edit summary', subtitle: 'Scope and instructor notes.', onTap: onEditSummary),
+          _ActionTileV2(icon: Icons.speed_rounded, title: 'Delivery state', subtitle: 'Difficulty and readiness.', onTap: onEditStatus),
+          _ActionTileV2(icon: Icons.account_tree_outlined, title: 'Add subtopic', subtitle: 'Create final learning units.', onTap: onAddSubtopic),
+          _ActionTileV2(icon: Icons.delete_outline_rounded, title: 'Delete topic', subtitle: 'Remove this topic branch.', onTap: onDelete, danger: true),
+        ],
+      ),
     );
   }
+
 }
 
 class _SubtopicBriefCardV2 extends StatelessWidget {
@@ -2023,40 +2270,23 @@ class _SubtopicOpsPanelV2 extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    return Column(
-      children: [
-        _StudioPanelV2(
-          icon: Icons.tune_rounded,
-          title: 'Subtopic actions',
-          subtitle: 'Separate tools for this final-level item.',
-          compact: true,
-          child: Column(
-            children: [
-              _ActionTileV2(icon: Icons.drive_file_rename_outline_rounded, title: 'Rename subtopic', subtitle: 'Change title only.', onTap: onRename, primary: true),
-              _ActionTileV2(icon: Icons.subject_rounded, title: 'Edit summary', subtitle: 'Explain exact scope.', onTap: onEditSummary),
-              _ActionTileV2(icon: Icons.flag_outlined, title: 'Map outcomes', subtitle: 'Attach course LOs here.', onTap: onMapOutcomes),
-              _ActionTileV2(icon: Icons.speed_rounded, title: 'Delivery state', subtitle: 'Difficulty and readiness.', onTap: onEditStatus),
-              _ActionTileV2(icon: Icons.delete_outline_rounded, title: 'Delete subtopic', subtitle: 'Remove this leaf item.', onTap: onDelete, danger: true),
-            ],
-          ),
-        ),
-        const SizedBox(height: 16),
-        _StudioPanelV2(
-          icon: Icons.insights_outlined,
-          title: 'Subtopic signal',
-          subtitle: 'Readiness for assessment use.',
-          compact: true,
-          child: Column(
-            children: [
-              _SignalRowV2(label: 'Readiness', value: '$score%'),
-              _SignalRowV2(label: 'Mapped outcomes', value: '$mappedOutcomeCount'),
-              const _SignalRowV2(label: 'Depth', value: 'Final level'),
-            ],
-          ),
-        ),
-      ],
+    return _StudioPanelV2(
+      icon: Icons.bolt_outlined,
+      title: 'Subtopic actions',
+      subtitle: 'Focused controls for this subtopic.',
+      compact: true,
+      child: Column(
+        children: [
+          _ActionTileV2(icon: Icons.drive_file_rename_outline_rounded, title: 'Rename subtopic', subtitle: 'Change title only.', onTap: onRename, primary: true),
+          _ActionTileV2(icon: Icons.subject_rounded, title: 'Edit summary', subtitle: 'Teaching note and scope.', onTap: onEditSummary),
+          _ActionTileV2(icon: Icons.speed_rounded, title: 'Delivery state', subtitle: 'Difficulty and readiness.', onTap: onEditStatus),
+          _ActionTileV2(icon: Icons.flag_outlined, title: 'Map outcomes', subtitle: 'Connect this unit to outcomes.', onTap: onMapOutcomes),
+          _ActionTileV2(icon: Icons.delete_outline_rounded, title: 'Delete subtopic', subtitle: 'Remove this final unit.', onTap: onDelete, danger: true),
+        ],
+      ),
     );
   }
+
 }
 
 class _StudioPanelV2 extends StatelessWidget {
@@ -2076,7 +2306,7 @@ class _StudioPanelV2 extends StatelessWidget {
       width: double.infinity,
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -2176,13 +2406,16 @@ class _ActionTileV2 extends StatelessWidget {
 class _SubtopicPreviewTileV2 extends StatelessWidget {
   final int index;
   final TopicItem subtopic;
+  final List<LearningOutcome> outcomes;
   final VoidCallback onTap;
-  const _SubtopicPreviewTileV2({required this.index, required this.subtopic, required this.onTap});
+  const _SubtopicPreviewTileV2({required this.index, required this.subtopic, this.outcomes = const [], required this.onTap});
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final mappedCount = subtopic.learningOutcomeIds.isNotEmpty ? subtopic.learningOutcomeIds.length : subtopic.linkedOutcomeIds.length;
+    final mappedIds = _mappedOutcomeIdsForTopic(subtopic);
+    final mappedOutcomes = outcomes.where((o) => mappedIds.contains(o.id)).toList();
+    final mappedCount = mappedIds.length;
     final hasSummary = subtopic.description?.trim().isNotEmpty ?? false;
     return Material(
       color: AppColors.surfaceBg,
@@ -2214,7 +2447,10 @@ class _SubtopicPreviewTileV2 extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 12),
-              _TinyBadgeV2(label: '$mappedCount LO'),
+              _SubtopicLoPreviewBadge(
+                count: mappedCount,
+                outcomes: mappedOutcomes,
+              ),
               const SizedBox(width: 8),
               Icon(Icons.arrow_forward_rounded, size: 18, color: AppColors.textHint),
             ],
@@ -2225,9 +2461,142 @@ class _SubtopicPreviewTileV2 extends StatelessWidget {
   }
 }
 
+
+List<int> _mappedOutcomeIdsForTopic(TopicItem topic) {
+  final ids = <int>{...topic.learningOutcomeIds};
+  for (final raw in topic.linkedOutcomeIds) {
+    final parsed = int.tryParse(raw);
+    if (parsed != null) ids.add(parsed);
+  }
+  final legacy = int.tryParse(topic.linkedOutcomeId ?? '');
+  if (legacy != null) ids.add(legacy);
+  final sortedIds = ids.toList()..sort();
+  return sortedIds.isEmpty ? const <int>[] : <int>[sortedIds.first];
+}
+
+class _SubtopicLoPreviewBadge extends StatelessWidget {
+  final int count;
+  final List<LearningOutcome> outcomes;
+
+  const _SubtopicLoPreviewBadge({required this.count, required this.outcomes});
+
+  @override
+  Widget build(BuildContext context) {
+    if (count == 0) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.warningSoftBg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppColors.warningBorder),
+        ),
+        child: Text(
+          'No LO map',
+          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: AppColors.warningText),
+        ),
+      );
+    }
+
+    final visibleCodes = outcomes.isEmpty
+        ? <String>[]
+        : outcomes.take(3).map((o) => o.code).where((code) => code.trim().isNotEmpty).toList();
+    final label = visibleCodes.isEmpty
+        ? '$count LO mapped'
+        : '${visibleCodes.join(', ')}${count > visibleCodes.length ? ' +${count - visibleCodes.length}' : ''}';
+
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 230),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.badgeBlueBorder),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.flag_outlined, size: 13, color: AppColors.primary),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: AppColors.primary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopicHeaderActionButton extends StatefulWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback? onTap;
+  final bool primary;
+  final bool danger;
+
+  const _TopicHeaderActionButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.primary = false,
+    this.danger = false,
+  });
+
+  @override
+  State<_TopicHeaderActionButton> createState() => _TopicHeaderActionButtonState();
+}
+
+class _TopicHeaderActionButtonState extends State<_TopicHeaderActionButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = widget.onTap != null;
+    final Color background = widget.primary
+        ? Colors.white
+        : widget.danger
+            ? (_hovered ? Colors.white.withOpacity(0.24) : Colors.white.withOpacity(0.16))
+            : (_hovered ? Colors.white.withOpacity(0.22) : Colors.white.withOpacity(0.14));
+    final Color foreground = widget.primary
+        ? AppColors.primary
+        : widget.danger
+            ? const Color(0xFFFFD7D7)
+            : Colors.white;
+
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: SizedBox(
+        height: 38,
+        child: OutlinedButton.icon(
+          onPressed: widget.onTap,
+          icon: Icon(widget.icon, size: 15),
+          label: Text(widget.label),
+          style: OutlinedButton.styleFrom(
+            elevation: 0,
+            foregroundColor: enabled ? foreground : Colors.white.withOpacity(0.55),
+            backgroundColor: enabled ? background : Colors.white.withOpacity(0.08),
+            disabledForegroundColor: Colors.white.withOpacity(0.55),
+            disabledBackgroundColor: Colors.white.withOpacity(0.08),
+            side: BorderSide(color: widget.primary ? Colors.white : Colors.white.withOpacity(0.28)),
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 0),
+            textStyle: const TextStyle(fontSize: 12.3, fontWeight: FontWeight.w900),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _EmptySubtopicCanvasV2 extends StatelessWidget {
   final VoidCallback onAddSubtopic;
-  const _EmptySubtopicCanvasV2({required this.onAddSubtopic});
+  final bool showAction;
+  const _EmptySubtopicCanvasV2({required this.onAddSubtopic, this.showAction = true});
 
   @override
   Widget build(BuildContext context) {
@@ -2243,8 +2612,10 @@ class _EmptySubtopicCanvasV2 extends StatelessWidget {
           Text('No subtopics yet', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
           const SizedBox(height: 6),
           Text('Create subtopics before mapping learning outcomes. This keeps the topic as a clean parent container.', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, height: 1.45, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
-          const SizedBox(height: 16),
-          _HeroActionV2.primary(icon: Icons.add_rounded, label: 'Create first subtopic', onTap: onAddSubtopic),
+          if (showAction) ...[
+            const SizedBox(height: 16),
+            _HeroActionV2.primary(icon: Icons.add_rounded, label: 'Create first subtopic', onTap: onAddSubtopic),
+          ],
         ],
       ),
     );

@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:learnova/core/storage/user_storage.dart';
+import 'package:learnova/core/ui/toast.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:learnova/features/instructor/presentation/widgets/create_course_dialog.dart';
 import 'package:learnova/features/instructor/presentation/widgets/invite_students_dialog.dart';
 import 'package:learnova/features/instructor/data/mock_services.dart';
 import 'package:learnova/features/instructor/data/authoring_mode.dart';
+import 'package:learnova/features/instructor/data/courses_models.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_course_widgets.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_dashboard_content.dart';
 
@@ -54,10 +56,19 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
 
     if (result == null) return;
 
-    // 1) Create course first (backend returns course with id)
-    final created = await ref
-        .read(instructorCoursesControllerProvider.notifier)
-        .createCourse(result.request);
+    // 1) Create course first (backend returns course with id).
+    // Controller stores any backend validation/network error in page state.
+    final created = await (() async {
+      try {
+        return await ref
+            .read(instructorCoursesControllerProvider.notifier)
+            .createCourse(result.request);
+      } catch (_) {
+        return null;
+      }
+    })();
+
+    if (created == null) return;
 
     final courseId = created.id;
 
@@ -66,7 +77,29 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
       return;
     }
 
-    // 2) Seed locally-managed learning outcomes for the dedicated Outcomes tab.
+    // 2) Upload selected cover image after the course exists and has an id.
+    if ((result.coverBytes?.isNotEmpty ?? false)) {
+      try {
+        await ref
+            .read(instructorCoursesControllerProvider.notifier)
+            .uploadCourseCoverById(
+              courseId: courseId,
+              bytes: result.coverBytes!,
+              contentType: result.coverContentType,
+              filename: result.coverFilename ?? 'course-cover.jpg',
+            );
+      } catch (_) {
+        if (mounted) {
+          AppToast.error(
+            context,
+            title: 'Cover upload failed',
+            message: 'Course created, but the cover image could not be uploaded.',
+          );
+        }
+      }
+    }
+
+    // 3) Seed locally-managed learning outcomes for the dedicated Outcomes tab.
     if (result.learningOutcomes.isNotEmpty &&
         ref.read(enableLocalAuthoringFallbackProvider)) {
       await ref
@@ -74,7 +107,7 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
           .seedOutcomes(courseId, result.learningOutcomes);
     }
 
-    // 3) If course is PRIVATE (needs invites), open upload dialog with courseId
+    // 4) If course is PRIVATE (needs invites), open upload dialog with courseId
     if (result.needsInvites) {
       await showDialog<bool>(
         context: context,
@@ -82,7 +115,7 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
       );
     }
 
-    // 4) Refresh courses list after creation (and possible invites)
+    // 5) Refresh courses list after creation, cover upload, and possible invites
     await ref.read(instructorCoursesControllerProvider.notifier).load(force: true);
   }
 
@@ -98,6 +131,17 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
       courses: state.items,
       onRefresh: () => controller.load(force: true),
       onCreateNewCourse: _openCreateCourse,
+      onUploadCover: ({
+        required MyCourseItem course,
+        required List<int> bytes,
+        required String? contentType,
+        required String filename,
+      }) => controller.uploadCourseCover(
+        course: course,
+        bytes: bytes,
+        contentType: contentType,
+        filename: filename,
+      ),
     );
   }
 }

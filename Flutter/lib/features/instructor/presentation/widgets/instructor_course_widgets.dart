@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:learnova/core/routing/routes.dart';
 import 'package:learnova/core/ui/toast.dart';
+import 'package:learnova/core/utils/image_picker_bytes.dart';
 import '../../data/courses_models.dart';
 import '../../data/course_vocabulary.dart';
 import 'package:learnova/shared/widgets/app_ui_components.dart';
@@ -17,6 +18,12 @@ typedef CourseUpdateAction = Future<MyCourseItem> Function(
 );
 typedef CourseArchiveAction = Future<MyCourseItem> Function(MyCourseItem course);
 typedef CourseDeleteAction = Future<void> Function(MyCourseItem course);
+typedef CourseCoverUploadAction = Future<MyCourseItem> Function({
+  required MyCourseItem course,
+  required List<int> bytes,
+  required String? contentType,
+  required String filename,
+});
 
 class InstructorCourseContent extends StatefulWidget {
   final VoidCallback? onCreateNewCourse;
@@ -27,6 +34,7 @@ class InstructorCourseContent extends StatefulWidget {
   final CourseUpdateAction? onUpdateCourse;
   final CourseArchiveAction? onArchiveCourse;
   final CourseDeleteAction? onDeleteCourse;
+  final CourseCoverUploadAction? onUploadCover;
 
   const InstructorCourseContent({
     super.key,
@@ -38,6 +46,7 @@ class InstructorCourseContent extends StatefulWidget {
     this.onUpdateCourse,
     this.onArchiveCourse,
     this.onDeleteCourse,
+    this.onUploadCover,
   });
 
   @override
@@ -285,6 +294,7 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
                         onUpdateCourse: widget.onUpdateCourse,
                         onArchiveCourse: widget.onArchiveCourse,
                         onDeleteCourse: widget.onDeleteCourse,
+                        onUploadCover: widget.onUploadCover,
                       ),
                       const SizedBox(height: 24),
                     ],
@@ -794,6 +804,7 @@ class _CoursesGrid extends StatelessWidget {
   final CourseUpdateAction? onUpdateCourse;
   final CourseArchiveAction? onArchiveCourse;
   final CourseDeleteAction? onDeleteCourse;
+  final CourseCoverUploadAction? onUploadCover;
 
   const _CoursesGrid({
     required this.columns,
@@ -806,6 +817,7 @@ class _CoursesGrid extends StatelessWidget {
     this.onUpdateCourse,
     this.onArchiveCourse,
     this.onDeleteCourse,
+    this.onUploadCover,
   });
 
   @override
@@ -842,6 +854,7 @@ class _CoursesGrid extends StatelessWidget {
               onUpdateCourse: onUpdateCourse,
               onArchiveCourse: onArchiveCourse,
               onDeleteCourse: onDeleteCourse,
+              onUploadCover: onUploadCover,
             ),
           );
         }).toList(),
@@ -1125,12 +1138,14 @@ class _ApiCourseCard extends StatefulWidget {
   final CourseUpdateAction? onUpdateCourse;
   final CourseArchiveAction? onArchiveCourse;
   final CourseDeleteAction? onDeleteCourse;
+  final CourseCoverUploadAction? onUploadCover;
 
   const _ApiCourseCard({
     required this.course,
     this.onUpdateCourse,
     this.onArchiveCourse,
     this.onDeleteCourse,
+    this.onUploadCover,
   });
 
   @override
@@ -1203,6 +1218,11 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
           icon: Icons.edit_rounded,
         ),
         FigmaUmMenuEntry.item(
+          value: 'cover',
+          label: 'Change course cover',
+          icon: Icons.add_photo_alternate_outlined,
+        ),
+        FigmaUmMenuEntry.item(
           value: 'archive',
           label: 'Archive course',
           icon: Icons.archive_rounded,
@@ -1240,12 +1260,82 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
       case 'edit':
         await _editCourse(c);
         return;
+      case 'cover':
+        await _changeCourseCover(c);
+        return;
       case 'archive':
         await _archiveCourse(c);
         return;
       case 'delete':
         await _deleteCourse(c);
         return;
+    }
+  }
+
+  String? _coverValidationError(PickedBrowserFile file) {
+    final contentType = (file.mimeType ?? '').trim().toLowerCase();
+    final name = (file.name ?? '').trim().toLowerCase();
+    final isAllowed = contentType == 'image/png' ||
+        contentType == 'image/jpeg' ||
+        contentType == 'image/jpg' ||
+        name.endsWith('.png') ||
+        name.endsWith('.jpg') ||
+        name.endsWith('.jpeg');
+
+    if (!isAllowed) return 'Course cover must be PNG or JPG.';
+    if (file.bytes.length > 5 * 1024 * 1024) {
+      return 'Course cover must be 5MB or smaller.';
+    }
+    return null;
+  }
+
+  Future<void> _changeCourseCover(MyCourseItem course) async {
+    final action = widget.onUploadCover;
+    if (action == null) {
+      AppToast.warning(
+        context,
+        title: 'Unavailable',
+        message: 'Course cover upload is not available in this build.',
+      );
+      return;
+    }
+
+    try {
+      final file = await pickSingleImageFile(
+        accept: const ['image/png', 'image/jpeg', 'image/jpg'],
+      );
+      if (!mounted || file == null) return;
+
+      final validationError = _coverValidationError(file);
+      if (validationError != null) {
+        AppToast.error(
+          context,
+          title: 'Invalid cover image',
+          message: validationError,
+        );
+        return;
+      }
+
+      final updated = await action(
+        course: course,
+        bytes: file.bytes,
+        contentType: file.mimeType,
+        filename: file.name ?? 'course-cover.jpg',
+      );
+      SelectedCourseCache.set(updated);
+      if (!mounted) return;
+      AppToast.success(
+        context,
+        title: 'Cover updated',
+        message: 'The course cover image was updated successfully.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        title: 'Cover upload failed',
+        message: 'The course cover image could not be uploaded.',
+      );
     }
   }
 
@@ -1391,6 +1481,8 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
         : (isArchived
             ? LinearGradient(colors: [AppColors.textHint, AppColors.textGray500])
             : const LinearGradient(colors: [Color(0xFF134E4A), Color(0xFF0891B2)]));
+    final coverUrl = (widget.course.coverImageUrl ?? '').trim();
+    final hasCover = coverUrl.isNotEmpty;
     final enrollCount = widget.course.enrollmentCount ?? 0;
     final modulesCount = widget.course.moduleCount ?? 0;
     final code = (widget.course.courseCode?.isNotEmpty ?? false) ? widget.course.courseCode! : '—';
@@ -1437,9 +1529,17 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
                 child: Stack(
                   children: [
                     Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(gradient: heroGradient),
-                      ),
+                      child: hasCover
+                          ? Image.network(
+                              coverUrl,
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => DecoratedBox(
+                                decoration: BoxDecoration(gradient: heroGradient),
+                              ),
+                            )
+                          : DecoratedBox(
+                              decoration: BoxDecoration(gradient: heroGradient),
+                            ),
                     ),
                     const Positioned.fill(
                       child: DecoratedBox(

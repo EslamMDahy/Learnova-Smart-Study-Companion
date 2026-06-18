@@ -1,297 +1,243 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import 'package:learnova/core/routing/routes.dart';
 import 'package:learnova/core/theme/app_theme.dart';
+import 'package:learnova/features/student/data/student_exam_history_providers.dart';
 
-class StudentQuizHistoryPage extends StatelessWidget {
+class StudentQuizHistoryPage extends ConsumerStatefulWidget {
   const StudentQuizHistoryPage({super.key});
 
   @override
+  ConsumerState<StudentQuizHistoryPage> createState() => _StudentQuizHistoryPageState();
+}
+
+class _StudentQuizHistoryPageState extends ConsumerState<StudentQuizHistoryPage> {
+  final TextEditingController _searchController = TextEditingController();
+  String _query = '';
+  int _selectedCourseId = 0;
+  String _selectedStatus = 'all';
+
+  @override
+  void initState() {
+    super.initState();
+    _searchController.addListener(() {
+      setState(() => _query = _searchController.text.trim().toLowerCase());
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    // تم استخدام Padding خارجي مريح (64 من اليمين والشمال، و 40 من فوق وتحت) 
-    // ليعطي نفس إحساس الفراغ والابتعاد عن الـ Sidebar والـ Header الموجود في الصورة.
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 40),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          /// TITLE SECTION
-          Text(
-            'My Quiz History',
-            style: TextStyle(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textGray,
-              letterSpacing: -0.5,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            'View your past results, scores, and performance metrics across all courses.',
-            style: TextStyle(
-              fontSize: 14,
-              color: AppColors.textMuted,
-            ),
-          ),
-          const SizedBox(height: 32),
+    final historyAsync = ref.watch(studentExamHistoryProvider);
 
-          /// STATS CARDS
-          Row(
-            children: [
-              Expanded(
-                child: _statCard(
-                  title: 'Total Quizzes Taken',
-                  value: '24',
-                  subText: '↑ +2 this week',
-                  icon: Icons.assignment_turned_in_outlined,
-                  iconColor: AppColors.primary,
-                  subTextColor: AppColors.successDot,
-                ),
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                child: _statCard(
-                  title: 'Average Score',
-                  value: '82%',
-                  subText: 'Top 15% of class average',
-                  icon: Icons.bar_chart_rounded,
-                  iconColor: AppColors.successDot,
-                  subTextColor: AppColors.textMuted,
-                ),
-              ),
-              const SizedBox(width: 24),
-              Expanded(
-                child: _statCard(
-                  title: 'Pending Retakes',
-                  value: '2',
-                  subText: 'Due within 3 days',
-                  icon: Icons.assignment_late_outlined,
-                  iconColor: AppColors.warningText,
-                  subTextColor: AppColors.warningText,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 32),
+    return historyAsync.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (error, _) => _HistoryErrorState(
+        message: error.toString(),
+        onRetry: () => ref.invalidate(studentExamHistoryProvider),
+      ),
+      data: (history) {
+        final filteredRows = _filterRows(history.rows);
 
-          /// SEARCH & FILTER BAR
-          Row(
-            children: [
-              // شريط البحث الممتد
-              Expanded(
-                child: Container(
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: AppColors.headerBg,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: TextField(
-                    textAlignVertical: TextAlignVertical.center,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      border: InputBorder.none,
-                      hintText: 'Search by quiz name, topic...',
-                      hintStyle: TextStyle(color: AppColors.textHint, fontSize: 13),
-                      prefixIcon: Icon(Icons.search, size: 18, color: AppColors.textHint),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 16),
-              _filterButton('All Courses'),
-              const SizedBox(width: 12),
-              _filterButton('Status: All'),
-              const SizedBox(width: 12),
-              // زر More Filters المتناسق مع الصورة
-              Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(
+        return RefreshIndicator(
+          onRefresh: () async => ref.invalidate(studentExamHistoryProvider),
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(horizontal: 64, vertical: 40),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
                   children: [
-                    Icon(Icons.tune, size: 16, color: AppColors.textMuted),
-                    const SizedBox(width: 8),
-                    Text(
-                      'More Filters',
-                      style: TextStyle(color: AppColors.textMuted, fontSize: 13, fontWeight: FontWeight.w500),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'My Exam History',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textGray,
+                              letterSpacing: -0.5,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'View your submitted exams, scores, grading status, and retakes across enrolled courses.',
+                            style: TextStyle(fontSize: 14, color: AppColors.textMuted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton.filledTonal(
+                      tooltip: 'Refresh exam history',
+                      onPressed: () => ref.invalidate(studentExamHistoryProvider),
+                      icon: const Icon(Icons.refresh_rounded),
                     ),
                   ],
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          /// DATA TABLE CONTAINER
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.cardBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+                const SizedBox(height: 32),
+                _StatsRow(history: history),
+                const SizedBox(height: 32),
+                _buildFilters(history),
+                const SizedBox(height: 24),
+                _buildTable(filteredRows, history.rows.length),
+              ],
             ),
-            child: Column(
+          ),
+        );
+      },
+    );
+  }
+
+  List<StudentExamHistoryRow> _filterRows(List<StudentExamHistoryRow> rows) {
+    return rows.where((row) {
+      final matchesCourse = _selectedCourseId == 0 || row.courseId == _selectedCourseId;
+      final matchesStatus = _selectedStatus == 'all' || _statusKey(row) == _selectedStatus;
+      final searchable = [
+        row.exam.safeTitle,
+        row.exam.safeType,
+        row.course.title,
+        row.course.courseCode ?? '',
+        row.statusLabel,
+      ].join(' ').toLowerCase();
+      final matchesQuery = _query.isEmpty || searchable.contains(_query);
+      return matchesCourse && matchesStatus && matchesQuery;
+    }).toList(growable: false);
+  }
+
+  String _statusKey(StudentExamHistoryRow row) {
+    if (row.isInProgress) return 'in_progress';
+    if (row.isPending) return 'pending';
+    if (row.isPassed) return 'passed';
+    if (row.isFailed) return 'failed';
+    return 'completed';
+  }
+
+  Widget _buildFilters(StudentExamHistoryData history) {
+    return Row(
+      children: [
+        Expanded(
+          child: Container(
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.headerBg,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: TextField(
+              controller: _searchController,
+              textAlignVertical: TextAlignVertical.center,
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                hintText: 'Search by exam, course, or status...',
+                hintStyle: TextStyle(color: AppColors.textHint, fontSize: 13),
+                prefixIcon: Icon(Icons.search, size: 18, color: AppColors.textHint),
+                suffixIcon: _query.isEmpty
+                    ? null
+                    : IconButton(
+                        tooltip: 'Clear search',
+                        icon: Icon(Icons.close_rounded, size: 18, color: AppColors.textHint),
+                        onPressed: _searchController.clear,
+                      ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        _CourseFilterButton(
+          courses: history.courses,
+          selectedCourseId: _selectedCourseId,
+          onChanged: (value) => setState(() => _selectedCourseId = value),
+        ),
+        const SizedBox(width: 12),
+        _StatusFilterButton(
+          selectedStatus: _selectedStatus,
+          onChanged: (value) => setState(() => _selectedStatus = value),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTable(List<StudentExamHistoryRow> rows, int totalCount) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.bg,
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
+              border: Border(bottom: BorderSide(color: AppColors.border)),
+            ),
+            child: Row(
               children: [
-                /// TABLE HEADER
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  decoration: BoxDecoration(
-                    color: AppColors.bg,
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(11)),
-                    border: Border(bottom: BorderSide(color: AppColors.border)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(flex: 4, child: Text('QUIZ DETAILS', style: _headerStyle)),
-                      Expanded(flex: 2, child: Text('DATE TAKEN', style: _headerStyle)),
-                      Expanded(flex: 2, child: Text('DURATION', style: _headerStyle)),
-                      Expanded(flex: 2, child: Text('SCORE', style: _headerStyle)),
-                      Expanded(flex: 2, child: Text('STATUS', style: _headerStyle)),
-                      Expanded(flex: 2, child: Align(alignment: Alignment.centerRight, child: Text('ACTIONS', style: _headerStyle))),
-                    ],
+                Expanded(flex: 4, child: Text('EXAM DETAILS', style: _headerStyle)),
+                Expanded(flex: 2, child: Text('DATE TAKEN', style: _headerStyle)),
+                Expanded(flex: 2, child: Text('DURATION', style: _headerStyle)),
+                Expanded(flex: 2, child: Text('SCORE', style: _headerStyle)),
+                Expanded(flex: 2, child: Text('STATUS', style: _headerStyle)),
+                Expanded(
+                  flex: 2,
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: Text('ACTIONS', style: _headerStyle),
                   ),
                 ),
-
-                /// TABLE ROWS (بيانات مطابقة للصورة تماماً)
-                _quizRow(
-                  title: 'Intro to Machine Learning - Midterm',
-                  code: 'CS401',
-                  subtitle: 'Module 4 Assessment',
-                  date: 'Oct 24, 2023',
-                  time: '10:30 AM',
-                  duration: '45m 12s',
-                  score: '88%',
-                  progress: 0.88,
-                  progressColor: AppColors.successDot,
-                  status: 'Passed',
-                  statusColor: AppColors.successDot,
-                  actions: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Icon(Icons.visibility_outlined, size: 18, color: AppColors.textMuted),
-                      const SizedBox(width: 12),
-                      Icon(Icons.refresh, size: 18, color: AppColors.textMuted),
-                    ],
-                  ),
+              ],
+            ),
+          ),
+          if (rows.isEmpty)
+            _EmptyHistoryState(hasFilters: _query.isNotEmpty || _selectedCourseId != 0 || _selectedStatus != 'all')
+          else
+            ...rows.asMap().entries.map((entry) {
+              return _ExamHistoryRowWidget(
+                row: entry.value,
+                isLast: entry.key == rows.length - 1,
+                onView: () {
+                  context.go(
+                    Routes.studentExamResultFor(
+                      courseId: entry.value.courseId,
+                      examId: entry.value.examId,
+                      attemptId: entry.value.attemptId,
+                    ),
+                  );
+                },
+                onRetake: () {
+                  context.go(
+                    Routes.studentExamAttemptFor(
+                      courseId: entry.value.courseId,
+                      examId: entry.value.examId,
+                    ),
+                  );
+                },
+              );
+            }),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+            child: Row(
+              children: [
+                Text(
+                  'Showing ${rows.length} of $totalCount attempts',
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 13),
                 ),
-
-                _quizRow(
-                  title: 'Data Structures Basics',
-                  code: 'CS202',
-                  subtitle: 'Weekly Quiz 3',
-                  date: 'Oct 20, 2023',
-                  time: '02:15 PM',
-                  duration: '28m 05s',
-                  score: '92%',
-                  progress: 0.92,
-                  progressColor: AppColors.successDot,
-                  status: 'Passed',
-                  statusColor: AppColors.successDot,
-                  actions: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Icon(Icons.visibility_outlined, size: 18, color: AppColors.textMuted),
-                    ],
-                  ),
-                ),
-
-                _quizRow(
-                  title: 'Advanced Calculus - Quiz 1',
-                  code: 'MATH301',
-                  subtitle: '',
-                  date: 'Oct 18, 2023',
-                  time: '09:00 AM',
-                  duration: '55m 00s',
-                  score: '45%',
-                  progress: 0.45,
-                  progressColor: AppColors.errorDot,
-                  status: 'Failed',
-                  statusColor: AppColors.errorDot,
-                  actions: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Icon(Icons.visibility_outlined, size: 18, color: AppColors.textMuted),
-                      const SizedBox(width: 12),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: AppColors.infoBg,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: AppColors.infoBorder),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.refresh, size: 14, color: AppColors.primary),
-                            SizedBox(width: 4),
-                            Text(
-                              'Retake',
-                              style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-
-                _quizRow(
-                  title: 'Physics II - Electromagnetism',
-                  code: 'PHY102',
-                  subtitle: '',
-                  date: 'Oct 15, 2023',
-                  time: '11:45 AM',
-                  duration: '-',
-                  score: 'Not graded',
-                  progress: 0.0,
-                  progressColor: Colors.transparent,
-                  status: 'Pending',
-                  statusColor: AppColors.warningText,
-                  actions: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Icon(Icons.info_outline, size: 18, color: AppColors.textMuted),
-                    ],
-                  ),
-                ),
-
-                _quizRow(
-                  title: 'Operating Systems - Final',
-                  code: 'CS305',
-                  subtitle: '',
-                  date: 'Oct 10, 2023',
-                  time: '01:00 PM',
-                  duration: '1h 12m',
-                  score: '76%',
-                  progress: 0.76,
-                  progressColor: AppColors.warningDot,
-                  status: 'Passed',
-                  statusColor: AppColors.successDot,
-                  isLast: true, // لإلغاء الخط السفلي لآخر عنصر في الجدول
-                  actions: Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      Icon(Icons.visibility_outlined, size: 18, color: AppColors.textMuted),
-                    ],
-                  ),
-                ),
-
-                /// TABLE FOOTER (PAGINATION)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                  child: Row(
-                    children: [
-                      Text(
-                        'Showing 1-5 of 24 results',
-                        style: TextStyle(color: AppColors.textMuted, fontSize: 13),
-                      ),
-                      const Spacer(),
-                      _pageButton('Previous', disabled: true),
-                      const SizedBox(width: 8),
-                      _pageButton('Next', disabled: false),
-                    ],
-                  ),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () => ref.invalidate(studentExamHistoryProvider),
+                  icon: const Icon(Icons.refresh_rounded, size: 16),
+                  label: const Text('Refresh'),
                 ),
               ],
             ),
@@ -302,20 +248,80 @@ class StudentQuizHistoryPage extends StatelessWidget {
   }
 
   static TextStyle get _headerStyle => TextStyle(
-    fontSize: 11,
-    fontWeight: FontWeight.w600,
-    color: AppColors.textMuted,
-    letterSpacing: 0.5,
-  );
+        fontSize: 11,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textMuted,
+        letterSpacing: 0.5,
+      );
+}
 
-  static Widget _statCard({
-    required String title,
-    required String value,
-    required String subText,
-    required IconData icon,
-    required Color iconColor,
-    required Color subTextColor,
-  }) {
+class _StatsRow extends StatelessWidget {
+  final StudentExamHistoryData history;
+
+  const _StatsRow({required this.history});
+
+  @override
+  Widget build(BuildContext context) {
+    final average = history.averageScore;
+
+    return Row(
+      children: [
+        Expanded(
+          child: _StatCard(
+            title: 'Total Attempts',
+            value: history.totalAttempts.toString(),
+            subText: '${history.gradedCount} graded attempts',
+            icon: Icons.assignment_turned_in_outlined,
+            iconColor: AppColors.primary,
+            subTextColor: AppColors.textMuted,
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: _StatCard(
+            title: 'Average Score',
+            value: average == null ? '—' : '${average.round()}%',
+            subText: average == null ? 'No graded exams yet' : 'Based on graded attempts',
+            icon: Icons.bar_chart_rounded,
+            iconColor: AppColors.successDot,
+            subTextColor: AppColors.textMuted,
+          ),
+        ),
+        const SizedBox(width: 24),
+        Expanded(
+          child: _StatCard(
+            title: 'Pending Grading',
+            value: history.pendingCount.toString(),
+            subText: '${history.retakeAvailableCount} retakes available',
+            icon: Icons.pending_actions_outlined,
+            iconColor: AppColors.warningText,
+            subTextColor: AppColors.warningText,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatCard extends StatelessWidget {
+  final String title;
+  final String value;
+  final String subText;
+  final IconData icon;
+  final Color iconColor;
+  final Color subTextColor;
+
+  const _StatCard({
+    required this.title,
+    required this.value,
+    required this.subText,
+    required this.icon,
+    required this.iconColor,
+    required this.subTextColor,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -357,43 +363,28 @@ class StudentQuizHistoryPage extends StatelessWidget {
       ),
     );
   }
+}
 
-  static Widget _filterButton(String text) {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: AppColors.headerBg,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          Text(
-            text,
-            style: TextStyle(fontSize: 13, color: AppColors.textGray, fontWeight: FontWeight.w500),
-          ),
-          const SizedBox(width: 8),
-          Icon(Icons.keyboard_arrow_down, size: 16, color: AppColors.textMuted),
-        ],
-      ),
-    );
-  }
+class _ExamHistoryRowWidget extends StatelessWidget {
+  final StudentExamHistoryRow row;
+  final bool isLast;
+  final VoidCallback onView;
+  final VoidCallback onRetake;
 
-  static Widget _quizRow({
-    required String title,
-    required String code,
-    required String subtitle,
-    required String date,
-    required String time,
-    required String duration,
-    required String score,
-    required double progress,
-    required Color progressColor,
-    required String status,
-    required Color statusColor,
-    required Widget actions,
-    bool isLast = false,
-  }) {
+  const _ExamHistoryRowWidget({
+    required this.row,
+    required this.isLast,
+    required this.onView,
+    required this.onRetake,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final percentage = row.percentageScore;
+    final progress = percentage == null ? 0.0 : (percentage / 100).clamp(0.0, 1.0).toDouble();
+    final statusColor = _statusColor(row);
+    final courseCode = (row.course.courseCode ?? '').trim().isEmpty ? 'COURSE' : row.course.courseCode!.trim();
+
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: BoxDecoration(
@@ -401,14 +392,15 @@ class StudentQuizHistoryPage extends StatelessWidget {
       ),
       child: Row(
         children: [
-          /// DETAILS Column
           Expanded(
             flex: 4,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  title,
+                  row.exam.safeTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontWeight: FontWeight.w600, fontSize: 14, color: AppColors.textTitle),
                 ),
                 const SizedBox(height: 6),
@@ -421,84 +413,81 @@ class StudentQuizHistoryPage extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
-                        code,
+                        courseCode,
                         style: TextStyle(color: AppColors.badgeIndigoFg, fontSize: 10, fontWeight: FontWeight.w700),
                       ),
                     ),
-                    if (subtitle.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Text(
-                        subtitle,
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        '${row.course.title} • Attempt ${row.attempt.attemptNumber}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(color: AppColors.textHint, fontSize: 12),
                       ),
-                    ],
+                    ),
                   ],
                 ),
               ],
             ),
           ),
-
-          /// DATE TAKEN Column
           Expanded(
             flex: 2,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(date, style: TextStyle(fontSize: 13, color: AppColors.textGray, fontWeight: FontWeight.w500)),
+                Text(
+                  _formatDate(row.displayDate),
+                  style: TextStyle(fontSize: 13, color: AppColors.textGray, fontWeight: FontWeight.w500),
+                ),
                 const SizedBox(height: 2),
-                Text(time, style: TextStyle(fontSize: 11, color: AppColors.textHint)),
+                Text(
+                  _formatTime(row.displayDate),
+                  style: TextStyle(fontSize: 11, color: AppColors.textHint),
+                ),
               ],
             ),
           ),
-
-          /// DURATION Column
           Expanded(
             flex: 2,
             child: Text(
-              duration,
+              _formatDuration(row.duration),
               style: TextStyle(
-                fontSize: 13, 
-                color: duration == '-' ? AppColors.textHint : AppColors.textMuted,
+                fontSize: 13,
+                color: row.duration == null ? AppColors.textHint : AppColors.textMuted,
               ),
             ),
           ),
-
-          /// SCORE Column
           Expanded(
             flex: 2,
             child: Row(
               children: [
                 Text(
-                  score,
+                  percentage == null ? 'Not graded' : '${percentage.round()}%',
                   style: TextStyle(
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
-                    color: score == 'Not graded' ? AppColors.textHint : AppColors.textTitle,
+                    color: percentage == null ? AppColors.textHint : AppColors.textTitle,
                   ),
                 ),
-                if (progress > 0) ...[
+                if (percentage != null) ...[
                   const SizedBox(width: 8),
                   Expanded(
-                    child: SizedBox(
-                      width: 40,
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: LinearProgressIndicator(
-                          value: progress,
-                          minHeight: 4,
-                          backgroundColor: AppColors.headerBg,
-                          valueColor: AlwaysStoppedAnimation(progressColor),
-                        ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(2),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 4,
+                        backgroundColor: AppColors.headerBg,
+                        valueColor: AlwaysStoppedAnimation(statusColor),
                       ),
                     ),
                   ),
-                  const SizedBox(width: 16), // مسافة تضمن تباعد البروجرس بار عن العمود القادم
+                  const SizedBox(width: 16),
                 ],
               ],
             ),
           ),
-
-          /// STATUS Column
           Expanded(
             flex: 2,
             child: Align(
@@ -519,7 +508,7 @@ class StudentQuizHistoryPage extends StatelessWidget {
                     ),
                     const SizedBox(width: 6),
                     Text(
-                      status,
+                      row.statusLabel,
                       style: TextStyle(color: statusColor, fontWeight: FontWeight.w600, fontSize: 12),
                     ),
                   ],
@@ -527,31 +516,296 @@ class StudentQuizHistoryPage extends StatelessWidget {
               ),
             ),
           ),
-
-          /// ACTIONS Column
           Expanded(
             flex: 2,
-            child: actions,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                if (row.canViewResult)
+                  IconButton(
+                    tooltip: 'View result',
+                    onPressed: onView,
+                    icon: Icon(Icons.visibility_outlined, size: 18, color: AppColors.textMuted),
+                  ),
+                if (row.isInProgress)
+                  _SmallActionButton(
+                    label: 'Continue',
+                    icon: Icons.play_arrow_rounded,
+                    onPressed: onRetake,
+                  )
+                else if (row.canRetake)
+                  _SmallActionButton(
+                    label: 'Retake',
+                    icon: Icons.refresh_rounded,
+                    onPressed: onRetake,
+                  ),
+                if (!row.canViewResult && !row.isInProgress && !row.canRetake)
+                  Icon(Icons.info_outline, size: 18, color: AppColors.textHint),
+              ],
+            ),
           ),
         ],
       ),
     );
   }
 
-  static Widget _pageButton(String text, {required bool disabled}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: disabled ? AppColors.bg : AppColors.cardBg,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: AppColors.border),
+  static Color _statusColor(StudentExamHistoryRow row) {
+    if (row.isPassed) return AppColors.successDot;
+    if (row.isFailed) return AppColors.errorDot;
+    if (row.isPending || row.isInProgress) return AppColors.warningText;
+    return AppColors.primary;
+  }
+
+  static String _formatDate(DateTime? value) {
+    if (value == null) return '—';
+    final local = value.toLocal();
+    const months = [
+      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+    ];
+    return '${months[local.month - 1]} ${local.day}, ${local.year}';
+  }
+
+  static String _formatTime(DateTime? value) {
+    if (value == null) return '';
+    final local = value.toLocal();
+    final hour12 = local.hour == 0 ? 12 : local.hour > 12 ? local.hour - 12 : local.hour;
+    final minute = local.minute.toString().padLeft(2, '0');
+    final suffix = local.hour >= 12 ? 'PM' : 'AM';
+    return '$hour12:$minute $suffix';
+  }
+
+  static String _formatDuration(Duration? value) {
+    if (value == null) return '—';
+    final hours = value.inHours;
+    final minutes = value.inMinutes.remainder(60);
+    final seconds = value.inSeconds.remainder(60);
+    if (hours > 0) {
+      return '${hours}h ${minutes}m';
+    }
+    if (minutes > 0) {
+      return '${minutes}m ${seconds.toString().padLeft(2, '0')}s';
+    }
+    return '${seconds}s';
+  }
+}
+
+class _SmallActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback onPressed;
+
+  const _SmallActionButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onPressed,
+      borderRadius: BorderRadius.circular(6),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.infoBg,
+          borderRadius: BorderRadius.circular(6),
+          border: Border.all(color: AppColors.infoBorder),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 14, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w600),
+            ),
+          ],
+        ),
       ),
-      child: Text(
-        text,
-        style: TextStyle(
-          color: disabled ? AppColors.textHint : AppColors.textGray,
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
+    );
+  }
+}
+
+class _CourseFilterButton extends StatelessWidget {
+  final List<dynamic> courses;
+  final int selectedCourseId;
+  final ValueChanged<int> onChanged;
+
+  const _CourseFilterButton({
+    required this.courses,
+    required this.selectedCourseId,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    dynamic selectedCourse;
+    if (selectedCourseId != 0) {
+      for (final course in courses) {
+        if (course.id == selectedCourseId) {
+          selectedCourse = course;
+          break;
+        }
+      }
+    }
+    final label = selectedCourse == null ? 'All Courses' : selectedCourse.title.toString();
+
+    return PopupMenuButton<int>(
+      tooltip: 'Filter by course',
+      onSelected: onChanged,
+      itemBuilder: (context) => [
+        const PopupMenuItem<int>(value: 0, child: Text('All Courses')),
+        ...courses.map(
+          (course) => PopupMenuItem<int>(
+            value: course.id as int,
+            child: Text(course.title.toString()),
+          ),
+        ),
+      ],
+      child: _FilterChip(label: label),
+    );
+  }
+}
+
+class _StatusFilterButton extends StatelessWidget {
+  final String selectedStatus;
+  final ValueChanged<String> onChanged;
+
+  const _StatusFilterButton({
+    required this.selectedStatus,
+    required this.onChanged,
+  });
+
+  static const _labels = <String, String>{
+    'all': 'Status: All',
+    'passed': 'Passed',
+    'failed': 'Failed',
+    'pending': 'Pending',
+    'in_progress': 'In progress',
+    'completed': 'Completed',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<String>(
+      tooltip: 'Filter by status',
+      onSelected: onChanged,
+      itemBuilder: (context) => _labels.entries
+          .map((entry) => PopupMenuItem<String>(value: entry.key, child: Text(entry.value)))
+          .toList(growable: false),
+      child: _FilterChip(label: _labels[selectedStatus] ?? 'Status: All'),
+    );
+  }
+}
+
+class _FilterChip extends StatelessWidget {
+  final String label;
+
+  const _FilterChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 220),
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 14),
+      decoration: BoxDecoration(
+        color: AppColors.headerBg,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13, color: AppColors.textGray, fontWeight: FontWeight.w500),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Icon(Icons.keyboard_arrow_down, size: 16, color: AppColors.textMuted),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyHistoryState extends StatelessWidget {
+  final bool hasFilters;
+
+  const _EmptyHistoryState({required this.hasFilters});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 56),
+      child: Center(
+        child: Column(
+          children: [
+            Icon(Icons.history_toggle_off_rounded, size: 42, color: AppColors.textHint),
+            const SizedBox(height: 12),
+            Text(
+              hasFilters ? 'No exams match your filters' : 'No exam attempts yet',
+              style: TextStyle(color: AppColors.textTitle, fontSize: 16, fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              hasFilters
+                  ? 'Try changing the search, course, or status filter.'
+                  : 'Submitted and in-progress exam attempts will appear here.',
+              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HistoryErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _HistoryErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 520,
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.error_outline_rounded, size: 42, color: AppColors.dangerText),
+            const SizedBox(height: 12),
+            Text(
+              'Could not load exam history',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: AppColors.textTitle),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Try again'),
+            ),
+          ],
         ),
       ),
     );

@@ -68,6 +68,14 @@ class _LoginFormState extends ConsumerState<LoginForm> {
   void _clearError() =>
       ref.read(loginControllerProvider.notifier).clearError();
 
+  bool _isSafeInternalNext(String? value) {
+    if (value == null) return false;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty || !trimmed.startsWith('/')) return false;
+    if (trimmed.startsWith('//')) return false;
+    return true;
+  }
+
   Future<void> _onLogin() async {
     final okForm = _formKey.currentState?.validate() ?? false;
     if (!okForm) return;
@@ -85,7 +93,10 @@ class _LoginFormState extends ConsumerState<LoginForm> {
 
     switch (result) {
       case LoginResult.success:
-        if (UserStorage.isOwner) {
+        final next = GoRouterState.of(context).uri.queryParameters['next'];
+        if (_isSafeInternalNext(next)) {
+          context.go(next!);
+        } else if (UserStorage.isOwner) {
           context.go(Routes.adminUsers);
         } else if (UserStorage.isInstructor) {
           context.go(Routes.instructorDashboard);

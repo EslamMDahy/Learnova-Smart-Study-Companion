@@ -1,9 +1,13 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../../core/network/error_mapper.dart';
 import '../../../../../shared/widgets/app_ui_components.dart';
 import '../../../data/courses_models.dart';
+import '../../../data/exam_models.dart';
 import '../../../data/exam_templates_storage.dart';
 import '../../../data/learning_outcomes_models.dart';
 import '../../../data/materials_models.dart';
@@ -29,6 +33,7 @@ class CourseQuestionBankTab extends ConsumerStatefulWidget {
 
 class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
   final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
 
   String _search = '';
   QuestionType? _filterType;
@@ -47,6 +52,8 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
   bool _treeRequested = false;
   String? _error;
   List<QuestionModel> _questions = [];
+  int _pageIndex = 0;
+  int _pageSize = 10;
 
   @override
   void initState() {
@@ -60,6 +67,7 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
 
   @override
   void dispose() {
+    _searchDebounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
@@ -73,24 +81,11 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
     try {
       final api = ref.read(questionsApiProvider);
       final resp = await api.getCourseQuestions(courseId: widget.course.id);
-      final enriched = await Future.wait(
-        resp.questions.map((question) async {
-          final id = question.remoteId;
-          if (id == null) return question;
-          try {
-            return await api.getQuestion(
-              courseId: widget.course.id,
-              questionId: id,
-            );
-          } catch (_) {
-            return question;
-          }
-        }),
-      );
       if (!mounted) return;
       setState(() {
-        _questions = enriched;
+        _questions = resp.questions;
         _loading = false;
+        _pageIndex = 0;
         if (_selectedQuestionId != null &&
             !_questions.any((question) => question.id == _selectedQuestionId)) {
           _selectedQuestionId = null;
@@ -118,20 +113,40 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
   }
 
   void _onSearchChanged(String value) {
-    if (value == _search) return;
-    setState(() => _search = value);
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 220), () {
+      if (!mounted || value == _search) return;
+      setState(() {
+        _search = value;
+        _pageIndex = 0;
+      });
+    });
   }
 
   Future<void> _editQuestion(
     QuestionModel question,
     List<_TopicTarget> topicTargets,
   ) async {
+    var editableQuestion = question;
+    final qid = question.remoteId ?? int.tryParse(question.id);
+    if (qid != null && qid > 0) {
+      try {
+        editableQuestion = await ref.read(questionsApiProvider).getQuestion(
+              courseId: widget.course.id,
+              questionId: qid,
+            );
+      } catch (_) {
+        editableQuestion = question;
+      }
+    }
+
+    if (!mounted) return;
     final updated = await showDialog<QuestionModel>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _EditQuestionDialog(
         courseId: widget.course.id,
-        question: question,
+        question: editableQuestion,
         topicTargets: topicTargets,
       ),
     );
@@ -155,7 +170,8 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
     setState(() => _selectedQuestionId = question.id);
     showDialog<void>(
       context: context,
-      builder: (dialogContext) => _QuestionReviewDialog(
+      builder: (_) => _QuestionReviewDialog(
+        courseId: widget.course.id,
         question: question,
         topicTargets: topicTargets,
       ),
@@ -173,9 +189,19 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
   @override
   Widget build(BuildContext context) {
     final courseState = ref.watch(courseDetailsControllerProvider(widget.course.id));
+    final courseOutcomes = ref.watch(courseLOProvider(widget.course.id));
     final topicTargets = _topicTargetsFromState(courseState);
-    final filtered = _applyFilters(_questions, topicTargets);
-    final selectedQuestionId = _selectedQuestion(filtered)?.id;
+    final topicTargetByTopicId = {for (final target in topicTargets) target.topic.id: target};
+    final filtered = _applyFilters(_questions, topicTargetByTopicId);
+    final totalPages = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _pageSize) + 1;
+    final safePageIndex = _pageIndex.clamp(0, totalPages - 1).toInt();
+    final startIndex = filtered.isEmpty ? 0 : safePageIndex * _pageSize;
+    final endIndex = filtered.isEmpty
+        ? 0
+        : (startIndex + _pageSize > filtered.length ? filtered.length : startIndex + _pageSize);
+    final pageQuestions = filtered.isEmpty ? <QuestionModel>[] : filtered.sublist(startIndex, endIndex);
+    final selectedQuestionId = _selectedQuestionId;
+    final examReadyCount = _questions.where((question) => question.remoteId != null).length;
 
     if (_creatingExam) {
       final config = _examStartConfig;
@@ -187,6 +213,7 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
         initialScopeMaterialId: config?.materialId,
         initialScopeTopicIds: config?.topicIds ?? const <int>{},
         initialScopeOutcomeIds: config?.outcomeIds ?? const <int>{},
+        initialTitle: config?.title,
         onCancel: () => setState(() {
           _creatingExam = false;
           _examStartConfig = null;
@@ -204,98 +231,141 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
 
     return Container(
       color: AppColors.pageBg,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-      child: Column(
-        children: [
-          _QuestionBankHeader(
-            loading: _loading,
-            canCreateExam: _questions.isNotEmpty,
-            onRefresh: _loadQuestions,
-            onCreateExam: _openCreateExamStart,
-          ),
-          const SizedBox(height: 16),
-          Expanded(
-            child: _QuestionBankWorkspace(
-              loading: _loading,
-              error: _error == null ? null : _friendlyError(_error!),
-              questions: filtered,
-              allQuestionsCount: _questions.length,
-              selectedQuestionId: selectedQuestionId,
-              searchController: _searchController,
-              filterModuleId: _filterModuleId,
-              filterDiff: _filterDiff,
-              filterType: _filterType,
-              filterSource: _filterSource,
-              filterUsed: _filterUsed,
-              filterMaterialId: _filterMaterialId,
-              filterTopicId: _filterTopicId,
-              filterOutcomeId: _filterOutcomeId,
-              modules: courseState.modules,
-              topicTargets: topicTargets,
-              allQuestions: _questions,
-              onSearchChanged: _onSearchChanged,
-              onSelectQuestion: (question) => _openQuestionReview(question, topicTargets),
-              onModuleChanged: (value) => setState(() {
-                _filterModuleId = value;
-                if (value == null) {
-                  _filterMaterialId = null;
-                  _filterTopicId = null;
-                } else if (_filterMaterialId != null &&
-                    !_materialBelongsToModule(topicTargets, _filterMaterialId!, value)) {
-                  _filterMaterialId = null;
-                  _filterTopicId = null;
-                }
-              }),
-              onMaterialChanged: (value) => setState(() {
-                _filterMaterialId = value;
-                if (value == null) {
-                  _filterTopicId = null;
-                } else if (_filterTopicId != null &&
-                    !_topicBelongsToMaterial(topicTargets, _filterTopicId!, value)) {
-                  _filterTopicId = null;
-                }
-              }),
-              onTopicChanged: (value) => setState(() => _filterTopicId = value),
-              onOutcomeChanged: (value) => setState(() => _filterOutcomeId = value),
-              onSourceChanged: (value) => setState(() => _filterSource = value),
-              onUsageChanged: (value) => setState(() => _filterUsed = value),
-              onDifficultyChanged: (value) => setState(() => _filterDiff = value),
-              onTypeChanged: (value) => setState(() => _filterType = value),
-              onClearFilters: _clearFilters,
-              onRetry: _loadQuestions,
-              onEditQuestion: _editQuestion,
-              onDeleteUnavailable: _showDeleteUnavailable,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1480),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _QuestionBankHeader(
+                  loading: _loading,
+                  canCreateExam: _questions.isNotEmpty,
+                  totalQuestionsCount: _questions.length,
+                  visibleQuestionsCount: filtered.length,
+                  examReadyCount: examReadyCount,
+                  onRefresh: _loadQuestions,
+                  onCreateExam: _openCreateExamStart,
+                ),
+                const SizedBox(height: 16),
+                _QuestionBankWorkspace(
+                  loading: _loading,
+                  error: _error == null ? null : _friendlyError(_error!),
+                  questions: pageQuestions,
+                  allQuestionsCount: _questions.length,
+                  filteredQuestionsCount: filtered.length,
+                  pageStartIndex: startIndex,
+                  pageIndex: safePageIndex,
+                  pageSize: _pageSize,
+                  totalPages: totalPages,
+                  selectedQuestionId: selectedQuestionId,
+                  searchController: _searchController,
+                  filterModuleId: _filterModuleId,
+                  filterDiff: _filterDiff,
+                  filterType: _filterType,
+                  filterSource: _filterSource,
+                  filterUsed: _filterUsed,
+                  filterMaterialId: _filterMaterialId,
+                  filterTopicId: _filterTopicId,
+                  filterOutcomeId: _filterOutcomeId,
+                  modules: courseState.modules,
+                  topicTargets: topicTargets,
+                  topicTargetByTopicId: topicTargetByTopicId,
+                  allQuestions: _questions,
+                  courseOutcomes: courseOutcomes,
+                  onSearchChanged: _onSearchChanged,
+                  onSelectQuestion: (question) => _openQuestionReview(question, topicTargets),
+                  onModuleChanged: (value) => setState(() {
+                    _filterModuleId = value;
+                    _pageIndex = 0;
+                    if (value == null) {
+                      _filterMaterialId = null;
+                      _filterTopicId = null;
+                    } else if (_filterMaterialId != null &&
+                        !_materialBelongsToModule(topicTargets, _filterMaterialId!, value)) {
+                      _filterMaterialId = null;
+                      _filterTopicId = null;
+                    }
+                  }),
+                  onMaterialChanged: (value) => setState(() {
+                    _filterMaterialId = value;
+                    _pageIndex = 0;
+                    if (value == null) {
+                      _filterTopicId = null;
+                    } else if (_filterTopicId != null &&
+                        !_topicBelongsToMaterial(topicTargets, _filterTopicId!, value)) {
+                      _filterTopicId = null;
+                    }
+                  }),
+                  onTopicChanged: (value) => setState(() {
+                    _filterTopicId = value;
+                    _pageIndex = 0;
+                  }),
+                  onOutcomeChanged: (value) => setState(() {
+                    _filterOutcomeId = value;
+                    _pageIndex = 0;
+                  }),
+                  onSourceChanged: (value) => setState(() {
+                    _filterSource = value;
+                    _pageIndex = 0;
+                  }),
+                  onUsageChanged: (value) => setState(() {
+                    _filterUsed = value;
+                    _pageIndex = 0;
+                  }),
+                  onDifficultyChanged: (value) => setState(() {
+                    _filterDiff = value;
+                    _pageIndex = 0;
+                  }),
+                  onTypeChanged: (value) => setState(() {
+                    _filterType = value;
+                    _pageIndex = 0;
+                  }),
+                  onPageChanged: (value) => setState(() => _pageIndex = value),
+                  onPageSizeChanged: (value) => setState(() {
+                    _pageSize = value;
+                    _pageIndex = 0;
+                  }),
+                  onClearFilters: _clearFilters,
+                  onRetry: _loadQuestions,
+                  onEditQuestion: _editQuestion,
+                  onDeleteUnavailable: _showDeleteUnavailable,
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 
   Future<void> _openCreateExamStart() async {
-    if (_questions.isEmpty) return;
-    await _loadCourseTree();
-    await ensureCourseLearningOutcomesLoaded(ref, widget.course.id);
-    List<ExamTemplateModel> templates;
-    try {
-      templates = await ref.read(examTemplatesStorageProvider).load(widget.course.id);
-    } catch (_) {
-      templates = [ExamTemplateModel.custom(widget.course.id)];
-    }
+    if (_questions.isEmpty || _creatingExam) return;
+    _loadCourseTree();
+    ensureCourseLearningOutcomesLoaded(ref, widget.course.id);
+
+    final Future<List<ExamTemplateModel>> templatesFuture = ref
+        .read(examTemplatesStorageProvider)
+        .load(widget.course.id)
+        .catchError((Object _) => ExamTemplateModel.defaults(widget.course.id));
+
     final outcomes = ref.read(courseLOProvider(widget.course.id));
     final latestState = ref.read(courseDetailsControllerProvider(widget.course.id));
     final latestTopicTargets = _topicTargetsFromState(latestState);
-    if (!mounted) return;
     final config = await showDialog<_ExamStartConfig>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _CreateExamStartDialog(
         course: widget.course,
-        templates: templates,
+        templates: ExamTemplateModel.defaults(widget.course.id),
+        templatesFuture: templatesFuture,
         modules: latestState.modules,
         topicTargets: latestTopicTargets,
         outcomes: outcomes,
         questions: _questions,
+        onGenerated: _loadQuestions,
       ),
     );
     if (config == null || !mounted) return;
@@ -317,21 +387,11 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
       _filterMaterialId = null;
       _filterTopicId = null;
       _filterOutcomeId = null;
+      _pageIndex = 0;
     });
   }
 
-  QuestionModel? _selectedQuestion(List<QuestionModel> filtered) {
-    if (filtered.isEmpty) return null;
-    final id = _selectedQuestionId;
-    if (id != null) {
-      for (final question in filtered) {
-        if (question.id == id) return question;
-      }
-    }
-    return filtered.first;
-  }
-
-  List<QuestionModel> _applyFilters(List<QuestionModel> input, List<_TopicTarget> topicTargets) {
+  List<QuestionModel> _applyFilters(List<QuestionModel> input, Map<int, _TopicTarget> topicTargetByTopicId) {
     return input.where((q) {
       final s = _search.trim().toLowerCase();
       if (s.isNotEmpty) {
@@ -358,14 +418,18 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
           return false;
         }
       }
-      final target = _targetForQuestion(topicTargets, q);
+      final target = q.topicId == null ? null : topicTargetByTopicId[q.topicId];
+      final moduleId = q.moduleId ?? target?.module.id;
+      final materialId = q.materialId ?? target?.material.id;
+      final topicId = q.topicId ?? target?.topic.id;
+
+      if (_filterModuleId != null && moduleId != _filterModuleId) return false;
+      if (_filterMaterialId != null && materialId != _filterMaterialId) return false;
+      if (_filterTopicId != null && topicId != _filterTopicId) return false;
       if (_filterType != null && q.type != _filterType) return false;
       if (_filterDiff != null && q.difficulty != _filterDiff) return false;
       if (_filterSource != null && q.source != _filterSource) return false;
       if (_filterUsed != null && (q.usageCount > 0) != _filterUsed) return false;
-      if (_filterModuleId != null && (q.moduleId ?? target?.module.id) != _filterModuleId) return false;
-      if (_filterMaterialId != null && (q.materialId ?? target?.material.id) != _filterMaterialId) return false;
-      if (_filterTopicId != null && (q.topicId ?? target?.topic.id) != _filterTopicId) return false;
       if (_filterOutcomeId != null && !q.learningOutcomes.any((outcome) => outcome.id == _filterOutcomeId)) {
         return false;
       }
@@ -423,6 +487,7 @@ enum _ExamScopeMode { topics, outcomes }
 
 class _ExamStartConfig {
   final ExamTemplateModel template;
+  final String? title;
   final int? moduleId;
   final int? materialId;
   final Set<int> topicIds;
@@ -430,6 +495,7 @@ class _ExamStartConfig {
 
   const _ExamStartConfig({
     required this.template,
+    this.title,
     this.moduleId,
     this.materialId,
     this.topicIds = const <int>{},
@@ -437,45 +503,275 @@ class _ExamStartConfig {
   });
 }
 
-class _CreateExamStartDialog extends StatefulWidget {
+class _CreateExamStartDialog extends ConsumerStatefulWidget {
   final MyCourseItem course;
   final List<ExamTemplateModel> templates;
+  final Future<List<ExamTemplateModel>>? templatesFuture;
   final List<ModuleItem> modules;
   final List<_TopicTarget> topicTargets;
   final List<LearningOutcome> outcomes;
   final List<QuestionModel> questions;
+  final Future<void> Function()? onGenerated;
 
   const _CreateExamStartDialog({
     required this.course,
     required this.templates,
+    this.templatesFuture,
     required this.modules,
     required this.topicTargets,
     required this.outcomes,
     required this.questions,
+    this.onGenerated,
   });
 
   @override
-  State<_CreateExamStartDialog> createState() => _CreateExamStartDialogState();
+  ConsumerState<_CreateExamStartDialog> createState() => _CreateExamStartDialogState();
 }
 
-class _CreateExamStartDialogState extends State<_CreateExamStartDialog> {
+class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> {
+  final TextEditingController _titleCtrl = TextEditingController();
+  late List<ExamTemplateModel> _templates;
   late ExamTemplateModel _template;
+  bool _templatesLoading = false;
+  bool _generating = false;
   int? _moduleId;
   int? _materialId;
   final Set<int> _topicIds = <int>{};
   final Set<int> _outcomeIds = <int>{};
+  bool _dialogTreeRequested = false;
   _ExamScopeMode _scopeMode = _ExamScopeMode.topics;
   String? _error;
 
   @override
   void initState() {
     super.initState();
-    _template = widget.templates.firstWhere(
+    _templates = widget.templates.isNotEmpty
+        ? List<ExamTemplateModel>.from(widget.templates)
+        : ExamTemplateModel.defaults(widget.course.id);
+    _template = _preferredTemplate(_templates);
+    _titleCtrl.text = _defaultExamTitle(_template);
+    _loadTemplatesInPlace();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureDialogCourseTreeLoaded());
+  }
+
+  @override
+  void dispose() {
+    _titleCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _ensureDialogCourseTreeLoaded() async {
+    if (_dialogTreeRequested) return;
+    _dialogTreeRequested = true;
+    try {
+      await Future.wait([
+        ref
+            .read(courseDetailsControllerProvider(widget.course.id).notifier)
+            .loadModulesAndAllMaterials(force: true),
+        ensureCourseLearningOutcomesLoaded(ref, widget.course.id, force: true),
+      ]);
+    } catch (_) {
+      // The dialog can still fall back to question-bank metadata.
+    } finally {
+      if (mounted) setState(() {});
+    }
+  }
+
+  bool _isCourseTreeLoading(CourseDetailsState state) {
+    return state.modulesLoading ||
+        state.materialsLoading.values.any((loading) => loading) ||
+        state.topicsLoading.values.any((loading) => loading);
+  }
+
+  List<_TopicTarget> _topicTargetsFromCourseState(CourseDetailsState state) {
+    final result = <_TopicTarget>[];
+    for (final module in state.modules) {
+      final materials = state.materials[module.id] ?? const <MaterialItem>[];
+      final materialsById = {for (final material in materials) material.id: material};
+      final topics = state.topics[module.id] ?? const <TopicItem>[];
+      for (final topic in topics) {
+        final material = materialsById[topic.materialId];
+        if (material == null) continue;
+        String? parentTitle;
+        if (topic.parentTopicId != null) {
+          for (final candidate in topics) {
+            if (candidate.id == topic.parentTopicId) {
+              parentTitle = candidate.title;
+              break;
+            }
+          }
+        }
+        result.add(_TopicTarget(
+          module: module,
+          material: material,
+          topic: topic.copyWith(moduleId: module.id),
+          parentTopicTitle: parentTitle,
+        ));
+      }
+    }
+    result.sort(_compareTopicTargets);
+    return result;
+  }
+
+  List<_TopicTarget> _topicTargetsFromQuestions(List<QuestionModel> questions) {
+    final now = DateTime.fromMillisecondsSinceEpoch(0);
+    final modulesById = <int, ModuleItem>{};
+    final materialsById = <int, MaterialItem>{};
+    final targetsByTopicId = <int, _TopicTarget>{};
+
+    for (final question in questions) {
+      final moduleId = question.moduleId;
+      final materialId = question.materialId;
+      final topicId = question.topicId;
+      if (moduleId == null || materialId == null || topicId == null) continue;
+
+      final module = modulesById.putIfAbsent(
+        moduleId,
+        () => ModuleItem(
+          id: moduleId,
+          courseId: widget.course.id,
+          title: (question.moduleName ?? '').trim().isEmpty
+              ? 'Module $moduleId'
+              : question.moduleName!.trim(),
+          orderIndex: moduleId,
+          isPublished: true,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      final material = materialsById.putIfAbsent(
+        materialId,
+        () => MaterialItem(
+          id: materialId,
+          moduleId: moduleId,
+          title: (question.materialName ?? '').trim().isEmpty
+              ? 'Material $materialId'
+              : question.materialName!.trim(),
+          type: 'document',
+          status: 'ready',
+          uploadedAt: now,
+          createdAt: now,
+          updatedAt: now,
+        ),
+      );
+
+      targetsByTopicId.putIfAbsent(
+        topicId,
+        () => _TopicTarget(
+          module: module,
+          material: material,
+          topic: TopicItem(
+            id: topicId,
+            materialId: materialId,
+            title: (question.topicName ?? '').trim().isEmpty
+                ? 'Topic $topicId'
+                : question.topicName!.trim(),
+            orderIndex: topicId,
+            createdAt: now,
+            updatedAt: now,
+            moduleId: moduleId,
+          ),
+        ),
+      );
+    }
+
+    final result = targetsByTopicId.values.toList()..sort(_compareTopicTargets);
+    return result;
+  }
+
+  List<_TopicTarget> _mergeTopicTargets(List<List<_TopicTarget>> groups) {
+    final byTopicId = <int, _TopicTarget>{};
+    for (final group in groups) {
+      for (final target in group) {
+        byTopicId.putIfAbsent(target.topic.id, () => target);
+      }
+    }
+    final result = byTopicId.values.toList()..sort(_compareTopicTargets);
+    return result;
+  }
+
+  List<ModuleItem> _mergeModules(
+    List<ModuleItem> courseStateModules,
+    List<ModuleItem> initialModules,
+    List<_TopicTarget> targets,
+  ) {
+    final byId = <int, ModuleItem>{};
+    for (final module in courseStateModules) {
+      byId[module.id] = module;
+    }
+    for (final module in initialModules) {
+      byId.putIfAbsent(module.id, () => module);
+    }
+    for (final target in targets) {
+      byId.putIfAbsent(target.module.id, () => target.module);
+    }
+    final result = byId.values.toList()
+      ..sort((a, b) {
+        final orderCmp = a.orderIndex.compareTo(b.orderIndex);
+        if (orderCmp != 0) return orderCmp;
+        return _moduleLabel(a).toLowerCase().compareTo(_moduleLabel(b).toLowerCase());
+      });
+    return result;
+  }
+
+  int _compareTopicTargets(_TopicTarget a, _TopicTarget b) {
+    final moduleCmp = a.module.orderIndex.compareTo(b.module.orderIndex);
+    if (moduleCmp != 0) return moduleCmp;
+    final materialCmp = a.material.displayTitle.toLowerCase().compareTo(
+          b.material.displayTitle.toLowerCase(),
+        );
+    if (materialCmp != 0) return materialCmp;
+    final topicOrderCmp = a.topic.orderIndex.compareTo(b.topic.orderIndex);
+    if (topicOrderCmp != 0) return topicOrderCmp;
+    return a.topic.title.toLowerCase().compareTo(b.topic.title.toLowerCase());
+  }
+
+  String _defaultExamTitle(ExamTemplateModel template) {
+    final base = widget.course.title.trim().isEmpty ? 'Course' : widget.course.title.trim();
+    final templateName = template.name.trim().isEmpty ? 'Exam' : template.name.trim();
+    return '$base • $templateName';
+  }
+
+  void _applyTemplate(ExamTemplateModel template) {
+    final previousDefault = _defaultExamTitle(_template);
+    final currentTitle = _titleCtrl.text.trim();
+    _template = template;
+    if (currentTitle.isEmpty || currentTitle == previousDefault) {
+      _titleCtrl.text = _defaultExamTitle(template);
+    }
+  }
+
+  ExamTemplateModel _preferredTemplate(List<ExamTemplateModel> templates) {
+    return templates.firstWhere(
       (item) => !item.isCustom,
-      orElse: () => widget.templates.isNotEmpty
-          ? widget.templates.first
+      orElse: () => templates.isNotEmpty
+          ? templates.first
           : ExamTemplateModel.custom(widget.course.id),
     );
+  }
+
+  Future<void> _loadTemplatesInPlace() async {
+    final future = widget.templatesFuture;
+    if (future == null) return;
+    _templatesLoading = true;
+    try {
+      final loaded = await future;
+      if (!mounted) return;
+      final nextTemplates = loaded.isNotEmpty ? loaded : ExamTemplateModel.defaults(widget.course.id);
+      final currentId = _template.id;
+      final stillExists = nextTemplates.any((item) => item.id == currentId);
+      setState(() {
+        _templates = nextTemplates;
+        if (!stillExists || _template.isCustom) {
+          _applyTemplate(_preferredTemplate(nextTemplates));
+        }
+        _templatesLoading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _templatesLoading = false);
+    }
   }
 
   bool get _hasRequiredScope {
@@ -488,12 +784,13 @@ class _CreateExamStartDialogState extends State<_CreateExamStartDialog> {
         : 'Select at least one learning outcome before building the question set.';
   }
 
-  List<QuestionModel> _matchingQuestions() {
+  List<QuestionModel> _matchingQuestions(List<_TopicTarget> topicTargets) {
     if (!_hasRequiredScope) return const <QuestionModel>[];
 
+    final targetByTopicId = {for (final target in topicTargets) target.topic.id: target};
     return widget.questions.where((question) {
       if (question.remoteId == null) return false;
-      final target = _targetForQuestion(widget.topicTargets, question);
+      final target = question.topicId == null ? null : targetByTopicId[question.topicId];
       final moduleId = question.moduleId ?? target?.module.id;
       final materialId = question.materialId ?? target?.material.id;
       final topicId = question.topicId ?? target?.topic.id;
@@ -542,13 +839,29 @@ class _CreateExamStartDialogState extends State<_CreateExamStartDialog> {
     final gaps = <_TemplateRequirementGap>[];
     for (final section in activeSections) {
       final type = parseQuestionType(section.questionType);
-      final available = eligible.where((question) => question.type == type).length;
-      if (available < section.questionCount) {
-        gaps.add(_TemplateRequirementGap(
-          label: _templateQuestionTypeLabel(section.questionType),
-          requiredCount: section.questionCount,
-          availableCount: available,
-        ));
+      final difficultyCounts = _sectionDifficultyDistribution(section);
+      if (difficultyCounts.isEmpty) {
+        final available = eligible.where((question) => question.type == type).length;
+        if (available < section.questionCount) {
+          gaps.add(_TemplateRequirementGap(
+            label: _templateQuestionTypeLabel(section.questionType),
+            requiredCount: section.questionCount,
+            availableCount: available,
+          ));
+        }
+        continue;
+      }
+
+      for (final entry in difficultyCounts.entries) {
+        final difficulty = parseQuestionDifficulty(entry.key);
+        final available = matching.where((question) => question.type == type && question.difficulty == difficulty).length;
+        if (available < entry.value) {
+          gaps.add(_TemplateRequirementGap(
+            label: '${_templateQuestionTypeLabel(section.questionType)} ${_difficultyLabelFromKey(entry.key)}',
+            requiredCount: entry.value,
+            availableCount: available,
+          ));
+        }
       }
     }
     return gaps;
@@ -558,24 +871,58 @@ class _CreateExamStartDialogState extends State<_CreateExamStartDialog> {
     return 'Not enough questions for this template distribution: ${gaps.map((gap) => '${gap.label} requires ${gap.requiredCount}, found ${gap.availableCount}').join('; ')}.';
   }
 
-  void _continue() {
+  String? _validatedExamTitle() {
+    final title = _titleCtrl.text.trim();
+    if (title.isEmpty) {
+      setState(() => _error = 'Enter an exam title before continuing.');
+      return null;
+    }
+    return title;
+  }
+
+  List<_TemplateRequirementGap>? _validateScopeAndDistribution({
+    required bool backendGenerate,
+    required List<_TopicTarget> topicTargets,
+  }) {
     if (!_hasRequiredScope) {
-      setState(() => _error = _scopeRequiredMessage);
-      return;
+      setState(() => _error = backendGenerate && _scopeMode == _ExamScopeMode.outcomes
+          ? 'The generate-exam endpoint needs topic/subtopic scope. Switch to Topics or use Build manually.'
+          : _scopeRequiredMessage);
+      return null;
     }
 
-    final matching = _matchingQuestions();
+    if (backendGenerate && _scopeMode != _ExamScopeMode.topics) {
+      setState(() => _error = 'Backend generation currently supports topic/subtopic scope. Use Build manually for learning outcomes.');
+      return null;
+    }
+
+    final matching = _matchingQuestions(topicTargets);
     if (matching.isEmpty) {
       setState(() => _error = 'No saved questions match the selected scope. Choose a different topic/subtopic or learning outcome.');
-      return;
+      return null;
     }
+
     final gaps = _templateRequirementGaps(matching);
     if (gaps.isNotEmpty) {
       setState(() => _error = _gapsMessage(gaps));
-      return;
+      return null;
     }
+
+    return gaps;
+  }
+
+  void _continue(List<_TopicTarget> topicTargets) {
+    final title = _validatedExamTitle();
+    if (title == null) return;
+    final validation = _validateScopeAndDistribution(
+      backendGenerate: false,
+      topicTargets: topicTargets,
+    );
+    if (validation == null) return;
+
     Navigator.of(context).pop(_ExamStartConfig(
       template: _template,
+      title: title,
       moduleId: _moduleId,
       materialId: _materialId,
       topicIds: _scopeMode == _ExamScopeMode.topics ? Set<int>.from(_topicIds) : const <int>{},
@@ -583,266 +930,470 @@ class _CreateExamStartDialogState extends State<_CreateExamStartDialog> {
     ),);
   }
 
+  Map<String, dynamic> _difficultyDistributionForTemplate(
+    ExamTemplateModel template,
+    List<QuestionModel> matching,
+  ) {
+    final sections = _effectiveDistributionSections(template);
+    final result = <String, dynamic>{};
+
+    for (var index = 0; index < sections.length; index++) {
+      final section = sections[index];
+      final orderIndex = section.orderIndex > 0 ? section.orderIndex : index + 1;
+      final type = parseQuestionType(section.questionType);
+      final configured = _difficultyPercentagesFromCounts(_sectionDifficultyDistribution(section));
+      if (configured.isNotEmpty) {
+        result['$orderIndex'] = configured;
+      } else {
+        final candidates = matching.where((question) => question.type == type).toList();
+        result['$orderIndex'] = _difficultyPercentages(candidates);
+      }
+    }
+
+    if (result.isEmpty) {
+      result['1'] = const <String, int>{'medium': 100};
+    }
+    return result;
+  }
+
+  List<ExamTemplateSectionModel> _effectiveDistributionSections(ExamTemplateModel template) {
+    final sections = template.sections.where((section) => section.questionCount > 0).toList()
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    if (sections.isNotEmpty) return sections;
+    final distributionSections = template.distributionSections;
+    if (distributionSections.isNotEmpty) return distributionSections;
+
+    final now = DateTime.fromMillisecondsSinceEpoch(0);
+    return [
+      ExamTemplateSectionModel(
+        title: 'Multiple Choice Questions',
+        questionType: 'multiple_choice',
+        questionCount: template.questionCount > 0 ? template.questionCount : 1,
+        pointsPerQuestion: 1,
+        sectionScore: (template.questionCount > 0 ? template.questionCount : 1).toDouble(),
+        orderIndex: 1,
+        createdAt: now,
+        updatedAt: now,
+      ),
+    ];
+  }
+
+  Map<String, int> _difficultyPercentages(List<QuestionModel> questions) {
+    final counts = <String, int>{
+      'easy': questions.where((question) => question.difficulty == QuestionDifficulty.easy).length,
+      'medium': questions.where((question) => question.difficulty == QuestionDifficulty.medium).length,
+      'hard': questions.where((question) => question.difficulty == QuestionDifficulty.hard).length,
+    };
+    final total = counts.values.fold<int>(0, (sum, count) => sum + count);
+    if (total <= 0) return const <String, int>{'medium': 100};
+
+    final nonZeroKeys = counts.entries.where((entry) => entry.value > 0).map((entry) => entry.key).toList();
+    var assigned = 0;
+    final distribution = <String, int>{};
+    for (var i = 0; i < nonZeroKeys.length; i++) {
+      final key = nonZeroKeys[i];
+      final value = counts[key] ?? 0;
+      final percent = i == nonZeroKeys.length - 1 ? 100 - assigned : (value * 100 / total).round();
+      distribution[key] = percent;
+      assigned += percent;
+    }
+
+    if (distribution.isEmpty) return const <String, int>{'medium': 100};
+    final sum = distribution.values.fold<int>(0, (a, b) => a + b);
+    if (sum != 100) {
+      final adjustKey = distribution.containsKey('medium') ? 'medium' : distribution.keys.first;
+      distribution[adjustKey] = (distribution[adjustKey] ?? 0) + (100 - sum);
+    }
+    return distribution;
+  }
+
+  Map<String, int> _difficultyPercentagesFromCounts(Map<String, int> counts) {
+    final positive = <String, int>{};
+    for (final entry in counts.entries) {
+      if (entry.value > 0) positive[entry.key] = entry.value;
+    }
+    final total = positive.values.fold<int>(0, (sum, count) => sum + count);
+    if (total <= 0) return const <String, int>{};
+
+    var assigned = 0;
+    final result = <String, int>{};
+    final entries = positive.entries.toList();
+    for (var i = 0; i < entries.length; i++) {
+      final entry = entries[i];
+      final percent = i == entries.length - 1 ? 100 - assigned : (entry.value * 100 / total).round();
+      if (percent > 0) result[entry.key] = percent;
+      assigned += percent;
+    }
+    if (result.isEmpty) return const <String, int>{'medium': 100};
+    final sum = result.values.fold<int>(0, (a, b) => a + b);
+    if (sum != 100) {
+      final adjustKey = result.containsKey('medium') ? 'medium' : result.keys.first;
+      result[adjustKey] = (result[adjustKey] ?? 0) + (100 - sum);
+    }
+    return result;
+  }
+
+  Future<void> _generateExamFromBackend(List<_TopicTarget> topicTargets) async {
+    if (_generating) return;
+    final title = _validatedExamTitle();
+    if (title == null) return;
+    final validation = _validateScopeAndDistribution(
+      backendGenerate: true,
+      topicTargets: topicTargets,
+    );
+    if (validation == null) return;
+
+    setState(() {
+      _generating = true;
+      _error = null;
+    });
+
+    try {
+      final savedTemplate = await ref
+          .read(examTemplatesStorageProvider)
+          .ensureBackendTemplate(widget.course.id, _template.copyWith(courseId: widget.course.id));
+      final templateId = savedTemplate.backendId;
+      if (templateId == null) {
+        throw const FormatException('Could not save the selected template before generating the exam.');
+      }
+
+      final topicIds = _topicIds.toList()..sort();
+      final distribution = _difficultyDistributionForTemplate(
+        savedTemplate,
+        _matchingQuestions(topicTargets),
+      );
+      final exam = await ref.read(examsApiProvider).generateExamFromTemplate(
+            courseId: widget.course.id,
+            templateId: templateId,
+            payload: GenerateExamFromTemplatePayload(
+              title: title,
+              topicIds: topicIds,
+              sectionDifficultyDistribution: distribution,
+            ),
+          );
+
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => _GeneratedExamSuccessDialog(exam: exam, template: savedTemplate),
+      );
+      if (!mounted) return;
+      await widget.onGenerated?.call();
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _generating = false;
+        _error = mapApiFailure(e).message;
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final materialOptions = _materialFilterOptions(widget.topicTargets, _moduleId);
-    final visibleTargets = widget.topicTargets.where((target) {
+    final courseState = ref.watch(courseDetailsControllerProvider(widget.course.id));
+    final liveOutcomes = ref.watch(courseLOProvider(widget.course.id));
+    final courseTreeTargets = _topicTargetsFromCourseState(courseState);
+    final questionMetadataTargets = _topicTargetsFromQuestions(widget.questions);
+    final effectiveTopicTargets = _mergeTopicTargets([
+      courseTreeTargets,
+      widget.topicTargets,
+      questionMetadataTargets,
+    ]);
+    final effectiveModules = _mergeModules(
+      courseState.modules,
+      widget.modules,
+      effectiveTopicTargets,
+    );
+    final effectiveOutcomes = liveOutcomes.isNotEmpty ? liveOutcomes : widget.outcomes;
+    final treeLoading = _isCourseTreeLoading(courseState);
+
+    final materialOptions = _materialFilterOptions(effectiveTopicTargets, _moduleId);
+    final visibleTargets = effectiveTopicTargets.where((target) {
       if (_moduleId != null && target.module.id != _moduleId) return false;
       if (_materialId != null && target.material.id != _materialId) return false;
       return true;
     }).toList();
-    final outcomeOptions = _learningOutcomeSetupOptions(widget.questions, widget.outcomes);
-    final matching = _matchingQuestions();
+    final outcomeOptions = _learningOutcomeSetupOptions(widget.questions, effectiveOutcomes);
+    final matching = _matchingQuestions(effectiveTopicTargets);
     final eligibleMatching = _eligibleQuestionsForTemplate(matching);
     final requirementGaps = _templateRequirementGaps(matching);
-    final templateItems = widget.templates.isNotEmpty ? widget.templates : <ExamTemplateModel>[_template];
+    final templateItems = _templates.isNotEmpty ? _templates : <ExamTemplateModel>[_template];
 
     final templateValue = _template.name;
     final templateLabels = templateItems.map((item) => item.name).toList();
-    final moduleValue = _selectedModuleLabel(widget.modules, _moduleId);
-    final moduleItems = <String>['All modules', ...widget.modules.map(_moduleLabel)];
+    final moduleValue = _selectedModuleLabel(effectiveModules, _moduleId);
+    final moduleItems = <String>['All modules', ...effectiveModules.map(_moduleLabel)];
     final materialValue = _selectedMaterialFilterLabel(materialOptions, _materialId);
     final materialItems = <String>['All materials', ...materialOptions.map((option) => option.label)];
+    final titleReady = _titleCtrl.text.trim().isNotEmpty;
+    final scopeReady = _hasRequiredScope && matching.isNotEmpty && requirementGaps.isEmpty;
+    final canBuildManually = titleReady && scopeReady && !_generating;
+    final canGenerate = canBuildManually && _scopeMode == _ExamScopeMode.topics;
+
+    final generateStatus = _generateStatusText(
+      titleReady: titleReady,
+      matchingCount: matching.length,
+      gaps: requirementGaps,
+    );
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 36, vertical: 22),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
       backgroundColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 880, maxHeight: 780),
+        constraints: const BoxConstraints(maxWidth: 1120, maxHeight: 820),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(10),
+          borderRadius: BorderRadius.circular(24),
           child: Material(
             color: AppColors.cardBg,
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 14, 16),
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFF145CCB), Color(0xFF137FEC), Color(0xFF22C1F1)],
+                _ExamSetupHeader(
+                  courseTitle: widget.course.title,
+                  totalQuestions: widget.questions.length,
+                  onClose: _generating ? null : () => Navigator.of(context).pop(),
+                ),
+                if (_error != null)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                    child: _SetupAlert(message: _error!, tone: _SetupAlertTone.danger),
+                  ),
+                if (_templatesLoading)
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(24, 18, 24, 0),
+                    child: _SetupAlert(
+                      message: 'Syncing saved exam templates from the backend. You can continue with the visible options.',
+                      tone: _SetupAlertTone.info,
                     ),
                   ),
-                  child: Row(
-                    children: [
-                      Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.14),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.white.withOpacity(0.2)),
-                        ),
-                        child: const Icon(Icons.playlist_add_check_rounded, color: Colors.white, size: 18),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
+                if (treeLoading && effectiveTopicTargets.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.fromLTRB(24, 18, 24, 0),
+                    child: _SetupAlert(
+                      message: 'Loading course materials and topics directly from the backend...',
+                      tone: _SetupAlertTone.info,
+                    ),
+                  ),
+                Flexible(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final compact = constraints.maxWidth < 900;
+                      final blueprintPanel = _SetupPanel(
+                        title: 'Blueprint',
+                        subtitle: 'Name the exam and select the template the backend should use.',
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
-                            const Text(
-                              'Create Exam Setup',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 19,
-                                height: 1.1,
-                                fontWeight: FontWeight.w900,
-                              ),
+                            _SetupTextField(
+                              label: 'Exam title',
+                              controller: _titleCtrl,
+                              enabled: !_generating,
+                              onChanged: (_) => setState(() => _error = null),
                             ),
-                            const SizedBox(height: 4),
-                            Text(
-                              'Choose a template, then pick either topics/subtopics or learning outcomes.',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                color: Colors.white.withOpacity(0.80),
-                                fontSize: 12.5,
-                                fontWeight: FontWeight.w700,
-                              ),
+                            const SizedBox(height: 14),
+                            _SetupDropdownField(
+                              label: 'Template',
+                              width: double.infinity,
+                              value: templateValue,
+                              items: templateLabels,
+                              onChanged: (value) {
+                                final selected = templateItems.cast<ExamTemplateModel?>().firstWhere(
+                                      (item) => item != null && item.name == value,
+                                      orElse: () => null,
+                                    );
+                                if (selected == null) return;
+                                setState(() {
+                                  _applyTemplate(selected);
+                                  _error = null;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 14),
+                            LayoutBuilder(
+                              builder: (context, inner) {
+                                final twoCols = inner.maxWidth >= 560;
+                                final width = twoCols ? (inner.maxWidth - 12) / 2 : inner.maxWidth;
+                                return Wrap(
+                                  spacing: 12,
+                                  runSpacing: 12,
+                                  children: [
+                                    _SetupDropdownField(
+                                      label: 'Module scope',
+                                      width: width,
+                                      value: moduleValue,
+                                      items: moduleItems,
+                                      onChanged: (value) {
+                                        final module = effectiveModules.cast<ModuleItem?>().firstWhere(
+                                              (item) => item != null && _moduleLabel(item) == value,
+                                              orElse: () => null,
+                                            );
+                                        setState(() {
+                                          _moduleId = module?.id;
+                                          _materialId = null;
+                                          _topicIds.clear();
+                                          _error = null;
+                                        });
+                                      },
+                                    ),
+                                    _SetupDropdownField(
+                                      label: 'Material scope',
+                                      width: width,
+                                      value: materialValue,
+                                      items: materialItems,
+                                      onChanged: (value) {
+                                        final option = materialOptions.cast<_FilterOption?>().firstWhere(
+                                              (item) => item != null && item.label == value,
+                                              orElse: () => null,
+                                            );
+                                        setState(() {
+                                          _materialId = option?.id;
+                                          _topicIds.clear();
+                                          _error = null;
+                                        });
+                                      },
+                                    ),
+                                  ],
+                                );
+                              },
+                            ),
+                            const SizedBox(height: 18),
+                            _TemplateInsightCard(template: _template),
+                            const SizedBox(height: 14),
+                            _SetupMetricGrid(
+                              matchingCount: eligibleMatching.length,
+                              targetCount: _template.questionCount,
+                              durationMinutes: _template.durationMinutes,
+                              publishAfterSave: _template.publishAfterSave,
                             ),
                           ],
                         ),
-                      ),
-                      IconButton(
-                        visualDensity: VisualDensity.compact,
-                        onPressed: () => Navigator.of(context).pop(),
-                        icon: const Icon(Icons.close_rounded, color: Colors.white, size: 21),
-                      ),
-                    ],
-                  ),
-                ),
-                Flexible(
-                  child: SingleChildScrollView(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (_error != null) ...[
-                          Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                            decoration: BoxDecoration(
-                              color: AppColors.dangerBg,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.dangerBorder),
-                            ),
-                            child: Text(
-                              _error!,
-                              style: TextStyle(
-                                color: AppColors.dangerText,
-                                fontWeight: FontWeight.w800,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                        ],
-                        LayoutBuilder(
-                          builder: (context, constraints) {
-                            final twoCols = constraints.maxWidth >= 660;
-                            final fieldWidth = twoCols ? (constraints.maxWidth - 12) / 2 : constraints.maxWidth;
-                            final fields = <Widget>[
-                              _SetupDropdownField(
-                                label: 'Template',
-                                width: fieldWidth,
-                                value: templateValue,
-                                items: templateLabels,
-                                onChanged: (value) {
-                                  final selected = templateItems.cast<ExamTemplateModel?>().firstWhere(
-                                        (item) => item != null && item.name == value,
-                                        orElse: () => null,
-                                      );
-                                  if (selected == null) return;
-                                  setState(() {
-                                    _template = selected;
-                                    _error = null;
-                                  });
-                                },
-                              ),
-                              _SetupDropdownField(
-                                label: 'Module',
-                                width: fieldWidth,
-                                value: moduleValue,
-                                items: moduleItems,
-                                onChanged: (value) {
-                                  final module = widget.modules.cast<ModuleItem?>().firstWhere(
-                                        (item) => item != null && _moduleLabel(item) == value,
-                                        orElse: () => null,
-                                      );
-                                  setState(() {
-                                    _moduleId = module?.id;
-                                    _materialId = null;
-                                    _topicIds.clear();
-                                    _error = null;
-                                  });
-                                },
-                              ),
-                              _SetupDropdownField(
-                                label: 'Material',
-                                width: fieldWidth,
-                                value: materialValue,
-                                items: materialItems,
-                                onChanged: (value) {
-                                  final option = materialOptions.cast<_FilterOption?>().firstWhere(
-                                        (item) => item != null && item.label == value,
-                                        orElse: () => null,
-                                      );
-                                  setState(() {
-                                    _materialId = option?.id;
-                                    _topicIds.clear();
-                                    _error = null;
-                                  });
-                                },
-                              ),
-                            ];
+                      );
 
-                            return Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
-                              children: fields,
-                            );
-                          },
+                      final scopePanel = _SetupPanel(
+                        title: 'Question source',
+                        subtitle: 'Choose the exact scope. Generate uses topics; manual build also supports outcomes.',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            _ScopeModeSelector(
+                              mode: _scopeMode,
+                              selectedTopicCount: _topicIds.length,
+                              selectedOutcomeCount: _outcomeIds.length,
+                              onChanged: (mode) {
+                                if (mode == _scopeMode || _generating) return;
+                                setState(() {
+                                  _scopeMode = mode;
+                                  if (mode == _ExamScopeMode.topics) {
+                                    _outcomeIds.clear();
+                                  } else {
+                                    _topicIds.clear();
+                                  }
+                                  _error = null;
+                                });
+                              },
+                            ),
+                            const SizedBox(height: 14),
+                            AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 160),
+                              child: _scopeMode == _ExamScopeMode.topics
+                                  ? _SetupTopicTreePicker(
+                                      key: const ValueKey<String>('topics'),
+                                      targets: visibleTargets,
+                                      selectedTopicIds: _topicIds,
+                                      onChanged: (ids) {
+                                        if (_generating) return;
+                                        setState(() {
+                                          _topicIds
+                                            ..clear()
+                                            ..addAll(ids);
+                                          _error = null;
+                                        });
+                                      },
+                                    )
+                                  : _SetupOutcomePicker(
+                                      key: const ValueKey<String>('outcomes'),
+                                      outcomes: outcomeOptions,
+                                      selectedOutcomeIds: _outcomeIds,
+                                      onChanged: (ids) {
+                                        if (_generating) return;
+                                        setState(() {
+                                          _outcomeIds
+                                            ..clear()
+                                            ..addAll(ids);
+                                          _error = null;
+                                        });
+                                      },
+                                    ),
+                            ),
+                            const SizedBox(height: 14),
+                            _TemplateDistributionStatus(template: _template, gaps: requirementGaps),
+                            const SizedBox(height: 14),
+                            _BackendGenerateStatus(
+                              enabled: canGenerate,
+                              templateWillBeSaved: _template.backendId == null,
+                              message: generateStatus,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 16),
-                        _ScopeModeSelector(
-                          mode: _scopeMode,
-                          selectedTopicCount: _topicIds.length,
-                          selectedOutcomeCount: _outcomeIds.length,
-                          onChanged: (mode) {
-                            if (mode == _scopeMode) return;
-                            setState(() {
-                              _scopeMode = mode;
-                              if (mode == _ExamScopeMode.topics) {
-                                _outcomeIds.clear();
-                              } else {
-                                _topicIds.clear();
-                              }
-                              _error = null;
-                            });
-                          },
-                        ),
-                        const SizedBox(height: 12),
-                        if (_scopeMode == _ExamScopeMode.topics)
-                          _SetupTopicTreePicker(
-                            targets: visibleTargets,
-                            selectedTopicIds: _topicIds,
-                            onChanged: (ids) {
-                              setState(() {
-                                _topicIds
-                                  ..clear()
-                                  ..addAll(ids);
-                                _error = null;
-                              });
-                            },
-                          )
-                        else
-                          _SetupOutcomePicker(
-                            outcomes: outcomeOptions,
-                            selectedOutcomeIds: _outcomeIds,
-                            onChanged: (ids) {
-                              setState(() {
-                                _outcomeIds
-                                  ..clear()
-                                  ..addAll(ids);
-                                _error = null;
-                              });
-                            },
-                          ),
-                        const SizedBox(height: 14),
-                        _SetupInlineSummary(
-                          matchingCount: eligibleMatching.length,
-                          targetCount: _template.questionCount,
-                          durationMinutes: _template.durationMinutes,
-                          publishAfterSave: _template.publishAfterSave,
-                        ),
-                        const SizedBox(height: 10),
-                        _TemplateDistributionStatus(
-                          template: _template,
-                          gaps: requirementGaps,
-                        ),
-                      ],
-                    ),
+                      );
+
+                      return SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+                        child: compact
+                            ? Column(
+                                children: [
+                                  blueprintPanel,
+                                  const SizedBox(height: 16),
+                                  scopePanel,
+                                ],
+                              )
+                            : Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  SizedBox(width: 360, child: blueprintPanel),
+                                  const SizedBox(width: 18),
+                                  Expanded(child: scopePanel),
+                                ],
+                              ),
+                      );
+                    },
                   ),
                 ),
                 Divider(height: 1, color: AppColors.borderGray),
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+                  padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
                   child: Row(
                     children: [
                       TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
+                        onPressed: _generating ? null : () => Navigator.of(context).pop(),
                         child: const Text('Cancel'),
                       ),
                       const Spacer(),
+                      OutlinedButton.icon(
+                        onPressed: canBuildManually ? () => _continue(effectiveTopicTargets) : null,
+                        icon: const Icon(Icons.tune_rounded, size: 18),
+                        label: const Text('Build manually'),
+                        style: OutlinedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
                       FilledButton.icon(
-                        onPressed: _hasRequiredScope && matching.isNotEmpty ? _continue : null,
-                        icon: const Icon(Icons.arrow_forward_rounded, size: 17),
-                        label: const Text('Build Question Set'),
+                        onPressed: canGenerate ? () => _generateExamFromBackend(effectiveTopicTargets) : null,
+                        icon: _generating
+                            ? const SizedBox(
+                                width: 17,
+                                height: 17,
+                                child: CircularProgressIndicator(strokeWidth: 2.3, color: Colors.white),
+                              )
+                            : const Icon(Icons.auto_awesome_rounded, size: 18),
+                        label: Text(_generating ? 'Generating...' : 'Generate Exam'),
                         style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 17, vertical: 13),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                         ),
                       ),
                     ],
@@ -855,8 +1406,557 @@ class _CreateExamStartDialogState extends State<_CreateExamStartDialog> {
       ),
     );
   }
+
+  String _generateStatusText({
+    required bool titleReady,
+    required int matchingCount,
+    required List<_TemplateRequirementGap> gaps,
+  }) {
+    if (!titleReady) return 'Add an exam title first.';
+    if (_scopeMode != _ExamScopeMode.topics) {
+      return 'Backend generate-exam accepts topic/subtopic IDs. Learning outcomes can still be used in the manual builder.';
+    }
+    if (_topicIds.isEmpty) return 'Select one or more topics/subtopics to enable backend generation.';
+    if (matchingCount == 0) return 'No backend-saved questions match this scope.';
+    if (gaps.isNotEmpty) return _gapsMessage(gaps);
+    if (_template.backendId == null) {
+      return 'Ready. The selected template will be saved to the backend first, then generate-exam will create the exam.';
+    }
+    return 'Ready to call generate-exam with ${_topicIds.length} selected topic${_topicIds.length == 1 ? '' : 's'}.';
+  }
 }
 
+
+enum _SetupAlertTone { info, danger }
+
+class _ExamSetupHeader extends StatelessWidget {
+  final String courseTitle;
+  final int totalQuestions;
+  final VoidCallback? onClose;
+
+  const _ExamSetupHeader({
+    required this.courseTitle,
+    required this.totalQuestions,
+    required this.onClose,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(24, 22, 18, 22),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        border: Border(bottom: BorderSide(color: AppColors.borderGray)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [Color(0xFF145CCB), Color(0xFF22C1F1)],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.22), blurRadius: 22, offset: const Offset(0, 10))],
+            ),
+            child: const Icon(Icons.assignment_turned_in_rounded, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    Flexible(
+                      child: Text(
+                        'Create Exam',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: AppColors.textTitle,
+                          fontSize: 22,
+                          height: 1.1,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.primarySoft,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: AppColors.primary.withOpacity(0.16)),
+                      ),
+                      child: Text(
+                        '$totalQuestions questions',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  courseTitle.trim().isEmpty
+                      ? 'Generate from backend templates or build a curated set manually.'
+                      : '$courseTitle • Generate from backend templates or build a curated set manually.',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12.5,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            tooltip: 'Close',
+            onPressed: onClose,
+            icon: Icon(Icons.close_rounded, color: AppColors.textMuted, size: 22),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SetupAlert extends StatelessWidget {
+  final String message;
+  final _SetupAlertTone tone;
+
+  const _SetupAlert({required this.message, required this.tone});
+
+  @override
+  Widget build(BuildContext context) {
+    final danger = tone == _SetupAlertTone.danger;
+    final bg = danger ? AppColors.dangerBg : AppColors.infoBg;
+    final border = danger ? AppColors.dangerBorder : AppColors.infoBorder;
+    final color = danger ? AppColors.dangerText : AppColors.infoText;
+    final icon = danger ? Icons.error_outline_rounded : Icons.info_outline_rounded;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 18, color: color),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              message,
+              style: TextStyle(color: color, fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SetupPanel extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final Widget child;
+
+  const _SetupPanel({
+    required this.title,
+    required this.subtitle,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceMuted,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.borderGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              color: AppColors.textTitle,
+              fontSize: 15.5,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.15,
+            ),
+          ),
+          const SizedBox(height: 5),
+          Text(
+            subtitle,
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12.2, height: 1.35, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 16),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _SetupTextField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final bool enabled;
+  final ValueChanged<String> onChanged;
+
+  const _SetupTextField({
+    required this.label,
+    required this.controller,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            color: AppColors.textMuted,
+            fontSize: 11.5,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 7),
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          onChanged: onChanged,
+          textInputAction: TextInputAction.done,
+          style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w800, fontSize: 13.2),
+          decoration: InputDecoration(
+            filled: true,
+            fillColor: enabled ? AppColors.fieldBg : AppColors.fieldDisabledBg,
+            hintText: 'e.g. Java Midterm - Chapter 1',
+            hintStyle: TextStyle(color: AppColors.textHint, fontWeight: FontWeight.w600, fontSize: 13),
+            prefixIcon: Icon(Icons.drive_file_rename_outline_rounded, size: 18, color: AppColors.textMuted),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.borderGray),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
+            ),
+            disabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.borderGray),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TemplateInsightCard extends StatelessWidget {
+  final ExamTemplateModel template;
+
+  const _TemplateInsightCard({required this.template});
+
+  @override
+  Widget build(BuildContext context) {
+    final distribution = _templateDistributionText(template);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderGray),
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 16, offset: const Offset(0, 8))],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Icon(Icons.schema_rounded, color: AppColors.primary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  template.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textTitle, fontSize: 13.5, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  distribution.isEmpty ? 'Uses total question count.' : 'Distribution: $distribution',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 11.7, height: 1.35, fontWeight: FontWeight.w700),
+                ),
+                const SizedBox(height: 9),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    _SetupChip(label: template.examType.toUpperCase()),
+                    _SetupChip(label: template.backendId == null ? 'Local template' : 'Backend template'),
+                    _SetupChip(label: template.shuffleQuestions ? 'Shuffle questions' : 'Fixed order'),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SetupMetricGrid extends StatelessWidget {
+  final int matchingCount;
+  final int targetCount;
+  final int durationMinutes;
+  final bool publishAfterSave;
+
+  const _SetupMetricGrid({
+    required this.matchingCount,
+    required this.targetCount,
+    required this.durationMinutes,
+    required this.publishAfterSave,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final twoCols = constraints.maxWidth >= 300;
+        final width = twoCols ? (constraints.maxWidth - 10) / 2 : constraints.maxWidth;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: [
+            _SetupMetricTile(width: width, label: 'Matching', value: '$matchingCount'),
+            _SetupMetricTile(width: width, label: 'Target', value: '$targetCount'),
+            _SetupMetricTile(width: width, label: 'Duration', value: '$durationMinutes min'),
+            _SetupMetricTile(width: width, label: 'Mode', value: publishAfterSave ? 'Publish' : 'Draft'),
+          ],
+        );
+      },
+    );
+  }
+}
+
+class _SetupMetricTile extends StatelessWidget {
+  final double width;
+  final String label;
+  final String value;
+
+  const _SetupMetricTile({required this.width, required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.borderGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 10.5, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 4),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textTitle, fontSize: 14.5, fontWeight: FontWeight.w900)),
+        ],
+      ),
+    );
+  }
+}
+
+class _SetupChip extends StatelessWidget {
+  final String label;
+
+  const _SetupChip({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.headerBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.borderGray),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(color: AppColors.textMuted, fontSize: 10.2, fontWeight: FontWeight.w900, letterSpacing: 0.2),
+      ),
+    );
+  }
+}
+
+class _BackendGenerateStatus extends StatelessWidget {
+  final bool enabled;
+  final bool templateWillBeSaved;
+  final String message;
+
+  const _BackendGenerateStatus({
+    required this.enabled,
+    required this.templateWillBeSaved,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final color = enabled ? AppColors.successText : AppColors.warningText;
+    final bg = enabled ? AppColors.successBg : AppColors.warningSoftBg;
+    final border = enabled ? AppColors.greenBorder : AppColors.warningBorder;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(enabled ? Icons.rocket_launch_rounded : Icons.rule_rounded, color: color, size: 19),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  enabled ? 'Backend generate-exam is ready' : 'Generate-exam requirements',
+                  style: TextStyle(color: color, fontSize: 12.4, fontWeight: FontWeight.w900),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  message,
+                  style: TextStyle(color: color, fontSize: 11.8, height: 1.35, fontWeight: FontWeight.w700),
+                ),
+                if (enabled && templateWillBeSaved) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    'This local template will be created in the backend automatically before generation.',
+                    style: TextStyle(color: color, fontSize: 11.4, height: 1.35, fontWeight: FontWeight.w700),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _GeneratedExamSuccessDialog extends StatelessWidget {
+  final ExamModel exam;
+  final ExamTemplateModel template;
+
+  const _GeneratedExamSuccessDialog({required this.exam, required this.template});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      icon: Container(
+        width: 48,
+        height: 48,
+        decoration: BoxDecoration(color: AppColors.successBg, borderRadius: BorderRadius.circular(16)),
+        child: Icon(Icons.check_circle_rounded, color: AppColors.successText, size: 28),
+      ),
+      title: const Text('Exam generated'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'The backend generate-exam endpoint created the exam successfully.',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 13, height: 1.45, fontWeight: FontWeight.w700),
+          ),
+          const SizedBox(height: 14),
+          _GeneratedExamLine(label: 'Exam', value: exam.title),
+          _GeneratedExamLine(label: 'Template', value: template.name),
+          _GeneratedExamLine(label: 'Questions', value: '${exam.totalQuestions}'),
+          _GeneratedExamLine(label: 'Score', value: exam.totalScore.toStringAsFixed(exam.totalScore.truncateToDouble() == exam.totalScore ? 0 : 1)),
+          _GeneratedExamLine(label: 'Status', value: exam.isPublished ? 'Published' : 'Draft'),
+        ],
+      ),
+      actions: [
+        FilledButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Done'),
+        ),
+      ],
+    );
+  }
+}
+
+class _GeneratedExamLine extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _GeneratedExamLine({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 80,
+            child: Text(label, style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w900)),
+          ),
+          Expanded(
+            child: Text(value, style: TextStyle(color: AppColors.textTitle, fontSize: 12.5, fontWeight: FontWeight.w800)),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _TemplateRequirementGap {
   final String label;
@@ -906,11 +2006,47 @@ class _TemplateDistributionStatus extends StatelessWidget {
   }
 }
 
+Map<String, int> _sectionDifficultyDistribution(ExamTemplateSectionModel section) {
+  final result = <String, int>{};
+  for (final entry in section.difficultyDistribution.entries) {
+    final key = entry.key.trim().toLowerCase();
+    if (entry.value <= 0) continue;
+    if (key == 'easy' || key == 'medium' || key == 'hard') result[key] = entry.value;
+  }
+  return result;
+}
+
+String _difficultyCountsText(Map<String, int> counts) {
+  if (counts.isEmpty) return '';
+  final parts = <String>[];
+  final easy = counts['easy'] ?? 0;
+  final medium = counts['medium'] ?? 0;
+  final hard = counts['hard'] ?? 0;
+  if (easy > 0) parts.add('E$easy');
+  if (medium > 0) parts.add('M$medium');
+  if (hard > 0) parts.add('H$hard');
+  return parts.join('/');
+}
+
+String _difficultyLabelFromKey(String key) {
+  switch (key.trim().toLowerCase()) {
+    case 'easy':
+      return 'Easy';
+    case 'hard':
+      return 'Hard';
+    default:
+      return 'Medium';
+  }
+}
+
 String _templateDistributionText(ExamTemplateModel template) {
   final sections = template.sections.where((section) => section.questionCount > 0).toList()
     ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
   if (sections.isEmpty) return '';
-  return sections.map((section) => '${section.questionCount} ${_shortTemplateQuestionTypeLabel(section.questionType)}').join(' / ');
+  return sections.map((section) {
+    final difficulty = _difficultyCountsText(_sectionDifficultyDistribution(section));
+    return '${section.questionCount} ${_shortTemplateQuestionTypeLabel(section.questionType)}${difficulty.isEmpty ? '' : ' ($difficulty)'}';
+  }).join(' / ');
 }
 
 String _templateQuestionTypeLabel(String questionType) {
@@ -923,6 +2059,13 @@ String _templateQuestionTypeLabel(String questionType) {
       return 'Essay';
     case 'multi_select':
       return 'Multi-Select';
+    case 'fill_in_the_blank':
+    case 'fill_in_blank':
+      return 'Fill in the Blank';
+    case 'numeric':
+      return 'Numeric';
+    case 'code':
+      return 'Code';
     default:
       return 'Multiple Choice';
   }
@@ -938,6 +2081,13 @@ String _shortTemplateQuestionTypeLabel(String questionType) {
       return 'Essay';
     case 'multi_select':
       return 'MS';
+    case 'fill_in_the_blank':
+    case 'fill_in_blank':
+      return 'Blank';
+    case 'numeric':
+      return 'Num';
+    case 'code':
+      return 'Code';
     default:
       return 'MCQ';
   }
@@ -1113,6 +2263,7 @@ class _SetupTopicTreePicker extends StatelessWidget {
   final ValueChanged<Set<int>> onChanged;
 
   const _SetupTopicTreePicker({
+    super.key,
     required this.targets,
     required this.selectedTopicIds,
     required this.onChanged,
@@ -1300,6 +2451,7 @@ class _SetupOutcomePicker extends StatelessWidget {
   final ValueChanged<Set<int>> onChanged;
 
   const _SetupOutcomePicker({
+    super.key,
     required this.outcomes,
     required this.selectedOutcomeIds,
     required this.onChanged,
@@ -1860,12 +3012,18 @@ class _StartPreview extends StatelessWidget {
 class _QuestionBankHeader extends StatelessWidget {
   final bool loading;
   final bool canCreateExam;
+  final int totalQuestionsCount;
+  final int visibleQuestionsCount;
+  final int examReadyCount;
   final VoidCallback onRefresh;
   final VoidCallback onCreateExam;
 
   const _QuestionBankHeader({
     required this.loading,
     required this.canCreateExam,
+    required this.totalQuestionsCount,
+    required this.visibleQuestionsCount,
+    required this.examReadyCount,
     required this.onRefresh,
     required this.onCreateExam,
   });
@@ -1880,7 +3038,7 @@ class _QuestionBankHeader extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [Color(0xFF145CCB), Color(0xFF137FEC), Color(0xFF22C1F1)],
         ),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
             color: AppColors.primary.withOpacity(0.18),
@@ -1905,7 +3063,7 @@ class _QuestionBankHeader extends StatelessWidget {
                   side: BorderSide(color: Colors.white.withOpacity(0.35)),
                   backgroundColor: Colors.white.withOpacity(0.08),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('Refresh'),
@@ -1918,11 +3076,23 @@ class _QuestionBankHeader extends StatelessWidget {
                   disabledBackgroundColor: Colors.white.withOpacity(0.45),
                   disabledForegroundColor: AppColors.primary.withOpacity(0.45),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
                 icon: const Icon(Icons.playlist_add_check_rounded, size: 18),
                 label: const Text('Create Exam'),
               ),
+            ],
+          );
+
+          final stats = Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _HeaderCounter(label: 'Total questions', value: totalQuestionsCount),
+              _HeaderCounter(label: 'Visible', value: visibleQuestionsCount),
+              _HeaderCounter(label: 'Exam-ready', value: examReadyCount),
             ],
           );
 
@@ -1933,7 +3103,7 @@ class _QuestionBankHeader extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.14),
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(9),
                   border: Border.all(color: Colors.white.withOpacity(0.18)),
                 ),
                 child: Text(
@@ -1976,6 +3146,8 @@ class _QuestionBankHeader extends StatelessWidget {
               children: [
                 copy,
                 const SizedBox(height: 18),
+                stats,
+                const SizedBox(height: 10),
                 actions,
               ],
             );
@@ -1989,6 +3161,8 @@ class _QuestionBankHeader extends StatelessWidget {
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
+                  stats,
+                  const SizedBox(height: 10),
                   actions,
                 ],
               ),
@@ -2001,11 +3175,60 @@ class _QuestionBankHeader extends StatelessWidget {
 }
 
 
+class _HeaderCounter extends StatelessWidget {
+  final String label;
+  final int value;
+
+  const _HeaderCounter({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$value',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              height: 1,
+            ),
+          ),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.78),
+              fontSize: 11.2,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
 class _QuestionBankWorkspace extends StatelessWidget {
   final bool loading;
   final String? error;
   final List<QuestionModel> questions;
   final int allQuestionsCount;
+  final int filteredQuestionsCount;
+  final int pageStartIndex;
+  final int pageIndex;
+  final int pageSize;
+  final int totalPages;
   final String? selectedQuestionId;
   final TextEditingController searchController;
   final int? filterModuleId;
@@ -2018,7 +3241,9 @@ class _QuestionBankWorkspace extends StatelessWidget {
   final bool? filterUsed;
   final List<ModuleItem> modules;
   final List<_TopicTarget> topicTargets;
+  final Map<int, _TopicTarget> topicTargetByTopicId;
   final List<QuestionModel> allQuestions;
+  final List<LearningOutcome> courseOutcomes;
   final ValueChanged<String> onSearchChanged;
   final ValueChanged<QuestionModel> onSelectQuestion;
   final ValueChanged<int?> onModuleChanged;
@@ -2029,6 +3254,8 @@ class _QuestionBankWorkspace extends StatelessWidget {
   final ValueChanged<QuestionType?> onTypeChanged;
   final ValueChanged<QuestionSource?> onSourceChanged;
   final ValueChanged<bool?> onUsageChanged;
+  final ValueChanged<int> onPageChanged;
+  final ValueChanged<int> onPageSizeChanged;
   final VoidCallback onClearFilters;
   final VoidCallback onRetry;
   final void Function(QuestionModel question, List<_TopicTarget> topicTargets) onEditQuestion;
@@ -2039,6 +3266,11 @@ class _QuestionBankWorkspace extends StatelessWidget {
     required this.error,
     required this.questions,
     required this.allQuestionsCount,
+    required this.filteredQuestionsCount,
+    required this.pageStartIndex,
+    required this.pageIndex,
+    required this.pageSize,
+    required this.totalPages,
     required this.selectedQuestionId,
     required this.searchController,
     required this.filterModuleId,
@@ -2051,7 +3283,9 @@ class _QuestionBankWorkspace extends StatelessWidget {
     required this.filterUsed,
     required this.modules,
     required this.topicTargets,
+    required this.topicTargetByTopicId,
     required this.allQuestions,
+    required this.courseOutcomes,
     required this.onSearchChanged,
     required this.onSelectQuestion,
     required this.onModuleChanged,
@@ -2062,6 +3296,8 @@ class _QuestionBankWorkspace extends StatelessWidget {
     required this.onTypeChanged,
     required this.onSourceChanged,
     required this.onUsageChanged,
+    required this.onPageChanged,
+    required this.onPageSizeChanged,
     required this.onClearFilters,
     required this.onRetry,
     required this.onEditQuestion,
@@ -2071,87 +3307,148 @@ class _QuestionBankWorkspace extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hasFilters = searchController.text.trim().isNotEmpty ||
-        filterModuleId != null ||
-        filterMaterialId != null ||
-        filterTopicId != null ||
         filterOutcomeId != null ||
-        filterDiff != null ||
-        filterType != null ||
-        filterSource != null ||
-        filterUsed != null;
+        filterType != null;
 
+    Widget body;
+    if (loading) {
+      body = const _QuestionBankSkeleton();
+    } else if (error != null) {
+      body = SizedBox(height: 360, child: _QuestionBankError(message: error!, onRetry: onRetry));
+    } else if (questions.isEmpty) {
+      body = SizedBox(height: 360, child: _QuestionBankEmpty(hasQuestions: allQuestionsCount > 0));
+    } else {
+      body = _QuestionRows(
+        questions: questions,
+        topicTargetByTopicId: topicTargetByTopicId,
+        selectedQuestionId: selectedQuestionId,
+        pageStartIndex: pageStartIndex,
+        onSelectQuestion: onSelectQuestion,
+        onEditQuestion: (question) => onEditQuestion(question, topicTargets),
+        onDeleteUnavailable: onDeleteUnavailable,
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _QuestionBankToolbar(
+          searchController: searchController,
+          filterModuleId: filterModuleId,
+          filterDiff: filterDiff,
+          filterType: filterType,
+          filterSource: filterSource,
+          filterUsed: filterUsed,
+          filterMaterialId: filterMaterialId,
+          filterTopicId: filterTopicId,
+          filterOutcomeId: filterOutcomeId,
+          modules: modules,
+          topicTargets: topicTargets,
+          allQuestions: allQuestions,
+          courseOutcomes: courseOutcomes,
+          hasFilters: hasFilters,
+          resultCount: filteredQuestionsCount,
+          totalCount: allQuestionsCount,
+          onSearchChanged: onSearchChanged,
+          onModuleChanged: onModuleChanged,
+          onMaterialChanged: onMaterialChanged,
+          onTopicChanged: onTopicChanged,
+          onOutcomeChanged: onOutcomeChanged,
+          onDifficultyChanged: onDifficultyChanged,
+          onTypeChanged: onTypeChanged,
+          onSourceChanged: onSourceChanged,
+          onUsageChanged: onUsageChanged,
+          onClearFilters: onClearFilters,
+        ),
+        const SizedBox(height: 12),
+        _QuestionBankTableCard(
+          body: body,
+          loading: loading,
+          error: error,
+          allQuestionsCount: allQuestionsCount,
+          pageIndex: pageIndex,
+          pageSize: pageSize,
+          totalPages: totalPages,
+          resultCount: filteredQuestionsCount,
+          pageCount: questions.length,
+          pageStartIndex: pageStartIndex,
+          onPageChanged: onPageChanged,
+          onPageSizeChanged: onPageSizeChanged,
+        ),
+      ],
+    );
+  }
+}
+
+
+class _QuestionBankTableCard extends StatelessWidget {
+  final Widget body;
+  final bool loading;
+  final String? error;
+  final int allQuestionsCount;
+  final int pageIndex;
+  final int pageSize;
+  final int totalPages;
+  final int resultCount;
+  final int pageCount;
+  final int pageStartIndex;
+  final ValueChanged<int> onPageChanged;
+  final ValueChanged<int> onPageSizeChanged;
+
+  const _QuestionBankTableCard({
+    required this.body,
+    required this.loading,
+    required this.error,
+    required this.allQuestionsCount,
+    required this.pageIndex,
+    required this.pageSize,
+    required this.totalPages,
+    required this.resultCount,
+    required this.pageCount,
+    required this.pageStartIndex,
+    required this.onPageChanged,
+    required this.onPageSizeChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
             color: AppColors.shadowThin,
-            blurRadius: 24,
+            blurRadius: 22,
             offset: const Offset(0, 10),
           ),
         ],
       ),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(10),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            _QuestionBankToolbar(
-              searchController: searchController,
-              filterModuleId: filterModuleId,
-              filterDiff: filterDiff,
-              filterType: filterType,
-              filterSource: filterSource,
-              filterUsed: filterUsed,
-              filterMaterialId: filterMaterialId,
-              filterTopicId: filterTopicId,
-              filterOutcomeId: filterOutcomeId,
-              modules: modules,
-              topicTargets: topicTargets,
-              allQuestions: allQuestions,
-              hasFilters: hasFilters,
-              resultCount: questions.length,
-              totalCount: allQuestionsCount,
-              onSearchChanged: onSearchChanged,
-              onModuleChanged: onModuleChanged,
-              onMaterialChanged: onMaterialChanged,
-              onTopicChanged: onTopicChanged,
-              onOutcomeChanged: onOutcomeChanged,
-              onDifficultyChanged: onDifficultyChanged,
-              onTypeChanged: onTypeChanged,
-              onSourceChanged: onSourceChanged,
-              onUsageChanged: onUsageChanged,
-              onClearFilters: onClearFilters,
-            ),
-            Divider(height: 1, color: AppColors.border),
-            Expanded(
-              child: loading
-                  ? const _QuestionBankSkeleton()
-                  : error != null
-                      ? _QuestionBankError(message: error!, onRetry: onRetry)
-                      : questions.isEmpty
-                          ? _QuestionBankEmpty(hasQuestions: allQuestionsCount > 0)
-                          : LayoutBuilder(
-                              builder: (context, constraints) {
-                                return _QuestionRows(
-                                  questions: questions,
-                                  selectedQuestionId: selectedQuestionId,
-                                  onSelectQuestion: onSelectQuestion,
-                                  onEditQuestion: (question) => onEditQuestion(question, topicTargets),
-                                  onDeleteUnavailable: onDeleteUnavailable,
-                                  compact: constraints.maxWidth < 900,
-                                );
-                              },
-                            ),
-            ),
+            body,
+            if (!loading && error == null && allQuestionsCount > 0)
+              _QuestionBankPagination(
+                pageIndex: pageIndex,
+                pageSize: pageSize,
+                totalPages: totalPages,
+                resultCount: resultCount,
+                pageCount: pageCount,
+                pageStartIndex: pageStartIndex,
+                onPageChanged: onPageChanged,
+                onPageSizeChanged: onPageSizeChanged,
+              ),
           ],
         ),
       ),
     );
   }
 }
-
 class _QuestionBankToolbar extends StatelessWidget {
   final TextEditingController searchController;
   final int? filterModuleId;
@@ -2165,6 +3462,7 @@ class _QuestionBankToolbar extends StatelessWidget {
   final List<ModuleItem> modules;
   final List<_TopicTarget> topicTargets;
   final List<QuestionModel> allQuestions;
+  final List<LearningOutcome> courseOutcomes;
   final bool hasFilters;
   final int resultCount;
   final int totalCount;
@@ -2192,6 +3490,7 @@ class _QuestionBankToolbar extends StatelessWidget {
     required this.modules,
     required this.topicTargets,
     required this.allQuestions,
+    required this.courseOutcomes,
     required this.hasFilters,
     required this.resultCount,
     required this.totalCount,
@@ -2209,327 +3508,187 @@ class _QuestionBankToolbar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final moduleValue = _selectedModuleLabel(modules, filterModuleId);
-    final moduleItems = <String>['All modules', ...modules.map(_moduleLabel)];
-
-    final materialOptions = _materialFilterOptions(topicTargets, filterModuleId);
-    final materialValue = _selectedMaterialFilterLabel(materialOptions, filterMaterialId);
-    final materialItems = <String>['All materials', ...materialOptions.map((option) => option.label)];
-
-    final topicOptions = _topicFilterOptions(
-      topicTargets,
-      moduleId: filterModuleId,
-      materialId: filterMaterialId,
-    );
-    final topicValue = _selectedTopicFilterLabel(topicOptions, filterTopicId);
-    final topicItems = <String>['All topics / subtopics', ...topicOptions.map((option) => option.label)];
-
-    final outcomeOptions = _learningOutcomeFilterOptions(allQuestions);
+    final outcomeOptions = _learningOutcomeSetupOptions(allQuestions, courseOutcomes);
     final outcomeValue = _selectedOutcomeFilterLabel(outcomeOptions, filterOutcomeId);
-    final outcomeItems = <String>['All LOs', ...outcomeOptions.map((option) => option.label)];
-
-    final diffValue = filterDiff?.label ?? 'Any difficulty';
     final typeValue = filterType?.label ?? 'All types';
-    final sourceValue = filterSource == null ? 'Any source' : _sourceLabel(filterSource!);
-    final usageValue = filterUsed == null ? 'Used / unused' : (filterUsed! ? 'Used in exams' : 'Unused');
+
+    final outcomeItems = <String>['All LOs', ...outcomeOptions.map((option) => option.label)];
+    const typeItems = <String>[
+      'All types',
+      'Multiple Choice',
+      'Multi-Select',
+      'True / False',
+      'Short Answer',
+      'Essay',
+      'Fill in the Blank',
+      'Numeric',
+      'Code',
+    ];
+
+    Widget dropdown({
+      required double width,
+      required String value,
+      required List<String> items,
+      required ValueChanged<String> onChanged,
+    }) {
+      return FigmaUmDropdown40(
+        width: width,
+        value: value,
+        items: items,
+        onChanged: onChanged,
+      );
+    }
 
     return Container(
-      color: AppColors.cardBg,
       padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowThin,
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final fieldWidth = constraints.maxWidth >= 1180 ? 250.0 : 220.0;
+          final clearWidth = hasFilters ? 78.0 : 0.0;
+          final fixedWidth = fieldWidth + fieldWidth + 88 + clearWidth + (hasFilters ? 40 : 30);
+          final minSearchWidth = constraints.maxWidth >= 900 ? 360.0 : 280.0;
+          final rowWidth = constraints.maxWidth < fixedWidth + minSearchWidth
+              ? fixedWidth + minSearchWidth
+              : constraints.maxWidth;
+
+          final filtersRow = SizedBox(
+            width: rowWidth,
+            child: Row(
+              children: [
+                Expanded(
+                  child: FigmaUmSearch40(
+                    controller: searchController,
+                    hint: 'Search question, topic, LO, tag...',
+                    onChanged: onSearchChanged,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                dropdown(
+                  width: fieldWidth,
+                  value: outcomeValue,
+                  items: outcomeItems,
+                  onChanged: (value) {
+                    if (value == 'All LOs') {
+                      onOutcomeChanged(null);
+                      return;
+                    }
+                    final option = outcomeOptions.cast<_FilterOption?>().firstWhere(
+                          (item) => item != null && item.label == value,
+                          orElse: () => null,
+                        );
+                    onOutcomeChanged(option?.id);
+                  },
+                ),
+                const SizedBox(width: 10),
+                dropdown(
+                  width: fieldWidth,
+                  value: typeValue,
+                  items: typeItems,
+                  onChanged: (value) => onTypeChanged(_typeFromLabel(value)),
+                ),
+                const SizedBox(width: 10),
+                Container(
+                  width: 88,
+                  height: 40,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppColors.headerBg,
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Text(
+                    '$resultCount / $totalCount',
+                    style: TextStyle(
+                      color: AppColors.textMuted,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                if (hasFilters) ...[
+                  const SizedBox(width: 10),
+                  SizedBox(
+                    width: 78,
+                    height: 40,
+                    child: TextButton.icon(
+                      onPressed: onClearFilters,
+                      icon: const Icon(Icons.close_rounded, size: 16),
+                      label: const Text('Clear'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          );
+
+          if (rowWidth == constraints.maxWidth) return filtersRow;
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: filtersRow,
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _FilterField extends StatelessWidget {
+  final String label;
+  final double width;
+  final Widget child;
+
+  const _FilterField({
+    required this.label,
+    required this.width,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final narrow = constraints.maxWidth < 1180;
-              final search = FigmaUmSearch40(
-                controller: searchController,
-                hint: 'Search questions, topics, modules, materials, LOs, source, or tags...',
-                onChanged: onSearchChanged,
-              );
-
-              final moduleDrop = FigmaUmDropdown40(
-                width: narrow ? 210 : 180,
-                value: moduleValue,
-                items: moduleItems,
-                onChanged: (value) {
-                  if (value == 'All modules') {
-                    onModuleChanged(null);
-                    return;
-                  }
-                  final module = modules.cast<ModuleItem?>().firstWhere(
-                        (m) => m != null && _moduleLabel(m) == value,
-                        orElse: () => null,
-                      );
-                  onModuleChanged(module?.id);
-                },
-              );
-
-              final materialDrop = FigmaUmDropdown40(
-                width: narrow ? 230 : 210,
-                value: materialValue,
-                items: materialItems,
-                onChanged: (value) {
-                  if (value == 'All materials') {
-                    onMaterialChanged(null);
-                    return;
-                  }
-                  final option = materialOptions.cast<_FilterOption?>().firstWhere(
-                        (item) => item != null && item.label == value,
-                        orElse: () => null,
-                      );
-                  onMaterialChanged(option?.id);
-                },
-              );
-
-              final topicDrop = FigmaUmDropdown40(
-                width: narrow ? 260 : 230,
-                value: topicValue,
-                items: topicItems,
-                onChanged: (value) {
-                  if (value == 'All topics / subtopics') {
-                    onTopicChanged(null);
-                    return;
-                  }
-                  final option = topicOptions.cast<_FilterOption?>().firstWhere(
-                        (item) => item != null && item.label == value,
-                        orElse: () => null,
-                      );
-                  onTopicChanged(option?.id);
-                },
-              );
-
-              final outcomeDrop = FigmaUmDropdown40(
-                width: narrow ? 230 : 190,
-                value: outcomeValue,
-                items: outcomeItems,
-                onChanged: (value) {
-                  if (value == 'All LOs') {
-                    onOutcomeChanged(null);
-                    return;
-                  }
-                  final option = outcomeOptions.cast<_FilterOption?>().firstWhere(
-                        (item) => item != null && item.label == value,
-                        orElse: () => null,
-                      );
-                  onOutcomeChanged(option?.id);
-                },
-              );
-
-              final diffDrop = FigmaUmDropdown40(
-                width: narrow ? 170 : 152,
-                value: diffValue,
-                items: const ['Any difficulty', 'Easy', 'Medium', 'Hard'],
-                onChanged: (value) => onDifficultyChanged(_difficultyFromLabel(value)),
-              );
-
-              final typeDrop = FigmaUmDropdown40(
-                width: narrow ? 190 : 166,
-                value: typeValue,
-                items: const [
-                  'All types',
-                  'Multiple Choice',
-                  'True / False',
-                  'Short Answer',
-                  'Essay',
-                  'Multi-Select',
-                  'Fill in the Blank',
-                  'Numeric',
-                  'Code',
-                ],
-                onChanged: (value) => onTypeChanged(_typeFromLabel(value)),
-              );
-
-              final sourceDrop = FigmaUmDropdown40(
-                width: narrow ? 170 : 150,
-                value: sourceValue,
-                items: const ['Any source', 'Manual', 'AI', 'Imported'],
-                onChanged: (value) => onSourceChanged(_sourceFromLabel(value)),
-              );
-
-              final usageDrop = FigmaUmDropdown40(
-                width: narrow ? 170 : 154,
-                value: usageValue,
-                items: const ['Used / unused', 'Used in exams', 'Unused'],
-                onChanged: (value) => onUsageChanged(_usageFromLabel(value)),
-              );
-
-              final countLabel = Container(
-                height: 40,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: AppColors.headerBg,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(
-                  '$resultCount of $totalCount questions',
-                  style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              );
-
-              return Container(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: narrow ? 12 : 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: AppColors.borderGray),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x08000000),
-                      blurRadius: 8,
-                      offset: Offset(0, 2),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(child: search),
-                        if (!narrow) ...[
-                          const SizedBox(width: 12),
-                          countLabel,
-                        ],
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Wrap(
-                      spacing: 10,
-                      runSpacing: 10,
-                      children: [
-                        moduleDrop,
-                        materialDrop,
-                        topicDrop,
-                        outcomeDrop,
-                        typeDrop,
-                        diffDrop,
-                        sourceDrop,
-                        usageDrop,
-                        if (narrow) countLabel,
-                      ],
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-          if (hasFilters) ...[
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                if (searchController.text.trim().isNotEmpty)
-                  _ActiveChip(label: 'Search: ${searchController.text.trim()}', onDeleted: () {
-                    searchController.clear();
-                    onSearchChanged('');
-                  },),
-                if (filterModuleId != null)
-                  _ActiveChip(label: moduleValue, onDeleted: () => onModuleChanged(null)),
-                if (filterMaterialId != null)
-                  _ActiveChip(label: materialValue, onDeleted: () => onMaterialChanged(null)),
-                if (filterTopicId != null)
-                  _ActiveChip(label: topicValue, onDeleted: () => onTopicChanged(null)),
-                if (filterOutcomeId != null)
-                  _ActiveChip(label: outcomeValue, onDeleted: () => onOutcomeChanged(null)),
-                if (filterType != null)
-                  _ActiveChip(label: filterType!.label, onDeleted: () => onTypeChanged(null)),
-                if (filterDiff != null)
-                  _ActiveChip(label: filterDiff!.label, onDeleted: () => onDifficultyChanged(null)),
-                if (filterSource != null)
-                  _ActiveChip(label: _sourceLabel(filterSource!), onDeleted: () => onSourceChanged(null)),
-                if (filterUsed != null)
-                  _ActiveChip(label: filterUsed! ? 'Used in exams' : 'Unused', onDeleted: () => onUsageChanged(null)),
-                TextButton.icon(
-                  onPressed: onClearFilters,
-                  icon: const Icon(Icons.close_rounded, size: 16),
-                  label: const Text('Clear all'),
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.only(left: 2, bottom: 6),
+            child: Text(
+              label,
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 10.8,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.35,
+              ),
             ),
-          ],
+          ),
+          child,
         ],
       ),
     );
   }
 }
 
-class _ActiveChip extends StatelessWidget {
-  final String label;
-  final VoidCallback onDeleted;
 
-  const _ActiveChip({required this.label, required this.onDeleted});
 
-  @override
-  Widget build(BuildContext context) {
-    return InputChip(
-      label: Text(
-        label,
-        style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
-      ),
-      onDeleted: onDeleted,
-      deleteIcon: const Icon(Icons.close_rounded, size: 16),
-      backgroundColor: AppColors.headerBg,
-      side: BorderSide(color: AppColors.border),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-    );
-  }
-}
 
-class _QuestionRows extends StatelessWidget {
-  final List<QuestionModel> questions;
-  final String? selectedQuestionId;
-  final ValueChanged<QuestionModel> onSelectQuestion;
-  final ValueChanged<QuestionModel> onEditQuestion;
-  final VoidCallback onDeleteUnavailable;
-  final bool compact;
-
-  const _QuestionRows({
-    required this.questions,
-    required this.selectedQuestionId,
-    required this.onSelectQuestion,
-    required this.onEditQuestion,
-    required this.onDeleteUnavailable,
-    required this.compact,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        if (!compact) const _QuestionTableHeader(),
-        Expanded(
-          child: ListView.builder(
-            primary: false,
-            padding: EdgeInsets.zero,
-            itemCount: questions.length,
-            itemBuilder: (context, index) {
-              final question = questions[index];
-              return _QuestionRow(
-                index: index,
-                question: question,
-                selected: selectedQuestionId == question.id,
-                isLast: index == questions.length - 1,
-                compact: compact,
-                onTap: () => onSelectQuestion(question),
-                onEdit: () => onEditQuestion(question),
-                onDeleteUnavailable: onDeleteUnavailable,
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _QuestionTableHeader extends StatelessWidget {
   const _QuestionTableHeader();
@@ -2545,11 +3704,14 @@ class _QuestionTableHeader extends StatelessWidget {
       ),
       child: const Row(
         children: [
-          Expanded(flex: 58, child: _HeaderCell('Question')),
+          SizedBox(width: 96, child: _HeaderCell('#')),
+          Expanded(flex: 50, child: _HeaderCell('Question')),
+          SizedBox(width: 24),
+          Expanded(flex: 34, child: _HeaderCell('Topic')),
           SizedBox(width: 22),
-          Expanded(flex: 28, child: _HeaderCell('Context')),
-          SizedBox(width: 18),
-          SizedBox(width: 96, child: _HeaderCell('Actions')),
+          SizedBox(width: 150, child: _HeaderCell('Type')),
+          SizedBox(width: 16),
+          SizedBox(width: 88, child: _HeaderCell('Actions')),
         ],
       ),
     );
@@ -2576,13 +3738,52 @@ class _HeaderCell extends StatelessWidget {
     );
   }
 }
+class _QuestionRows extends StatelessWidget {
+  final List<QuestionModel> questions;
+  final Map<int, _TopicTarget> topicTargetByTopicId;
+  final String? selectedQuestionId;
+  final int pageStartIndex;
+  final ValueChanged<QuestionModel> onSelectQuestion;
+  final ValueChanged<QuestionModel> onEditQuestion;
+  final VoidCallback onDeleteUnavailable;
 
-class _QuestionRow extends StatefulWidget {
+  const _QuestionRows({
+    required this.questions,
+    required this.topicTargetByTopicId,
+    required this.selectedQuestionId,
+    required this.pageStartIndex,
+    required this.onSelectQuestion,
+    required this.onEditQuestion,
+    required this.onDeleteUnavailable,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const _QuestionTableHeader(),
+        for (var i = 0; i < questions.length; i++)
+          _QuestionRow(
+            index: pageStartIndex + i,
+            question: questions[i],
+            topicTarget: questions[i].topicId == null ? null : topicTargetByTopicId[questions[i].topicId],
+            selected: selectedQuestionId == questions[i].id,
+            isLast: i == questions.length - 1,
+            onTap: () => onSelectQuestion(questions[i]),
+            onEdit: () => onEditQuestion(questions[i]),
+            onDeleteUnavailable: onDeleteUnavailable,
+          ),
+      ],
+    );
+  }
+}
+class _QuestionRow extends StatelessWidget {
   final int index;
   final QuestionModel question;
+  final _TopicTarget? topicTarget;
   final bool selected;
   final bool isLast;
-  final bool compact;
   final VoidCallback onTap;
   final VoidCallback onEdit;
   final VoidCallback onDeleteUnavailable;
@@ -2590,109 +3791,233 @@ class _QuestionRow extends StatefulWidget {
   const _QuestionRow({
     required this.index,
     required this.question,
+    required this.topicTarget,
     required this.selected,
     required this.isLast,
-    required this.compact,
     required this.onTap,
     required this.onEdit,
     required this.onDeleteUnavailable,
   });
 
   @override
-  State<_QuestionRow> createState() => _QuestionRowState();
-}
-
-class _QuestionRowState extends State<_QuestionRow> {
-  bool _hovered = false;
-
-  @override
   Widget build(BuildContext context) {
-    final q = widget.question;
-    final selected = widget.selected;
-    final bg = selected
-        ? AppColors.selectedBg
-        : _hovered
-            ? AppColors.hoverBg
-            : AppColors.cardBg;
+    final q = question;
+    final topic = _topicPathFromTarget(topicTarget, q);
 
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
-      child: Material(
-        color: bg,
-        child: InkWell(
-          onTap: widget.onTap,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 120),
-            padding: EdgeInsets.symmetric(
-              horizontal: 18,
-              vertical: widget.compact ? 10 : 11,
+    final rowColor = index.isEven ? AppColors.cardBg : AppColors.surfaceBg.withOpacity(0.45);
+
+    return Material(
+      color: rowColor,
+      child: InkWell(
+        onTap: onTap,
+        hoverColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        child: Container(
+          constraints: const BoxConstraints(minHeight: 68),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+          decoration: BoxDecoration(
+            border: Border(
+              left: BorderSide(
+                color: selected ? AppColors.primary : Colors.transparent,
+                width: 3,
+              ),
+              bottom: isLast ? BorderSide.none : BorderSide(color: AppColors.border),
             ),
-            decoration: BoxDecoration(
-              border: widget.isLast ? null : Border(bottom: BorderSide(color: AppColors.border)),
-            ),
-            child: widget.compact ? _buildCompact(q, selected) : _buildWide(q, selected),
+          ),
+          child: Row(
+            children: [
+              SizedBox(
+                width: 96,
+                child: Align(
+                  alignment: Alignment.center,
+                  child: _QuestionNumber(index: index, selected: selected),
+                ),
+              ),
+              Expanded(
+                flex: 50,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      q.text.replaceAll('\n', ' '),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textTitle,
+                        fontSize: 13.6,
+                        height: 1.25,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 4,
+                      children: [
+                        _QuestionMiniPill(icon: Icons.bolt_rounded, label: _sourceLabel(q.source)),
+                        _QuestionMiniPill(icon: Icons.insights_rounded, label: _usageLabel(q.usageCount)),
+                        if (q.learningOutcomes.isNotEmpty)
+                          _QuestionMiniPill(
+                            icon: Icons.track_changes_rounded,
+                            label: '${q.learningOutcomes.length} LO${q.learningOutcomes.length == 1 ? '' : 's'}',
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 24),
+              Expanded(
+                flex: 34,
+                child: Text(
+                  topic,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textTitle,
+                    fontSize: 12.4,
+                    height: 1.25,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 22),
+              SizedBox(
+                width: 150,
+                child: _SoftStatusPill(label: q.typeLabel, icon: Icons.quiz_outlined),
+              ),
+              const SizedBox(width: 16),
+              SizedBox(
+                width: 88,
+                child: _RowActions(
+                  onEdit: onEdit,
+                  onDeleteUnavailable: onDeleteUnavailable,
+                ),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildWide(QuestionModel q, bool selected) {
-    return Row(
-      children: [
-        Expanded(
-          flex: 58,
-          child: Row(
-            children: [
-              _QuestionNumber(index: widget.index, selected: selected),
-              const SizedBox(width: 10),
-              Expanded(child: _QuestionTextBlock(question: q)),
-            ],
-          ),
-        ),
-        const SizedBox(width: 22),
-        Expanded(flex: 28, child: _ContextBlock(question: q)),
-        const SizedBox(width: 18),
-        SizedBox(
-          width: 96,
-          child: _RowActions(
-            onEdit: widget.onEdit,
-            onDeleteUnavailable: widget.onDeleteUnavailable,
-          ),
-        ),
-      ],
-    );
-  }
+class _QuestionMiniPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
 
-  Widget _buildCompact(QuestionModel q, bool selected) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _QuestionNumber(index: widget.index, selected: selected),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: _QuestionTextBlock(question: q)),
-                  _RowActions(
-                    onEdit: widget.onEdit,
-                    onDeleteUnavailable: widget.onDeleteUnavailable,
-                  ),
-                ],
-              ),
-            ],
+  const _QuestionMiniPill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: AppColors.textHint),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 10.5,
+              fontWeight: FontWeight.w800,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 }
 
+class _SoftStatusPill extends StatelessWidget {
+  final String label;
+  final IconData icon;
+
+  const _SoftStatusPill({required this.label, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 30,
+      padding: const EdgeInsets.symmetric(horizontal: 9),
+      decoration: BoxDecoration(
+        color: AppColors.headerBg,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppColors.textHint),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: AppColors.textTitle,
+                fontSize: 11.2,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DifficultyPill extends StatelessWidget {
+  final QuestionDifficulty difficulty;
+
+  const _DifficultyPill({required this.difficulty});
+
+  @override
+  Widget build(BuildContext context) {
+    Color color;
+    switch (difficulty) {
+      case QuestionDifficulty.easy:
+        color = AppColors.successText;
+        break;
+      case QuestionDifficulty.medium:
+        color = AppColors.warningText;
+        break;
+      case QuestionDifficulty.hard:
+        color = AppColors.dangerText;
+        break;
+    }
+    return Container(
+      height: 30,
+      alignment: Alignment.center,
+      padding: const EdgeInsets.symmetric(horizontal: 9),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.22)),
+      ),
+      child: Text(
+        difficulty.label,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          color: color,
+          fontSize: 11.2,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+  }
+}
 
 class _RowActions extends StatelessWidget {
   final VoidCallback onEdit;
@@ -2738,12 +4063,12 @@ class _QuestionNumber extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 32,
-      height: 32,
+      width: 30,
+      height: 30,
       alignment: Alignment.center,
       decoration: BoxDecoration(
         color: selected ? AppColors.primary : AppColors.primarySoft,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Text(
         '${index + 1}',
@@ -2757,125 +4082,178 @@ class _QuestionNumber extends StatelessWidget {
   }
 }
 
-class _QuestionTextBlock extends StatelessWidget {
-  final QuestionModel question;
+class _QuestionBankPagination extends StatelessWidget {
+  final int pageIndex;
+  final int pageSize;
+  final int totalPages;
+  final int resultCount;
+  final int pageCount;
+  final int pageStartIndex;
+  final ValueChanged<int> onPageChanged;
+  final ValueChanged<int> onPageSizeChanged;
 
-  const _QuestionTextBlock({required this.question});
-
-  @override
-  Widget build(BuildContext context) {
-    final outcome = question.learningOutcomes.isEmpty
-        ? 'No linked LO'
-        : "LO: ${question.learningOutcomes.map((item) => item.title).take(1).join(' • ')}";
-    final meta = [
-      outcome,
-      _sourceLabel(question.source),
-      _approvalLabel(question.approvalStatus),
-      _usageLabel(question.usageCount),
-      'Updated ${_shortDate(question.updatedAt)}',
-    ].join(' • ');
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          question.text.replaceAll('\n', ' '),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: AppColors.textTitle,
-            fontSize: 13.4,
-            height: 1.25,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          meta,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 11,
-            height: 1.15,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _ContextBlock extends StatelessWidget {
-  final QuestionModel question;
-
-  const _ContextBlock({required this.question});
+  const _QuestionBankPagination({
+    required this.pageIndex,
+    required this.pageSize,
+    required this.totalPages,
+    required this.resultCount,
+    required this.pageCount,
+    required this.pageStartIndex,
+    required this.onPageChanged,
+    required this.onPageSizeChanged,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final primary = _contextLabel(question);
-    final secondary = question.moduleName ?? question.materialName;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          primary,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: AppColors.textTitle,
-            fontSize: 12.3,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-        if (secondary != null && secondary.trim().isNotEmpty) ...[
-          const SizedBox(height: 3),
+    final from = resultCount == 0 ? 0 : pageStartIndex + 1;
+    final to = resultCount == 0 ? 0 : pageStartIndex + pageCount;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
           Text(
-            secondary,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 10.8,
-              fontWeight: FontWeight.w700,
-            ),
+            'Showing $from-$to of $resultCount',
+            style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w800),
+          ),
+          const Spacer(),
+          FigmaUmDropdown40(
+            width: 104,
+            value: '$pageSize / page',
+            items: const ['10 / page', '20 / page'],
+            onChanged: (value) => onPageSizeChanged(value.startsWith('20') ? 20 : 10),
+          ),
+          const SizedBox(width: 8),
+          _PagerButton(
+            icon: Icons.chevron_left_rounded,
+            enabled: pageIndex > 0,
+            onTap: () => onPageChanged(pageIndex - 1),
+          ),
+          const SizedBox(width: 6),
+          Text(
+            '${pageIndex + 1} / $totalPages',
+            style: TextStyle(color: AppColors.textTitle, fontSize: 12, fontWeight: FontWeight.w900),
+          ),
+          const SizedBox(width: 6),
+          _PagerButton(
+            icon: Icons.chevron_right_rounded,
+            enabled: pageIndex + 1 < totalPages,
+            onTap: () => onPageChanged(pageIndex + 1),
           ),
         ],
-      ],
+      ),
     );
   }
 }
 
-class _QuestionReviewDialog extends StatelessWidget {
+class _PagerButton extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _PagerButton({required this.icon, required this.enabled, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: enabled ? onTap : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: enabled ? AppColors.headerBg : AppColors.surfaceBg,
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Icon(icon, size: 20, color: enabled ? AppColors.textTitle : AppColors.textHint),
+      ),
+    );
+  }
+}
+
+class _QuestionReviewDialog extends ConsumerStatefulWidget {
+  final int courseId;
   final QuestionModel question;
   final List<_TopicTarget> topicTargets;
 
   const _QuestionReviewDialog({
+    required this.courseId,
     required this.question,
     required this.topicTargets,
   });
 
   @override
+  ConsumerState<_QuestionReviewDialog> createState() => _QuestionReviewDialogState();
+}
+
+class _QuestionReviewDialogState extends ConsumerState<_QuestionReviewDialog> {
+  late QuestionModel _question;
+  bool _loadingDetails = false;
+  String? _detailsError;
+
+  @override
+  void initState() {
+    super.initState();
+    _question = widget.question;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadFullQuestion());
+  }
+
+  Future<void> _loadFullQuestion() async {
+    final questionId = widget.question.remoteId ?? int.tryParse(widget.question.id);
+    if (questionId == null || questionId <= 0) return;
+    if (!mounted) return;
+    setState(() {
+      _loadingDetails = true;
+      _detailsError = null;
+    });
+    try {
+      final hydrated = await ref.read(questionsApiProvider).getQuestion(
+            courseId: widget.courseId,
+            questionId: questionId,
+          );
+      if (!mounted) return;
+      setState(() {
+        _question = hydrated;
+        _loadingDetails = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _detailsError = mapApiFailure(e).message;
+        _loadingDetails = false;
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final size = MediaQuery.of(context).size;
+    final compact = size.width < 760;
     return Dialog(
       elevation: 0,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 42),
+      insetPadding: EdgeInsets.symmetric(
+        horizontal: compact ? 14 : 42,
+        vertical: compact ? 18 : 34,
+      ),
       backgroundColor: Colors.transparent,
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          maxWidth: 720,
-          maxHeight: size.height * 0.72,
+          maxWidth: 940,
+          maxHeight: size.height * 0.88,
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(12),
           child: Material(
-            color: AppColors.surfaceBg,
+            color: AppColors.cardBg,
             child: _QuestionInspector(
-              question: question,
-              topicTargets: topicTargets,
+              question: _question,
+              topicTargets: widget.topicTargets,
+              loadingDetails: _loadingDetails,
+              detailsError: _detailsError,
               onClose: () => Navigator.of(context).pop(),
             ),
           ),
@@ -2888,11 +4266,15 @@ class _QuestionReviewDialog extends StatelessWidget {
 class _QuestionInspector extends StatelessWidget {
   final QuestionModel? question;
   final List<_TopicTarget> topicTargets;
+  final bool loadingDetails;
+  final String? detailsError;
   final VoidCallback? onClose;
 
   const _QuestionInspector({
     required this.question,
     required this.topicTargets,
+    this.loadingDetails = false,
+    this.detailsError,
     this.onClose,
   });
 
@@ -2902,10 +4284,10 @@ class _QuestionInspector extends StatelessWidget {
     if (q == null) {
       return Container(
         padding: const EdgeInsets.all(24),
-        color: AppColors.surfaceBg,
+        color: AppColors.cardBg,
         child: Center(
           child: Text(
-            'Select a question to inspect its answer, context, and learning outcomes.',
+            'Select a question to review the answer and details.',
             textAlign: TextAlign.center,
             style: TextStyle(color: AppColors.textMuted, height: 1.5, fontWeight: FontWeight.w700),
           ),
@@ -2914,154 +4296,193 @@ class _QuestionInspector extends StatelessWidget {
     }
 
     final target = _targetForQuestion(topicTargets, q);
+    final topicPath = _topicPathFromTarget(target, q);
 
-    return Container(
-      color: AppColors.surfaceBg,
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.fromLTRB(22, 18, 22, 16),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceBg,
-              border: Border(bottom: BorderSide(color: AppColors.border)),
+    return Column(
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(22, 18, 16, 18),
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              colors: [Color(0xFF145CCB), Color(0xFF137FEC), Color(0xFF22C1F1)],
             ),
-            child: Row(
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white.withOpacity(0.22)),
+                ),
+                child: const Icon(Icons.fact_check_outlined, color: Colors.white, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Question review',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 19,
+                        height: 1.15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 5),
+                    Text(
+                      '$topicPath • ${q.typeLabel} • ${q.difficultyLabel}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.82),
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (onClose != null)
+                IconButton(
+                  tooltip: 'Close',
+                  onPressed: onClose,
+                  icon: const Icon(Icons.close_rounded, color: Colors.white, size: 22),
+                ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 38,
-                  height: 38,
-                  decoration: BoxDecoration(
-                    color: AppColors.primarySoft,
-                    borderRadius: BorderRadius.circular(14),
+                if (loadingDetails) ...[
+                  const _InspectorNotice(
+                    icon: Icons.sync_rounded,
+                    message: 'Loading the full question record from the backend...',
+                    tone: _InspectorNoticeTone.info,
                   ),
-                  child: const Icon(Icons.fact_check_outlined, color: AppColors.primary, size: 19),
+                  const SizedBox(height: 14),
+                ],
+                if (detailsError != null) ...[
+                  _InspectorNotice(
+                    icon: Icons.warning_amber_rounded,
+                    message: 'Full question details could not be loaded. Showing the cached row data. ${detailsError!}',
+                    tone: _InspectorNoticeTone.warning,
+                  ),
+                  const SizedBox(height: 14),
+                ],
+                _InspectorSection(
+                  title: 'Question',
+                  child: Text(
+                    q.text,
+                    style: TextStyle(
+                      color: AppColors.textTitle,
+                      fontSize: 17,
+                      height: 1.45,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -0.15,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Question Review',
-                        style: TextStyle(
-                          color: AppColors.textTitle,
-                          fontSize: 15,
-                          fontWeight: FontWeight.w900,
+                const SizedBox(height: 14),
+                _InspectorSection(
+                  title: 'Answer',
+                  child: _AnswerPreview(question: q),
+                ),
+                if (q.explanation != null && q.explanation!.trim().isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  _InspectorSection(
+                    title: 'Explanation',
+                    child: _MutedBox(q.explanation!),
+                  ),
+                ],
+                if (q.gradingRubric != null) ...[
+                  const SizedBox(height: 14),
+                  _InspectorSection(
+                    title: 'Grading rubric',
+                    child: _MutedBox(_jsonish(q.gradingRubric)),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                _InspectorSection(
+                  title: 'Learning outcomes',
+                  child: q.learningOutcomes.isEmpty
+                      ? const _MutedBox('No learning outcome is linked to this question.')
+                      : Column(
+                          children: q.learningOutcomes
+                              .map((outcome) => _OutcomeLine(title: outcome.title))
+                              .toList(),
                         ),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'ID ${q.remoteId ?? q.id}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w700),
-                      ),
-                    ],
-                  ),
                 ),
-                if (onClose != null) ...[
-                  const SizedBox(width: 10),
-                  IconButton(
-                    tooltip: 'Close',
-                    onPressed: onClose,
-                    icon: Icon(Icons.close_rounded, color: AppColors.textMuted),
+                if (q.tags.isNotEmpty) ...[
+                  const SizedBox(height: 14),
+                  _InspectorSection(
+                    title: 'Tags',
+                    child: Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: q.tags.map((tag) => _TagChip(tag)).toList(),
+                    ),
                   ),
                 ],
               ],
             ),
           ),
+        ),
+      ],
+    );
+  }
+}
+
+
+
+enum _InspectorNoticeTone { info, warning }
+
+class _InspectorNotice extends StatelessWidget {
+  final IconData icon;
+  final String message;
+  final _InspectorNoticeTone tone;
+
+  const _InspectorNotice({
+    required this.icon,
+    required this.message,
+    required this.tone,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final warning = tone == _InspectorNoticeTone.warning;
+    final fg = warning ? AppColors.warningText : AppColors.primary;
+    final bg = warning ? AppColors.warningSoftBg : AppColors.primarySoft;
+    final border = warning ? AppColors.warningBorder : AppColors.primary.withOpacity(0.22);
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 17, color: fg),
+          const SizedBox(width: 8),
           Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(22, 16, 22, 22),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    q.text,
-                    style: TextStyle(
-                      color: AppColors.textTitle,
-                      fontSize: 17,
-                      height: 1.42,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _TypeBadge(label: q.typeLabel),
-                      _DifficultyBadge(diff: q.difficulty),
-                      _SourceBadge(source: q.source),
-                      _TinyMeta(
-                        icon: Icons.verified_outlined,
-                        label: _approvalLabel(q.approvalStatus),
-                      ),
-                      _TinyMeta(
-                        icon: Icons.assignment_turned_in_outlined,
-                        label: _usageLabel(q.usageCount),
-                      ),
-                      _TinyMeta(
-                        icon: q.autoGradable ? Icons.bolt_rounded : Icons.rate_review_outlined,
-                        label: q.autoGradable ? 'Auto-gradable' : 'Manual review',
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  _InspectorSection(
-                    title: 'Answer',
-                    child: _AnswerPreview(question: q),
-                  ),
-                  const SizedBox(height: 14),
-                  _InspectorSection(
-                    title: 'Context & usage',
-                    child: Column(
-                      children: [
-                        _InspectorKv(label: 'Module', value: q.moduleName ?? target?.module.title ?? 'Not assigned'),
-                        _InspectorKv(label: 'Material', value: q.materialName ?? target?.material.displayTitle ?? 'Not assigned'),
-                        _InspectorKv(label: target?.parentTopicTitle == null ? 'Topic' : 'Parent', value: target?.parentTopicTitle ?? q.topicName ?? target?.topic.title ?? 'Not assigned'),
-                        if (target?.parentTopicTitle != null)
-                          _InspectorKv(label: 'Subtopic', value: q.topicName ?? target!.topic.title),
-                        _InspectorKv(label: 'LO coverage', value: '${q.learningOutcomes.length} outcome${q.learningOutcomes.length == 1 ? '' : 's'}'),
-                        _InspectorKv(label: 'Source', value: _sourceLabel(q.source)),
-                        _InspectorKv(label: 'Usage', value: _usageLabel(q.usageCount)),
-                        _InspectorKv(label: 'Status', value: _approvalLabel(q.approvalStatus)),
-                        _InspectorKv(label: 'Updated', value: _shortDate(q.updatedAt)),
-                        _InspectorKv(label: 'Score', value: '${q.maxScore} point${q.maxScore == 1 ? '' : 's'}'),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  _InspectorSection(
-                    title: 'Learning outcomes',
-                    child: q.learningOutcomes.isEmpty
-                        ? const _MutedBox('No learning outcome is linked to this question.')
-                        : Column(
-                            children: q.learningOutcomes
-                                .map((outcome) => _OutcomeLine(title: outcome.title))
-                                .toList(),
-                          ),
-                  ),
-                  if (q.explanation != null && q.explanation!.trim().isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    _InspectorSection(
-                      title: 'Explanation',
-                      child: _MutedBox(q.explanation!),
-                    ),
-                  ],
-                  if (q.tags.isNotEmpty) ...[
-                    const SizedBox(height: 14),
-                    _InspectorSection(
-                      title: 'Tags',
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: q.tags.map((tag) => _TagChip(tag)).toList(),
-                      ),
-                    ),
-                  ],
-                ],
+            child: Text(
+              message,
+              style: TextStyle(
+                color: fg,
+                fontSize: 12,
+                height: 1.35,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ),
@@ -3071,6 +4492,126 @@ class _QuestionInspector extends StatelessWidget {
   }
 }
 
+class _QuestionMetadataGrid extends StatelessWidget {
+  final QuestionModel question;
+  final _TopicTarget? target;
+  final String topicPath;
+
+  const _QuestionMetadataGrid({
+    required this.question,
+    required this.target,
+    required this.topicPath,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final q = question;
+    final items = <_QuestionMetadataItem>[
+      _QuestionMetadataItem(icon: Icons.tag_rounded, label: 'Question ID', value: q.remoteId?.toString() ?? q.id),
+      _QuestionMetadataItem(icon: Icons.book_outlined, label: 'Course ID', value: _optionalInt(q.courseId)),
+      _QuestionMetadataItem(icon: Icons.view_module_outlined, label: 'Module', value: _firstText([target?.module.title, q.moduleName])),
+      _QuestionMetadataItem(icon: Icons.description_outlined, label: 'Material', value: _firstText([target?.material.displayTitle, q.materialName])),
+      _QuestionMetadataItem(icon: Icons.account_tree_outlined, label: 'Topic', value: topicPath),
+      _QuestionMetadataItem(icon: Icons.category_outlined, label: 'Type', value: q.typeLabel),
+      _QuestionMetadataItem(icon: Icons.speed_rounded, label: 'Difficulty', value: q.difficultyLabel),
+      _QuestionMetadataItem(icon: Icons.bolt_rounded, label: 'Source', value: _sourceLabel(q.source)),
+      _QuestionMetadataItem(icon: Icons.verified_outlined, label: 'Approval', value: _approvalLabel(q.approvalStatus)),
+      _QuestionMetadataItem(icon: Icons.score_outlined, label: 'Max score', value: '${q.maxScore}'),
+      _QuestionMetadataItem(icon: Icons.auto_awesome_outlined, label: 'Auto gradable', value: q.autoGradable ? 'Yes' : 'No'),
+      _QuestionMetadataItem(icon: Icons.insights_rounded, label: 'Usage', value: _usageLabel(q.usageCount)),
+      _QuestionMetadataItem(icon: Icons.trending_up_rounded, label: 'Success rate', value: _successRate(q.successRate)),
+      _QuestionMetadataItem(icon: Icons.timer_outlined, label: 'Avg time', value: _seconds(q.averageTimeSeconds)),
+      _QuestionMetadataItem(icon: Icons.person_outline_rounded, label: 'Created by', value: _optionalInt(q.createdBy)),
+      _QuestionMetadataItem(icon: Icons.event_outlined, label: 'Created', value: _shortDate(q.createdAt)),
+      _QuestionMetadataItem(icon: Icons.update_rounded, label: 'Updated', value: _shortDate(q.updatedAt)),
+    ];
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final tight = constraints.maxWidth < 620;
+        final width = tight ? constraints.maxWidth : (constraints.maxWidth - 10) / 2;
+        return Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: items
+              .map((item) => SizedBox(
+                    width: width,
+                    child: _QuestionMetadataTile(item: item),
+                  ))
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _QuestionMetadataItem {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _QuestionMetadataItem({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+}
+
+class _QuestionMetadataTile extends StatelessWidget {
+  final _QuestionMetadataItem item;
+
+  const _QuestionMetadataTile({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(item.icon, size: 16, color: AppColors.textHint),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  item.label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 10.6,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.35,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  item.value,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textTitle,
+                    fontSize: 12.4,
+                    height: 1.25,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 class _InspectorSection extends StatelessWidget {
   final String title;
   final Widget child;
@@ -3084,7 +4625,7 @@ class _InspectorSection extends StatelessWidget {
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
@@ -3115,46 +4656,199 @@ class _AnswerPreview extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (question.options.isNotEmpty) {
+      final hasCorrect = question.options.asMap().entries.any((entry) => _isCorrectOption(question, entry.value, index: entry.key));
       return Column(
-        children: question.options.map((option) {
-          final correct = option.isCorrect || question.correctOptionId == option.id;
-          return Container(
-            margin: const EdgeInsets.only(bottom: 8),
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: correct ? AppColors.successBg : AppColors.surfaceBg,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: correct ? AppColors.greenBorder : AppColors.border),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ...List<Widget>.generate(question.options.length, (index) {
+            final option = question.options[index];
+            final correct = _isCorrectOption(question, option, index: index);
+            return _AnswerOptionCard(
+              index: index,
+              option: option,
+              correct: correct,
+              multiSelect: question.type == QuestionType.multiSelect,
+            );
+          }),
+          if (!hasCorrect && _answerText(question).isNotEmpty) ...[
+            const SizedBox(height: 4),
+            _InspectorNotice(
+              icon: Icons.info_outline_rounded,
+              message: 'Stored expected answer: ${_answerText(question)}. It does not match any visible option id.',
+              tone: _InspectorNoticeTone.warning,
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  correct ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
-                  size: 17,
-                  color: correct ? AppColors.successText : AppColors.textHint,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    option.text,
-                    style: TextStyle(
-                      color: correct ? AppColors.successText : AppColors.textTitle,
-                      fontSize: 12.5,
-                      height: 1.35,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        }).toList(),
+          ],
+        ],
       );
+    }
+
+    if (question.type == QuestionType.trueFalse) {
+      final answer = question.correctBool ?? (question.expectedAnswer?.toLowerCase() == 'true' ? true : question.expectedAnswer?.toLowerCase() == 'false' ? false : null);
+      if (answer != null) {
+        return Row(
+          children: [
+            Expanded(child: _BooleanAnswerPreview(label: 'True', selected: answer == true)),
+            const SizedBox(width: 10),
+            Expanded(child: _BooleanAnswerPreview(label: 'False', selected: answer == false)),
+          ],
+        );
+      }
     }
 
     final answer = _answerText(question);
     return _MutedBox(answer.isEmpty ? 'No answer stored for this question.' : answer);
+  }
+}
+
+class _AnswerOptionCard extends StatelessWidget {
+  final int index;
+  final QuestionOption option;
+  final bool correct;
+  final bool multiSelect;
+
+  const _AnswerOptionCard({
+    required this.index,
+    required this.option,
+    required this.correct,
+    required this.multiSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final label = String.fromCharCode(65 + index);
+    return Container(
+      margin: const EdgeInsets.only(bottom: 9),
+      padding: const EdgeInsets.all(11),
+      decoration: BoxDecoration(
+        color: correct ? AppColors.successBg : AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: correct ? AppColors.greenBorder : AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: correct ? AppColors.successText : AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: correct ? AppColors.successText : AppColors.border),
+                ),
+                child: Text(
+                  label,
+                  style: TextStyle(
+                    color: correct ? Colors.white : AppColors.textMuted,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 9),
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Icon(
+                  correct
+                      ? Icons.check_circle_rounded
+                      : multiSelect
+                          ? Icons.check_box_outline_blank_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                  size: 17,
+                  color: correct ? AppColors.successText : AppColors.textHint,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  option.text,
+                  style: TextStyle(
+                    color: correct ? AppColors.successText : AppColors.textTitle,
+                    fontSize: 12.8,
+                    height: 1.4,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              if (correct)
+                Container(
+                  margin: const EdgeInsets.only(left: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.62),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(color: AppColors.greenBorder),
+                  ),
+                  child: Text(
+                    'Correct',
+                    style: TextStyle(
+                      color: AppColors.successText,
+                      fontSize: 10.6,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+          if ((option.explanation ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Padding(
+              padding: const EdgeInsets.only(left: 45),
+              child: Text(
+                option.explanation!.trim(),
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11.5,
+                  height: 1.35,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _BooleanAnswerPreview extends StatelessWidget {
+  final String label;
+  final bool selected;
+
+  const _BooleanAnswerPreview({required this.label, required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 52,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: selected ? AppColors.successBg : AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: selected ? AppColors.greenBorder : AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            selected ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+            size: 18,
+            color: selected ? AppColors.successText : AppColors.textHint,
+          ),
+          const SizedBox(width: 9),
+          Text(
+            label,
+            style: TextStyle(
+              color: selected ? AppColors.successText : AppColors.textTitle,
+              fontSize: 13,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -3385,7 +5079,7 @@ class _EditQuestionDialogState extends ConsumerState<_EditQuestionDialog> {
 
     if (type == QuestionType.multipleChoice || type == QuestionType.multiSelect) {
       final cleanOptions = _options.where((option) => option.controller.text.trim().isNotEmpty).toList();
-      final optionIds = List.generate(cleanOptions.length, (index) => String.fromCharCode(65 + index));
+      final optionIds = List.generate(cleanOptions.length, (index) => index.toString());
       final createOptions = List.generate(cleanOptions.length, (index) {
         return CreateQuestionOption(id: optionIds[index], text: cleanOptions[index].controller.text.trim());
       });
@@ -3449,7 +5143,7 @@ class _EditQuestionDialogState extends ConsumerState<_EditQuestionDialog> {
           child: Container(
             decoration: BoxDecoration(
               color: AppColors.pageBg,
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(12),
             ),
             child: Column(
               children: [
@@ -3511,7 +5205,6 @@ class _EditQuestionDialogState extends ConsumerState<_EditQuestionDialog> {
                       ),
                       child: Column(
                         children: [
-                          _LockedQuestionTypeTabs(type: q.type),
                           Expanded(
                             child: SingleChildScrollView(
                               padding: const EdgeInsets.fromLTRB(22, 16, 22, 18),
@@ -4969,7 +6662,7 @@ class _QuestionBankEmpty extends StatelessWidget {
               constraints: const BoxConstraints(maxWidth: 520),
               child: Text(
                 hasQuestions
-                    ? 'Adjust the search term, module, difficulty, or type to reveal more questions.'
+                    ? 'Adjust the search term, learning outcome, or question type to reveal more questions.'
                     : 'Questions will appear here after they are saved from the material generation workspace or manual authoring flow.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textMuted, fontSize: 13, height: 1.5, fontWeight: FontWeight.w700),
@@ -5041,6 +6734,78 @@ InputDecoration _editDecoration(String label) => InputDecoration(
         borderSide: const BorderSide(color: AppColors.primary, width: 1.3),
       ),
     );
+
+
+bool _isCorrectOption(QuestionModel question, QuestionOption option, {int? index}) {
+  if (option.isCorrect) return true;
+  if (question.correctOptionId != null && question.correctOptionId == option.id) return true;
+
+  final normalizedTokens = _expectedAnswerTokens(question)
+      .map((token) => token.trim().toLowerCase())
+      .where((token) => token.isNotEmpty)
+      .toSet();
+  if (normalizedTokens.isEmpty) return false;
+
+  final keys = <String>{
+    option.id,
+    option.orderIndex.toString(),
+  };
+  if (index != null) {
+    keys.add(String.fromCharCode(65 + index));
+    keys.add(index.toString());
+    keys.add('${index + 1}');
+    keys.add('opt_$index');
+  }
+
+  return keys.map((key) => key.trim().toLowerCase()).any(normalizedTokens.contains);
+}
+
+List<String> _expectedAnswerTokens(QuestionModel question) {
+  final expected = question.expectedAnswer;
+  if (expected == null || expected.trim().isEmpty) return const <String>[];
+  return expected
+      .replaceAll('[', '')
+      .replaceAll(']', '')
+      .replaceAll('"', '')
+      .replaceAll("'", '')
+      .split(',')
+      .map((token) => token.trim())
+      .where((token) => token.isNotEmpty)
+      .toList();
+}
+
+String _jsonish(Object? value) {
+  if (value == null) return '—';
+  if (value is String) return value.trim().isEmpty ? '—' : value;
+  try {
+    return const JsonEncoder.withIndent('  ').convert(value);
+  } catch (_) {
+    return value.toString();
+  }
+}
+
+String _firstText(List<String?> values) {
+  for (final value in values) {
+    final clean = value?.trim();
+    if (clean != null && clean.isNotEmpty) return clean;
+  }
+  return '—';
+}
+
+String _optionalInt(int? value) => value == null ? '—' : '$value';
+
+String _successRate(double? value) {
+  if (value == null) return '—';
+  final normalized = value <= 1 ? value * 100 : value;
+  return '${normalized.toStringAsFixed(normalized == normalized.roundToDouble() ? 0 : 1)}%';
+}
+
+String _seconds(double? value) {
+  if (value == null) return '—';
+  if (value < 60) return '${value.toStringAsFixed(value == value.roundToDouble() ? 0 : 1)}s';
+  final minutes = value / 60;
+  return '${minutes.toStringAsFixed(minutes == minutes.roundToDouble() ? 0 : 1)}m';
+}
 
 
 class _FilterOption {
@@ -5237,10 +7002,36 @@ String _contextLabel(QuestionModel question) {
 
 String _answerText(QuestionModel question) {
   if (question.correctBool != null) return question.correctBool! ? 'True' : 'False';
+  if (question.options.isNotEmpty && (question.expectedAnswer ?? '').trim().isNotEmpty) {
+    final labels = _expectedAnswerTokens(question)
+        .map((token) => _answerTokenLabel(question, token))
+        .where((token) => token.trim().isNotEmpty)
+        .toList(growable: false);
+    if (labels.isNotEmpty) return labels.join(', ');
+  }
   if ((question.expectedAnswer ?? '').trim().isNotEmpty) return question.expectedAnswer!.trim();
   if ((question.sampleAnswer ?? '').trim().isNotEmpty) return question.sampleAnswer!.trim();
   if ((question.correctOptionId ?? '').trim().isNotEmpty) return question.correctOptionId!.trim();
   return '';
+}
+
+String _answerTokenLabel(QuestionModel question, String token) {
+  final normalized = token.trim().replaceAll('"', '').replaceAll("'", '');
+  if (normalized.isEmpty) return '';
+
+  final numericIndex = int.tryParse(normalized);
+  if (numericIndex != null && numericIndex >= 0 && numericIndex < question.options.length) {
+    return String.fromCharCode(65 + numericIndex);
+  }
+
+  final upper = normalized.toUpperCase();
+  for (var i = 0; i < question.options.length; i++) {
+    final option = question.options[i];
+    if (option.id.trim().toUpperCase() == upper) {
+      return String.fromCharCode(65 + i);
+    }
+  }
+  return normalized;
 }
 
 String _moduleLabel(ModuleItem module) => module.title.trim().isEmpty ? 'Module ${module.id}' : module.title.trim();

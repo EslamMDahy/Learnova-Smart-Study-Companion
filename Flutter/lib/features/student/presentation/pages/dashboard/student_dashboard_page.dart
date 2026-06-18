@@ -1,236 +1,912 @@
 import 'package:flutter/material.dart';
-import 'package:learnova/core/theme/app_theme.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
-class StudentDashboardPage extends StatelessWidget {
+import '../../../../../core/routing/routes.dart';
+import '../../../../../core/storage/user_storage.dart';
+import '../../../../../core/theme/app_theme.dart';
+import '../../../data/student_dashboard_models.dart';
+import '../../../data/student_dashboard_providers.dart';
+
+class StudentDashboardPage extends ConsumerWidget {
   const StudentDashboardPage({super.key});
 
   @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dashboard = ref.watch(studentDashboardProvider);
+
+    return dashboard.when(
+      loading: () => const _DashboardLoading(),
+      error: (error, _) => _DashboardError(
+        message: error.toString(),
+        onRetry: () => ref.invalidate(studentDashboardProvider),
+      ),
+      data: (data) => _DashboardView(
+        data: data,
+        onRefresh: () => ref.invalidate(studentDashboardProvider),
+      ),
+    );
+  }
+}
+
+class _DashboardView extends StatelessWidget {
+  final StudentDashboardData data;
+  final VoidCallback onRefresh;
+
+  const _DashboardView({
+    required this.data,
+    required this.onRefresh,
+  });
+
+  @override
   Widget build(BuildContext context) {
-    Theme.of(context);
+    return RefreshIndicator(
+      onRefresh: () async {
+        onRefresh();
+      },
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 1180;
+
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(
+              horizontal: constraints.maxWidth < 800 ? 20 : 32,
+              vertical: 24,
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _DashboardHero(data: data),
+                const SizedBox(height: 24),
+                isNarrow
+                    ? Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _MainDashboardContent(data: data),
+                          const SizedBox(height: 24),
+                          _SideDashboardContent(data: data),
+                        ],
+                      )
+                    : Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Expanded(
+                            flex: 7,
+                            child: _MainDashboardContent(data: data),
+                          ),
+                          const SizedBox(width: 24),
+                          Expanded(
+                            flex: 3,
+                            child: _SideDashboardContent(data: data),
+                          ),
+                        ],
+                      ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _DashboardHero extends StatelessWidget {
+  final StudentDashboardData data;
+
+  const _DashboardHero({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final firstName = _firstName(UserStorage.fullName ?? 'Student');
+    final upcomingCount = data.upcomingExams.length;
+    final availableCount = data.availableExams.length;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Welcome back, $firstName',
+          style: TextStyle(
+            fontSize: 32,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textTitle,
+            letterSpacing: -0.7,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'You have $upcomingCount upcoming assessments and $availableCount available now.',
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.45,
+            color: AppColors.textMuted,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MainDashboardContent extends StatelessWidget {
+  final StudentDashboardData data;
+
+  const _MainDashboardContent({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final shownCourses = data.courses.take(2).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _StatsGrid(data: data),
+        const SizedBox(height: 32),
+        _SectionHeader(
+          title: 'Enrolled Courses',
+          actionText: data.courses.isEmpty ? null : 'View All',
+          onAction: data.courses.isEmpty
+              ? null
+              : () => context.go(Routes.studentCourses),
+        ),
+        const SizedBox(height: 16),
+        if (shownCourses.isEmpty)
+          _EmptyCard(
+            icon: Icons.menu_book_outlined,
+            title: 'No enrolled courses yet',
+            message: 'When you enroll in a course, it will appear here.',
+            actionText: 'Find Courses',
+            onAction: () => context.go(Routes.studentCourses),
+          )
+        else
+          _CourseCardsGrid(courses: shownCourses),
+        const SizedBox(height: 24),
+        _LearningInsightsCard(data: data),
+      ],
+    );
+  }
+}
+
+class _SideDashboardContent extends StatelessWidget {
+  final StudentDashboardData data;
+
+  const _SideDashboardContent({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        _DashboardPanel(
+          title: 'Upcoming Deadlines',
+          child: _DeadlineList(exams: data.upcomingExams.take(4).toList()),
+        ),
+        const SizedBox(height: 20),
+        _DashboardPanel(
+          title: 'Recent Results',
+          child: const _RecentResultsList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _StatsGrid extends StatelessWidget {
+  final StudentDashboardData data;
+
+  const _StatsGrid({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final stats = [
+      _StatItem(
+        title: 'Enrolled Courses',
+        value: data.courses.length.toString(),
+        caption: '${data.activeCoursesCount} active',
+        icon: Icons.school_outlined,
+      ),
+      _StatItem(
+        title: 'Upcoming Exams',
+        value: data.upcomingExams.length.toString(),
+        caption: '${data.availableExams.length} available now',
+        icon: Icons.event_available_outlined,
+      ),
+      _StatItem(
+        title: 'Question Pool',
+        value: data.totalQuestionCount.toString(),
+        caption: 'From published exams',
+        icon: Icons.quiz_outlined,
+      ),
+      _StatItem(
+        title: 'Assessments',
+        value: data.totalPublishedExams.toString(),
+        caption: data.failedExamCourseLoads == 0
+            ? 'Synced with backend'
+            : '${data.failedExamCourseLoads} course sync skipped',
+        icon: Icons.trending_up_rounded,
+      ),
+    ];
+
     return LayoutBuilder(
       builder: (context, constraints) {
-        // الحفاظ على التصميم المتجاوب (Responsive) بناءً على عرض الشاشة
-        final isSmall = constraints.maxWidth < 1150;
+        final columns = constraints.maxWidth < 560
+            ? 1
+            : constraints.maxWidth < 920
+                ? 2
+                : 4;
+        const spacing = 16.0;
+        final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-          child: isSmall
-              ? const Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _LeftContent(),
-                    SizedBox(height: 24),
-                    _RightContent(),
-                  ],
-                )
-              : const Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // الجزء الأيسر (العريض) يأخذ نسبة 7 نفس الصورة
-                    Expanded(
-                      flex: 7,
-                      child: _LeftContent(),
-                    ),
-                    SizedBox(width: 24),
-                    // الجزء الأيمن (الجانبي) يأخذ نسبة 3 نفس الصورة
-                    Expanded(
-                      flex: 3,
-                      child: _RightContent(),
-                    ),
-                  ],
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: stats
+              .map(
+                (item) => SizedBox(
+                  width: width,
+                  child: _StatCard(item: item),
                 ),
+              )
+              .toList(),
         );
       },
     );
   }
 }
 
-/// ==========================================
-/// الجزء الأيسر (الرئيسي)
-/// ==========================================
-class _LeftContent extends StatelessWidget {
-  const _LeftContent();
+class _StatItem {
+  final String title;
+  final String value;
+  final String caption;
+  final IconData icon;
+
+  const _StatItem({
+    required this.title,
+    required this.value,
+    required this.caption,
+    required this.icon,
+  });
+}
+
+class _StatCard extends StatelessWidget {
+  final _StatItem item;
+
+  const _StatCard({required this.item});
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        /// الترحيب والاسم باللون الداكن المظبوط
-        Text(
-          'Welcome back, Alex',
-          style: TextStyle(
-            fontSize: 32,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textTitle,
-            letterSpacing: -0.5,
+    return Container(
+      constraints: const BoxConstraints(minHeight: 102),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowThin,
+            blurRadius: 18,
+            offset: const Offset(0, 8),
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'You have 2 upcoming quizzes and 3 new recommendations.',
-          style: TextStyle(
-            fontSize: 14,
-            color: AppColors.textMuted,
-          ),
-        ),
-        const SizedBox(height: 24),
-
-        /// صف كروت الإحصائيات الأربعة
-        const Row(
-          children: [
-            Expanded(
-              child: _StatCard(
-                title: 'Current GPA',
-                value: '3.8',
-                percent: '+0.2%',
-                icon: Icons.school_outlined,
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: _StatCard(
-                title: 'Quizzes Done',
-                value: '24',
-                percent: '+4%',
-                icon: Icons.assignment_turned_in_outlined,
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: _StatCard(
-                title: 'Study Hours',
-                value: '15h',
-                percent: '+12%',
-                icon: Icons.access_time_rounded,
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: _StatCard(
-                title: 'Accuracy Rate',
-                value: '82%',
-                percent: '+1.5%',
-                icon: Icons.trending_up_rounded,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 32),
-
-        /// عنوان الكورسات
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              'Enrolled Courses',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textTitle,
-              ),
-            ),
-            TextButton(
-              onPressed: () {},
-              style: TextButton.styleFrom(
-                padding: EdgeInsets.zero,
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-              ),
-              child: const Text(
-                'View All',
-                style: TextStyle(
-                  color: AppColors.primary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 13,
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 16),
-
-        /// كروت الكورسات (اثنين بجانب بعضهما)
-        const Row(
-          children: [
-            Expanded(
-              child: _CourseCard(
-                title: 'Data Structures & Algo',
-                instructor: 'Dr. Sarah Jenkins',
-              ),
-            ),
-            SizedBox(width: 16),
-            Expanded(
-              child: _CourseCard(
-                title: 'Data Structures & Algo',
-                instructor: 'Dr. Sarah Jenkins',
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 24),
-
-        /// قسم تحليلات الذكاء الاصطناعي (AI Insights) بنفس اللون الفاتح الجميل
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.infoBg,
-            borderRadius: BorderRadius.circular(16),
+              Icon(item.icon, color: AppColors.primary, size: 18),
+            ],
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          const SizedBox(height: 12),
+          Text(
+            item.value,
+            style: TextStyle(
+              fontSize: 25,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textTitle,
+              letterSpacing: -0.4,
+            ),
+          ),
+          const SizedBox(height: 3),
+          Text(
+            item.caption,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: AppColors.successText,
+              fontWeight: FontWeight.w600,
+              fontSize: 11,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  final String title;
+  final String? actionText;
+  final VoidCallback? onAction;
+
+  const _SectionHeader({
+    required this.title,
+    this.actionText,
+    this.onAction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          title,
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w800,
+            color: AppColors.textTitle,
+          ),
+        ),
+        if (actionText != null)
+          TextButton(
+            onPressed: onAction,
+            style: TextButton.styleFrom(
+              padding: EdgeInsets.zero,
+              minimumSize: Size.zero,
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+            child: Text(
+              actionText!,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontWeight: FontWeight.w700,
+                fontSize: 13,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+}
+
+class _CourseCardsGrid extends StatelessWidget {
+  final List<StudentDashboardCourse> courses;
+
+  const _CourseCardsGrid({required this.courses});
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth < 760 ? 1 : 2;
+        const spacing = 16.0;
+        final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+
+        return Wrap(
+          spacing: spacing,
+          runSpacing: spacing,
+          children: courses
+              .map(
+                (course) => SizedBox(
+                  width: width,
+                  child: _CourseCard(course: course),
+                ),
+              )
+              .toList(),
+        );
+      },
+    );
+  }
+}
+
+class _CourseCard extends StatelessWidget {
+  final StudentDashboardCourse course;
+
+  const _CourseCard({required this.course});
+
+  @override
+  Widget build(BuildContext context) {
+    final coverUrl = (course.coverImageUrl ?? '').trim();
+    final hasCover = coverUrl.isNotEmpty;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowThin,
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            height: 128,
+            width: double.infinity,
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                if (hasCover)
+                  Image.network(
+                    coverUrl,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xff073B34), Color(0xff0B1D33)],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                    ),
+                  )
+                else
+                  const DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [Color(0xff073B34), Color(0xff0B1D33)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                  ),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.black.withOpacity(0.04),
+                        Colors.black.withOpacity(0.42),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: -24,
+                  top: -28,
+                  child: Container(
+                    width: 128,
+                    height: 128,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                Positioned(
+                  right: 10,
+                  bottom: 10,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.42),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      course.safeCode,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(15),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  course.safeTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textTitle,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  '${course.safeCategory} • ${_titleCase(course.status)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
+                ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  height: 38,
+                  child: ElevatedButton(
+                    onPressed: () => context.go(
+                      '${Routes.studentCourseDetails}?courseId=${course.id}',
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.headerBg,
+                      foregroundColor: AppColors.textGray,
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    child: const Text(
+                      'Continue',
+                      style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LearningInsightsCard extends StatelessWidget {
+  final StudentDashboardData data;
+
+  const _LearningInsightsCard({required this.data});
+
+  @override
+  Widget build(BuildContext context) {
+    final insights = _buildInsights(data);
+    final highlightCourse = data.courses.isNotEmpty ? data.courses.first.safeTitle : 'your courses';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.infoBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.infoBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 8,
+            runSpacing: 4,
             children: [
-              Row(
-                children: [
-                  const Icon(Icons.auto_awesome,
-                      color: AppColors.primary, size: 18,),
-                  const SizedBox(width: 8),
-                  Text(
-                    'AI Learning Insights',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w700,
-                      fontSize: 15,
-                      color: AppColors.textTitle,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    'Based on your recent quiz performance in ',
-                    style:
-                        TextStyle(color: AppColors.textMuted, fontSize: 12),
-                  ),
-                  const Text(
-                    'Calculus II.',
-                    style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
+              const Icon(Icons.auto_awesome, color: AppColors.primary, size: 18),
+              Text(
+                'AI Learning Insights',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  color: AppColors.textTitle,
+                ),
               ),
-              const SizedBox(height: 16),
-              _InsightRowItem(
-                icon: Icons.error_outline_rounded,
-                iconColor: AppColors.errorDot,
-                iconBg: AppColors.dangerBorder,
-                title: 'Weak Topic: Integration by Parts',
-                subtitle: 'Your score: 45% (Avg: 78%)',
-                buttonText: 'Practice Now',
-                isPrimaryButton: true,
+              Text(
+                'Based on your enrolled courses and assessments in ',
+                style: TextStyle(color: AppColors.textMuted, fontSize: 12),
               ),
-              const SizedBox(height: 12),
-              _InsightRowItem(
-                icon: Icons.trending_down_rounded,
-                iconColor: AppColors.warningText,
-                iconBg: AppColors.warningSoftBg,
-                title: 'Weak Topic: Chain Rule Application',
-                subtitle: 'Your score: 58% (Avg: 82%)',
-                buttonText: 'Review Notes',
-                isPrimaryButton: false,
+              Text(
+                highlightCourse,
+                style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
               ),
             ],
+          ),
+          const SizedBox(height: 16),
+          for (var i = 0; i < insights.length; i++) ...[
+            if (i > 0) const SizedBox(height: 12),
+            _InsightRowItem(item: insights[i]),
+          ],
+        ],
+      ),
+    );
+  }
+
+  List<_InsightItem> _buildInsights(StudentDashboardData data) {
+    final available = data.availableExams;
+    final upcoming = data.upcomingExams;
+
+    if (data.courses.isEmpty) {
+      return const [
+        _InsightItem(
+          icon: Icons.school_outlined,
+          iconColorType: _InsightColorType.info,
+          title: 'Start by enrolling in a course',
+          subtitle: 'Your dashboard will unlock assessments and recommendations after enrollment.',
+          buttonText: 'Browse',
+          route: Routes.studentCourses,
+          primary: true,
+        ),
+      ];
+    }
+
+    final items = <_InsightItem>[];
+    if (available.isNotEmpty) {
+      final exam = available.first;
+      items.add(
+        _InsightItem(
+          icon: Icons.bolt_rounded,
+          iconColorType: _InsightColorType.danger,
+          title: 'Ready now: ${exam.safeTitle}',
+          subtitle: '${exam.courseTitle} • ${exam.totalQuestions} questions • due ${_formatShortDateTime(exam.deadline)}',
+          buttonText: 'Practice Now',
+          route: '${Routes.studentCourseDetails}?courseId=${exam.courseId}&examId=${exam.id}',
+          primary: true,
+        ),
+      );
+    }
+
+    if (upcoming.isNotEmpty) {
+      final exam = upcoming.first;
+      items.add(
+        _InsightItem(
+          icon: Icons.schedule_rounded,
+          iconColorType: _InsightColorType.warning,
+          title: 'Upcoming: ${exam.safeTitle}',
+          subtitle: '${exam.courseTitle} • ${_relativeDate(exam.deadline)}',
+          buttonText: 'Review Course',
+          route: '${Routes.studentCourseDetails}?courseId=${exam.courseId}',
+          primary: false,
+        ),
+      );
+    }
+
+    if (items.length < 2 && data.courses.isNotEmpty) {
+      final course = data.courses.first;
+      items.add(
+        _InsightItem(
+          icon: Icons.menu_book_rounded,
+          iconColorType: _InsightColorType.info,
+          title: 'Continue learning: ${course.safeTitle}',
+          subtitle: '${course.safeCode} • ${course.safeCategory}',
+          buttonText: 'Continue',
+          route: '${Routes.studentCourseDetails}?courseId=${course.id}',
+          primary: items.isEmpty,
+        ),
+      );
+    }
+
+    if (items.isEmpty) {
+      items.add(
+        const _InsightItem(
+          icon: Icons.check_circle_outline_rounded,
+          iconColorType: _InsightColorType.success,
+          title: 'All caught up',
+          subtitle: 'No published assessments are due right now.',
+          buttonText: 'My Courses',
+          route: Routes.studentCourses,
+          primary: false,
+        ),
+      );
+    }
+
+    return items.take(2).toList();
+  }
+}
+
+enum _InsightColorType { danger, warning, info, success }
+
+class _InsightItem {
+  final IconData icon;
+  final _InsightColorType iconColorType;
+  final String title;
+  final String subtitle;
+  final String buttonText;
+  final String route;
+  final bool primary;
+
+  const _InsightItem({
+    required this.icon,
+    required this.iconColorType,
+    required this.title,
+    required this.subtitle,
+    required this.buttonText,
+    required this.route,
+    required this.primary,
+  });
+}
+
+
+class _InsightColors {
+  final Color background;
+  final Color foreground;
+
+  const _InsightColors(this.background, this.foreground);
+}
+
+class _InsightRowItem extends StatelessWidget {
+  final _InsightItem item;
+
+  const _InsightRowItem({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = _insightColors(item.iconColorType);
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 16,
+            backgroundColor: colors.background,
+            child: Icon(item.icon, color: colors.foreground, size: 16),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: AppColors.textGray,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  item.subtitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox(
+            height: 32,
+            child: ElevatedButton(
+              onPressed: () => context.go(item.route),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: item.primary ? AppColors.primary : AppColors.cardBg,
+                foregroundColor: item.primary ? Colors.white : AppColors.textGray,
+                elevation: 0,
+                side: item.primary ? BorderSide.none : BorderSide(color: AppColors.border),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+              ),
+              child: Text(
+                item.buttonText,
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  _InsightColors _insightColors(_InsightColorType type) {
+    switch (type) {
+      case _InsightColorType.danger:
+        return _InsightColors(AppColors.dangerBorder, AppColors.errorDot);
+      case _InsightColorType.warning:
+        return _InsightColors(AppColors.warningSoftBg, AppColors.warningText);
+      case _InsightColorType.success:
+        return _InsightColors(AppColors.successBg, AppColors.successText);
+      case _InsightColorType.info:
+        return _InsightColors(AppColors.infoBg, AppColors.infoText);
+    }
+  }
+}
+
+class _DashboardPanel extends StatelessWidget {
+  final String title;
+  final Widget child;
+
+  const _DashboardPanel({
+    required this.title,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowThin,
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textTitle,
+            ),
+          ),
+          const SizedBox(height: 18),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _DeadlineList extends StatelessWidget {
+  final List<StudentDashboardExam> exams;
+
+  const _DeadlineList({required this.exams});
+
+  @override
+  Widget build(BuildContext context) {
+    if (exams.isEmpty) {
+      return const _CompactEmptyState(
+        icon: Icons.event_busy_outlined,
+        title: 'No deadlines yet',
+        message: 'Published exams will appear here when your instructor schedules them.',
+      );
+    }
+
+    return Column(
+      children: [
+        for (final exam in exams) _DeadlineRow(exam: exam),
+        const SizedBox(height: 6),
+        SizedBox(
+          width: double.infinity,
+          height: 38,
+          child: OutlinedButton(
+            onPressed: () => context.go(Routes.studentCourses),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: AppColors.border),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+            ),
+            child: Text(
+              'View Courses',
+              style: TextStyle(
+                color: AppColors.textGray,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
           ),
         ),
       ],
@@ -238,143 +914,15 @@ class _LeftContent extends StatelessWidget {
   }
 }
 
-/// ==========================================
-/// الجزء الأيمن الجانبي
-/// ==========================================
-class _RightContent extends StatelessWidget {
-  const _RightContent();
+class _DeadlineRow extends StatelessWidget {
+  final StudentDashboardExam exam;
+
+  const _DeadlineRow({required this.exam});
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    return Column(
-      children: [
-        /// كارت المواعيد النهائية (Upcoming Deadlines)
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Upcoming Deadlines',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textTitle,
-                ),
-              ),
-              const SizedBox(height: 20),
-              _buildDeadlineRow(
-                  'OCT', '24', 'Midterm Exam', 'Data Structures • 10:00 AM',),
-              _buildDeadlineRow('OCT', '28', 'Lab Report Submission',
-                  'Physics 101 • 11:59 PM',),
-              _buildDeadlineRow('NOV', '02', 'Quiz: Photosynthesis',
-                  'Advanced Biology • Online',),
-              const SizedBox(height: 8),
-              SizedBox(
-                width: double.infinity,
-                height: 38,
-                child: OutlinedButton(
-                  onPressed: () {},
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),),
-                  ),
-                  child: Text(
-                    'View Calendar',
-                    style: TextStyle(
-                      color: AppColors.textGray,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
+    final date = exam.deadline;
 
-        const SizedBox(height: 20),
-
-        /// كارت النتائج الأخيرة (Recent Results) مع خط الـ Timeline الواصل بينهم
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: AppColors.cardBg,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Recent Results',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textTitle,
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // تم بناء هيكل يدوي هنا لرسم الخط العمودي الرمادي الواصل بين الدوائر كما بالصورة
-              Stack(
-                children: [
-                  Positioned(
-                    left: 16,
-                    top: 20,
-                    bottom: 20,
-                    child: Container(
-                      width: 2,
-                      color: AppColors.headerBg,
-                    ),
-                  ),
-                  Column(
-                    children: [
-                      _buildResultRow(
-                          'A',
-                          'Linear Algebra Quiz',
-                          '2 hours ago',
-                          '95/100',
-                          AppColors.successBg,
-                          AppColors.successText,),
-                      const SizedBox(height: 16),
-                      _buildResultRow(
-                          'B+',
-                          'Organic Chemistry',
-                          'Yesterday',
-                          '88/100',
-                          AppColors.infoBg,
-                          AppColors.infoText,),
-                      const SizedBox(height: 16),
-                      _buildResultRow(
-                          'C',
-                          'History Essay',
-                          '3 days ago',
-                          '72/100',
-                          AppColors.warningSoftBg,
-                          AppColors.warningText,),
-                    ],
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDeadlineRow(
-      String month, String day, String title, String subtitle,) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -384,24 +932,26 @@ class _RightContent extends StatelessWidget {
             height: 50,
             decoration: BoxDecoration(
               color: AppColors.infoBg,
-              borderRadius: BorderRadius.circular(10),
+              borderRadius: BorderRadius.circular(11),
             ),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  month,
+                  _monthAbbr(date),
                   style: const TextStyle(
-                      fontSize: 10,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w700,),
+                    fontSize: 10,
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 Text(
-                  day,
+                  _dayNumber(date),
                   style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textTitle,),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    color: AppColors.textTitle,
+                  ),
                 ),
               ],
             ),
@@ -411,208 +961,22 @@ class _RightContent extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: AppColors.textTitle,),),
-                const SizedBox(height: 2),
-                Text(subtitle,
-                    style: TextStyle(
-                        fontSize: 11, color: AppColors.textMuted,),),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildResultRow(String grade, String title, String time, String score,
-      Color bg, Color text,) {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 16,
-          backgroundColor: bg,
-          child: Text(grade,
-              style: TextStyle(
-                  color: text, fontSize: 12, fontWeight: FontWeight.w700,),),
-        ),
-        const SizedBox(width: 14),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title,
+                Text(
+                  exam.safeTitle,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                      fontSize: 13,
-                      color: AppColors.textTitle,),),
-              const SizedBox(height: 2),
-              Text(time,
-                  style:
-                      TextStyle(fontSize: 11, color: AppColors.textHint),),
-            ],
-          ),
-        ),
-        Text(score,
-            style: TextStyle(
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
-                color: AppColors.textTitle,),),
-      ],
-    );
-  }
-}
-
-/// ==========================================
-/// المكونات الفرعية (Widgets الأزرار والكروت المخصصة)
-/// ==========================================
-
-class _StatCard extends StatelessWidget {
-  final String title;
-  final String value;
-  final String percent;
-  final IconData icon;
-
-  const _StatCard(
-      {required this.title,
-      required this.value,
-      required this.percent,
-      required this.icon,});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(title,
-                  style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,),),
-              Icon(icon, color: AppColors.primary, size: 18),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Text(value,
-                  style: TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textTitle,),),
-              const SizedBox(width: 6),
-              Padding(
-                padding: const EdgeInsets.only(bottom: 3),
-                child: Text(percent,
-                    style: const TextStyle(
-                        color: AppColors.successDot,
-                        fontWeight: FontWeight.w600,
-                        fontSize: 11,),),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CourseCard extends StatelessWidget {
-  final String title;
-  final String instructor;
-
-  const _CourseCard({required this.title, required this.instructor});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 130,
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              borderRadius: BorderRadius.vertical(top: Radius.circular(11)),
-              gradient: LinearGradient(
-                colors: [Color(0xff092C28), Color(0xff0A192F)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-            ),
-            child: Stack(
-              children: [
-                Positioned(
-                  bottom: 8,
-                  right: 8,
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
-                    decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.4),
-                        borderRadius: BorderRadius.circular(4),),
-                    child: const Text('CS-101',
-                        style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w600,),),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                    color: AppColors.textTitle,
                   ),
                 ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textTitle,),),
-                const SizedBox(height: 2),
-                Text(instructor,
-                    style: TextStyle(
-                        fontSize: 12, color: AppColors.textMuted,),),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  height: 36,
-                  child: ElevatedButton(
-                    onPressed: () {},
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.headerBg,
-                      foregroundColor: AppColors.textGray,
-                      elevation: 0,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(6),),
-                    ),
-                    child: const Text('Continue',
-                        style: TextStyle(
-                            fontSize: 13, fontWeight: FontWeight.w600,),),
-                  ),
+                const SizedBox(height: 3),
+                Text(
+                  '${exam.courseTitle} • ${_formatTime(date)}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 11, color: AppColors.textMuted),
                 ),
               ],
             ),
@@ -623,84 +987,337 @@ class _CourseCard extends StatelessWidget {
   }
 }
 
-class _InsightRowItem extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final Color iconBg;
-  final String title;
-  final String subtitle;
-  final String buttonText;
-  final bool isPrimaryButton;
+class _RecentResultsList extends StatelessWidget {
+  const _RecentResultsList();
 
-  const _InsightRowItem({
+  @override
+  Widget build(BuildContext context) {
+    return const _CompactEmptyState(
+      icon: Icons.insights_outlined,
+      title: 'No graded results yet',
+      message: 'Your submitted and graded exams will appear here.',
+    );
+  }
+}
+
+class _EmptyCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionText;
+  final VoidCallback? onAction;
+
+  const _EmptyCard({
     required this.icon,
-    required this.iconColor,
-    required this.iconBg,
     required this.title,
-    required this.subtitle,
-    required this.buttonText,
-    required this.isPrimaryButton,
+    required this.message,
+    this.actionText,
+    this.onAction,
   });
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border),
       ),
-      child: Row(
+      child: Column(
         children: [
           CircleAvatar(
-            radius: 16,
-            backgroundColor: iconBg,
-            child: Icon(icon, color: iconColor, size: 16),
+            radius: 22,
+            backgroundColor: AppColors.infoBg,
+            child: Icon(icon, color: AppColors.primary),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: TextStyle(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 13,
-                        color: AppColors.textGray,),),
-                const SizedBox(height: 2),
-                Text(subtitle,
-                    style: TextStyle(
-                        color: AppColors.textMuted, fontSize: 11,),),
-              ],
+          const SizedBox(height: 12),
+          Text(
+            title,
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textTitle,
             ),
           ),
-          const SizedBox(width: 8),
-          SizedBox(
-            height: 32,
-            child: ElevatedButton(
-              onPressed: () {},
+          const SizedBox(height: 4),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(color: AppColors.textMuted, fontSize: 13),
+          ),
+          if (actionText != null) ...[
+            const SizedBox(height: 14),
+            ElevatedButton(
+              onPressed: onAction,
               style: ElevatedButton.styleFrom(
-                backgroundColor:
-                    isPrimaryButton ? AppColors.primary : AppColors.cardBg,
-                foregroundColor:
-                    isPrimaryButton ? Colors.white : AppColors.textGray,
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
                 elevation: 0,
-                side: isPrimaryButton
-                    ? BorderSide.none
-                    : BorderSide(color: AppColors.border),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(6),),
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
               ),
-              child: Text(buttonText,
-                  style: const TextStyle(
-                      fontSize: 12, fontWeight: FontWeight.w600,),),
+              child: Text(actionText!),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactEmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+
+  const _CompactEmptyState({
+    required this.icon,
+    required this.title,
+    required this.message,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.headerBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, color: AppColors.textMuted, size: 24),
+          const SizedBox(height: 8),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textTitle,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              height: 1.4,
+              color: AppColors.textMuted,
             ),
           ),
         ],
       ),
     );
   }
+}
+
+class _DashboardLoading extends StatelessWidget {
+  const _DashboardLoading();
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SkeletonBox(width: 360, height: 38, radius: 10),
+          const SizedBox(height: 10),
+          _SkeletonBox(width: 440, height: 16, radius: 8),
+          const SizedBox(height: 26),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth < 560
+                  ? 1
+                  : constraints.maxWidth < 920
+                      ? 2
+                      : 4;
+              const spacing = 16.0;
+              final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
+              return Wrap(
+                spacing: spacing,
+                runSpacing: spacing,
+                children: List.generate(
+                  4,
+                  (_) => _SkeletonBox(width: width, height: 102, radius: 14),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 32),
+          _SkeletonBox(width: double.infinity, height: 220, radius: 16),
+          const SizedBox(height: 20),
+          _SkeletonBox(width: double.infinity, height: 160, radius: 16),
+        ],
+      ),
+    );
+  }
+}
+
+class _DashboardError extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const _DashboardError({
+    required this.message,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Container(
+        width: 520,
+        margin: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: AppColors.dangerBg,
+              child: Icon(Icons.cloud_off_rounded, color: AppColors.dangerText),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              'Could not load dashboard',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textTitle,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+            ),
+            const SizedBox(height: 18),
+            ElevatedButton.icon(
+              onPressed: onRetry,
+              icon: const Icon(Icons.refresh_rounded, size: 18),
+              label: const Text('Try Again'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SkeletonBox extends StatelessWidget {
+  final double width;
+  final double height;
+  final double radius;
+
+  const _SkeletonBox({
+    required this.width,
+    required this.height,
+    required this.radius,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: width,
+      height: height,
+      decoration: BoxDecoration(
+        color: AppColors.headerBg,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+    );
+  }
+}
+
+String _firstName(String name) {
+  final clean = name.trim();
+  if (clean.isEmpty) return 'Student';
+  return clean.split(RegExp(r'\s+')).first;
+}
+
+String _titleCase(String value) {
+  final clean = value.trim().replaceAll('_', ' ');
+  if (clean.isEmpty) return 'Unknown';
+  return clean
+      .split(' ')
+      .where((part) => part.isNotEmpty)
+      .map((part) => '${part[0].toUpperCase()}${part.substring(1).toLowerCase()}')
+      .join(' ');
+}
+
+String _monthAbbr(DateTime? date) {
+  if (date == null) return '--';
+  const months = [
+    'JAN',
+    'FEB',
+    'MAR',
+    'APR',
+    'MAY',
+    'JUN',
+    'JUL',
+    'AUG',
+    'SEP',
+    'OCT',
+    'NOV',
+    'DEC',
+  ];
+  return months[date.toLocal().month - 1];
+}
+
+String _dayNumber(DateTime? date) {
+  if (date == null) return '--';
+  return date.toLocal().day.toString().padLeft(2, '0');
+}
+
+String _formatTime(DateTime? date) {
+  if (date == null) return 'No time';
+  final local = date.toLocal();
+  final hour12 = local.hour == 0 ? 12 : (local.hour > 12 ? local.hour - 12 : local.hour);
+  final minute = local.minute.toString().padLeft(2, '0');
+  final period = local.hour >= 12 ? 'PM' : 'AM';
+  return '$hour12:$minute $period';
+}
+
+String _formatShortDateTime(DateTime? date) {
+  if (date == null) return 'not scheduled';
+  return '${_monthAbbr(date)} ${_dayNumber(date)} • ${_formatTime(date)}';
+}
+
+String _relativeDate(DateTime? date) {
+  if (date == null) return 'Not scheduled';
+  final now = DateTime.now();
+  final local = date.toLocal();
+  final diff = local.difference(now);
+  final absolute = diff.abs();
+
+  if (absolute.inMinutes < 60) {
+    final minutes = absolute.inMinutes <= 0 ? 1 : absolute.inMinutes;
+    return diff.isNegative ? '$minutes min ago' : 'in $minutes min';
+  }
+  if (absolute.inHours < 24) {
+    return diff.isNegative ? '${absolute.inHours} hours ago' : 'in ${absolute.inHours} hours';
+  }
+  if (absolute.inDays < 7) {
+    return diff.isNegative ? '${absolute.inDays} days ago' : 'in ${absolute.inDays} days';
+  }
+  return _formatShortDateTime(local);
 }

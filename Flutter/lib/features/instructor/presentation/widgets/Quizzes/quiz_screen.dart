@@ -2,17 +2,22 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import 'package:learnova/core/network/error_mapper.dart';
+import 'package:learnova/core/routing/routes.dart';
+import 'package:learnova/core/storage/published_exams_cache.dart';
 import 'package:learnova/core/theme/app_theme.dart';
+import 'package:learnova/core/ui/toast.dart';
 import 'package:learnova/core/utils/file_download_stub.dart'
     if (dart.library.html) 'package:learnova/core/utils/file_download_web.dart';
-import 'package:learnova/core/ui/toast.dart';
 import 'package:learnova/features/instructor/data/courses_models.dart';
 import 'package:learnova/features/instructor/data/courses_providers.dart';
 import 'package:learnova/features/instructor/data/exam_models.dart';
 import 'package:learnova/features/instructor/data/question_models.dart';
 import 'package:learnova/features/instructor/data/modules_materials_providers.dart';
+import 'package:learnova/features/instructor/presentation/controllers/selected_course_provider.dart';
+import 'package:learnova/features/instructor/presentation/course_route_identity.dart';
 
 class InstructorQuizzesScreen extends ConsumerStatefulWidget {
   final int? courseId;
@@ -26,25 +31,36 @@ class InstructorQuizzesScreen extends ConsumerStatefulWidget {
 }
 
 class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScreen> {
+  final TextEditingController _searchController = TextEditingController();
+
   bool _loading = true;
   String? _error;
-  List<_CourseQuizGroup> _groups = const [];
-  Set<int> _expandedCourseIds = const {};
+  List<_CourseExamGroup> _groups = const [];
   int? _activeCourseId;
+  _ExamStatusFilter _statusFilter = _ExamStatusFilter.all;
+
   ExamModel? _selectedExam;
-  int? _selectedExamCourseId;
+  MyCourseItem? _selectedExamCourse;
   ExamDetailsModel? _selectedDetails;
   bool _detailsLoading = false;
+  bool _publishing = false;
   bool _exportingExamPdf = false;
   String? _detailsError;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAllCourseQuizzes());
+    _searchController.addListener(() => setState(() {}));
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadAllCourseExams());
   }
 
-  Future<void> _loadAllCourseQuizzes() async {
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadAllCourseExams() async {
     setState(() {
       _loading = true;
       _error = null;
@@ -55,32 +71,34 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
       final courses = [...coursesResponse.items]
         ..sort((a, b) => a.safeTitle.toLowerCase().compareTo(b.safeTitle.toLowerCase()));
 
-      final groups = await Future.wait<_CourseQuizGroup>(courses.map((course) async {
-        try {
-          final response = await ref.read(examsApiProvider).listExams(courseId: course.id);
-          final exams = [...response.exams]
-            ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
-          return _CourseQuizGroup(course: course, exams: exams);
-        } catch (e) {
-          return _CourseQuizGroup(
-            course: course,
-            exams: const [],
-            error: mapApiFailure(e).message,
-          );
-        }
-      }),);
+      final groups = await Future.wait<_CourseExamGroup>(
+        courses.map((course) async {
+          try {
+            final response = await ref.read(examsApiProvider).listExams(courseId: course.id);
+            final exams = [...response.exams]
+              ..sort((a, b) => b.updatedAt.compareTo(a.updatedAt));
+            _cachePublishedExamsForStudents(course, exams);
+            return _CourseExamGroup(course: course, exams: exams);
+          } catch (e) {
+            return _CourseExamGroup(
+              course: course,
+              exams: const [],
+              error: mapApiFailure(e).message,
+            );
+          }
+        }),
+      );
 
       if (!mounted) return;
-      final groupsWithExams = groups.where((group) => group.exams.isNotEmpty).toList();
       final preferredCourseId = widget.courseId;
-      final activeCourseId = preferredCourseId != null && groupsWithExams.any((g) => g.course.id == preferredCourseId)
+      final activeCourseId = preferredCourseId != null && groups.any((g) => g.course.id == preferredCourseId)
           ? preferredCourseId
-          : groupsWithExams.isNotEmpty
-              ? groupsWithExams.first.course.id
+          : groups.isNotEmpty
+              ? groups.first.course.id
               : null;
+
       setState(() {
-        _groups = groupsWithExams;
-        _expandedCourseIds = groupsWithExams.map((g) => g.course.id).toSet();
+        _groups = groups;
         _activeCourseId = activeCourseId;
         _loading = false;
       });
@@ -89,74 +107,162 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
       setState(() {
         _error = mapApiFailure(e).message;
         _groups = const [];
-        _expandedCourseIds = const {};
         _activeCourseId = null;
         _loading = false;
       });
     }
   }
 
-  List<_CourseQuizGroup> get _visibleGroups => _groups;
-
-  _CourseQuizGroup? get _activeGroup {
-    final activeId = _activeCourseId;
-    if (activeId == null) return _visibleGroups.isNotEmpty ? _visibleGroups.first : null;
-    for (final group in _visibleGroups) {
-      if (group.course.id == activeId) return group;
-    }
-    return _visibleGroups.isNotEmpty ? _visibleGroups.first : null;
+  void _cachePublishedExamsForStudents(
+    MyCourseItem course,
+    List<ExamModel> exams,
+  ) {
+    PublishedExamsCache.saveInstructorExams(
+      courseId: course.id,
+      courseTitle: course.safeTitle,
+      courseCode: course.safeCourseCode,
+      exams: exams.map(_examToPublishedCacheJson).toList(growable: false),
+    );
   }
+
+  Map<String, dynamic> _examToPublishedCacheJson(ExamModel exam) {
+    return <String, dynamic>{
+      'id': exam.id,
+      'course_id': exam.courseId,
+      'title': exam.title,
+      'description': exam.description,
+      'exam_type': exam.examType,
+      'duration_minutes': exam.durationMinutes,
+      'max_attempts': exam.maxAttempts,
+      'passing_score': exam.passingScore,
+      'total_questions': exam.totalQuestions,
+      'total_score': exam.totalScore,
+      'is_published': exam.isPublished,
+      'available_from': exam.availableFrom?.toUtc().toIso8601String(),
+      'available_to': exam.availableTo?.toUtc().toIso8601String(),
+      'is_available': true,
+    }..removeWhere((_, value) => value == null);
+  }
+
+  List<_CourseExamGroup> get _filteredGroups {
+    final query = _searchController.text.trim().toLowerCase();
+    final hasQuery = query.isNotEmpty;
+
+    final filtered = <_CourseExamGroup>[];
+    for (final group in _groups) {
+      final course = group.course;
+      final courseMatches = hasQuery &&
+          (course.safeTitle.toLowerCase().contains(query) ||
+              course.safeCourseCode.toLowerCase().contains(query) ||
+              (course.category ?? '').toLowerCase().contains(query));
+
+      final exams = group.exams.where((exam) {
+        final statusMatches = _statusFilter == _ExamStatusFilter.all ||
+            (_statusFilter == _ExamStatusFilter.published && exam.isPublished) ||
+            (_statusFilter == _ExamStatusFilter.draft && !exam.isPublished);
+        final examMatches = !hasQuery ||
+            exam.title.toLowerCase().contains(query) ||
+            (exam.description ?? '').toLowerCase().contains(query) ||
+            exam.examType.toLowerCase().contains(query);
+        return statusMatches && (!hasQuery || courseMatches || examMatches);
+      }).toList();
+
+      final includeCourse = !hasQuery && _statusFilter == _ExamStatusFilter.all
+          ? true
+          : courseMatches || exams.isNotEmpty;
+      if (includeCourse) filtered.add(group.copyWith(exams: exams));
+    }
+    return filtered;
+  }
+
+  _CourseExamGroup? get _activeGroup {
+    final visible = _filteredGroups;
+    if (visible.isEmpty) return null;
+    final activeId = _activeCourseId;
+    if (activeId != null) {
+      for (final group in visible) {
+        if (group.course.id == activeId) return group;
+      }
+    }
+    return visible.first;
+  }
+
+  _ExamStudioStats get _stats => _ExamStudioStats.fromGroups(_groups);
 
   @override
   Widget build(BuildContext context) {
     if (_selectedExam != null || _detailsLoading) {
-      return _ExamAnalyticsPage(
+      return _ExamDetailsWorkspace(
         exam: _selectedDetails?.exam ?? _selectedExam,
-        courseId: _selectedExamCourseId,
+        course: _selectedExamCourse,
         details: _selectedDetails,
         loading: _detailsLoading,
-        exportingPdf: _exportingExamPdf,
         error: _detailsError,
-        onBack: _backToQuizWorkspace,
-        onExportPdf: _exportExamPdfFromBackend,
+        publishing: _publishing,
+        exportingPdf: _exportingExamPdf,
+        onBack: _backToExamStudio,
         onRetry: () {
           final exam = _selectedExam;
-          final courseId = _selectedExamCourseId;
-          if (exam != null && courseId != null) {
-            unawaited(_openExamDetails(courseId: courseId, exam: exam));
+          final course = _selectedExamCourse;
+          if (exam != null && course != null) {
+            unawaited(_openExamDetails(course: course, exam: exam));
           }
         },
+        onPublish: _selectedExamCourse == null || _selectedExam == null
+            ? null
+            : () => _publishExam(course: _selectedExamCourse!, exam: _selectedDetails?.exam ?? _selectedExam!),
+        onExportPdf: _selectedExamCourse == null || _selectedExam == null
+            ? null
+            : () => _exportExamPdf(course: _selectedExamCourse!, exam: _selectedDetails?.exam ?? _selectedExam!),
+        onOpenQuestionBank: _selectedExamCourse == null
+            ? null
+            : () => _goToQuestionBank(_selectedExamCourse!),
       );
     }
 
-    final visibleGroups = _visibleGroups;
+    final visibleGroups = _filteredGroups;
     final activeGroup = _activeGroup;
+    final createExamCourse = activeGroup?.course ?? (_groups.isNotEmpty ? _groups.first.course : null);
+
     return Container(
       color: AppColors.pageBg,
       child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 32),
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
         children: [
           Align(
             alignment: Alignment.topCenter,
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1220),
+              constraints: const BoxConstraints(maxWidth: 1500),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _WorkspaceHeader(
-                    stats: _QuizWorkspaceStats.fromGroups(_groups),
+                  _ExamStudioHero(
+                    stats: _stats,
+                    onRefresh: _loadAllCourseExams,
+                    refreshing: _loading,
+                    onCreateExam: createExamCourse == null
+                        ? null
+                        : () => _goToQuestionBank(createExamCourse),
                   ),
-                  const SizedBox(height: 16),
-                  _QuizWorkspaceBody(
+                  const SizedBox(height: 18),
+                  _ExamStudioBody(
                     loading: _loading,
                     error: _error,
                     groups: visibleGroups,
-                    activeCourseId: activeGroup?.course.id,
-                    expandedCourseIds: _expandedCourseIds,
-                    onRetry: _loadAllCourseQuizzes,
-                    onToggleCourse: _toggleCourse,
+                    allGroups: _groups,
+                    activeGroup: activeGroup,
+                    statusFilter: _statusFilter,
+                    searchController: _searchController,
+                    hasActiveFilters: _searchController.text.trim().isNotEmpty || _statusFilter != _ExamStatusFilter.all,
+                    onStatusChanged: (value) => setState(() => _statusFilter = value),
+                    onClearFilters: _clearFilters,
+                    onRetry: _loadAllCourseExams,
                     onSelectCourse: (courseId) => setState(() => _activeCourseId = courseId),
-                    onOpenExam: (courseId, exam) => _openExamDetails(courseId: courseId, exam: exam),
+                    onOpenExam: (course, exam) => _openExamDetails(course: course, exam: exam),
+                    onPublishExam: (course, exam) => _publishExam(course: course, exam: exam),
+                    onExportExam: (course, exam) => _exportExamPdf(course: course, exam: exam),
+                    onOpenQuestionBank: _goToQuestionBank,
+                    onOpenTemplates: _goToTemplates,
                   ),
                 ],
               ),
@@ -167,23 +273,10 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
     );
   }
 
-  void _toggleCourse(int courseId) {
-    setState(() {
-      _activeCourseId = courseId;
-      final next = {..._expandedCourseIds};
-      if (next.contains(courseId)) {
-        next.remove(courseId);
-      } else {
-        next.add(courseId);
-      }
-      _expandedCourseIds = next;
-    });
-  }
-
-  Future<void> _openExamDetails({required int courseId, required ExamModel exam}) async {
+  Future<void> _openExamDetails({required MyCourseItem course, required ExamModel exam}) async {
     setState(() {
       _selectedExam = exam;
-      _selectedExamCourseId = courseId;
+      _selectedExamCourse = course;
       _selectedDetails = null;
       _detailsLoading = true;
       _detailsError = null;
@@ -191,7 +284,7 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
 
     try {
       final details = await ref.read(examsApiProvider).getExam(
-            courseId: courseId,
+            courseId: course.id,
             examId: exam.id,
           );
       if (!mounted) return;
@@ -209,9 +302,83 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
     }
   }
 
-  Future<void> _exportExamPdfFromBackend(ExamModel exam) async {
-    final courseId = _selectedExamCourseId;
-    if (courseId == null || _exportingExamPdf) return;
+  Future<void> _publishExam({required MyCourseItem course, required ExamModel exam}) async {
+    if (_publishing || exam.isPublished) return;
+    setState(() => _publishing = true);
+    try {
+      final api = ref.read(examsApiProvider);
+      final publishableExam = await _ensureExamHasBackendAvailability(
+        course: course,
+        exam: exam,
+      );
+      final response = await api.publishExam(
+            courseId: course.id,
+            examId: publishableExam.id,
+          );
+      if (!mounted) return;
+
+      final updated = _copyExamAfterPublish(publishableExam, response);
+      setState(() {
+        _groups = _replaceExamInGroups(_groups, course.id, updated);
+        if (_selectedExam?.id == exam.id) _selectedExam = updated;
+        if (_selectedDetails?.exam.id == exam.id) {
+          _selectedDetails = ExamDetailsModel(
+            exam: updated,
+            sections: _selectedDetails!.sections,
+            questions: _selectedDetails!.questions,
+          );
+        }
+      });
+      unawaited(api.listExams(courseId: course.id).catchError(
+            (_) => ExamListResponse(courseId: course.id, total: 0, exams: const []),
+          ));
+
+      AppToast.success(
+        context,
+        title: 'Exam published',
+        message: response.message.trim().isEmpty
+            ? 'Students can now see this exam when backend availability rules allow it.'
+            : response.message,
+      );
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        title: 'Publish failed',
+        message: mapApiFailure(e).message,
+      );
+    } finally {
+      if (mounted) setState(() => _publishing = false);
+    }
+  }
+
+  Future<ExamModel> _ensureExamHasBackendAvailability({
+    required MyCourseItem course,
+    required ExamModel exam,
+  }) async {
+    if (exam.availableFrom != null && exam.availableTo != null) {
+      return exam;
+    }
+
+    final now = DateTime.now().toUtc();
+    final start = (exam.availableFrom ?? now.subtract(const Duration(minutes: 5))).toUtc();
+    var end = (exam.availableTo ?? now.add(const Duration(days: 3650))).toUtc();
+    if (!end.isAfter(start)) {
+      end = start.add(const Duration(days: 3650));
+    }
+
+    return ref.read(examsApiProvider).updateExam(
+          courseId: course.id,
+          examId: exam.id,
+          payload: {
+            'available_from': start.toIso8601String(),
+            'available_to': end.toIso8601String(),
+          },
+        );
+  }
+
+  Future<void> _exportExamPdf({required MyCourseItem course, required ExamModel exam}) async {
+    if (_exportingExamPdf) return;
 
     final options = await _showExamPdfExportOptionsDialog();
     if (options == null || !mounted) return;
@@ -219,7 +386,7 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
     setState(() => _exportingExamPdf = true);
     try {
       final export = await ref.read(examsApiProvider).exportExamPdf(
-            courseId: courseId,
+            courseId: course.id,
             examId: exam.id,
             includeLearnovaLogo: options.includeLearnovaLogo,
             includeCourseTitle: options.includeCourseTitle,
@@ -230,6 +397,9 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
             includePoints: options.includePoints,
             includeStudentInfoFields: options.includeStudentInfoFields,
             includeAnswerSpace: options.includeAnswerSpace,
+            includeOcrSupport: options.includeOcrSupport,
+            shuffleQuestions: options.shuffleQuestions,
+            shuffleOptions: options.shuffleOptions,
           );
       if (!mounted) return;
       downloadBytesFile(
@@ -240,7 +410,7 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
       AppToast.success(
         context,
         title: 'PDF exported',
-        message: 'Downloaded the backend-generated exam PDF.',
+        message: 'Downloaded the backend-generated exam paper.',
       );
     } catch (e) {
       if (!mounted) return;
@@ -261,12 +431,28 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
     );
   }
 
-  void _backToQuizWorkspace() {
+  void _goToQuestionBank(MyCourseItem course) {
+    SelectedCourseCache.set(course);
+    context.go(Routes.courseQuestionBank(buildCourseRouteSlug(course)));
+  }
+
+  void _goToTemplates(MyCourseItem course) {
+    SelectedCourseCache.set(course);
+    context.go(Routes.courseTemplates(buildCourseRouteSlug(course)));
+  }
+
+  void _clearFilters() {
+    _searchController.clear();
+    setState(() => _statusFilter = _ExamStatusFilter.all);
+  }
+
+  void _backToExamStudio() {
     setState(() {
       _selectedExam = null;
-      _selectedExamCourseId = null;
+      _selectedExamCourse = null;
       _selectedDetails = null;
       _detailsLoading = false;
+      _publishing = false;
       _exportingExamPdf = false;
       _detailsError = null;
     });
@@ -283,17 +469,23 @@ class _ExamPdfExportOptions {
   final bool includePoints;
   final bool includeStudentInfoFields;
   final bool includeAnswerSpace;
+  final bool includeOcrSupport;
+  final bool shuffleQuestions;
+  final bool shuffleOptions;
 
   const _ExamPdfExportOptions({
     this.includeLearnovaLogo = true,
     this.includeCourseTitle = true,
     this.includeCourseCode = false,
     this.includeExamMetadata = true,
-    this.includeInstructions = false,
+    this.includeInstructions = true,
     this.includeSectionDescriptions = true,
     this.includePoints = true,
     this.includeStudentInfoFields = true,
     this.includeAnswerSpace = true,
+    this.includeOcrSupport = false,
+    this.shuffleQuestions = false,
+    this.shuffleOptions = false,
   });
 }
 
@@ -309,163 +501,475 @@ class _ExamPdfExportOptionsDialogState extends State<_ExamPdfExportOptionsDialog
   bool _includeCourseTitle = true;
   bool _includeCourseCode = false;
   bool _includeExamMetadata = true;
-  bool _includeInstructions = false;
+  bool _includeInstructions = true;
   bool _includeSectionDescriptions = true;
   bool _includePoints = true;
   bool _includeStudentInfoFields = true;
   bool _includeAnswerSpace = true;
+  bool _includeOcrSupport = false;
+  bool _shuffleQuestions = false;
+  bool _shuffleOptions = false;
+
+  void _setOcrSupport(bool value) {
+    setState(() {
+      _includeOcrSupport = value;
+      if (value) {
+        _includeStudentInfoFields = true;
+        _includeAnswerSpace = true;
+        _shuffleQuestions = false;
+        _shuffleOptions = false;
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('PDF export options'),
-      content: SizedBox(
-        width: 420,
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _switchTile(
-                title: 'Learnova logo',
-                value: _includeLearnovaLogo,
-                onChanged: (value) => setState(() => _includeLearnovaLogo = value),
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 28),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 680),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 22, 18, 16),
+              child: Row(
+                children: [
+                  _IconBox(icon: Icons.picture_as_pdf_outlined, color: AppColors.primary, size: 46),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Export exam paper', style: _textStyle(color: AppColors.textTitle, size: 21, weight: FontWeight.w900)),
+                        const SizedBox(height: 5),
+                        Text('Choose the print layout and the fields rendered by the backend PDF endpoint.', style: _textStyle(color: AppColors.textMuted, size: 12.5, weight: FontWeight.w700)),
+                      ],
+                    ),
+                  ),
+                  IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded)),
+                ],
               ),
-              _switchTile(
-                title: 'Course title',
-                value: _includeCourseTitle,
-                onChanged: (value) => setState(() => _includeCourseTitle = value),
+            ),
+            Divider(height: 1, color: AppColors.border),
+            Flexible(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(24, 18, 24, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _ExportSectionLabel('Print mode'),
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _ExportModeCard(
+                            selected: !_includeOcrSupport,
+                            icon: Icons.description_outlined,
+                            title: 'Standard PDF',
+                            subtitle: 'Clean paper copy for manual marking or normal distribution.',
+                            onTap: () => _setOcrSupport(false),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: _ExportModeCard(
+                            selected: _includeOcrSupport,
+                            icon: Icons.document_scanner_outlined,
+                            title: 'OCR-ready print',
+                            subtitle: 'Adds QR, student ID bubbles, answer bubbles and OCR boxes.',
+                            onTap: () => _setOcrSupport(true),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (_includeOcrSupport) ...[
+                      const SizedBox(height: 12),
+                      const _ExportNotice(
+                        icon: Icons.verified_outlined,
+                        title: 'OCR scan compatible',
+                        message: 'This layout is prepared for the /ocr/exam-scan/analyze pipeline after students submit scanned papers. Question and option shuffling are locked off so detected answers stay aligned with the backend exam order.',
+                      ),
+                    ],
+                    const SizedBox(height: 18),
+                    _ExportSectionLabel('Header and exam details'),
+                    const SizedBox(height: 10),
+                    _ExportToggle(
+                      title: 'Learnova logo',
+                      subtitle: 'Show platform branding at the top of the paper.',
+                      value: _includeLearnovaLogo,
+                      onChanged: (value) => setState(() => _includeLearnovaLogo = value),
+                    ),
+                    _ExportToggle(
+                      title: 'Course title',
+                      subtitle: 'Print the course name in the exam header.',
+                      value: _includeCourseTitle,
+                      onChanged: (value) => setState(() => _includeCourseTitle = value),
+                    ),
+                    _ExportToggle(
+                      title: 'Course code',
+                      subtitle: 'Useful when the same exam title exists across courses.',
+                      value: _includeCourseCode,
+                      onChanged: (value) => setState(() => _includeCourseCode = value),
+                    ),
+                    _ExportToggle(
+                      title: 'Exam metadata',
+                      subtitle: 'Includes type, duration, total questions and total score.',
+                      value: _includeExamMetadata,
+                      onChanged: (value) => setState(() => _includeExamMetadata = value),
+                    ),
+                    _ExportToggle(
+                      title: 'Instructions',
+                      subtitle: 'Render the saved student-facing instructions.',
+                      value: _includeInstructions,
+                      onChanged: (value) => setState(() => _includeInstructions = value),
+                    ),
+                    const SizedBox(height: 10),
+                    _ExportSectionLabel('Question paper content'),
+                    const SizedBox(height: 10),
+                    _ExportToggle(
+                      title: 'Section descriptions',
+                      subtitle: 'Show each section description above its questions.',
+                      value: _includeSectionDescriptions,
+                      onChanged: (value) => setState(() => _includeSectionDescriptions = value),
+                    ),
+                    _ExportToggle(
+                      title: 'Question points',
+                      subtitle: 'Print the score value next to each question.',
+                      value: _includePoints,
+                      onChanged: (value) => setState(() => _includePoints = value),
+                    ),
+                    _ExportToggle(
+                      title: 'Student info fields',
+                      subtitle: _includeOcrSupport ? 'OCR mode uses the dedicated name/date area and student ID bubble grid.' : 'Adds name/date fields for manual paper submissions.',
+                      value: _includeStudentInfoFields,
+                      enabled: !_includeOcrSupport,
+                      onChanged: (value) => setState(() => _includeStudentInfoFields = value),
+                    ),
+                    _ExportToggle(
+                      title: 'Answer space',
+                      subtitle: _includeOcrSupport ? 'Required for OCR answer boxes and written-answer detection.' : 'Adds blank space for written answers.',
+                      value: _includeAnswerSpace,
+                      enabled: !_includeOcrSupport,
+                      onChanged: (value) => setState(() => _includeAnswerSpace = value),
+                    ),
+                    const SizedBox(height: 10),
+                    _ExportSectionLabel('Randomization'),
+                    const SizedBox(height: 10),
+                    _ExportToggle(
+                      title: 'Shuffle questions in PDF',
+                      subtitle: _includeOcrSupport ? 'Disabled for OCR so scanned answers match the backend question order.' : 'Override the saved exam setting for this export only.',
+                      value: _shuffleQuestions,
+                      enabled: !_includeOcrSupport,
+                      onChanged: (value) => setState(() => _shuffleQuestions = value),
+                    ),
+                    _ExportToggle(
+                      title: 'Shuffle answer options in PDF',
+                      subtitle: _includeOcrSupport ? 'Disabled for OCR so selected bubbles map to the saved options.' : 'Override the saved exam setting for this export only.',
+                      value: _shuffleOptions,
+                      enabled: !_includeOcrSupport,
+                      onChanged: (value) => setState(() => _shuffleOptions = value),
+                    ),
+                  ],
+                ),
               ),
-              _switchTile(
-                title: 'Course code',
-                value: _includeCourseCode,
-                onChanged: (value) => setState(() => _includeCourseCode = value),
+            ),
+            Container(
+              padding: const EdgeInsets.fromLTRB(24, 14, 24, 20),
+              decoration: BoxDecoration(border: Border(top: BorderSide(color: AppColors.border))),
+              child: Row(
+                children: [
+                  TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancel')),
+                  const Spacer(),
+                  FilledButton.icon(
+                    onPressed: () {
+                      Navigator.of(context).pop(
+                        _ExamPdfExportOptions(
+                          includeLearnovaLogo: _includeLearnovaLogo,
+                          includeCourseTitle: _includeCourseTitle,
+                          includeCourseCode: _includeCourseCode,
+                          includeExamMetadata: _includeExamMetadata,
+                          includeInstructions: _includeInstructions,
+                          includeSectionDescriptions: _includeSectionDescriptions,
+                          includePoints: _includePoints,
+                          includeStudentInfoFields: _includeStudentInfoFields,
+                          includeAnswerSpace: _includeAnswerSpace,
+                          includeOcrSupport: _includeOcrSupport,
+                          shuffleQuestions: _includeOcrSupport ? false : _shuffleQuestions,
+                          shuffleOptions: _includeOcrSupport ? false : _shuffleOptions,
+                        ),
+                      );
+                    },
+                    icon: Icon(_includeOcrSupport ? Icons.document_scanner_outlined : Icons.download_rounded, size: 18),
+                    label: Text(_includeOcrSupport ? 'Export OCR PDF' : 'Export PDF'),
+                  ),
+                ],
               ),
-              _switchTile(
-                title: 'Exam metadata',
-                value: _includeExamMetadata,
-                onChanged: (value) => setState(() => _includeExamMetadata = value),
-              ),
-              _switchTile(
-                title: 'Instructions',
-                subtitle: 'Off by default.',
-                value: _includeInstructions,
-                onChanged: (value) => setState(() => _includeInstructions = value),
-              ),
-              _switchTile(
-                title: 'Section descriptions',
-                value: _includeSectionDescriptions,
-                onChanged: (value) => setState(() => _includeSectionDescriptions = value),
-              ),
-              _switchTile(
-                title: 'Question points',
-                value: _includePoints,
-                onChanged: (value) => setState(() => _includePoints = value),
-              ),
-              _switchTile(
-                title: 'Student info fields',
-                value: _includeStudentInfoFields,
-                onChanged: (value) => setState(() => _includeStudentInfoFields = value),
-              ),
-              _switchTile(
-                title: 'Answer space',
-                value: _includeAnswerSpace,
-                onChanged: (value) => setState(() => _includeAnswerSpace = value),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Cancel'),
-        ),
-        FilledButton(
-          onPressed: () {
-            Navigator.of(context).pop(
-              _ExamPdfExportOptions(
-                includeLearnovaLogo: _includeLearnovaLogo,
-                includeCourseTitle: _includeCourseTitle,
-                includeCourseCode: _includeCourseCode,
-                includeExamMetadata: _includeExamMetadata,
-                includeInstructions: _includeInstructions,
-                includeSectionDescriptions: _includeSectionDescriptions,
-                includePoints: _includePoints,
-                includeStudentInfoFields: _includeStudentInfoFields,
-                includeAnswerSpace: _includeAnswerSpace,
-              ),
-            );
-          },
-          child: const Text('Export'),
-        ),
-      ],
-    );
-  }
-
-  Widget _switchTile({
-    required String title,
-    String? subtitle,
-    required bool value,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return SwitchListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-      subtitle: subtitle == null ? null : Text(subtitle),
-      value: value,
-      onChanged: onChanged,
     );
   }
 }
 
-class _CourseQuizGroup {
+class _ExportSectionLabel extends StatelessWidget {
+  final String label;
+
+  const _ExportSectionLabel(this.label);
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label.toUpperCase(),
+      style: _textStyle(
+        color: AppColors.textMuted,
+        size: 11,
+        weight: FontWeight.w900,
+      ).copyWith(letterSpacing: .8),
+    );
+  }
+}
+
+class _ExportModeCard extends StatelessWidget {
+  final bool selected;
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  const _ExportModeCard({
+    required this.selected,
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderColor = selected ? AppColors.primary : AppColors.border;
+    final bg = selected ? AppColors.primarySoft : AppColors.surfaceBg;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: borderColor, width: selected ? 1.4 : 1),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: selected ? AppColors.primary : AppColors.cardBg,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+              ),
+              child: Icon(icon, color: selected ? Colors.white : AppColors.primary, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: _textStyle(color: AppColors.textTitle, size: 13.5, weight: FontWeight.w900)),
+                  const SizedBox(height: 4),
+                  Text(subtitle, style: _textStyle(color: AppColors.textMuted, size: 11.5, weight: FontWeight.w700, height: 1.35)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Icon(
+              selected ? Icons.radio_button_checked : Icons.radio_button_unchecked,
+              color: selected ? AppColors.primary : AppColors.textHint,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExportNotice extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+
+  const _ExportNotice({required this.icon, required this.title, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.infoBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.infoBorder),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: AppColors.infoText, size: 20),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: _textStyle(color: AppColors.infoText, size: 12.5, weight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text(message, style: _textStyle(color: AppColors.infoText, size: 11.5, weight: FontWeight.w700, height: 1.42)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExportToggle extends StatelessWidget {
+  final String title;
+  final String? subtitle;
+  final bool value;
+  final bool enabled;
+  final ValueChanged<bool> onChanged;
+
+  const _ExportToggle({
+    required this.title,
+    this.subtitle,
+    required this.value,
+    this.enabled = true,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final effectiveTitleColor = enabled ? AppColors.textTitle : AppColors.textHint;
+    final effectiveSubtitleColor = enabled ? AppColors.textMuted : AppColors.textHint;
+    return AnimatedOpacity(
+      duration: const Duration(milliseconds: 160),
+      opacity: enabled ? 1 : .78,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
+        decoration: BoxDecoration(
+          color: enabled ? AppColors.surfaceBg : AppColors.fieldDisabledBg,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: _textStyle(color: effectiveTitleColor, size: 13, weight: FontWeight.w900)),
+                  if (subtitle != null && subtitle!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 3),
+                    Text(subtitle!, style: _textStyle(color: effectiveSubtitleColor, size: 11.3, weight: FontWeight.w700, height: 1.35)),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 14),
+            Switch(value: value, onChanged: enabled ? onChanged : null),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+enum _ExamStatusFilter { all, published, draft }
+
+extension _ExamStatusFilterX on _ExamStatusFilter {
+  String get label {
+    switch (this) {
+      case _ExamStatusFilter.all:
+        return 'All';
+      case _ExamStatusFilter.published:
+        return 'Published';
+      case _ExamStatusFilter.draft:
+        return 'Draft';
+    }
+  }
+}
+
+class _CourseExamGroup {
   final MyCourseItem course;
   final List<ExamModel> exams;
   final String? error;
 
-  const _CourseQuizGroup({required this.course, required this.exams, this.error});
+  const _CourseExamGroup({required this.course, required this.exams, this.error});
 
   int get published => exams.where((exam) => exam.isPublished).length;
   int get draft => exams.length - published;
   int get totalQuestions => exams.fold<int>(0, (sum, exam) => sum + exam.totalQuestions);
+  double get totalScore => exams.fold<double>(0, (sum, exam) => sum + exam.totalScore);
+  DateTime get lastUpdated {
+    if (exams.isEmpty) return course.updatedAt;
+    return exams.map((e) => e.updatedAt).reduce((a, b) => a.isAfter(b) ? a : b);
+  }
 
-  _CourseQuizGroup copyWith({List<ExamModel>? exams}) {
-    return _CourseQuizGroup(
+  _CourseExamGroup copyWith({List<ExamModel>? exams, String? error}) {
+    return _CourseExamGroup(
       course: course,
       exams: exams ?? this.exams,
-      error: error,
+      error: error ?? this.error,
     );
   }
 }
 
-class _QuizWorkspaceStats {
+class _ExamStudioStats {
   final int courses;
-  final int quizzes;
+  final int exams;
   final int published;
   final int draft;
   final int questions;
 
-  const _QuizWorkspaceStats({required this.courses, required this.quizzes, required this.published, required this.draft, required this.questions});
+  const _ExamStudioStats({
+    required this.courses,
+    required this.exams,
+    required this.published,
+    required this.draft,
+    required this.questions,
+  });
 
-  factory _QuizWorkspaceStats.fromGroups(List<_CourseQuizGroup> groups) {
-    final quizzes = groups.fold<int>(0, (sum, group) => sum + group.exams.length);
+  factory _ExamStudioStats.fromGroups(List<_CourseExamGroup> groups) {
+    final exams = groups.fold<int>(0, (sum, group) => sum + group.exams.length);
     final published = groups.fold<int>(0, (sum, group) => sum + group.published);
     final questions = groups.fold<int>(0, (sum, group) => sum + group.totalQuestions);
-    return _QuizWorkspaceStats(
+    return _ExamStudioStats(
       courses: groups.length,
-      quizzes: quizzes,
+      exams: exams,
       published: published,
-      draft: quizzes - published,
+      draft: exams - published,
       questions: questions,
     );
   }
 }
 
-class _WorkspaceHeader extends StatelessWidget {
-  final _QuizWorkspaceStats stats;
+class _ExamStudioHero extends StatelessWidget {
+  final _ExamStudioStats stats;
+  final bool refreshing;
+  final VoidCallback onRefresh;
+  final VoidCallback? onCreateExam;
 
-  const _WorkspaceHeader({required this.stats});
+  const _ExamStudioHero({
+    required this.stats,
+    required this.refreshing,
+    required this.onRefresh,
+    required this.onCreateExam,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -473,158 +977,312 @@ class _WorkspaceHeader extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(22, 20, 22, 20),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF1155CC), Color(0xFF1787E8), Color(0xFF22C3DD)],
+          colors: [Color(0xFF0F3EA8), Color(0xFF137FEC), Color(0xFF20C6D8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 20, offset: const Offset(0, 10))],
+        borderRadius: BorderRadius.circular(10),
+        boxShadow: [BoxShadow(color: AppColors.shadowBlue.withOpacity(0.34), blurRadius: 22, offset: const Offset(0, 12))],
       ),
       child: Row(
         children: [
           Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withOpacity(0.18))),
-            child: const Icon(Icons.account_tree_outlined, color: Colors.white, size: 22),
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.14),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: Colors.white.withOpacity(0.22)),
+            ),
+            child: const Icon(Icons.assignment_turned_in_outlined, color: Colors.white, size: 29),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 18),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Quiz Workspace', style: TextStyle(color: Colors.white, fontSize: 25, fontWeight: FontWeight.w900, letterSpacing: -0.5)),
-                const SizedBox(height: 4),
-                Text('Browse every course and open its saved exams from one tree.', style: TextStyle(color: Colors.white.withOpacity(0.86), fontSize: 13, fontWeight: FontWeight.w700)),
+                const Text('Exams', style: TextStyle(color: Colors.white, fontSize: 30, fontWeight: FontWeight.w900, letterSpacing: -0.7)),
+                const SizedBox(height: 6),
+                Text(
+                  'Manage generated exams, publish them to students, and export backend-ready paper PDFs.',
+                  style: TextStyle(color: Colors.white.withOpacity(0.86), fontSize: 13, fontWeight: FontWeight.w700, height: 1.35),
+                ),
               ],
             ),
           ),
-          _HeaderMetric(value: '${stats.courses}', label: 'Courses'),
-          const SizedBox(width: 10),
-          _HeaderMetric(value: '${stats.quizzes}', label: 'Quizzes'),
-          const SizedBox(width: 10),
-          _HeaderMetric(value: '${stats.questions}', label: 'Questions'),
+          const SizedBox(width: 18),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _HeroMetric(value: '${stats.courses}', label: 'Courses'),
+              _HeroMetric(value: '${stats.exams}', label: 'Exams'),
+              _HeroMetric(value: '${stats.published}', label: 'Published'),
+              _HeroMetric(value: '${stats.questions}', label: 'Questions'),
+            ],
+          ),
+          const SizedBox(width: 18),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              OutlinedButton.icon(
+                onPressed: refreshing ? null : onRefresh,
+                icon: refreshing
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.refresh_rounded, size: 18),
+                label: Text(refreshing ? 'Loading...' : 'Refresh'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white.withOpacity(0.55),
+                  side: BorderSide(color: Colors.white.withOpacity(0.35)),
+                  backgroundColor: Colors.white.withOpacity(0.08),
+                ),
+              ),
+              const SizedBox(height: 10),
+              FilledButton.icon(
+                onPressed: onCreateExam,
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('Create exam'),
+                style: FilledButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  backgroundColor: Colors.white,
+                  disabledBackgroundColor: Colors.white.withOpacity(0.25),
+                  disabledForegroundColor: Colors.white.withOpacity(0.65),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ],
+          ),
         ],
       ),
     );
   }
 }
 
-class _HeaderMetric extends StatelessWidget {
+class _HeroMetric extends StatelessWidget {
   final String value;
   final String label;
 
-  const _HeaderMetric({required this.value, required this.label});
+  const _HeroMetric({required this.value, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 92,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(color: Colors.white.withOpacity(0.12), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white.withOpacity(0.18))),
+      width: 96,
+      padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.13),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.18)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(value, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 2),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withOpacity(0.78), fontSize: 11, fontWeight: FontWeight.w800)),
+          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 3),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withOpacity(0.76), fontSize: 11, fontWeight: FontWeight.w800)),
         ],
       ),
     );
   }
 }
 
-class _QuizWorkspaceBody extends StatelessWidget {
+class _ExamStudioBody extends StatelessWidget {
   final bool loading;
   final String? error;
-  final List<_CourseQuizGroup> groups;
-  final int? activeCourseId;
-  final Set<int> expandedCourseIds;
+  final List<_CourseExamGroup> groups;
+  final List<_CourseExamGroup> allGroups;
+  final _CourseExamGroup? activeGroup;
+  final _ExamStatusFilter statusFilter;
+  final TextEditingController searchController;
+  final bool hasActiveFilters;
+  final ValueChanged<_ExamStatusFilter> onStatusChanged;
+  final VoidCallback onClearFilters;
   final VoidCallback onRetry;
-  final ValueChanged<int> onToggleCourse;
   final ValueChanged<int> onSelectCourse;
-  final void Function(int courseId, ExamModel exam) onOpenExam;
+  final void Function(MyCourseItem course, ExamModel exam) onOpenExam;
+  final void Function(MyCourseItem course, ExamModel exam) onPublishExam;
+  final void Function(MyCourseItem course, ExamModel exam) onExportExam;
+  final ValueChanged<MyCourseItem> onOpenQuestionBank;
+  final ValueChanged<MyCourseItem> onOpenTemplates;
 
-  const _QuizWorkspaceBody({
+  const _ExamStudioBody({
     required this.loading,
     required this.error,
     required this.groups,
-    required this.activeCourseId,
-    required this.expandedCourseIds,
+    required this.allGroups,
+    required this.activeGroup,
+    required this.statusFilter,
+    required this.searchController,
+    required this.hasActiveFilters,
+    required this.onStatusChanged,
+    required this.onClearFilters,
     required this.onRetry,
-    required this.onToggleCourse,
     required this.onSelectCourse,
     required this.onOpenExam,
+    required this.onPublishExam,
+    required this.onExportExam,
+    required this.onOpenQuestionBank,
+    required this.onOpenTemplates,
   });
 
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const _WorkspaceShell(
-        child: SizedBox(
-          height: 360,
-          child: Center(child: CircularProgressIndicator()),
-        ),
+      return const _StudioShell(
+        child: SizedBox(height: 560, child: Center(child: CircularProgressIndicator())),
       );
     }
     if (error != null) {
-      return _WorkspaceShell(
-        child: _TableMessage(icon: Icons.error_outline_rounded, title: 'Could not load quizzes', message: error!, actionLabel: 'Retry', onAction: onRetry),
+      return _StudioShell(
+        child: _StateMessage(
+          icon: Icons.error_outline_rounded,
+          title: 'Could not load exams',
+          message: error!,
+          actionLabel: 'Retry',
+          onAction: onRetry,
+        ),
       );
     }
-    if (groups.isEmpty) {
-      return const _WorkspaceShell(
-        child: _TableMessage(icon: Icons.school_outlined, title: 'No quizzes found', message: 'Only courses that already have saved exams appear here. Create an exam from a course Question Bank first.'),
+    final noMatches = groups.isEmpty && hasActiveFilters && allGroups.isNotEmpty;
+    if (groups.isEmpty && !noMatches) {
+      return _StudioShell(
+        child: _StateMessage(
+          icon: Icons.school_outlined,
+          title: 'No courses found',
+          message: 'Create a course first. Exams are scoped per course in the backend.',
+          actionLabel: 'Refresh',
+          onAction: onRetry,
+        ),
       );
     }
 
-    final activeGroup = groups.firstWhere(
-      (group) => group.course.id == activeCourseId,
-      orElse: () => groups.first,
-    );
+    final group = noMatches ? allGroups.first : activeGroup ?? groups.first;
+    final navigatorGroups = noMatches ? const <_CourseExamGroup>[] : groups;
+    final board = noMatches
+        ? _NoMatchingExamsPanel(onClearFilters: onClearFilters)
+        : _CourseExamBoard(
+            group: group,
+            onOpenExam: onOpenExam,
+            onPublishExam: onPublishExam,
+            onExportExam: onExportExam,
+            onOpenQuestionBank: onOpenQuestionBank,
+            onOpenTemplates: onOpenTemplates,
+          );
 
-    return _WorkspaceShell(
-      child: SizedBox(
-        height: 560,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 980;
+        if (compact) {
+          return Column(
+            children: [
+              _CourseNavigatorCard(
+                groups: navigatorGroups,
+                totalCount: noMatches ? allGroups.length : groups.length,
+                activeCourseId: group.course.id,
+                statusFilter: statusFilter,
+                searchController: searchController,
+                emptyMessage: noMatches ? 'No courses or exams match the current filters.' : null,
+                onStatusChanged: onStatusChanged,
+                onSelectCourse: onSelectCourse,
+              ),
+              const SizedBox(height: 16),
+              board,
+            ],
+          );
+        }
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             SizedBox(
-              width: 390,
-              child: _CourseQuizTree(
-                groups: groups,
-                activeCourseId: activeGroup.course.id,
-                expandedCourseIds: expandedCourseIds,
-                onToggleCourse: onToggleCourse,
+              width: 420,
+              child: _CourseNavigatorCard(
+                groups: navigatorGroups,
+                totalCount: noMatches ? allGroups.length : groups.length,
+                activeCourseId: group.course.id,
+                statusFilter: statusFilter,
+                searchController: searchController,
+                emptyMessage: noMatches ? 'No courses or exams match the current filters.' : null,
+                onStatusChanged: onStatusChanged,
                 onSelectCourse: onSelectCourse,
-                onOpenExam: onOpenExam,
               ),
             ),
-            VerticalDivider(width: 1, color: AppColors.border),
-            Expanded(
-              child: _CourseExamsPanel(
-                group: activeGroup,
-                onOpenExam: (exam) => onOpenExam(activeGroup.course.id, exam),
-              ),
-            ),
+            const SizedBox(width: 18),
+            Expanded(child: board),
           ],
+        );
+      },
+    );
+  }
+}
+
+class _NoMatchingExamsPanel extends StatelessWidget {
+  final VoidCallback onClearFilters;
+
+  const _NoMatchingExamsPanel({required this.onClearFilters});
+
+  @override
+  Widget build(BuildContext context) {
+    return _StudioShell(
+      child: SizedBox(
+        height: 360,
+        child: _StateMessage(
+          icon: Icons.search_rounded,
+          title: 'No matching exams',
+          message: 'No course or exam matches the current search/status filters. Clear filters or edit the search box on the left.',
+          actionLabel: 'Clear filters',
+          onAction: onClearFilters,
         ),
       ),
     );
   }
 }
 
-class _WorkspaceShell extends StatelessWidget {
+class _InlineEmptyMessage extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+
+  const _InlineEmptyMessage({required this.icon, required this.title, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _IconBox(icon: icon, color: AppColors.textMuted, size: 36),
+          const SizedBox(height: 12),
+          Text(title, style: _textStyle(color: AppColors.textTitle, size: 13, weight: FontWeight.w900)),
+          const SizedBox(height: 5),
+          Text(message, style: _textStyle(color: AppColors.textMuted, size: 12, weight: FontWeight.w700, height: 1.4)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StudioShell extends StatelessWidget {
   final Widget child;
 
-  const _WorkspaceShell({required this.child});
+  const _StudioShell({required this.child});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
-        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 20, offset: const Offset(0, 10))],
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 24, offset: const Offset(0, 14))],
       ),
       clipBehavior: Clip.antiAlias,
       child: child,
@@ -632,468 +1290,662 @@ class _WorkspaceShell extends StatelessWidget {
   }
 }
 
-class _CourseQuizTree extends StatelessWidget {
-  final List<_CourseQuizGroup> groups;
+class _CourseNavigatorCard extends StatelessWidget {
+  final List<_CourseExamGroup> groups;
+  final int totalCount;
   final int activeCourseId;
-  final Set<int> expandedCourseIds;
-  final ValueChanged<int> onToggleCourse;
+  final _ExamStatusFilter statusFilter;
+  final TextEditingController searchController;
+  final String? emptyMessage;
+  final ValueChanged<_ExamStatusFilter> onStatusChanged;
   final ValueChanged<int> onSelectCourse;
-  final void Function(int courseId, ExamModel exam) onOpenExam;
 
-  const _CourseQuizTree({required this.groups, required this.activeCourseId, required this.expandedCourseIds, required this.onToggleCourse, required this.onSelectCourse, required this.onOpenExam});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Container(
-          height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 18),
-          color: AppColors.surfaceBg,
-          child: Row(
-            children: [
-              const Icon(Icons.account_tree_outlined, size: 18, color: AppColors.primary),
-              const SizedBox(width: 8),
-              Expanded(child: Text('Course quiz tree', style: TextStyle(color: AppColors.textTitle, fontSize: 14, fontWeight: FontWeight.w900))),
-              _Badge(label: '${groups.length}', color: AppColors.primary),
-            ],
-          ),
-        ),
-        Expanded(
-          child: ListView.separated(
-            padding: const EdgeInsets.all(12),
-            itemCount: groups.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 8),
-            itemBuilder: (context, index) {
-              final group = groups[index];
-              final expanded = expandedCourseIds.contains(group.course.id);
-              final active = group.course.id == activeCourseId;
-              return _CourseTreeNode(
-                group: group,
-                expanded: expanded,
-                active: active,
-                onToggle: () => onToggleCourse(group.course.id),
-                onSelect: () => onSelectCourse(group.course.id),
-                onOpenExam: (exam) => onOpenExam(group.course.id, exam),
-              );
-            },
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CourseTreeNode extends StatelessWidget {
-  final _CourseQuizGroup group;
-  final bool expanded;
-  final bool active;
-  final VoidCallback onToggle;
-  final VoidCallback onSelect;
-  final ValueChanged<ExamModel> onOpenExam;
-
-  const _CourseTreeNode({required this.group, required this.expanded, required this.active, required this.onToggle, required this.onSelect, required this.onOpenExam});
-
-  @override
-  Widget build(BuildContext context) {
-    final course = group.course;
-    return Container(
-      decoration: BoxDecoration(
-        color: active ? AppColors.primarySoft : AppColors.cardBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: active ? AppColors.primary.withOpacity(0.28) : AppColors.border),
-      ),
-      child: Column(
-        children: [
-          InkWell(
-            onTap: () {
-              onSelect();
-              if (!expanded) onToggle();
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
-              child: Row(
-                children: [
-                  InkWell(
-                    onTap: onToggle,
-                    borderRadius: BorderRadius.circular(8),
-                    child: SizedBox(
-                      width: 28,
-                      height: 28,
-                      child: Icon(expanded ? Icons.keyboard_arrow_down_rounded : Icons.chevron_right_rounded, size: 22, color: AppColors.textMuted),
-                    ),
-                  ),
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.border)),
-                    child: const Icon(Icons.folder_copy_outlined, size: 18, color: AppColors.primary),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(course.safeTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textTitle, fontSize: 13, fontWeight: FontWeight.w900)),
-                        const SizedBox(height: 3),
-                        Text('${group.exams.length} quiz${group.exams.length == 1 ? '' : 'zes'} • ${course.safeCourseCode}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.w700)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          if (expanded) ...[
-            Divider(height: 1, color: AppColors.border),
-            if (group.error != null)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-                child: Text(group.error!, style: const TextStyle(color: AppColors.errorDot, fontSize: 12, fontWeight: FontWeight.w700)),
-              )
-            else if (group.exams.isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(48, 10, 14, 12),
-                child: Text('No exams in this course', style: TextStyle(color: AppColors.textHint, fontSize: 12, fontWeight: FontWeight.w700)),
-              )
-            else
-              ...group.exams.map((exam) => _ExamTreeLeaf(exam: exam, onTap: () => onOpenExam(exam))),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ExamTreeLeaf extends StatelessWidget {
-  final ExamModel exam;
-  final VoidCallback onTap;
-
-  const _ExamTreeLeaf({required this.exam, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(54, 8, 12, 8),
-        child: Row(
-          children: [
-            Icon(Icons.subdirectory_arrow_right_rounded, size: 16, color: AppColors.textHint),
-            const SizedBox(width: 7),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(exam.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textGray, fontSize: 12, fontWeight: FontWeight.w800)),
-                  const SizedBox(height: 2),
-                  Text('${exam.totalQuestions} q • ${exam.durationMinutes == null ? 'No limit' : '${exam.durationMinutes} min'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 10, fontWeight: FontWeight.w700)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 6),
-            _StatusDot(published: exam.isPublished),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatusDot extends StatelessWidget {
-  final bool published;
-
-  const _StatusDot({required this.published});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = published ? AppColors.successDot : AppColors.textHint;
-    return Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle));
-  }
-}
-
-class _CourseExamsPanel extends StatelessWidget {
-  final _CourseQuizGroup group;
-  final ValueChanged<ExamModel> onOpenExam;
-
-  const _CourseExamsPanel({required this.group, required this.onOpenExam});
-
-  @override
-  Widget build(BuildContext context) {
-    final course = group.course;
-    return Column(
-      children: [
-        Container(
-          height: 78,
-          padding: const EdgeInsets.symmetric(horizontal: 22),
-          decoration: BoxDecoration(border: Border(bottom: BorderSide(color: AppColors.border))),
-          child: Row(
-            children: [
-              Container(
-                width: 42,
-                height: 42,
-                decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.school_outlined, color: AppColors.primary, size: 21),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(course.safeTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textTitle, fontSize: 17, fontWeight: FontWeight.w900)),
-                    const SizedBox(height: 4),
-                    Text('${group.exams.length} quizzes • ${group.published} published • ${group.draft} draft', style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
-              _Badge(label: course.isPrivate ? 'Private' : 'Public', color: course.isPrivate ? AppColors.warningText : AppColors.successText),
-            ],
-          ),
-        ),
-        Expanded(
-          child: group.error != null
-              ? _TableMessage(icon: Icons.error_outline_rounded, title: 'Could not load course exams', message: group.error!)
-              : group.exams.isEmpty
-                  ? const _TableMessage(icon: Icons.assignment_outlined, title: 'No quizzes in this course', message: 'Create an exam from this course Question Bank. It will appear here under the course node.')
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(14),
-                      itemCount: group.exams.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 10),
-                      itemBuilder: (context, index) => _CourseExamTile(
-                        index: index + 1,
-                        exam: group.exams[index],
-                        onTap: () => onOpenExam(group.exams[index]),
-                      ),
-                    ),
-        ),
-      ],
-    );
-  }
-}
-
-class _CourseExamTile extends StatelessWidget {
-  final int index;
-  final ExamModel exam;
-  final VoidCallback onTap;
-
-  const _CourseExamTile({required this.index, required this.exam, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final statusColor = exam.isPublished ? AppColors.successText : AppColors.textMuted;
-    final type = _ExamRow._titleCase(exam.examType);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-        decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
-        child: Row(
-          children: [
-            Container(
-              width: 34,
-              height: 34,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(10)),
-              child: Text('$index', style: const TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.w900)),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(exam.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textTitle, fontSize: 14, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 5),
-                  Text('$type • ${exam.totalQuestions} questions • ${_points(exam.totalScore)} points • ${exam.durationMinutes == null ? 'No limit' : '${exam.durationMinutes} min'}', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w700)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 10),
-            _Badge(label: exam.isPublished ? 'Published' : 'Draft', color: statusColor),
-            const SizedBox(width: 14),
-            Text(_ExamRow._formatDate(exam.updatedAt), style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w800)),
-            const SizedBox(width: 14),
-            TextButton(onPressed: onTap, child: const Text('Open')),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HeaderText extends StatelessWidget {
-  final String text;
-  const _HeaderText(this.text);
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(text, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.textMuted, letterSpacing: 0.5));
-  }
-}
-
-class _ExamRow {
-  static String _subtitle(ExamModel exam) {
-    final type = exam.examType.trim().isEmpty ? 'Quiz' : _titleCase(exam.examType);
-    final score = exam.totalScore == exam.totalScore.roundToDouble() ? exam.totalScore.toInt().toString() : exam.totalScore.toStringAsFixed(1);
-    return '$type • $score total points • ${exam.maxAttempts} attempt${exam.maxAttempts == 1 ? '' : 's'}';
-  }
-
-  static String _titleCase(String value) {
-    final normalized = value.replaceAll('_', ' ').trim();
-    if (normalized.isEmpty) return 'Quiz';
-    return normalized.split(RegExp(r'\s+')).map((word) => word.isEmpty ? word : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}').join(' ');
-  }
-
-  static String _formatDate(DateTime date) {
-    if (date.millisecondsSinceEpoch == 0) return '-';
-    final d = date.day.toString().padLeft(2, '0');
-    final m = date.month.toString().padLeft(2, '0');
-    return '$d/$m/${date.year}';
-  }
-}
-
-class _Badge extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _Badge({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(999)),
-      child: Text(label, style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w800)),
-    );
-  }
-}
-
-class _TableMessage extends StatelessWidget {
-  final IconData icon;
-  final String title;
-  final String message;
-  final String? actionLabel;
-  final VoidCallback? onAction;
-  const _TableMessage({required this.icon, required this.title, required this.message, this.actionLabel, this.onAction});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 44),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 34, color: AppColors.textHint),
-          const SizedBox(height: 12),
-          Text(title, style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16, color: AppColors.textTitle)),
-          const SizedBox(height: 6),
-          Text(message, textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted, fontSize: 13)),
-          if (actionLabel != null && onAction != null) ...[
-            const SizedBox(height: 14),
-            OutlinedButton(onPressed: onAction, child: Text(actionLabel!)),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _ExamAnalyticsPage extends StatelessWidget {
-  final ExamModel? exam;
-  final int? courseId;
-  final ExamDetailsModel? details;
-  final bool loading;
-  final bool exportingPdf;
-  final String? error;
-  final VoidCallback onBack;
-  final Future<void> Function(ExamModel exam) onExportPdf;
-  final VoidCallback onRetry;
-
-  const _ExamAnalyticsPage({
-    required this.exam,
-    required this.courseId,
-    required this.details,
-    required this.loading,
-    required this.exportingPdf,
-    required this.error,
-    required this.onBack,
-    required this.onExportPdf,
-    required this.onRetry,
+  const _CourseNavigatorCard({
+    required this.groups,
+    required this.totalCount,
+    required this.activeCourseId,
+    required this.statusFilter,
+    required this.searchController,
+    this.emptyMessage,
+    required this.onStatusChanged,
+    required this.onSelectCourse,
   });
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    final resolvedExam = details?.exam ?? exam;
-    final questions = details?.questions ?? const <ExamQuestionDetail>[];
-    final totalQuestions = questions.isNotEmpty
-        ? questions.length
-        : resolvedExam?.totalQuestions ?? 0;
-    final totalPoints = resolvedExam == null
-        ? 0.0
-        : resolvedExam.totalScore;
-
-    return Container(
-      color: AppColors.pageBg,
-      child: ListView(
-        padding: const EdgeInsets.fromLTRB(24, 28, 24, 36),
+    return _StudioShell(
+      child: Column(
         children: [
-          Align(
-            alignment: Alignment.topCenter,
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 1180),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(18, 18, 18, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    _IconBox(icon: Icons.folder_open_outlined, color: AppColors.primary, size: 38),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Course library', style: _textStyle(color: AppColors.textTitle, size: 16, weight: FontWeight.w900)),
+                          const SizedBox(height: 3),
+                          Text('Backend exams grouped by course', style: _textStyle(color: AppColors.textMuted, size: 11, weight: FontWeight.w700)),
+                        ],
+                      ),
+                    ),
+                    _MiniBadge(label: '$totalCount', color: AppColors.primary),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _SearchField(controller: searchController),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _ExamStatusFilter.values.map((filter) {
+                    return _FilterChipButton(
+                      label: filter.label,
+                      selected: filter == statusFilter,
+                      onTap: () => onStatusChanged(filter),
+                    );
+                  }).toList(),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border),
+          if (groups.isEmpty && emptyMessage != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(18, 20, 18, 22),
+              child: _InlineEmptyMessage(
+                icon: Icons.manage_search_rounded,
+                title: 'No matches',
+                message: emptyMessage!,
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(12),
+              itemCount: groups.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                final group = groups[index];
+                return _CourseTile(
+                  group: group,
+                  active: group.course.id == activeCourseId,
+                  onTap: () => onSelectCourse(group.course.id),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SearchField extends StatelessWidget {
+  final TextEditingController controller;
+
+  const _SearchField({required this.controller});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      decoration: InputDecoration(
+        hintText: 'Search course or exam...',
+        prefixIcon: const Icon(Icons.search_rounded, size: 18),
+        suffixIcon: controller.text.isEmpty
+            ? null
+            : IconButton(
+                onPressed: controller.clear,
+                icon: const Icon(Icons.close_rounded, size: 18),
+              ),
+        filled: true,
+        fillColor: AppColors.surfaceBg,
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.border)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary)),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+      ),
+      style: _textStyle(color: AppColors.textTitle, size: 13, weight: FontWeight.w700),
+    );
+  }
+}
+
+class _FilterChipButton extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _FilterChipButton({required this.label, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 8),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primary : AppColors.surfaceBg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+        ),
+        child: Text(
+          label,
+          style: _textStyle(
+            color: selected ? Colors.white : AppColors.textMuted,
+            size: 12,
+            weight: FontWeight.w900,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CourseTile extends StatelessWidget {
+  final _CourseExamGroup group;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _CourseTile({required this.group, required this.active, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final course = group.course;
+    final statusColor = course.isPrivate ? AppColors.warningText : AppColors.successText;
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: active ? AppColors.selectedBg : AppColors.cardBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: active ? AppColors.primary.withOpacity(0.42) : AppColors.border),
+          boxShadow: active ? [BoxShadow(color: AppColors.shadowThin, blurRadius: 14, offset: const Offset(0, 8))] : null,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                _IconBox(icon: Icons.school_outlined, color: active ? AppColors.primary : AppColors.textMuted, size: 36),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(course.safeTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: _textStyle(color: AppColors.textTitle, size: 13, weight: FontWeight.w900)),
+                      const SizedBox(height: 3),
+                      Text(course.safeCourseCode, maxLines: 1, overflow: TextOverflow.ellipsis, style: _textStyle(color: AppColors.textMuted, size: 11, weight: FontWeight.w800)),
+                    ],
+                  ),
+                ),
+                _StatusDot(color: group.error == null ? statusColor : AppColors.errorDot),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                _CompactStat(value: '${group.exams.length}', label: 'Exams'),
+                const SizedBox(width: 8),
+                _CompactStat(value: '${group.published}', label: 'Live'),
+                const SizedBox(width: 8),
+                _CompactStat(value: '${group.draft}', label: 'Draft'),
+              ],
+            ),
+            if (group.error != null) ...[
+              const SizedBox(height: 10),
+              Text(group.error!, maxLines: 2, overflow: TextOverflow.ellipsis, style: _textStyle(color: AppColors.dangerText, size: 11, weight: FontWeight.w700)),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CompactStat extends StatelessWidget {
+  final String value;
+  final String label;
+
+  const _CompactStat({required this.value, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surfaceBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(value, style: _textStyle(color: AppColors.textTitle, size: 13, weight: FontWeight.w900)),
+            Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: _textStyle(color: AppColors.textHint, size: 10, weight: FontWeight.w800)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CourseExamBoard extends StatelessWidget {
+  final _CourseExamGroup group;
+  final void Function(MyCourseItem course, ExamModel exam) onOpenExam;
+  final void Function(MyCourseItem course, ExamModel exam) onPublishExam;
+  final void Function(MyCourseItem course, ExamModel exam) onExportExam;
+  final ValueChanged<MyCourseItem> onOpenQuestionBank;
+  final ValueChanged<MyCourseItem> onOpenTemplates;
+
+  const _CourseExamBoard({
+    required this.group,
+    required this.onOpenExam,
+    required this.onPublishExam,
+    required this.onExportExam,
+    required this.onOpenQuestionBank,
+    required this.onOpenTemplates,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final course = group.course;
+    return _StudioShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          _CourseBoardHeader(
+            group: group,
+            onOpenQuestionBank: () => onOpenQuestionBank(course),
+            onOpenTemplates: () => onOpenTemplates(course),
+          ),
+          if (group.error != null)
+            Padding(
+              padding: const EdgeInsets.all(24),
+              child: _StateMessage(icon: Icons.error_outline_rounded, title: 'Could not load course exams', message: group.error!),
+            )
+          else if (group.exams.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 88, horizontal: 24),
+              child: _EmptyCourseExams(course: course, onOpenQuestionBank: () => onOpenQuestionBank(course), onOpenTemplates: () => onOpenTemplates(course)),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.all(18),
+              itemCount: group.exams.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final exam = group.exams[index];
+                return _ExamListCard(
+                  index: index + 1,
+                  course: course,
+                  exam: exam,
+                  onOpen: () => onOpenExam(course, exam),
+                  onPublish: exam.isPublished ? null : () => onPublishExam(course, exam),
+                  onExport: () => onExportExam(course, exam),
+                );
+              },
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CourseBoardHeader extends StatelessWidget {
+  final _CourseExamGroup group;
+  final VoidCallback onOpenQuestionBank;
+  final VoidCallback onOpenTemplates;
+
+  const _CourseBoardHeader({required this.group, required this.onOpenQuestionBank, required this.onOpenTemplates});
+
+  @override
+  Widget build(BuildContext context) {
+    final course = group.course;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 20, 22, 18),
+      decoration: BoxDecoration(
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+        gradient: LinearGradient(colors: [AppColors.surfaceAlt, AppColors.surfaceBg], begin: Alignment.topLeft, end: Alignment.bottomRight),
+      ),
+      child: Row(
+        children: [
+          _IconBox(icon: Icons.menu_book_outlined, color: AppColors.primary, size: 48),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  children: [
+                    Text(course.safeTitle, style: _textStyle(color: AppColors.textTitle, size: 21, weight: FontWeight.w900, letterSpacing: -0.3)),
+                    _MiniBadge(label: course.isPrivate ? 'Private' : 'Public', color: course.isPrivate ? AppColors.warningText : AppColors.successText),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '${course.safeCourseCode} • ${group.exams.length} exams • ${group.published} published • ${group.draft} draft',
+                  style: _textStyle(color: AppColors.textMuted, size: 12, weight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          OutlinedButton.icon(
+            onPressed: onOpenTemplates,
+            icon: const Icon(Icons.view_module_outlined, size: 18),
+            label: const Text('Templates'),
+          ),
+          const SizedBox(width: 10),
+          FilledButton.icon(
+            onPressed: onOpenQuestionBank,
+            icon: const Icon(Icons.add_rounded, size: 18),
+            label: const Text('Create exam'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyCourseExams extends StatelessWidget {
+  final MyCourseItem course;
+  final VoidCallback onOpenQuestionBank;
+  final VoidCallback onOpenTemplates;
+
+  const _EmptyCourseExams({required this.course, required this.onOpenQuestionBank, required this.onOpenTemplates});
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _IconBox(icon: Icons.add_task_rounded, color: AppColors.primary, size: 62),
+              const SizedBox(height: 18),
+              Text('No exams for ${course.safeTitle} yet', textAlign: TextAlign.center, style: _textStyle(color: AppColors.textTitle, size: 20, weight: FontWeight.w900)),
+              const SizedBox(height: 8),
+              Text(
+                'Create an exam from the course Question Bank, or generate one from a saved template. The backend stores exams per course.',
+                textAlign: TextAlign.center,
+                style: _textStyle(color: AppColors.textMuted, size: 13, weight: FontWeight.w700, height: 1.45),
+              ),
+              const SizedBox(height: 20),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                alignment: WrapAlignment.center,
+                children: [
+                  FilledButton.icon(onPressed: onOpenQuestionBank, icon: const Icon(Icons.add_rounded), label: const Text('Create from Question Bank')),
+                  OutlinedButton.icon(onPressed: onOpenTemplates, icon: const Icon(Icons.view_module_outlined), label: const Text('Open templates')),
+                ],
+              ),
+            ],
+          ),
+        ),
+    );
+  }
+}
+
+class _ExamListCard extends StatelessWidget {
+  final int index;
+  final MyCourseItem course;
+  final ExamModel exam;
+  final VoidCallback onOpen;
+  final VoidCallback? onPublish;
+  final VoidCallback onExport;
+
+  const _ExamListCard({
+    required this.index,
+    required this.course,
+    required this.exam,
+    required this.onOpen,
+    required this.onPublish,
+    required this.onExport,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = exam.isPublished ? AppColors.successText : AppColors.warningText;
+    return InkWell(
+      onTap: onOpen,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 16, offset: const Offset(0, 10))],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppColors.badgeBlueBorder)),
+              child: Text(index.toString().padLeft(2, '0'), style: _textStyle(color: AppColors.primary, size: 13, weight: FontWeight.w900)),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              flex: 5,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _ExamDetailsHeader(
-                    exam: resolvedExam,
-                    questionsCount: totalQuestions,
-                    onBack: onBack,
-                    exportingPdf: exportingPdf,
-                    onExportPdf: resolvedExam == null || courseId == null || exportingPdf
-                        ? null
-                        : () => onExportPdf(resolvedExam),
-                  ),
-                  const SizedBox(height: 22),
-                  _ExamDetailsStats(
-                    exam: resolvedExam,
-                    questionsCount: totalQuestions,
-                    totalPoints: totalPoints,
-                  ),
-                  const SizedBox(height: 22),
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        flex: 7,
-                        child: Column(
-                          children: [
-                            _ScoreDistributionCard(
-                              loading: loading,
-                              hasSubmissions: false,
-                            ),
-                            const SizedBox(height: 18),
-                            _QuestionBreakdownCard(
-                              loading: loading,
-                              error: error,
-                              questions: questions,
-                              onRetry: onRetry,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 18),
-                      const SizedBox(
-                        width: 300,
-                        child: _StudentResultsCard(),
-                      ),
+                      Expanded(child: Text(exam.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: _textStyle(color: AppColors.textTitle, size: 15, weight: FontWeight.w900))),
+                      const SizedBox(width: 8),
+                      _MiniBadge(label: exam.isPublished ? 'Published' : 'Draft', color: statusColor),
+                    ],
+                  ),
+                  const SizedBox(height: 7),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _MetaPill(icon: Icons.category_outlined, label: _titleCase(exam.examType)),
+                      _MetaPill(icon: Icons.quiz_outlined, label: '${exam.totalQuestions} questions'),
+                      _MetaPill(icon: Icons.stacked_line_chart_rounded, label: '${_points(exam.totalScore)} points'),
+                      _MetaPill(icon: Icons.timer_outlined, label: _duration(exam.durationMinutes)),
+                      _MetaPill(icon: Icons.repeat_rounded, label: '${exam.maxAttempts} attempt${exam.maxAttempts == 1 ? '' : 's'}'),
                     ],
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 96,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Updated', style: _textStyle(color: AppColors.textHint, size: 10, weight: FontWeight.w900)),
+                  const SizedBox(height: 4),
+                  Text(_formatDate(exam.updatedAt), style: _textStyle(color: AppColors.textMuted, size: 12, weight: FontWeight.w900)),
+                ],
+              ),
+            ),
+            const SizedBox(width: 12),
+            PopupMenuButton<String>(
+              tooltip: 'Exam actions',
+              onSelected: (value) {
+                switch (value) {
+                  case 'open':
+                    onOpen();
+                    return;
+                  case 'publish':
+                    onPublish?.call();
+                    return;
+                  case 'export':
+                    onExport();
+                    return;
+                }
+              },
+              itemBuilder: (context) => [
+                const PopupMenuItem(value: 'open', child: _MenuItem(icon: Icons.open_in_new_rounded, label: 'Open details')),
+                if (!exam.isPublished)
+                  const PopupMenuItem(value: 'publish', child: _MenuItem(icon: Icons.publish_rounded, label: 'Publish to students')),
+                const PopupMenuItem(value: 'export', child: _MenuItem(icon: Icons.picture_as_pdf_outlined, label: 'Export PDF')),
+              ],
+            ),
+            const SizedBox(width: 6),
+            FilledButton(
+              onPressed: onOpen,
+              style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14)),
+              child: const Text('Open'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MenuItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _MenuItem({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Icon(icon, size: 18),
+        const SizedBox(width: 10),
+        Text(label),
+      ],
+    );
+  }
+}
+
+class _ExamDetailsWorkspace extends StatelessWidget {
+  final ExamModel? exam;
+  final MyCourseItem? course;
+  final ExamDetailsModel? details;
+  final bool loading;
+  final String? error;
+  final bool publishing;
+  final bool exportingPdf;
+  final VoidCallback onBack;
+  final VoidCallback onRetry;
+  final VoidCallback? onPublish;
+  final VoidCallback? onExportPdf;
+  final VoidCallback? onOpenQuestionBank;
+
+  const _ExamDetailsWorkspace({
+    required this.exam,
+    required this.course,
+    required this.details,
+    required this.loading,
+    required this.error,
+    required this.publishing,
+    required this.exportingPdf,
+    required this.onBack,
+    required this.onRetry,
+    required this.onPublish,
+    required this.onExportPdf,
+    required this.onOpenQuestionBank,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final resolvedExam = details?.exam ?? exam;
+    final questions = details?.questions ?? const <ExamQuestionDetail>[];
+    final sections = details?.sections ?? const <ExamSectionDetailsModel>[];
+    final questionsCount = questions.isNotEmpty ? questions.length : resolvedExam?.totalQuestions ?? 0;
+
+    return Container(
+      color: AppColors.pageBg,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
+        children: [
+          Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 1500),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _ExamDetailsHero(
+                    exam: resolvedExam,
+                    course: course,
+                    questionsCount: questionsCount,
+                    publishing: publishing,
+                    exportingPdf: exportingPdf,
+                    onBack: onBack,
+                    onPublish: resolvedExam == null || resolvedExam.isPublished || publishing ? null : onPublish,
+                    onExportPdf: resolvedExam == null || exportingPdf ? null : onExportPdf,
+                    onOpenQuestionBank: onOpenQuestionBank,
+                  ),
+                  const SizedBox(height: 18),
+                  if (loading)
+                    const _StudioShell(child: SizedBox(height: 520, child: Center(child: CircularProgressIndicator())))
+                  else if (error != null)
+                    _StudioShell(child: _StateMessage(icon: Icons.error_outline_rounded, title: 'Could not load exam details', message: error!, actionLabel: 'Retry', onAction: onRetry))
+                  else if (resolvedExam == null)
+                    const _StudioShell(child: _StateMessage(icon: Icons.assignment_outlined, title: 'No exam selected', message: 'Go back and choose an exam from the studio.'))
+                  else
+                    LayoutBuilder(
+                      builder: (context, constraints) {
+                        final compact = constraints.maxWidth < 980;
+                        if (compact) {
+                          return Column(
+                            children: [
+                              _ExamSnapshotGrid(exam: resolvedExam, questionsCount: questionsCount),
+                              const SizedBox(height: 18),
+                              _QuestionPaperCard(sections: sections, questions: questions),
+                              const SizedBox(height: 18),
+                              _ExamBackendSettingsCard(exam: resolvedExam, course: course),
+                            ],
+                          );
+                        }
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 7,
+                              child: Column(
+                                children: [
+                                  _ExamSnapshotGrid(exam: resolvedExam, questionsCount: questionsCount),
+                                  const SizedBox(height: 18),
+                                  _QuestionPaperCard(sections: sections, questions: questions),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(width: 18),
+                            SizedBox(
+                              width: 380,
+                              child: _ExamBackendSettingsCard(exam: resolvedExam, course: course),
+                            ),
+                          ],
+                        );
+                      },
+                    ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
@@ -1101,169 +1953,143 @@ class _ExamAnalyticsPage extends StatelessWidget {
   }
 }
 
-class _ExamDetailsHeader extends StatelessWidget {
+class _ExamDetailsHero extends StatelessWidget {
   final ExamModel? exam;
+  final MyCourseItem? course;
   final int questionsCount;
+  final bool publishing;
   final bool exportingPdf;
   final VoidCallback onBack;
+  final VoidCallback? onPublish;
   final VoidCallback? onExportPdf;
+  final VoidCallback? onOpenQuestionBank;
 
-  const _ExamDetailsHeader({
+  const _ExamDetailsHero({
     required this.exam,
+    required this.course,
     required this.questionsCount,
+    required this.publishing,
     required this.exportingPdf,
     required this.onBack,
+    required this.onPublish,
     required this.onExportPdf,
+    required this.onOpenQuestionBank,
   });
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    final title = exam?.title.trim().isNotEmpty ?? false
-        ? exam!.title
-        : 'Exam details';
-    final updated = exam == null ? '-' : _ExamRow._formatDate(exam!.updatedAt);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        OutlinedButton.icon(
-          onPressed: onBack,
-          icon: const Icon(Icons.arrow_back_rounded, size: 18),
-          label: const Text('Back to quizzes'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.primary,
-            side: BorderSide(color: AppColors.primary.withOpacity(0.24)),
-            backgroundColor: AppColors.primarySoft,
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+    final title = exam?.title.trim().isNotEmpty ?? false ? exam!.title : 'Exam details';
+    final statusColor = exam?.isPublished ?? false ? AppColors.successText : AppColors.warningText;
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 24, offset: const Offset(0, 14))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              OutlinedButton.icon(
+                onPressed: onBack,
+                icon: const Icon(Icons.arrow_back_rounded, size: 18),
+                label: const Text('Back to Exams'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  backgroundColor: AppColors.primarySoft,
+                  side: BorderSide(color: AppColors.primary.withOpacity(0.22)),
+                ),
+              ),
+              const Spacer(),
+              if (onOpenQuestionBank != null)
+                OutlinedButton.icon(
+                  onPressed: onOpenQuestionBank,
+                  icon: const Icon(Icons.quiz_outlined, size: 18),
+                  label: const Text('Question Bank'),
+                ),
+              const SizedBox(width: 10),
+              OutlinedButton.icon(
+                onPressed: onExportPdf,
+                icon: exportingPdf
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.picture_as_pdf_outlined, size: 18),
+                label: Text(exportingPdf ? 'Exporting...' : 'Export PDF'),
+              ),
+              const SizedBox(width: 10),
+              FilledButton.icon(
+                onPressed: onPublish,
+                icon: publishing
+                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                    : Icon((exam?.isPublished ?? false) ? Icons.verified_rounded : Icons.publish_rounded, size: 18),
+                label: Text((exam?.isPublished ?? false) ? 'Published' : publishing ? 'Publishing...' : 'Publish'),
+              ),
+            ],
           ),
-        ),
-        const SizedBox(height: 18),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: AppColors.textTitle,
-                      fontSize: 28,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -0.6,
+          const SizedBox(height: 22),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _IconBox(icon: Icons.assignment_turned_in_outlined, color: AppColors.primary, size: 58),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      children: [
+                        _MiniBadge(label: exam?.isPublished ?? false ? 'Published' : 'Draft', color: statusColor),
+                        _MiniBadge(label: _titleCase(exam?.examType ?? 'exam'), color: AppColors.primary),
+                        if (course != null) _MiniBadge(label: course!.safeCourseCode, color: AppColors.textMuted),
+                      ],
                     ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Updated $updated • $questionsCount question${questionsCount == 1 ? '' : 's'}',
-                    style: TextStyle(
-                      color: AppColors.textMuted,
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
+                    const SizedBox(height: 10),
+                    Text(title, maxLines: 2, overflow: TextOverflow.ellipsis, style: _textStyle(color: AppColors.textTitle, size: 30, weight: FontWeight.w900, letterSpacing: -0.7, height: 1.12)),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${course?.safeTitle ?? 'Course'} • $questionsCount questions • Updated ${exam == null ? '-' : _formatDate(exam!.updatedAt)}',
+                      style: _textStyle(color: AppColors.textMuted, size: 13, weight: FontWeight.w800),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(width: 16),
-            FilledButton.icon(
-              onPressed: onExportPdf,
-              icon: exportingPdf
-                  ? const SizedBox(
-                      width: 18,
-                      height: 18,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : const Icon(Icons.picture_as_pdf_outlined, size: 18),
-              label: Text(exportingPdf ? 'Exporting...' : 'Export PDF'),
-              style: FilledButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                disabledBackgroundColor: AppColors.border,
-                disabledForegroundColor: AppColors.textHint,
-                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
-              ),
-            ),
-          ],
-        ),
-      ],
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
 
-class _ExamDetailsStats extends StatelessWidget {
-  final ExamModel? exam;
+class _ExamSnapshotGrid extends StatelessWidget {
+  final ExamModel exam;
   final int questionsCount;
-  final double totalPoints;
 
-  const _ExamDetailsStats({
-    required this.exam,
-    required this.questionsCount,
-    required this.totalPoints,
-  });
+  const _ExamSnapshotGrid({required this.exam, required this.questionsCount});
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    return Row(
-      children: [
-        Expanded(
-          child: _MetricCard(
-            title: 'Questions',
-            value: '$questionsCount',
-            subtitle: 'saved in this quiz',
-            icon: Icons.quiz_outlined,
-            color: AppColors.primary,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _MetricCard(
-            title: 'Total Points',
-            value: _points(totalPoints),
-            subtitle: 'from selected questions',
-            icon: Icons.stacked_line_chart_rounded,
-            color: AppColors.successDot,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _MetricCard(
-            title: 'Time Limit',
-            value: exam?.durationMinutes == null
-                ? 'No limit'
-                : '${exam!.durationMinutes}m',
-            subtitle: 'student attempt time',
-            icon: Icons.timer_outlined,
-            color: AppColors.warningText,
-          ),
-        ),
-        const SizedBox(width: 16),
-        Expanded(
-          child: _MetricCard(
-            title: 'Status',
-            value: exam?.isPublished ?? false ? 'Published' : 'Draft',
-            subtitle: exam?.isPublished ?? false ? 'visible to students' : 'not visible yet',
-            icon: Icons.verified_outlined,
-            color: exam?.isPublished ?? false
-                ? AppColors.successDot
-                : AppColors.textMuted,
-          ),
-        ),
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final columns = constraints.maxWidth < 720 ? 2 : 4;
+        final width = (constraints.maxWidth - ((columns - 1) * 14)) / columns;
+        return Wrap(
+          spacing: 14,
+          runSpacing: 14,
+          children: [
+            SizedBox(width: width, child: _MetricCard(title: 'Questions', value: '$questionsCount', subtitle: 'attached to exam', icon: Icons.quiz_outlined, color: AppColors.primary)),
+            SizedBox(width: width, child: _MetricCard(title: 'Total Score', value: _points(exam.totalScore), subtitle: 'backend calculated', icon: Icons.stacked_line_chart_rounded, color: AppColors.successText)),
+            SizedBox(width: width, child: _MetricCard(title: 'Duration', value: _duration(exam.durationMinutes), subtitle: 'student time limit', icon: Icons.timer_outlined, color: AppColors.warningText)),
+            SizedBox(width: width, child: _MetricCard(title: 'Attempts', value: '${exam.maxAttempts}', subtitle: 'allowed attempts', icon: Icons.restart_alt_rounded, color: AppColors.purpleText)),
+          ],
+        );
+      },
     );
-  }
-
-  static String _points(double value) {
-    return value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(1);
   }
 }
 
@@ -1274,31 +2100,18 @@ class _MetricCard extends StatelessWidget {
   final IconData icon;
   final Color color;
 
-  const _MetricCard({
-    required this.title,
-    required this.value,
-    required this.subtitle,
-    required this.icon,
-    required this.color,
-  });
+  const _MetricCard({required this.title, required this.value, required this.subtitle, required this.icon, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     return Container(
       height: 118,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(17),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadowThin,
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 18, offset: const Offset(0, 10))],
       ),
       child: Row(
         children: [
@@ -1306,385 +2119,380 @@ class _MetricCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                Text(title, style: _textStyle(color: AppColors.textMuted, size: 12, weight: FontWeight.w900)),
                 const Spacer(),
-                Text(
-                  value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.textTitle,
-                    fontSize: 25,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.5,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: color,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
+                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: _textStyle(color: AppColors.textTitle, size: 24, weight: FontWeight.w900, letterSpacing: -0.5)),
+                const SizedBox(height: 3),
+                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: _textStyle(color: color, size: 11, weight: FontWeight.w800)),
               ],
             ),
           ),
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.10),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: color, size: 21),
-          ),
+          _IconBox(icon: icon, color: color, size: 42),
         ],
       ),
     );
   }
 }
 
-class _ScoreDistributionCard extends StatelessWidget {
-  final bool loading;
-  final bool hasSubmissions;
-
-  const _ScoreDistributionCard({
-    required this.loading,
-    required this.hasSubmissions,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return _PanelCard(
-      title: 'Score Distribution',
-      trailing: const _TinyLegend(label: 'Students'),
-      child: SizedBox(
-        height: 165,
-        child: Center(
-          child: loading
-              ? const CircularProgressIndicator()
-              : hasSubmissions
-                  ? const Text('Distribution will appear here.')
-                  : Text(
-                      'No student submissions yet.',
-                      style: TextStyle(
-                        color: AppColors.textMuted,
-                        fontSize: 13,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-        ),
-      ),
-    );
-  }
-}
-
-class _QuestionBreakdownCard extends StatelessWidget {
-  final bool loading;
-  final String? error;
+class _QuestionPaperCard extends StatelessWidget {
+  final List<ExamSectionDetailsModel> sections;
   final List<ExamQuestionDetail> questions;
-  final VoidCallback onRetry;
 
-  const _QuestionBreakdownCard({
-    required this.loading,
-    required this.error,
-    required this.questions,
-    required this.onRetry,
-  });
+  const _QuestionPaperCard({required this.sections, required this.questions});
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    Widget body;
-    if (loading) {
-      body = const Padding(
-        padding: EdgeInsets.symmetric(vertical: 42),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    } else if (error != null) {
-      body = _TableMessage(
-        icon: Icons.error_outline_rounded,
-        title: 'Could not load exam details',
-        message: error!,
-        actionLabel: 'Retry',
-        onAction: onRetry,
-      );
-    } else if (questions.isEmpty) {
-      body = const _TableMessage(
-        icon: Icons.quiz_outlined,
-        title: 'No questions attached',
-        message: 'This quiz was created but no questions were returned by the backend.',
-      );
-    } else {
-      body = Column(
-        children: [
-          const _QuestionBreakdownHeader(),
-          ...questions.asMap().entries.map((entry) {
-            return _QuestionBreakdownRow(
-              index: entry.key + 1,
-              question: entry.value.question,
-            );
-          }),
-        ],
+    if (questions.isEmpty) {
+      return const _StudioShell(
+        child: _StateMessage(
+          icon: Icons.quiz_outlined,
+          title: 'No questions attached',
+          message: 'This exam exists in the backend, but no questions were returned in the details response.',
+        ),
       );
     }
 
-    return _PanelCard(
-      title: 'Question Breakdown',
-      trailing: const SizedBox.shrink(),
-      child: body,
-    );
-  }
-}
-
-class _QuestionBreakdownHeader extends StatelessWidget {
-  const _QuestionBreakdownHeader();
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      height: 42,
-      color: AppColors.surfaceBg,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: const Row(
+    return _StudioShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          SizedBox(width: 48, child: _HeaderText('#')),
-          Expanded(flex: 5, child: _HeaderText('QUESTION')),
-          Expanded(flex: 2, child: _HeaderText('TYPE')),
-          Expanded(flex: 2, child: _HeaderText('DIFFICULTY')),
-          Expanded(flex: 2, child: _HeaderText('CORRECT RATE')),
+          _PanelHeader(
+            icon: Icons.fact_check_outlined,
+            title: 'Question paper',
+            subtitle: sections.isEmpty ? '${questions.length} questions' : '${sections.length} sections • ${questions.length} questions',
+          ),
+          Divider(height: 1, color: AppColors.border),
+          if (sections.isNotEmpty)
+            ...sections.map((section) => _SectionBlock(section: section))
+          else
+            ...questions.asMap().entries.map((entry) => _QuestionRow(index: entry.key + 1, question: entry.value, showSection: true)),
         ],
       ),
     );
   }
 }
 
-class _QuestionBreakdownRow extends StatelessWidget {
-  final int index;
-  final QuestionModel question;
+class _SectionBlock extends StatelessWidget {
+  final ExamSectionDetailsModel section;
 
-  const _QuestionBreakdownRow({
-    required this.index,
-    required this.question,
-  });
+  const _SectionBlock({required this.section});
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    final rate = question.successRate;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Container(
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+          color: AppColors.surfaceBg,
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(section.title, style: _textStyle(color: AppColors.textTitle, size: 14, weight: FontWeight.w900)),
+                    const SizedBox(height: 4),
+                    Text('${_titleCase(section.questionType)} • ${section.questionCount} questions • ${_points(section.sectionScore)} points', style: _textStyle(color: AppColors.textMuted, size: 11, weight: FontWeight.w800)),
+                  ],
+                ),
+              ),
+              _MiniBadge(label: section.mustComplete ? 'Required' : 'Optional', color: section.mustComplete ? AppColors.primary : AppColors.textMuted),
+            ],
+          ),
+        ),
+        ...section.questions.asMap().entries.map((entry) => _QuestionRow(index: entry.key + 1, question: entry.value, showSection: false)),
+      ],
+    );
+  }
+}
+
+class _QuestionRow extends StatelessWidget {
+  final int index;
+  final ExamQuestionDetail question;
+  final bool showSection;
+
+  const _QuestionRow({required this.index, required this.question, required this.showSection});
+
+  @override
+  Widget build(BuildContext context) {
+    final q = question.question;
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        border: Border(top: BorderSide(color: AppColors.headerBg)),
-      ),
+      padding: const EdgeInsets.fromLTRB(18, 15, 18, 15),
+      decoration: BoxDecoration(border: Border(top: BorderSide(color: AppColors.divider))),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 48,
-            child: Text(
-              index.toString().padLeft(2, '0'),
-              style: TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
+            width: 46,
+            child: Text(index.toString().padLeft(2, '0'), style: _textStyle(color: AppColors.textHint, size: 12, weight: FontWeight.w900)),
           ),
           Expanded(
-            flex: 5,
-            child: Text(
-              question.text,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppColors.textTitle,
-                fontSize: 13,
-                fontWeight: FontWeight.w800,
-                height: 1.35,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              question.typeLabel,
-              style: TextStyle(
-                color: AppColors.textGray,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: _DifficultyPill(question.difficultyLabel),
-            ),
-          ),
-          Expanded(
-            flex: 2,
-            child: Text(
-              rate == null ? '-' : '${rate.toStringAsFixed(0)}%',
-              style: TextStyle(
-                color: rate == null ? AppColors.textHint : AppColors.successText,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StudentResultsCard extends StatelessWidget {
-  const _StudentResultsCard();
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return _PanelCard(
-      title: 'Student Results',
-      trailing: Text(
-        'TOP 5',
-        style: TextStyle(
-          color: AppColors.textHint,
-          fontSize: 10,
-          fontWeight: FontWeight.w900,
-          letterSpacing: 0.6,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 48),
-        child: Column(
-          children: [
-            Icon(Icons.people_alt_outlined, color: AppColors.textHint, size: 34),
-            const SizedBox(height: 12),
-            Text(
-              'No submissions yet',
-              style: TextStyle(
-                color: AppColors.textTitle,
-                fontSize: 15,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Student scores will appear here after learners attempt this quiz.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 12,
-                height: 1.4,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PanelCard extends StatelessWidget {
-  final String title;
-  final Widget trailing;
-  final Widget child;
-
-  const _PanelCard({
-    required this.title,
-    required this.trailing,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.shadowThin,
-            blurRadius: 20,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      clipBehavior: Clip.antiAlias,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: TextStyle(
-                      color: AppColors.textTitle,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
+                Text(q.text, maxLines: 3, overflow: TextOverflow.ellipsis, style: _textStyle(color: AppColors.textTitle, size: 13, weight: FontWeight.w800, height: 1.38)),
+                const SizedBox(height: 9),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 6,
+                  children: [
+                    _MetaPill(icon: Icons.category_outlined, label: q.typeLabel),
+                    _DifficultyPill(label: q.difficultyLabel),
+                    _MetaPill(icon: Icons.grade_outlined, label: '${_points(question.points)} pts'),
+                    if (showSection && question.sectionId > 0) _MetaPill(icon: Icons.view_agenda_outlined, label: 'Section ${question.sectionId}'),
+                  ],
                 ),
-                trailing,
               ],
             ),
           ),
-          Divider(height: 1, color: AppColors.border),
-          child,
         ],
       ),
     );
   }
 }
 
-class _TinyLegend extends StatelessWidget {
-  final String label;
+class _ExamBackendSettingsCard extends StatelessWidget {
+  final ExamModel exam;
+  final MyCourseItem? course;
 
-  const _TinyLegend({required this.label});
+  const _ExamBackendSettingsCard({required this.exam, required this.course});
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    return Row(
-      children: [
-        Container(
-          width: 7,
-          height: 7,
-          decoration: const BoxDecoration(
-            color: AppColors.primary,
-            shape: BoxShape.circle,
+    return _StudioShell(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _PanelHeader(
+            icon: Icons.tune_rounded,
+            title: 'Backend settings',
+            subtitle: 'Values returned by the instructor exam endpoint.',
+          ),
+          Divider(height: 1, color: AppColors.border),
+          Padding(
+            padding: const EdgeInsets.all(18),
+            child: Column(
+              children: [
+                _SettingRow(label: 'Exam ID', value: '#${exam.id}'),
+                _SettingRow(label: 'Course', value: course?.safeTitle ?? 'Course #${exam.courseId}'),
+                _SettingRow(label: 'Type', value: _titleCase(exam.examType)),
+                _SettingRow(label: 'Status', value: exam.isPublished ? 'Published' : 'Draft', valueColor: exam.isPublished ? AppColors.successText : AppColors.warningText),
+                _SettingRow(label: 'Passing score', value: exam.passingScore == null ? 'Not set' : '${_points(exam.passingScore!)}%'),
+                _SettingRow(label: 'Shuffle questions', value: exam.shuffleQuestions ? 'Enabled' : 'Disabled'),
+                _SettingRow(label: 'Shuffle options', value: exam.shuffleOptions ? 'Enabled' : 'Disabled'),
+                _SettingRow(label: 'Created', value: _formatDate(exam.createdAt)),
+                _SettingRow(label: 'Updated', value: _formatDate(exam.updatedAt)),
+                if ((exam.instructions ?? '').trim().isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  _InfoNote(title: 'Instructions', message: exam.instructions!.trim()),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  const _InfoNote(title: 'Instructions', message: 'No student-facing instructions were saved for this exam.'),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PanelHeader extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+
+  const _PanelHeader({required this.icon, required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 15),
+      child: Row(
+        children: [
+          _IconBox(icon: icon, color: AppColors.primary, size: 38),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: _textStyle(color: AppColors.textTitle, size: 15, weight: FontWeight.w900)),
+                const SizedBox(height: 3),
+                Text(subtitle, style: _textStyle(color: AppColors.textMuted, size: 11, weight: FontWeight.w700)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SettingRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final Color? valueColor;
+
+  const _SettingRow({required this.label, required this.value, this.valueColor});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 9),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Expanded(child: Text(label, style: _textStyle(color: AppColors.textMuted, size: 12, weight: FontWeight.w800))),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.right,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: _textStyle(color: valueColor ?? AppColors.textTitle, size: 12, weight: FontWeight.w900),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InfoNote extends StatelessWidget {
+  final String title;
+  final String message;
+
+  const _InfoNote({required this.title, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.infoBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.infoBorder),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: _textStyle(color: AppColors.infoText, size: 12, weight: FontWeight.w900)),
+          const SizedBox(height: 5),
+          Text(message, style: _textStyle(color: AppColors.infoText, size: 12, weight: FontWeight.w700, height: 1.35)),
+        ],
+      ),
+    );
+  }
+}
+
+class _StateMessage extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
+
+  const _StateMessage({required this.icon, required this.title, required this.message, this.actionLabel, this.onAction});
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 380),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 480),
+          child: Padding(
+            padding: const EdgeInsets.all(30),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _IconBox(icon: icon, color: AppColors.textHint, size: 58),
+                const SizedBox(height: 16),
+                Text(title, textAlign: TextAlign.center, style: _textStyle(color: AppColors.textTitle, size: 18, weight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                Text(message, textAlign: TextAlign.center, style: _textStyle(color: AppColors.textMuted, size: 13, weight: FontWeight.w700, height: 1.45)),
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: 18),
+                  FilledButton(onPressed: onAction, child: Text(actionLabel!)),
+                ],
+              ],
+            ),
           ),
         ),
-        const SizedBox(width: 6),
-        Text(
-          label,
-          style: TextStyle(
-            color: AppColors.textMuted,
-            fontSize: 11,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
+      ),
+    );
+  }
+}
+
+class _IconBox extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final double size;
+
+  const _IconBox({required this.icon, required this.color, this.size = 40});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(size * 0.30),
+        border: Border.all(color: color.withOpacity(0.14)),
+      ),
+      child: Icon(icon, color: color, size: size * 0.50),
+    );
+  }
+}
+
+class _MiniBadge extends StatelessWidget {
+  final String label;
+  final Color color;
+
+  const _MiniBadge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withOpacity(0.16)),
+      ),
+      child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: _textStyle(color: color, size: 11, weight: FontWeight.w900)),
+    );
+  }
+}
+
+class _MetaPill extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _MetaPill({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppColors.textMuted),
+          const SizedBox(width: 5),
+          Text(label, style: _textStyle(color: AppColors.textMuted, size: 11, weight: FontWeight.w900)),
+        ],
+      ),
     );
   }
 }
@@ -1692,113 +2500,101 @@ class _TinyLegend extends StatelessWidget {
 class _DifficultyPill extends StatelessWidget {
   final String label;
 
-  const _DifficultyPill(this.label);
+  const _DifficultyPill({required this.label});
 
   @override
   Widget build(BuildContext context) {
-    Theme.of(context);
     final normalized = label.toLowerCase();
     final color = normalized == 'easy'
         ? AppColors.successText
         : normalized == 'hard'
-            ? AppColors.errorDot
-            : const Color(0xFFF97316);
-    return _Badge(label: label, color: color);
+            ? AppColors.dangerText
+            : AppColors.warningText;
+    return _MiniBadge(label: label, color: color);
   }
 }
+
+class _StatusDot extends StatelessWidget {
+  final Color color;
+
+  const _StatusDot({required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 9,
+      height: 9,
+      decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+    );
+  }
+}
+
+TextStyle _textStyle({
+  required Color color,
+  required double size,
+  required FontWeight weight,
+  double? height,
+  double? letterSpacing,
+}) {
+  return TextStyle(
+    color: color,
+    fontSize: size,
+    fontWeight: weight,
+    height: height,
+    letterSpacing: letterSpacing,
+  );
+}
+
+String _duration(int? minutes) => minutes == null || minutes <= 0 ? 'No limit' : '${minutes}m';
 
 String _points(double value) {
   return value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(1);
 }
 
-
-class _ExamDetailsDialog extends StatelessWidget {
-  final ExamModel exam;
-  final int questionsCount;
-  const _ExamDetailsDialog({required this.exam, required this.questionsCount});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 32, vertical: 32),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 640),
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(child: Text(exam.title, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900, color: AppColors.textTitle))),
-                  IconButton(onPressed: () => Navigator.of(context).pop(), icon: const Icon(Icons.close_rounded)),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: [
-                  _Badge(label: exam.isPublished ? 'Published' : 'Draft', color: exam.isPublished ? AppColors.successText : AppColors.textMuted),
-                  _Badge(label: _ExamRow._titleCase(exam.examType), color: AppColors.primary),
-                ],
-              ),
-              if ((exam.description ?? '').trim().isNotEmpty) ...[
-                const SizedBox(height: 18),
-                Text('Description', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textGray)),
-                const SizedBox(height: 6),
-                Text(exam.description!, style: TextStyle(color: AppColors.textGray, height: 1.45)),
-              ],
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  Expanded(child: _DetailTile(label: 'Questions', value: '$questionsCount')),
-                  const SizedBox(width: 12),
-                  Expanded(child: _DetailTile(label: 'Total Points', value: _points(exam.totalScore))),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(child: _DetailTile(label: 'Time Limit', value: exam.durationMinutes == null ? 'No limit' : '${exam.durationMinutes} min')),
-                  const SizedBox(width: 12),
-                  Expanded(child: _DetailTile(label: 'Attempts', value: '${exam.maxAttempts}')),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Align(alignment: Alignment.centerRight, child: FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Done'))),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  static String _points(double value) => value == value.roundToDouble() ? value.toInt().toString() : value.toStringAsFixed(1);
+String _formatDate(DateTime date) {
+  if (date.millisecondsSinceEpoch == 0) return '-';
+  final d = date.day.toString().padLeft(2, '0');
+  final m = date.month.toString().padLeft(2, '0');
+  return '$d/$m/${date.year}';
 }
 
-class _DetailTile extends StatelessWidget {
-  final String label;
-  final String value;
-  const _DetailTile({required this.label, required this.value});
+String _titleCase(String value) {
+  final normalized = value.replaceAll('_', ' ').trim();
+  if (normalized.isEmpty) return 'Exam';
+  return normalized
+      .split(RegExp(r'\s+'))
+      .map((word) => word.isEmpty ? word : '${word[0].toUpperCase()}${word.substring(1).toLowerCase()}')
+      .join(' ');
+}
 
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppColors.border)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(label, style: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text(value, style: TextStyle(color: AppColors.textTitle, fontSize: 16, fontWeight: FontWeight.w900)),
-        ],
-      ),
+ExamModel _copyExamAfterPublish(ExamModel exam, ExamPublishResponse response) {
+  return ExamModel(
+    id: exam.id,
+    courseId: exam.courseId,
+    title: exam.title,
+    description: exam.description,
+    instructions: exam.instructions,
+    examType: exam.examType,
+    durationMinutes: exam.durationMinutes,
+    maxAttempts: exam.maxAttempts,
+    passingScore: exam.passingScore,
+    totalQuestions: response.totalQuestions == 0 ? exam.totalQuestions : response.totalQuestions,
+    totalScore: response.totalScore == 0 ? exam.totalScore : response.totalScore,
+    isPublished: response.isPublished,
+    shuffleQuestions: exam.shuffleQuestions,
+    shuffleOptions: exam.shuffleOptions,
+    availableFrom: exam.availableFrom,
+    availableTo: exam.availableTo,
+    createdAt: exam.createdAt,
+    updatedAt: DateTime.now(),
+  );
+}
+
+List<_CourseExamGroup> _replaceExamInGroups(List<_CourseExamGroup> groups, int courseId, ExamModel updated) {
+  return groups.map((group) {
+    if (group.course.id != courseId) return group;
+    return group.copyWith(
+      exams: group.exams.map((exam) => exam.id == updated.id ? updated : exam).toList(),
     );
-  }
+  }).toList();
 }

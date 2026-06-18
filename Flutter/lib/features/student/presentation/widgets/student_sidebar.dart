@@ -17,7 +17,7 @@ class StudentSidebarWidget extends StatelessWidget {
     return AppSidebar(
       selectedIndex: selectedIndex,
       onItemSelected: onItemSelected,
-      portalSubtitle: 'STUDENT Portal',
+      portalSubtitle: 'STUDENT PORTAL',
       mainItems: const [
         AppSidebarItem(
           icon: Icons.grid_view_rounded,
@@ -30,31 +30,21 @@ class StudentSidebarWidget extends StatelessWidget {
           index: 1,
         ),
         AppSidebarItem(
-          icon: Icons.quiz_outlined,
-          title: 'Question Bank',
+          icon: Icons.travel_explore_rounded,
+          title: 'Discover Courses',
           index: 2,
-        ),
-        AppSidebarItem(
-          icon: Icons.history_rounded,
-          title: 'Quiz History',
-          index: 3,
-        ),
-        AppSidebarItem(
-          icon: Icons.auto_awesome_rounded,
-          title: 'Recommendations',
-          index: 4,
         ),
       ],
       bottomItems: const [
         AppSidebarItem(
           icon: Icons.settings_outlined,
           title: 'Settings',
-          index: 5,
+          index: 3,
         ),
         AppSidebarItem(
           icon: Icons.help_outline_rounded,
           title: 'Help & Support',
-          index: 6,
+          index: 4,
         ),
       ],
     );

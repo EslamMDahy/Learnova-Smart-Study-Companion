@@ -21,11 +21,22 @@ mixin _CourseDetailsMaterialsMixin on StateNotifier<CourseDetailsState> {
             courseId: courseId,
             moduleId: moduleId,
           );
+      final previousMaterialIds = state.materials[moduleId]
+              ?.map((MaterialItem material) => material.id)
+              .toSet() ??
+          const <int>{};
       final newMats = Map<int, List<MaterialItem>>.from(state.materials)
         ..[moduleId] = res.materials;
       final newLoad = Map<int, bool>.from(state.materialsLoading)
         ..[moduleId] = false;
-      state = state.copyWith(materials: newMats, materialsLoading: newLoad);
+      final loadedTopicMaterialIds = force
+          ? (<int>{...state.topicsLoadedMaterialIds}..removeAll(previousMaterialIds))
+          : state.topicsLoadedMaterialIds;
+      state = state.copyWith(
+        materials: newMats,
+        materialsLoading: newLoad,
+        topicsLoadedMaterialIds: loadedTopicMaterialIds,
+      );
     } catch (e) {
       if (e is DioException && e.type == DioExceptionType.cancel) return;
       final failure = mapApiFailure(e);

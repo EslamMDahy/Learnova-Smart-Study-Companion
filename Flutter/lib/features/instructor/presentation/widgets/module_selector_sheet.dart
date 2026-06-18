@@ -37,8 +37,8 @@ Future<ModuleSelectorResult?> showModuleSelectorSheet(
   List<ModuleItem> currentModules = const [],
 }) {
   final size = MediaQuery.of(context).size;
-  final width = size.width < 600 ? size.width * 0.96 : 860.0;
-  final height = size.height < 820 ? size.height * 0.82 : 720.0;
+  final width = size.width < 600 ? size.width * 0.96 : 780.0;
+  final height = size.height < 780 ? size.height * 0.84 : 640.0;
 
   return showDialog<ModuleSelectorResult>(
     context: context,
@@ -69,9 +69,7 @@ class _ReusableCourse {
 
 final _reusableCoursesProvider =
     FutureProvider.autoDispose.family<List<_ReusableCourse>, int>((ref, currentCourseId) async {
-  final coursesResponse = await ref.read(coursesRepositoryProvider).myCourses(
-    
-  );
+  final coursesResponse = await ref.read(coursesRepositoryProvider).myCourses();
   final modulesApi = ref.read(modulesApiProvider);
 
   final reusable = <_ReusableCourse>[];
@@ -181,9 +179,9 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
       return 'These are the modules currently available in ${_selectedCourse?.course.safeTitle ?? 'this course'}. Pick one to copy.';
     }
     if (_step == _SelectorStep.create) {
-      return 'Build a clean section for this course in a way that matches the rest of the experience.';
+      return 'Set the module title and optional instructor note.';
     }
-    return 'Start with a clean new module or reuse one from another course.';
+    return 'Choose how this module should be added.';
   }
 
   Widget _buildOptions(AsyncValue<List<_ReusableCourse>> reusableAsync) {
@@ -195,115 +193,67 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
           final ready = c.modules.where((m) => !_isBlocked(m)).length;
           return sum + ready;
         });
-        final blockedCount = courses.fold<int>(0, (sum, c) {
-          final blocked = c.modules.where(_isBlocked).length;
-          return sum + blocked;
-        });
 
-        return ListView(
-          padding: const EdgeInsets.all(22),
-          children: [
-            Row(
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 700;
+            final createCard = _ActionCard(
+              icon: Icons.add_box_outlined,
+              badge: 'New',
+              badgeColor: AppColors.primarySoft,
+              badgeTextColor: AppColors.primary,
+              iconBg: AppColors.primarySoft,
+              iconFg: AppColors.primary,
+              title: 'Create a fresh module',
+              description: 'Add a clean empty section to this course.',
+              cta: 'Create',
+              onTap: () => setState(() => _step = _SelectorStep.create),
+            );
+            final reuseCard = _ActionCard(
+              icon: Icons.content_copy_outlined,
+              badge: readyCount > 0 ? '$readyCount ready' : 'Unavailable',
+              badgeColor: AppColors.surfaceBg,
+              badgeTextColor: readyCount > 0 ? AppColors.primary : AppColors.textMuted,
+              iconBg: AppColors.surfaceBg,
+              iconFg: readyCount > 0 ? AppColors.primary : AppColors.textMuted,
+              title: 'Reuse from another course',
+              description: courses.isEmpty
+                  ? 'No reusable modules are available yet.'
+                  : 'Copy an existing module from another course.',
+              cta: courses.isEmpty ? 'No modules' : 'Browse',
+              enabled: courses.isNotEmpty,
+              onTap: courses.isEmpty ? null : () => setState(() => _step = _SelectorStep.chooseCourse),
+            );
+
+            return ListView(
+              padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
               children: [
-                Expanded(
-                  child: _ActionCard(
-                    icon: Icons.auto_awesome_rounded,
-                    badge: 'Recommended',
-                    // Both badges use the same blue palette to stay consistent
-                    // with the site’s primary color. The old “From other courses”
-                    // badge was purple which clashed with the rest of the UI.
-                    badgeColor: AppColors.infoBg,
-                    badgeTextColor: AppColors.primary,
-                    iconBg: AppColors.primarySoft,
-                    iconFg: AppColors.primary,
-                    title: 'Create a fresh module',
-                    description:
-                        'Best for a brand-new chapter, week, or topic group. Title and description are validated before creation.',
-                    cta: 'Start creating',
-                    onTap: () => setState(() => _step = _SelectorStep.create),
+                if (compact) ...[
+                  createCard,
+                  const SizedBox(height: 10),
+                  reuseCard,
+                ] else
+                  Row(
+                    children: [
+                      Expanded(child: createCard),
+                      const SizedBox(width: 12),
+                      Expanded(child: reuseCard),
+                    ],
                   ),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: _ActionCard(
-                    icon: Icons.content_copy_rounded,
-                    badge: 'From other courses',
-                    badgeColor: AppColors.infoBg,
-                    badgeTextColor: AppColors.primary,
-                    iconBg: AppColors.primarySoft,
-                    iconFg: AppColors.primary,
-                    title: 'Reuse from another course',
-                    description: readyCount > 0
-                        ? '$readyCount validated modules can be copied from ${courses.length} ${courses.length == 1 ? 'other course' : 'other courses'}.'
-                        : 'No reusable modules are currently available from your other courses.',
-                    cta: courses.isEmpty ? 'No reusable modules' : 'Browse courses',
-                    enabled: courses.isNotEmpty,
-                    onTap: courses.isEmpty ? null : () => setState(() => _step = _SelectorStep.chooseCourse),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            _SectionCard(
-              title: 'Reusable source courses',
-              subtitle: courses.isEmpty
-                  ? 'No courses currently have modules you can copy.'
-                  : '${courses.length} ${courses.length == 1 ? 'course' : 'courses'} • $readyCount ${readyCount == 1 ? 'module' : 'modules'} ready to copy',
-              actionLabel: courses.isEmpty ? null : 'Open browser',
-              onAction: courses.isEmpty ? null : () => setState(() => _step = _SelectorStep.chooseCourse),
-              child: courses.isEmpty
-                  ? const _EmptyState(
-                      icon: Icons.inbox_outlined,
-                      title: 'No reusable modules yet',
-                      message: 'Create modules in another course first, then return here to copy them.',
-                    )
-                  : Column(
-                      children: [
-                        if (blockedCount > 0)
-                          Container(
-                            width: double.infinity,
-                            margin: const EdgeInsets.only(bottom: 14),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
-                              color: AppColors.surfaceBg,
-                              borderRadius: BorderRadius.circular(8),
-                              border: Border.all(color: AppColors.border),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.info_outline_rounded, size: 16, color: AppColors.textMuted),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: Text(
-                                    '$blockedCount ${blockedCount == 1 ? 'module already exists' : 'modules already exist'} in this course and will stay disabled to avoid duplicate copies.',
-                                    style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ...courses.map((course) {
-                          final ready = course.modules.where((m) => !_isBlocked(m)).length;
-                          final blocked = course.modules.length - ready;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 10),
-                            child: _CourseTile(
-                              course: course.course,
-                              readyCount: ready,
-                              blockedCount: blocked,
-                              onTap: () {
-                                setState(() {
-                                  _selectedCourse = course;
-                                  _step = _SelectorStep.chooseModule;
-                                });
-                              },
-                            ),
-                          );
-                        }),
-                      ],
+                if (courses.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _step = _SelectorStep.chooseCourse),
+                      icon: const Icon(Icons.search_rounded, size: 16),
+                      label: const Text('Browse reusable courses'),
                     ),
-            ),
-          ],
+                  ),
+                ],
+              ],
+            );
+          },
         );
       },
     );
@@ -452,38 +402,23 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
   Widget _buildCreateForm() {
     final previewTitle = _titleCtrl.text.trim().isEmpty ? 'New module' : _titleCtrl.text.trim();
     final previewDescription = _descCtrl.text.trim().isEmpty
-        ? 'This will appear cleanly in the materials sidebar.'
+        ? 'No description yet.'
         : _descCtrl.text.trim();
 
-    Widget quickChip(String label) {
-      return ActionChip(
-        label: Text(label),
-        side: BorderSide(color: AppColors.border),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-        backgroundColor: AppColors.cardBg,
-        onPressed: () {
-          _titleCtrl.text = label;
-          _titleCtrl.selection = TextSelection.collapsed(offset: _titleCtrl.text.length);
-          if (_titleError != null) setState(() => _titleError = null);
-          setState(() {});
-        },
-      );
-    }
-
     final detailsCard = Container(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Module details', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-          const SizedBox(height: 6),
-          Text('This section will appear in the course structure.', style: TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.textMuted)),
-          const SizedBox(height: 16),
+          const SizedBox(height: 4),
+          Text('This title appears in the course structure.', style: TextStyle(fontSize: 12.5, height: 1.4, color: AppColors.textMuted)),
+          const SizedBox(height: 14),
           const _FieldLabel('Module title', required: true),
           const SizedBox(height: 6),
           TextField(
@@ -494,9 +429,9 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
               setState(() {});
             },
             decoration: _inputDecoration(
-              hintText: 'e.g. Chapter 2',
+              hintText: 'Example: Module 02 — Data structures',
               errorText: _titleError,
-              helperText: 'Shown directly in the materials sidebar.',
+              helperText: '3–64 characters. Must be unique inside this course.',
               prefixIcon: const Icon(Icons.folder_open_outlined, size: 18),
             ),
           ),
@@ -505,20 +440,16 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
           const SizedBox(height: 6),
           TextField(
             controller: _descCtrl,
-            maxLines: 2,
-            minLines: 2,
+            maxLines: 5,
+            minLines: 4,
             onChanged: (_) {
               if (_descError != null) setState(() => _descError = null);
               setState(() {});
             },
             decoration: _inputDecoration(
-              hintText: 'Optional note about this module.',
+              hintText: 'Optional context for this module. Add the scope, chapter goal, or what students should expect.',
               errorText: _descError,
-              helperText: 'Optional. Keep it short.',
-              prefixIcon: const Padding(
-                padding: EdgeInsets.only(left: 12, right: 8, bottom: 18),
-                child: Icon(Icons.subject_rounded, size: 18),
-              ),
+              helperText: 'Optional. Up to 240 characters.',
             ),
           ),
         ],
@@ -529,108 +460,101 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Live preview', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-          const SizedBox(height: 12),
+          Text('Sidebar preview', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+          const SizedBox(height: 10),
           Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: AppColors.cardBg,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: AppColors.border),
             ),
-            child: Row(children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: AppColors.primarySoft,
-                  borderRadius: BorderRadius.circular(10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: AppColors.primarySoft,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.folder_open_rounded, color: AppColors.primary, size: 18),
                 ),
-                child: const Icon(Icons.folder_open_rounded, color: AppColors.primary, size: 18),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  Text(previewTitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                  const SizedBox(height: 4),
-                  Text(previewDescription, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.8, height: 1.4, color: AppColors.textMuted)),
-                ],),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(999)),
-                child: const Text('Module', style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
-              ),
-            ],),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        previewTitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.textTitle),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        previewDescription,
+                        maxLines: 4,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, height: 1.45, color: AppColors.textMuted),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(height: 12),
+          _MiniBadge(icon: Icons.sort_rounded, text: 'Added at the end'),
         ],
       ),
     );
 
     return Padding(
-      padding: const EdgeInsets.all(22),
+      padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _BackLink(label: 'Back to module options', onTap: () => setState(() => _step = _SelectorStep.options)),
-          const SizedBox(height: 16),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.hoverBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.badgeBlueBorder),
-            ),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              Text('Create a module', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-              const SizedBox(height: 6),
-              Text('Use a short, clear title. Description is optional and only appears as extra context.', style: TextStyle(fontSize: 12.8, height: 1.45, color: AppColors.textMuted)),
-              const SizedBox(height: 12),
-              Wrap(spacing: 8, runSpacing: 8, children: [
-                quickChip('Chapter 1'),
-                quickChip('Week 2'),
-                quickChip('Assessment Prep'),
-              ],),
-            ],),
-          ),
-          const SizedBox(height: 16),
+          _BackLink(label: 'Module options', onTap: () => setState(() => _step = _SelectorStep.options)),
+          const SizedBox(height: 14),
           Expanded(
             child: LayoutBuilder(
               builder: (context, constraints) {
-                final compact = constraints.maxWidth < 760;
+                final compact = constraints.maxWidth < 740;
                 if (compact) {
                   return ListView(
                     padding: EdgeInsets.zero,
-                    children: [detailsCard, const SizedBox(height: 14), previewCard],
+                    children: [detailsCard, const SizedBox(height: 12), previewCard],
                   );
                 }
                 return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(flex: 7, child: detailsCard),
-                    const SizedBox(width: 14),
+                    Expanded(flex: 8, child: detailsCard),
+                    const SizedBox(width: 12),
                     Expanded(flex: 5, child: previewCard),
                   ],
                 );
               },
             ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           Row(
             children: [
-              Expanded(
+              SizedBox(
+                width: 132,
                 child: OutlinedButton(
                   onPressed: () => setState(() => _step = _SelectorStep.options),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.textTitle,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     side: BorderSide(color: AppColors.border),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
@@ -639,12 +563,11 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
               ),
               const SizedBox(width: 10),
               Expanded(
-                flex: 2,
                 child: FilledButton.icon(
                   onPressed: _submitCreate,
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                   ),
                   icon: const Icon(Icons.add_rounded, size: 18),
@@ -867,55 +790,90 @@ class _ActionCard extends StatelessWidget {
   Widget build(BuildContext context) {
     Theme.of(context);
     return Opacity(
-      opacity: enabled ? 1 : 0.6,
+      opacity: enabled ? 1 : 0.58,
       child: Material(
         color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-          borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(12),
+        child: InkWell(
+          hoverColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          borderRadius: BorderRadius.circular(12),
           onTap: enabled ? onTap : null,
           child: Container(
-            padding: const EdgeInsets.all(18),
+            constraints: const BoxConstraints(minHeight: 124),
+            padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: AppColors.border),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: enabled ? AppColors.border : AppColors.borderSoft),
             ),
-            child: Column(
+            child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 42,
-                      height: 42,
-                      decoration: BoxDecoration(
-                        color: iconBg,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Icon(icon, size: 18, color: iconFg),
-                    ),
-                    const Spacer(),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                      decoration: BoxDecoration(
-                        color: badgeColor,
-                        borderRadius: BorderRadius.circular(99),
-                      ),
-                      child: Text(badge, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: badgeTextColor)),
-                    ),
-                  ],
+                Container(
+                  width: 42,
+                  height: 42,
+                  decoration: BoxDecoration(
+                    color: iconBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(icon, size: 19, color: iconFg),
                 ),
-                const SizedBox(height: 18),
-                Text(title, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                const SizedBox(height: 10),
-                Text(description, style: TextStyle(fontSize: 12.8, height: 1.55, color: AppColors.textMuted)),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Text(cta, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: enabled ? AppColors.primary : AppColors.textMuted)),
-                    const SizedBox(width: 6),
-                    Icon(Icons.arrow_forward_rounded, size: 16, color: enabled ? AppColors.primary : AppColors.textMuted),
-                  ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textTitle),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: badgeColor,
+                              borderRadius: BorderRadius.circular(999),
+                              border: Border.all(color: AppColors.border),
+                            ),
+                            child: Text(
+                              badge,
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.w800, color: badgeTextColor),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        description,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12.7, height: 1.45, color: AppColors.textMuted),
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Text(
+                            cta,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w800,
+                              color: enabled ? AppColors.primary : AppColors.textMuted,
+                            ),
+                          ),
+                          const SizedBox(width: 5),
+                          Icon(Icons.arrow_forward_rounded, size: 16, color: enabled ? AppColors.primary : AppColors.textMuted),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1229,18 +1187,30 @@ class _BackLink extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(6),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.textMuted),
-            const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-          ],
+    return Material(
+      color: AppColors.cardBg,
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        hoverColor: Colors.transparent,
+        splashColor: Colors.transparent,
+        highlightColor: Colors.transparent,
+        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.arrow_back_rounded, size: 16, color: AppColors.primary),
+              const SizedBox(width: 7),
+              Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.primary)),
+            ],
+          ),
         ),
       ),
     );

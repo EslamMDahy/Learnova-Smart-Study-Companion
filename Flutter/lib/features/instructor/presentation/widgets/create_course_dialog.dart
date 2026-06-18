@@ -1,6 +1,9 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:learnova/core/theme/app_theme.dart';
 import 'package:learnova/core/ui/toast.dart';
+import 'package:learnova/core/utils/image_picker_bytes.dart';
 import 'package:learnova/features/instructor/data/courses_models.dart';
 import 'package:learnova/features/instructor/data/course_vocabulary.dart';
 import 'package:learnova/features/instructor/data/learning_outcomes_models.dart';
@@ -11,10 +14,17 @@ class CreateCourseDialogResult {
   final CourseCreateRequest request;
   final bool needsInvites;
   final List<LearningOutcome> learningOutcomes;
+  final List<int>? coverBytes;
+  final String? coverContentType;
+  final String? coverFilename;
+
   const CreateCourseDialogResult({
     required this.request,
     required this.needsInvites,
     required this.learningOutcomes,
+    this.coverBytes,
+    this.coverContentType,
+    this.coverFilename,
   });
 }
 
@@ -42,6 +52,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
   bool _codeTouched  = false;
 
   List<LearningOutcome> _outcomes = [];
+  PickedBrowserFile? _coverFile;
 
   static final _codeRx = RegExp(r'^[A-Za-z0-9][A-Za-z0-9\-_\/ ]*$');
 
@@ -105,6 +116,51 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
   bool get _canSubmit =>
       _titleCtrl.text.trim().isNotEmpty && _titleError == null && _codeError == null;
 
+  String? _coverValidationError(PickedBrowserFile file) {
+    final contentType = (file.mimeType ?? '').trim().toLowerCase();
+    final name = (file.name ?? '').trim().toLowerCase();
+    final isAllowed = contentType == 'image/png' ||
+        contentType == 'image/jpeg' ||
+        contentType == 'image/jpg' ||
+        name.endsWith('.png') ||
+        name.endsWith('.jpg') ||
+        name.endsWith('.jpeg');
+
+    if (!isAllowed) return 'Course cover must be PNG or JPG.';
+    if (file.bytes.length > 5 * 1024 * 1024) {
+      return 'Course cover must be 5MB or smaller.';
+    }
+    return null;
+  }
+
+  Future<void> _pickCover() async {
+    try {
+      final file = await pickSingleImageFile(
+        accept: const ['image/png', 'image/jpeg', 'image/jpg'],
+      );
+      if (!mounted || file == null) return;
+
+      final error = _coverValidationError(file);
+      if (error != null) {
+        AppToast.error(context, title: 'Invalid cover image', message: error);
+        return;
+      }
+
+      setState(() => _coverFile = file);
+    } catch (_) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        title: 'Upload unavailable',
+        message: 'Could not open the image picker in this browser.',
+      );
+    }
+  }
+
+  void _removeCover() {
+    setState(() => _coverFile = null);
+  }
+
   void _submit() {
     _validateAll();
     if (!_canSubmit) {
@@ -139,6 +195,9 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
       request: request,
       needsInvites: !isPublic,
       learningOutcomes: _outcomes,
+      coverBytes: _coverFile?.bytes,
+      coverContentType: _coverFile?.mimeType,
+      coverFilename: _coverFile?.name,
     ),);
   }
 
@@ -378,7 +437,11 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
           child: _SectionCard(
             icon: Icons.image_outlined,
             title: 'Course Cover',
-            child: _CoverUpload(),
+            child: _CoverUpload(
+              file: _coverFile,
+              onPick: _pickCover,
+              onRemove: _removeCover,
+            ),
           ),
         ),
       ],
@@ -900,6 +963,16 @@ class _OptionTileState extends State<_OptionTile> {
 
 // ── Cover upload ──────────────────────────────────────────────────────────────
 class _CoverUpload extends StatefulWidget {
+  final PickedBrowserFile? file;
+  final Future<void> Function() onPick;
+  final VoidCallback onRemove;
+
+  const _CoverUpload({
+    required this.file,
+    required this.onPick,
+    required this.onRemove,
+  });
+
   @override
   State<_CoverUpload> createState() => _CoverUploadState();
 }
@@ -910,65 +983,198 @@ class _CoverUploadState extends State<_CoverUpload> {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final file = widget.file;
+    final hasFile = file != null && file.bytes.isNotEmpty;
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _h = true),
       onExit: (_) => setState(() => _h = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 28),
-        decoration: BoxDecoration(
-          color: _h ? AppColors.primarySoft : AppColors.hoverBg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: _h ? AppColors.primary : AppColors.border,
-            width: _h ? 1.5 : 1,
+      child: GestureDetector(
+        onTap: widget.onPick,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: double.infinity,
+          height: 184,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _h ? AppColors.primarySoft : AppColors.hoverBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _h || hasFile ? AppColors.primary : AppColors.border,
+              width: _h || hasFile ? 1.5 : 1,
+            ),
           ),
+          child: hasFile
+              ? _CoverPreview(
+                  bytes: Uint8List.fromList(file.bytes),
+                  filename: file.name,
+                  onReplace: widget.onPick,
+                  onRemove: widget.onRemove,
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: _h ? AppColors.primarySoft : AppColors.headerBg,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.add_photo_alternate_outlined,
+                        size: 22,
+                        color: _h ? AppColors.primary : AppColors.muted,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Upload a file',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: _h ? AppColors.primary : AppColors.muted,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'or drag and drop',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textHint,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'PNG, JPG up to 5MB',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11, color: AppColors.textHint),
+                    ),
+                  ],
+                ),
         ),
-  child: Column(
-  mainAxisSize: MainAxisSize.min, 
-  children: [
-    Container(
-      width: 46, height: 63,
-      decoration: BoxDecoration(
-        color: _h ? AppColors.primarySoft : AppColors.headerBg,
-        borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(Icons.add_photo_alternate_outlined, size: 22,
-          color: _h ? AppColors.primary : AppColors.muted,),
-    ),
-    const SizedBox(height: 12),
-    
-    // 2. جعل النصوص تحت بعضها وفي المنتصف
-    Text(
-      'Upload a file',
-      style: TextStyle(
-        fontSize: 13, 
-        fontWeight: FontWeight.w700,
-        color: _h ? AppColors.primary : AppColors.muted,
-        fontFamily: 'Inter',
+    );
+  }
+}
+
+class _CoverPreview extends StatelessWidget {
+  final Uint8List bytes;
+  final String? filename;
+  final Future<void> Function() onReplace;
+  final VoidCallback onRemove;
+
+  const _CoverPreview({
+    required this.bytes,
+    required this.filename,
+    required this.onReplace,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.memory(bytes, fit: BoxFit.cover),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withOpacity(0.05),
+                  Colors.black.withOpacity(0.58),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 10,
+            right: 10,
+            bottom: 10,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  (filename ?? 'Course cover').trim().isEmpty
+                      ? 'Course cover'
+                      : filename!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    _TinyCoverAction(
+                      icon: Icons.swap_horiz_rounded,
+                      label: 'Replace',
+                      onTap: onReplace,
+                    ),
+                    const SizedBox(width: 6),
+                    _TinyCoverAction(
+                      icon: Icons.close_rounded,
+                      label: 'Remove',
+                      onTap: onRemove,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
-    ),
-    const SizedBox(height: 4), // مسافة بسيطة بين السطرين
-    Text(
-      'or drag and drop',
-      style: TextStyle(
-        fontSize: 12, 
-        color: AppColors.textHint, 
-        fontFamily: 'Inter',
-      ),
-    ),
-    
-    const SizedBox(height: 8),
-    
-    Text(
-      'PNG, JPG, GIF up to 10MB',
-      textAlign: TextAlign.center, // تأكيد التوسط
-      style: TextStyle(fontSize: 11, color: AppColors.textHint),
-    ),
-  ],
-),
+    );
+  }
+}
+
+class _TinyCoverAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _TinyCoverAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.92),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

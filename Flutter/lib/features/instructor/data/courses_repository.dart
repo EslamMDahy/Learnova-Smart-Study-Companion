@@ -72,6 +72,22 @@ class CoursesRepository {
   }) =>
       _api.createCourse(payload: payload, cancelToken: cancelToken);
 
+
+  Future<CourseCoverConfirmResponse> uploadCourseCover({
+    required int courseId,
+    required Uint8List bytes,
+    required String? contentType,
+    required String filename,
+    CancelToken? cancelToken,
+  }) =>
+      _api.uploadCourseCover(
+        courseId: courseId,
+        bytes: bytes,
+        contentType: contentType,
+        filename: filename,
+        cancelToken: cancelToken,
+      );
+
   /// Upload invitations .xlsx file
   /// -> POST /courses/{id}/invitations/upload
   Future<Map<String, dynamic>> uploadInvitationsFile({

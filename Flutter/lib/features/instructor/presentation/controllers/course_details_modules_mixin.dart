@@ -7,6 +7,7 @@ mixin _CourseDetailsModulesMixin on StateNotifier<CourseDetailsState> {
   int get courseId;
   Future<void> loadMaterials(int moduleId, {bool force = false});
   Future<void> loadTopics(int moduleId, {bool force = false});
+  Future<void> loadTopicsForMaterial({required int moduleId, required int materialId, bool force = false});
   CancelToken? get cancelToken;
   set cancelToken(CancelToken? value);
 // ── Modules ──────────────────────────────────────────────────────────────
@@ -138,6 +139,12 @@ mixin _CourseDetailsModulesMixin on StateNotifier<CourseDetailsState> {
       final nextTopics = Map<int, List<TopicItem>>.from(state.topics)..remove(moduleId);
       final nextMaterialLoading = Map<int, bool>.from(state.materialsLoading)..remove(moduleId);
       final nextTopicLoading = Map<int, bool>.from(state.topicsLoading)..remove(moduleId);
+      final removedMaterialIds = state.materials[moduleId]
+              ?.map((MaterialItem material) => material.id)
+              .toSet() ??
+          const <int>{};
+      final nextLoadedTopicMaterialIds = <int>{...state.topicsLoadedMaterialIds}
+        ..removeAll(removedMaterialIds);
 
       state = state.copyWith(
         modules: nextModules,
@@ -145,6 +152,7 @@ mixin _CourseDetailsModulesMixin on StateNotifier<CourseDetailsState> {
         topics: nextTopics,
         materialsLoading: nextMaterialLoading,
         topicsLoading: nextTopicLoading,
+        topicsLoadedMaterialIds: nextLoadedTopicMaterialIds,
       );
       return true;
     } catch (e) {

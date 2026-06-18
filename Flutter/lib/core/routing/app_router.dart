@@ -3,10 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../session/session_providers.dart';
-import '../session/session_snapshot.dart';
 import '../storage/token_storage.dart';
 import '../storage/user_storage.dart';
-import '../theme/app_theme.dart';
 
 import '../../features/auth/presentation/pages/forget_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -27,14 +25,14 @@ import '../../features/instructor/presentation/pages/exam_correction_page.dart';
 import '../../features/instructor/presentation/widgets/Quizzes/quiz_screen.dart';
 import '../../features/instructor/presentation/controllers/selected_course_provider.dart';
 import '../../features/instructor/presentation/course_route_identity.dart';
-import '../../features/instructor/data/courses_providers.dart';
 import '../../features/student/presentation/pages/student_shell.dart';
 import '../../features/student/presentation/pages/dashboard/student_dashboard_page.dart';
 import '../../features/student/presentation/pages/courses/student_courses_page.dart';
+import '../../features/student/presentation/pages/courses/student_discover_courses_page.dart';
+import '../../features/student/presentation/pages/courses/student_course_invite_page.dart';
 import '../../features/student/presentation/pages/courses/student_course_details_page.dart';
-import '../../features/student/presentation/pages/question_bank/student_question_bank_page.dart';
-import '../../features/student/presentation/pages/quiz_history/student_quiz_history_page.dart';
-import '../../features/student/presentation/pages/recommendations/student_recommendations_page.dart';
+import '../../features/student/presentation/pages/quiz/student_quiz_active_page.dart';
+import '../../features/student/presentation/pages/quiz/student_quiz_result_page.dart';
 import '../../shared/pages/error_page.dart';
 import '../../shared/widgets/empty_state_page.dart';
 
@@ -51,8 +49,6 @@ final _routerRefreshListenableProvider = Provider<ValueNotifier<int>>((ref) {
 
 final appRouterProvider = Provider<GoRouter>((ref) {
   final refresh = ref.watch(_routerRefreshListenableProvider);
-  final initialSession = SessionSnapshot.fromStorage();
-
   Page<void> courseDetailsPage(
     GoRouterState state,
     CourseDetailsTab tab,
@@ -90,7 +86,6 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
   final router = GoRouter(
     navigatorKey: rootNavigatorKey,
-    initialLocation: _initialLocationSafe(initialSession),
     refreshListenable: refresh,
     redirect: (context, state) {
       try {
@@ -133,6 +128,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           if (path == Routes.verifyEmail || path == Routes.verifyEmailSent) {
             return null;
           }
+
+          // Preserve deep-link flows after login, especially course invites:
+          // /login?next=/course-invite?token=...
+          // Without this, the router refresh caused by saving the session can
+          // send the user to the dashboard before the login form navigates to
+          // the original invite link.
+          if (path == Routes.login) {
+            final next = state.uri.queryParameters['next'];
+            if (_isSafeInternalNext(next)) return next!.trim();
+          }
+
           if (!s.hasMe) return Routes.home;
           if (s.isOwner) return Routes.adminUsers;
           if (s.isInstructor) return Routes.instructorDashboard;
@@ -200,6 +206,14 @@ final appRouterProvider = Provider<GoRouter>((ref) {
         path: Routes.settings,
         name: RouteNames.settings,
         builder: (_, __) => const SettingsPage(),
+      ),
+
+      GoRoute(
+        path: Routes.courseInvite,
+        name: RouteNames.courseInvite,
+        builder: (_, state) => StudentCourseInvitePage(
+          token: state.uri.queryParameters['token'],
+        ),
       ),
 
       // ── Error / Fallback ──────────────────────────────────────────────────
@@ -387,6 +401,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
+            path: Routes.instructorQuizzesLegacy,
+            pageBuilder: (_, __) => const NoTransitionPage(
+              child: InstructorQuizzesScreen(),
+            ),
+          ),
+          GoRoute(
             path: Routes.instructorHelp,
             name: RouteNames.instructorHelp,
             pageBuilder: (_, __) => const NoTransitionPage(
@@ -418,6 +438,12 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 const NoTransitionPage(child: StudentCoursesPage()),
           ),
           GoRoute(
+            path: Routes.studentDiscoverCourses,
+            name: RouteNames.studentDiscoverCourses,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: StudentDiscoverCoursesPage()),
+          ),
+          GoRoute(
             path: Routes.studentCourseDetails,
             name: RouteNames.studentCourseDetails,
             pageBuilder: (_, __) =>
@@ -425,21 +451,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: Routes.studentQuestionBank,
-            name: RouteNames.studentQuestionBank,
-            pageBuilder: (_, __) =>
-                const NoTransitionPage(child: StudentQuestionBankPage()),
+            redirect: (_, __) => Routes.studentDashboard,
           ),
           GoRoute(
             path: Routes.studentQuizHistory,
-            name: RouteNames.studentQuizHistory,
+            redirect: (_, __) => Routes.studentDashboard,
+          ),
+          GoRoute(
+            path: Routes.studentExamAttempt,
+            name: RouteNames.studentExamAttempt,
             pageBuilder: (_, __) =>
-                const NoTransitionPage(child: StudentQuizHistoryPage()),
+                const NoTransitionPage(child: StudentQuizActivePage()),
+          ),
+          GoRoute(
+            path: Routes.studentExamResult,
+            name: RouteNames.studentExamResult,
+            pageBuilder: (_, __) =>
+                const NoTransitionPage(child: StudentQuizResultPage()),
           ),
           GoRoute(
             path: Routes.studentRecommendations,
-            name: RouteNames.studentRecommendations,
-            pageBuilder: (_, __) =>
-                const NoTransitionPage(child: StudentRecommendationsPage()),
+            redirect: (_, __) => Routes.studentDashboard,
           ),
           GoRoute(
             path: Routes.studentNotifications,
@@ -475,27 +507,11 @@ final appRouterProvider = Provider<GoRouter>((ref) {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-String _initialLocationSafe(SessionSnapshot session) {
-  try {
-    final pending = session.pendingVerificationEmail;
-    if (pending != null && !session.hasAccessToken && !session.isPersisted) {
-      return Routes.verifyEmailSentFor(pending);
-    }
-    if (!session.hasAccessToken) return Routes.landing;
-    if (session.hasMe && session.isOwner) return Routes.adminUsers;
-    if (session.hasMe && session.isInstructor) return Routes.instructorDashboard;
-    if (session.hasMe) return Routes.studentDashboard;
-    return Routes.home;
-  } catch (_) {
-    _clearSessionSafe();
-    return Routes.landing;
-  }
-}
-
 bool _isPublicRoute(String path) {
   return path == Routes.landing ||
       _isAuthOnlyRoute(path) ||
       path == Routes.error ||
+      path == Routes.courseInvite ||
       path == Routes.verifyEmail ||
       path == Routes.verifyEmailSent;
 }
@@ -507,6 +523,14 @@ bool _isAuthOnlyRoute(String path) {
       path == Routes.resetPassword ||
       path == Routes.verifyEmail ||
       path == Routes.verifyEmailSent;
+}
+
+bool _isSafeInternalNext(String? value) {
+  if (value == null) return false;
+  final trimmed = value.trim();
+  if (trimmed.isEmpty || !trimmed.startsWith('/')) return false;
+  if (trimmed.startsWith('//')) return false;
+  return true;
 }
 
 void _clearSessionSafe() {
@@ -530,12 +554,16 @@ class RouteNames {
   static const resetPassword   = 'resetPassword';
   static const settings  = 'settings';
   static const error     = 'error';
+  static const courseInvite = 'courseInvite';
 
   static const studentDashboard = 'studentDashboard';
   static const studentCourses = 'studentCourses';
+  static const studentDiscoverCourses = 'studentDiscoverCourses';
   static const studentCourseDetails = 'studentCourseDetails';
   static const studentQuestionBank = 'studentQuestionBank';
   static const studentQuizHistory = 'studentQuizHistory';
+  static const studentExamAttempt = 'studentExamAttempt';
+  static const studentExamResult = 'studentExamResult';
   static const studentRecommendations = 'studentRecommendations';
   static const studentSettings = 'studentSettings';
   static const studentHelp = 'studentHelp';

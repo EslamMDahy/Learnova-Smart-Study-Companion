@@ -81,6 +81,7 @@ class TopHeaderWidget extends StatelessWidget {
               child: FigmaUmSearch40(
                 controller: searchController,
                 onChanged: onSearchChanged ?? (_) {},
+                hint: searchHint,
               ),
             )
           else

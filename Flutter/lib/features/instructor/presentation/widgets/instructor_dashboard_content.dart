@@ -13,9 +13,7 @@ import '../course_route_identity.dart';
 
 final instructorDashboardSnapshotProvider =
     FutureProvider<InstructorDashboardSnapshot>((ref) async {
-  final response = await ref.read(coursesRepositoryProvider).myCourses(
-        enrichMissingModuleCounts: true,
-      );
+  final response = await ref.read(coursesRepositoryProvider).myCourses();
   return InstructorDashboardSnapshot.fromCourses(response.items);
 });
 
@@ -999,8 +997,8 @@ class _QuickActionsPanel extends StatelessWidget {
       ),
       const _QuickAction(
         icon: Icons.assignment_outlined,
-        label: 'Build quizzes',
-        sub: 'Open quizzes workspace',
+        label: 'Manage exams',
+        sub: 'Open exams workspace',
         route: Routes.instructorQuizzes,
       ),
     ];

@@ -1,539 +1,595 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:learnova/core/routing/routes.dart';
-import 'package:learnova/core/theme/app_theme.dart';
 
-class StudentCoursesPage extends StatelessWidget {
+import '../../../../../core/routing/routes.dart';
+import '../../../../../core/theme/app_theme.dart';
+import '../../../data/student_courses_models.dart';
+import '../../../data/student_courses_providers.dart';
+import 'student_course_widgets.dart';
+
+class StudentCoursesPage extends ConsumerStatefulWidget {
   const StudentCoursesPage({super.key});
 
   @override
+  ConsumerState<StudentCoursesPage> createState() => _StudentCoursesPageState();
+}
+
+class _StudentCoursesPageState extends ConsumerState<StudentCoursesPage> {
+  static const int _pageSize = 6;
+
+  int _pageIndex = 0;
+  _StudentCoursesViewMode _viewMode = _StudentCoursesViewMode.grid;
+
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() {
+      ref.read(studentCoursesControllerProvider.notifier).loadEnrolled();
+    });
+  }
+
+  Future<void> _refresh() async {
+    await ref
+        .read(studentCoursesControllerProvider.notifier)
+        .loadEnrolled(force: true);
+  }
+
+  void _openCourseWorkspace(StudentCourse course) {
+    context.go('${Routes.studentCourseDetails}?courseId=${course.id}');
+  }
+
+  void _goToPage(int index) {
+    if (index == _pageIndex) return;
+    setState(() => _pageIndex = index);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    Theme.of(context);
-    // تحديث تدرجات الألوان (Gradients) لتصبح أكثر حيوية وجاذبية وعصرية
-    final courses = [
-      {
-        'title': 'Intro to Machine Learning',
-        'code': 'CS-204',
-        'credits': '3 Credits',
-        'teacher': 'Dr. Sarah Chen',
-        'department': 'Computer Science Dept.',
-        'schedule': 'Mon/Wed 10:00 AM',
-        'location': 'Building A, 302',
-        'description':
-            'A comprehensive introduction to machine learning concepts, algorithms, and applications.',
-        'status': 'Open',
-        'button': 'Enroll',
-        'gradient1': const Color(0xff4F46E5), // Indigo
-        'gradient2': const Color(0xff06B6D4), // Cyan
-      },
-      {
-        'title': 'Advanced Algorithms',
-        'code': 'CS-301',
-        'credits': '4 Credits',
-        'teacher': 'Prof. Alan Smith',
-        'department': 'Computer Science Dept.',
-        'schedule': 'Tue/Thu 2:00 PM',
-        'location': 'Remote',
-        'description':
-            'Deep dive into graph algorithms, dynamic programming, and NP-completeness.',
-        'status': 'Waitlist',
-        'button': 'Join Waitlist',
-        'gradient1': AppColors.purpleText, // Purple
-        'gradient2': const Color(0xffEC4899), // Pink
-      },
-      {
-        'title': 'Data Structures',
-        'code': 'DS-101',
-        'credits': '3 Credits',
-        'teacher': 'Dr. Emily White',
-        'department': 'Data Science Dept.',
-        'schedule': 'Fri 9:00 AM',
-        'location': 'Lab 404',
-        'description':
-            'Fundamental data structures including arrays, linked lists, stacks, queues, trees, and graphs.',
-        'status': 'Enrolled',
-        'button': 'Enrolled',
-        'gradient1': const Color(0xff1E3A8A), // Royal Blue
-        'gradient2': AppColors.primary, // Light Blue
-      },
-      {
-        'title': 'Full Stack Development',
-        'code': 'WEB-200',
-        'credits': '3 Credits',
-        'teacher': 'Michael Torres',
-        'department': 'Engineering Dept.',
-        'schedule': 'Mon/Wed 3:00 PM',
-        'location': 'Building B, 101',
-        'description': 'Modern web development with React, Node.js, and SQL.',
-        'status': 'Open',
-        'button': 'Enroll',
-        'gradient1': const Color(0xff0F766E), // Teal
-        'gradient2': AppColors.successDot, // Emerald
-      },
-      {
-        'title': 'Engineering Ethics',
-        'code': 'ETH-101',
-        'credits': '2 Credits',
-        'teacher': 'Dr. James Wilson',
-        'department': 'Humanities Dept.',
-        'schedule': 'Fri 2:00 PM',
-        'location': 'Hall C',
-        'description':
-            'Ethical considerations in engineering practice and sustainability.',
-        'status': 'Closed',
-        'button': 'Closed',
-        'gradient1': AppColors.textGray, // Cool Gray
-        'gradient2': AppColors.textGray500, // Slate
-      },
-      {
-        'title': 'Digital Media Arts',
-        'code': 'ART-220',
-        'credits': '3 Credits',
-        'teacher': 'Lisa Ray',
-        'department': 'Arts Dept.',
-        'schedule': 'Tue/Thu 10:00 AM',
-        'location': 'Studio 5',
-        'description':
-            'Exploration of digital tools for creative expression and graphic design.',
-        'status': 'Open',
-        'button': 'Enroll',
-        'gradient1': AppColors.warningText, // Amber
-        'gradient2': AppColors.errorDot, // Red
-      },
-    ];
+    final state = ref.watch(studentCoursesControllerProvider);
+    final courses = state.enrolledCourses;
+    final totalPages = courses.isEmpty ? 1 : (courses.length / _pageSize).ceil();
+    final safePageIndex = _pageIndex.clamp(0, totalPages - 1).toInt();
+    final visibleCourses = courses
+        .skip(safePageIndex * _pageSize)
+        .take(_pageSize)
+        .toList(growable: false);
 
-    return Scaffold(
-      backgroundColor: AppColors.bg,
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 48, vertical: 36),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            /// TITLE
-            Text(
-              'My Courses',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textTitle,
-                letterSpacing: -0.5,
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              'Manage your curriculum, AI assessments, and student cohorts.',
-              style: TextStyle(
-                fontSize: 15,
-                color: AppColors.textMuted,
-              ),
-            ),
-            const SizedBox(height: 32),
+    return RefreshIndicator(
+      onRefresh: _refresh,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final horizontalPadding = constraints.maxWidth < 720 ? 20.0 : 32.0;
+          final verticalPadding = constraints.maxWidth < 720 ? 28.0 : 56.0;
 
-            /// TOP BAR
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Text(
-                  'Showing 24 courses',
-                  style: TextStyle(
-                    color: AppColors.textGray,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-                Row(
+          return SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: EdgeInsets.symmetric(
+              horizontal: horizontalPadding,
+              vertical: verticalPadding,
+            ),
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 1260),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _topIconButton(Icons.grid_view_rounded, true),
-                    const SizedBox(width: 8),
-                    _topIconButton(Icons.view_agenda_outlined, false),
-                  ],
-                ),
-              ],
-            ),
-            const SizedBox(height: 24),
-
-            /// GRID
-            LayoutBuilder(
-              builder: (context, constraints) {
-                int count = 3;
-                if (constraints.maxWidth < 1150) count = 2;
-                if (constraints.maxWidth < 750) count = 1;
-
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: courses.length,
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: count,
-                    crossAxisSpacing: 24,
-                    mainAxisSpacing: 24,
-                    mainAxisExtent:
-                        370, // تصغير طول الكارت الإجمالي ليكون أكثر تماسكاً
-                  ),
-                  itemBuilder: (context, index) {
-                    final course = courses[index];
-                    final status = course['status'].toString();
-                    final isClosed = status == 'Closed';
-                    final isWaitlist = status == 'Waitlist';
-                    final isEnrolled = status == 'Enrolled';
-
-                    return GestureDetector(
-                      onTap: () {
-                        context.go(Routes.studentCourseDetails);
+                    const _MyCoursesTitleBlock(),
+                    const SizedBox(height: 30),
+                    _CoursesToolbar(
+                      count: courses.length,
+                      viewMode: _viewMode,
+                      onViewModeChanged: (mode) {
+                        setState(() => _viewMode = mode);
                       },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: AppColors.cardBg,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(color: AppColors.border),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.015),
-                              blurRadius: 12,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            /// TOP COVER
-                            Container(
-                              height: 130, // تصغير بسيط لغطاء الكارت
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                borderRadius: const BorderRadius.only(
-                                  topLeft: Radius.circular(15),
-                                  topRight: Radius.circular(15),
-                                ),
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    course['gradient1'] as Color,
-                                    course['gradient2'] as Color,
-                                  ],
-                                ),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  /// BADGES
-                                  Row(
-                                    children: [
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: isClosed
-                                              ? AppColors.errorDot
-                                              : isWaitlist
-                                                  ? AppColors.warningText
-                                                  : AppColors.successDot,
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          status,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 8),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 10,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: Colors.white24,
-                                          borderRadius:
-                                              BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          course['credits'].toString(),
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 11,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      if (isEnrolled)
-                                        const CircleAvatar(
-                                          radius: 11,
-                                          backgroundColor: AppColors.primary,
-                                          child: Icon(
-                                            Icons.check,
-                                            size: 13,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                    ],
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    course['code'].toString(),
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Text(
-                                    course['title'].toString(),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w700,
-                                      height: 1.2,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-
-                            /// CONTENT - تغليفه بـ Expanded واستخدام Spacer لدفع المكونات للأسفل
-                            Expanded(
-                              child: Padding(
-                                padding: const EdgeInsets.all(16),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    /// TEACHER
-                                    Row(
-                                      children: [
-                                        CircleAvatar(
-                                          radius: 16,
-                                          backgroundColor: AppColors.infoBg,
-                                          child: const Icon(
-                                            Icons.person,
-                                            color: AppColors.primary,
-                                            size: 16,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment:
-                                                CrossAxisAlignment.start,
-                                            children: [
-                                              Text(
-                                                course['teacher'].toString(),
-                                                style: TextStyle(
-                                                  fontWeight: FontWeight.w700,
-                                                  fontSize: 13,
-                                                  color: AppColors.textTitle,
-                                                ),
-                                              ),
-                                              Text(
-                                                course['department'].toString(),
-                                                style: TextStyle(
-                                                  color: AppColors.textMuted,
-                                                  fontSize: 11,
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-
-                                    /// SCHEDULE & LOCATION
-                                    Row(
-                                      children: [
-                                        Icon(Icons.access_time_rounded,
-                                            size: 14, color: AppColors.textHint,),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            course['schedule'].toString(),
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w500,
-                                                color: AppColors.textGray,),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 6),
-                                    Row(
-                                      children: [
-                                        Icon(Icons.location_on_outlined,
-                                            size: 14, color: AppColors.textHint,),
-                                        const SizedBox(width: 6),
-                                        Expanded(
-                                          child: Text(
-                                            course['location'].toString(),
-                                            style: TextStyle(
-                                                fontSize: 12,
-                                                fontWeight: FontWeight.w500,
-                                                color: AppColors.textGray,),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 12),
-
-                                    /// DESCRIPTION (تم تحديد حد أقصى سطرين للملائمة مع الطول الجديد)
-                                    Text(
-                                      course['description'].toString(),
-                                      maxLines: 2,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: TextStyle(
-                                        height: 1.4,
-                                        fontSize: 12,
-                                        color: AppColors.textMuted,
-                                      ),
-                                    ),
-
-                                    // السبيسر السحري الذي يقوم بحجز المساحة ودفع زر Enroll ونهاية المحتوى إلى الأسفل تماماً لتوحيد الطول
-                                    const Spacer(),
-
-                                    /// BUTTON (Enroll)
-                                    SizedBox(
-                                      width: double.infinity,
-                                      height: 40,
-                                      child: ElevatedButton(
-                                        onPressed: () {},
-                                        style: ElevatedButton.styleFrom(
-                                          elevation: 0,
-                                          backgroundColor: isClosed
-                                              ? AppColors.headerBg
-                                              : isWaitlist
-                                                  ? Colors.white
-                                                  : isEnrolled
-                                                      ? AppColors.headerBg
-                                                      : AppColors.primary,
-                                          foregroundColor: isClosed
-                                              ? AppColors.textHint
-                                              : isWaitlist
-                                                  ? AppColors.primary
-                                                  : isEnrolled
-                                                      ? AppColors.textGray
-                                                      : Colors.white,
-                                          side: isWaitlist
-                                              ? const BorderSide(
-                                                  color: AppColors.primary,
-                                                  width: 1.5,
-                                                )
-                                              : null,
-                                          shape: RoundedRectangleBorder(
-                                            borderRadius:
-                                                BorderRadius.circular(8),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          course['button'].toString(),
-                                          style: const TextStyle(
-                                            fontWeight: FontWeight.w700,
-                                            fontSize: 13,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                    ),
+                    const SizedBox(height: 24),
+                    _EnrolledCoursesArea(
+                      state: state,
+                      courses: visibleCourses,
+                      viewMode: _viewMode,
+                      onRetry: _refresh,
+                      onDiscover: () => context.go(Routes.studentDiscoverCourses),
+                      onCourseTap: _openCourseWorkspace,
+                    ),
+                    if (courses.length > _pageSize) ...[
+                      const SizedBox(height: 48),
+                      Center(
+                        child: _CoursesPagination(
+                          pageIndex: safePageIndex,
+                          totalPages: totalPages,
+                          onPageSelected: _goToPage,
                         ),
                       ),
-                    );
-                  },
-                );
-              },
-            ),
-            const SizedBox(height: 48),
-
-            /// PAGINATION
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _paginationButton(Icons.chevron_left, false),
-                const SizedBox(width: 8),
-                _pageNumber('1', true),
-                _pageNumber('2', false),
-                _pageNumber('3', false),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
-                  child:
-                      Text('...', style: TextStyle(color: AppColors.textHint)),
+                    ],
+                    const SizedBox(height: 48),
+                  ],
                 ),
-                _pageNumber('8', false),
-                const SizedBox(width: 8),
-                _paginationButton(Icons.chevron_right, true),
-              ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _MyCoursesTitleBlock extends StatelessWidget {
+  const _MyCoursesTitleBlock();
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'My Courses',
+          style: TextStyle(
+            fontSize: 32,
+            height: 1.05,
+            fontWeight: FontWeight.w900,
+            color: AppColors.textTitle,
+            letterSpacing: -0.7,
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Manage your curriculum, AI assessments, and student cohorts.',
+          style: TextStyle(
+            fontSize: 14.5,
+            height: 1.35,
+            color: AppColors.textMuted,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _CoursesToolbar extends StatelessWidget {
+  final int count;
+  final _StudentCoursesViewMode viewMode;
+  final ValueChanged<_StudentCoursesViewMode> onViewModeChanged;
+
+  const _CoursesToolbar({
+    required this.count,
+    required this.viewMode,
+    required this.onViewModeChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(
+          'Showing $count course${count == 1 ? '' : 's'}',
+          style: TextStyle(
+            color: AppColors.textMuted,
+            fontWeight: FontWeight.w800,
+            fontSize: 12.5,
+            height: 1,
+          ),
+        ),
+        Row(
+          children: [
+            _TopIconButton(
+              icon: Icons.grid_view_rounded,
+              active: viewMode == _StudentCoursesViewMode.grid,
+              onTap: () => onViewModeChanged(_StudentCoursesViewMode.grid),
+            ),
+            const SizedBox(width: 8),
+            _TopIconButton(
+              icon: Icons.view_list_rounded,
+              active: viewMode == _StudentCoursesViewMode.list,
+              onTap: () => onViewModeChanged(_StudentCoursesViewMode.list),
             ),
           ],
         ),
-      ),
+      ],
     );
   }
+}
 
-  Widget _topIconButton(IconData icon, bool active) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: active ? AppColors.primary : AppColors.cardBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(
-            color: active ? Colors.transparent : AppColors.border,),
-      ),
-      child: Icon(
-        icon,
-        size: 18,
-        color: active ? Colors.white : AppColors.textMuted,
-      ),
+class _EnrolledCoursesArea extends StatelessWidget {
+  final StudentCoursesState state;
+  final List<StudentCourse> courses;
+  final _StudentCoursesViewMode viewMode;
+  final VoidCallback onRetry;
+  final VoidCallback onDiscover;
+  final ValueChanged<StudentCourse> onCourseTap;
+
+  const _EnrolledCoursesArea({
+    required this.state,
+    required this.courses,
+    required this.viewMode,
+    required this.onRetry,
+    required this.onDiscover,
+    required this.onCourseTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (state.isInitialLoading) {
+      return const StudentCoursesLoadingPanel(
+        message: 'Loading your courses...',
+      );
+    }
+
+    if (state.enrolledError != null && state.enrolledCourses.isEmpty) {
+      return StudentCoursesErrorPanel(
+        message: state.enrolledError!,
+        onRetry: onRetry,
+      );
+    }
+
+    if (state.enrolledCourses.isEmpty) {
+      return StudentCoursesEmptyPanel(
+        icon: Icons.menu_book_outlined,
+        title: 'No courses yet',
+        description:
+            'Accept an instructor invitation or discover public courses to start building your course list.',
+        actionLabel: 'Discover Courses',
+        onAction: onDiscover,
+      );
+    }
+
+    if (viewMode == _StudentCoursesViewMode.list) {
+      return _StudentCoursesList(
+        courses: courses,
+        onCourseTap: onCourseTap,
+      );
+    }
+
+    return StudentCourseGrid(
+      courses: courses,
+      enrollingIds: state.enrollingCourseIds,
+      onCourseTap: onCourseTap,
+      onEnroll: null,
     );
   }
+}
 
-  Widget _paginationButton(IconData icon, bool active) {
-    return Container(
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Icon(
-        icon,
-        size: 18,
-        color: AppColors.textMuted,
-      ),
+class _StudentCoursesList extends StatelessWidget {
+  final List<StudentCourse> courses;
+  final ValueChanged<StudentCourse> onCourseTap;
+
+  const _StudentCoursesList({
+    required this.courses,
+    required this.onCourseTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        for (var i = 0; i < courses.length; i++) ...[
+          _StudentCourseListTile(
+            course: courses[i],
+            onTap: () => onCourseTap(courses[i]),
+          ),
+          if (i != courses.length - 1) const SizedBox(height: 12),
+        ],
+      ],
     );
   }
+}
 
-  Widget _pageNumber(String number, bool active) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 4),
-      width: 36,
-      height: 36,
-      decoration: BoxDecoration(
-        color: active ? AppColors.primary : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        number,
-        style: TextStyle(
-          color: active ? Colors.white : AppColors.textMuted,
-          fontWeight: FontWeight.w700,
-          fontSize: 13,
+class _StudentCourseListTile extends StatelessWidget {
+  final StudentCourse course;
+  final VoidCallback onTap;
+
+  const _StudentCourseListTile({
+    required this.course,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(10),
+        child: Ink(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppColors.border.withOpacity(0.72)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.shadowThin,
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              ClipRRect(
+                borderRadius: BorderRadius.circular(8),
+                child: SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: (course.coverImageUrl ?? '').trim().isNotEmpty
+                      ? Image.network(
+                          course.coverImageUrl!.trim(),
+                          fit: BoxFit.cover,
+                          errorBuilder: (_, __, ___) => _CourseThumbFallback(),
+                        )
+                      : _CourseThumbFallback(),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      course.safeCode,
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.3,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      course.safeTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textTitle,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      course.safeDescription,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 14),
+              Container(
+                height: 32,
+                padding: const EdgeInsets.symmetric(horizontal: 14),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.fieldDisabledBg,
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  'Enrolled',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
+
+class _TopIconButton extends StatelessWidget {
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _TopIconButton({
+    required this.icon,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(6),
+        child: Ink(
+          width: 28,
+          height: 28,
+          decoration: BoxDecoration(
+            color: active ? AppColors.primarySoft : AppColors.cardBg,
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(
+              color: active ? AppColors.primary.withOpacity(0.14) : AppColors.border,
+            ),
+          ),
+          child: Icon(
+            icon,
+            size: 16,
+            color: active ? AppColors.primary : AppColors.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CoursesPagination extends StatelessWidget {
+  final int pageIndex;
+  final int totalPages;
+  final ValueChanged<int> onPageSelected;
+
+  const _CoursesPagination({
+    required this.pageIndex,
+    required this.totalPages,
+    required this.onPageSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final pages = _visiblePages();
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _PaginationArrow(
+          icon: Icons.chevron_left_rounded,
+          enabled: pageIndex > 0,
+          onTap: () => onPageSelected(pageIndex - 1),
+        ),
+        const SizedBox(width: 8),
+        for (final page in pages) ...[
+          if (page == null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 7),
+              child: Text(
+                '...',
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            )
+          else
+            _PaginationNumber(
+              label: '${page + 1}',
+              active: page == pageIndex,
+              onTap: () => onPageSelected(page),
+            ),
+          const SizedBox(width: 8),
+        ],
+        _PaginationArrow(
+          icon: Icons.chevron_right_rounded,
+          enabled: pageIndex < totalPages - 1,
+          onTap: () => onPageSelected(pageIndex + 1),
+        ),
+      ],
+    );
+  }
+
+  List<int?> _visiblePages() {
+    if (totalPages <= 4) {
+      return List<int>.generate(totalPages, (index) => index);
+    }
+
+    if (pageIndex <= 2) {
+      return [0, 1, 2, null, totalPages - 1];
+    }
+
+    if (pageIndex >= totalPages - 3) {
+      return [0, null, totalPages - 3, totalPages - 2, totalPages - 1];
+    }
+
+    return [0, null, pageIndex, null, totalPages - 1];
+  }
+}
+
+class _PaginationNumber extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _PaginationNumber({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Ink(
+          width: 30,
+          height: 30,
+          decoration: BoxDecoration(
+            color: active ? AppColors.primary : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: active ? Colors.white : AppColors.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PaginationArrow extends StatelessWidget {
+  final IconData icon;
+  final bool enabled;
+  final VoidCallback onTap;
+
+  const _PaginationArrow({
+    required this.icon,
+    required this.enabled,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: enabled ? onTap : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Ink(
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Icon(
+            icon,
+            color: enabled ? AppColors.textMuted : AppColors.textHint,
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+
+class _CourseThumbFallback extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      alignment: Alignment.center,
+      color: AppColors.primarySoft,
+      child: Icon(
+        Icons.menu_book_rounded,
+        color: AppColors.primary,
+        size: 24,
+      ),
+    );
+  }
+}
+
+enum _StudentCoursesViewMode { grid, list }

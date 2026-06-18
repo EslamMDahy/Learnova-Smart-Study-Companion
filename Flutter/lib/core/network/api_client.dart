@@ -458,8 +458,35 @@ class ApiClient implements ITokenRefreshScheduler {
     try {
       if (data is Map) {
         final m = data.cast<String, dynamic>();
-        final direct = (m['message'] ?? m['error'])?.toString();
-        if (direct != null && direct.trim().isNotEmpty) return direct.trim();
+        final directRaw = m['detail'] ?? m['message'] ?? m['error'];
+        if (directRaw is String && directRaw.trim().isNotEmpty) {
+          return directRaw.trim();
+        }
+
+        final detail = m['detail'];
+        if (detail is List && detail.isNotEmpty) {
+          final messages = <String>[];
+          for (final item in detail) {
+            if (item is Map) {
+              final loc = item['loc'];
+              final msg = item['msg']?.toString();
+              if (msg != null && msg.trim().isNotEmpty) {
+                if (loc is List && loc.isNotEmpty) {
+                  messages.add('${loc.join('.')}: ${msg.trim()}');
+                } else {
+                  messages.add(msg.trim());
+                }
+              } else {
+                final text = item.toString().trim();
+                if (text.isNotEmpty) messages.add(text);
+              }
+            } else {
+              final text = item.toString().trim();
+              if (text.isNotEmpty) messages.add(text);
+            }
+          }
+          if (messages.isNotEmpty) return messages.join('\n');
+        }
 
         final inner = m['data'];
         if (inner is Map) {

@@ -11,15 +11,19 @@ class Routes {
   static const verifyEmail    = '/verify-email';
   static const verifyEmailSent = '/verify-email-sent';
   static const error          = '/error';
+  static const courseInvite   = '/course-invite';
 
   static const settings = '/settings';
 
   static const student = '/student';
   static const studentDashboard = '/student/dashboard';
   static const studentCourses = '/student/courses';
+  static const studentDiscoverCourses = '/student/discover-courses';
   static const studentCourseDetails = '/student/courses/details';
   static const studentQuestionBank = '/student/question-bank';
   static const studentQuizHistory = '/student/quiz-history';
+  static const studentExamAttempt = '/student/exams/attempt';
+  static const studentExamResult = '/student/exams/result';
   static const studentRecommendations = '/student/recommendations';
   static const studentSettings = '/student/settings';
   static const studentHelp = '/student/help';
@@ -43,10 +47,11 @@ class Routes {
   static const instructorCourseAnalytics    = '/instructor/courses/:courseSlug/analytics';
   static const instructorCourseQuestionBank = '/instructor/courses/:courseSlug/question-bank';
   static const instructorCourseTemplates    = '/instructor/courses/:courseSlug/templates';
-  static const instructorCourseQuizzes      = '/instructor/courses/:courseSlug/quizzes';
+  static const instructorCourseQuizzes      = '/instructor/courses/:courseSlug/exams';
   static const instructorQuestionBank  = '/instructor/question-bank';
   static const instructorExamCorrection = '/instructor/exam-correction';
-  static const instructorQuizzes       = '/instructor/quizzes';
+  static const instructorQuizzesLegacy = '/instructor/quizzes';
+  static const instructorQuizzes       = '/instructor/exams';
   static const instructorSettings      = '/instructor/settings';
   static const instructorHelp          = '/instructor/help';
   static const instructorNotifications = '/instructor/notifications';
@@ -58,7 +63,7 @@ class Routes {
   static const courseAnalyticsSegment    = 'analytics';
   static const courseQuestionBankSegment = 'question-bank';
   static const courseTemplatesSegment    = 'templates';
-  static const courseQuizzesSegment      = 'quizzes';
+  static const courseQuizzesSegment      = 'exams';
 
   static String courseDetails(String slug)      => '/instructor/courses/$slug';
   static String courseMaterials(String slug)    => '/instructor/courses/$slug/materials';
@@ -67,7 +72,23 @@ class Routes {
   static String courseAnalytics(String slug)    => '/instructor/courses/$slug/analytics';
   static String courseQuestionBank(String slug) => '/instructor/courses/$slug/question-bank';
   static String courseTemplates(String slug)    => '/instructor/courses/$slug/templates';
-  static String courseQuizzes(String slug)      => '/instructor/courses/$slug/quizzes';
+  static String courseQuizzes(String slug)      => '/instructor/courses/$slug/exams';
+
+  static String courseInviteFor(String token) =>
+      '$courseInvite?token=${Uri.encodeQueryComponent(token)}';
+
+  static String studentExamAttemptFor({
+    required int courseId,
+    required int examId,
+  }) =>
+      '$studentExamAttempt?courseId=$courseId&examId=$examId';
+
+  static String studentExamResultFor({
+    required int courseId,
+    required int examId,
+    required int attemptId,
+  }) =>
+      '$studentExamResult?courseId=$courseId&examId=$examId&attemptId=$attemptId';
 
   /// Navigate to the "check your email" screen after signup or unverified login.
   static String verifyEmailSentFor(String email) =>

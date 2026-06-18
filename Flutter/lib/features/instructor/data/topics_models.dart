@@ -194,12 +194,20 @@ class TopicItem {
         DateTime.tryParse((v ?? '').toString()) ??
         DateTime.fromMillisecondsSinceEpoch(0);
 
-    // Backend sends learning_outcome_ids as List<int>
-    final intOutcomeIds = ((json['learning_outcome_ids'] as List?) ?? const [])
+    // Backend may send either learning_outcome_ids or learning_outcomes.
+    final explicitOutcomeIds = ((json['learning_outcome_ids'] as List?) ?? const [])
         .map((e) => (e as num).toInt())
         .toList();
+    final relatedOutcomeIds = ((json['learning_outcomes'] as List?) ?? const [])
+        .whereType<Map>()
+        .map((e) => (e['id'] as num?)?.toInt())
+        .whereType<int>()
+        .toList();
+    final intOutcomeIds = explicitOutcomeIds.isNotEmpty
+        ? explicitOutcomeIds
+        : relatedOutcomeIds;
 
-    // Derive UI string list from the int list
+    // Derive UI string list from the int list.
     final strOutcomeIds = intOutcomeIds.map((e) => e.toString()).toList();
 
     final isAi = (json['is_ai_generated'] as bool?) ?? false;
@@ -353,7 +361,8 @@ class TopicCreateRequest {
             .map((s) => int.tryParse(s))
             .whereType<int>()
             .toList();
-    if (ids.isNotEmpty) m['learning_outcome_ids'] = ids;
+    final normalizedIds = ids.isEmpty ? const <int>[] : <int>[ids.first];
+    if (normalizedIds.isNotEmpty) m['learning_outcome_ids'] = normalizedIds;
     return m;
   }
 }
@@ -378,7 +387,11 @@ class TopicUpdateRequest {
     if (title != null) m['title'] = title;
     if (description != null) m['description'] = description;
     if (parentTopicId != null) m['parent_topic_id'] = parentTopicId;
-    if (learningOutcomeIds != null) m['learning_outcome_ids'] = learningOutcomeIds;
+    if (learningOutcomeIds != null) {
+      m['learning_outcome_ids'] = learningOutcomeIds!.isEmpty
+          ? const <int>[]
+          : <int>[learningOutcomeIds!.first];
+    }
     return m;
   }
 }

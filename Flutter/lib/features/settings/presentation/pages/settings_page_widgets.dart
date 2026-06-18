@@ -78,9 +78,14 @@ class _ProfileCard extends StatelessWidget {
             child: Column(
               children: [
                 // Avatar with upload overlay
-                GestureDetector(
-                  onTap: uploadingAvatar ? null : onUploadAvatar,
-                  child: Stack(
+                MouseRegion(
+                  cursor: uploadingAvatar || onUploadAvatar == null
+                      ? SystemMouseCursors.basic
+                      : SystemMouseCursors.click,
+                  child: GestureDetector(
+                    behavior: HitTestBehavior.opaque,
+                    onTap: uploadingAvatar ? null : onUploadAvatar,
+                    child: Stack(
                     alignment: Alignment.center,
                     clipBehavior: Clip.none,
                     children: [
@@ -146,6 +151,7 @@ class _ProfileCard extends StatelessWidget {
                           ),
                         ),
                     ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),

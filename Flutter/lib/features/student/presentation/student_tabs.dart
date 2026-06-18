@@ -1,8 +1,7 @@
 enum StudentTabs {
   dashboard,
   myCourses,
-  questionBank,
-  quizHistory,
-  recommendations,
+  discoverCourses,
+  settings,
   help,
 }

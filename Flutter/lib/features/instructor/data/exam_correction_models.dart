@@ -38,6 +38,32 @@ class ExamCorrectionUploadFile {
   }
 }
 
+class OcrHealthResponse {
+  final bool available;
+  final String engine;
+  final String? version;
+  final List<String> languages;
+  final String? detail;
+
+  const OcrHealthResponse({
+    required this.available,
+    required this.engine,
+    required this.version,
+    required this.languages,
+    required this.detail,
+  });
+
+  factory OcrHealthResponse.fromJson(Map<String, dynamic> json) {
+    return OcrHealthResponse(
+      available: json['available'] == true,
+      engine: (json['engine'] ?? 'tesseract').toString(),
+      version: json['version']?.toString(),
+      languages: ((json['languages'] as List?) ?? const []).map((item) => item.toString()).toList(growable: false),
+      detail: json['detail']?.toString(),
+    );
+  }
+}
+
 class ExamScanAnalyzeResponse {
   final String scanId;
   final String status;
@@ -184,6 +210,9 @@ class ExamScanAnswer {
   final Map<String, dynamic>? answerRegion;
   final Map<String, dynamic>? aiGradingPayload;
   final double? aiScore;
+  final String? aiStatus;
+  final String? aiFeedback;
+  final String? aiRequestId;
 
   const ExamScanAnswer({
     required this.examQuestionId,
@@ -203,10 +232,18 @@ class ExamScanAnswer {
     required this.answerRegion,
     required this.aiGradingPayload,
     required this.aiScore,
+    required this.aiStatus,
+    required this.aiFeedback,
+    required this.aiRequestId,
   });
 
-  bool get needsReview => status == 'needs_review' || confidence < 62;
+  bool get hasAiGrade => aiStatus == 'completed' || status == 'ai_graded' || aiScore != null;
+  bool get isAiPending => aiStatus == 'pending' || aiStatus == 'sent';
+  bool get needsReview => status == 'needs_review' || isAiPending || confidence < 45 || (isWritten && pointsEarned == null && !hasAiGrade);
   bool get isWritten => type == 'essay' || type == 'short_answer';
+  String get reviewKey => examQuestionId != null ? 'eq_$examQuestionId' : 'q_${questionNumber}_$type';
+  String get typeLabel => type.replaceAll('_', ' ');
+
   String get displayAnswer {
     if (isWritten) return (answerText ?? '').trim().isEmpty ? 'No text extracted' : answerText!.trim();
     if (detectedAnswers.isNotEmpty) return detectedAnswers.join(', ');
@@ -235,19 +272,32 @@ class ExamScanAnswer {
       answerRegion: (json['answer_region'] as Map?)?.cast<String, dynamic>(),
       aiGradingPayload: (json['ai_grading_payload'] as Map?)?.cast<String, dynamic>(),
       aiScore: _nullableDouble(json['ai_score']),
+      aiStatus: json['ai_status']?.toString(),
+      aiFeedback: json['ai_feedback']?.toString(),
+      aiRequestId: json['ai_request_id']?.toString(),
     );
   }
 
-  Map<String, dynamic> toSubmitJson() {
+  Map<String, dynamic> toSubmitJson({
+    bool? isCorrectOverride,
+    double? pointsEarnedOverride,
+    String? teacherFeedback,
+  }) {
+    final effectiveCorrect = isCorrectOverride ?? isCorrect;
+    final effectivePoints = pointsEarnedOverride ?? pointsEarned;
+    final feedback = teacherFeedback?.trim();
+
+    final aiGraded = isWritten && hasAiGrade && effectivePoints != null;
     return {
       'exam_question_id': examQuestionId,
       'type': type,
       'selected_option_index': selectedOptionIndex,
       'selected_option_indices': selectedOptionIndices,
       'answer_text': answerText,
-      'is_correct': isCorrect,
-      'points_earned': pointsEarned,
-      'auto_graded': !isWritten,
+      'is_correct': effectiveCorrect,
+      'points_earned': effectivePoints,
+      'auto_graded': (!isWritten && effectiveCorrect != null) || aiGraded,
+      'teacher_feedback': feedback == null || feedback.isEmpty ? aiFeedback : feedback,
     }..removeWhere((key, value) => value == null);
   }
 }
@@ -260,6 +310,8 @@ class ExamScanGradePreview {
   final int writtenQuestions;
   final int needsReview;
   final int aiReady;
+  final int aiGraded;
+  final int aiPending;
 
   const ExamScanGradePreview({
     required this.scoreSoFar,
@@ -269,6 +321,8 @@ class ExamScanGradePreview {
     required this.writtenQuestions,
     required this.needsReview,
     required this.aiReady,
+    required this.aiGraded,
+    required this.aiPending,
   });
 
   factory ExamScanGradePreview.fromJson(Map<String, dynamic> json) {
@@ -280,6 +334,8 @@ class ExamScanGradePreview {
       writtenQuestions: _asInt(json['written_questions']),
       needsReview: _asInt(json['needs_review']),
       aiReady: _asInt(json['ai_ready']),
+      aiGraded: _asInt(json['ai_graded']),
+      aiPending: _asInt(json['ai_pending']),
     );
   }
 }
@@ -290,6 +346,9 @@ class ExamScanSubmitResponse {
   final int studentId;
   final int answerCount;
   final String status;
+  final bool aiGradingRequested;
+  final String? aiRequestId;
+  final String? aiError;
 
   const ExamScanSubmitResponse({
     required this.attemptId,
@@ -297,6 +356,9 @@ class ExamScanSubmitResponse {
     required this.studentId,
     required this.answerCount,
     required this.status,
+    required this.aiGradingRequested,
+    required this.aiRequestId,
+    required this.aiError,
   });
 
   factory ExamScanSubmitResponse.fromJson(Map<String, dynamic> json) {
@@ -306,6 +368,9 @@ class ExamScanSubmitResponse {
       studentId: _asInt(json['student_id']),
       answerCount: _asInt(json['answer_count']),
       status: (json['status'] ?? '').toString(),
+      aiGradingRequested: json['ai_grading_requested'] == true,
+      aiRequestId: json['ai_request_id']?.toString(),
+      aiError: json['ai_error']?.toString(),
     );
   }
 }

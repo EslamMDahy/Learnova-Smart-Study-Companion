@@ -1,5 +1,13 @@
 import 'question_models.dart';
 
+String _backendDateTime(DateTime value) => value.toUtc().toIso8601String();
+
+DateTime _defaultExamAvailableFrom() =>
+    DateTime.now().toUtc().subtract(const Duration(minutes: 5));
+
+DateTime _defaultExamAvailableTo() =>
+    DateTime.now().toUtc().add(const Duration(days: 3650));
+
 class ExamCreatePayload {
   final String title;
   final String? description;
@@ -40,8 +48,8 @@ class ExamCreatePayload {
       'passing_score': passingScore,
       'shuffle_questions': shuffleQuestions,
       'shuffle_options': shuffleOptions,
-      'available_from': availableFrom?.toIso8601String(),
-      'available_to': availableTo?.toIso8601String(),
+      'available_from': _backendDateTime(availableFrom ?? _defaultExamAvailableFrom()),
+      'available_to': _backendDateTime(availableTo ?? _defaultExamAvailableTo()),
       'access_code': accessCode,
     }..removeWhere((_, value) => value == null);
   }
@@ -73,6 +81,29 @@ class ExamSectionCreatePayload {
   }
 }
 
+class GenerateExamFromTemplatePayload {
+  final String title;
+  final List<int> topicIds;
+  final Map<String, dynamic>? sectionDifficultyDistribution;
+
+  const GenerateExamFromTemplatePayload({
+    required this.title,
+    this.topicIds = const <int>[],
+    this.sectionDifficultyDistribution,
+  });
+
+  Map<String, dynamic> toJson() {
+    final cleanedTitle = title.trim();
+    final uniqueTopicIds = topicIds.where((id) => id > 0).toSet().toList()..sort();
+    return {
+      'title': cleanedTitle,
+      if (uniqueTopicIds.isNotEmpty) 'topic_ids': uniqueTopicIds,
+      if (sectionDifficultyDistribution != null && sectionDifficultyDistribution!.isNotEmpty)
+        'section_difficulty_distribution': sectionDifficultyDistribution,
+    };
+  }
+}
+
 class ExamModel {
   final int id;
   final int courseId;
@@ -88,6 +119,8 @@ class ExamModel {
   final bool isPublished;
   final bool shuffleQuestions;
   final bool shuffleOptions;
+  final DateTime? availableFrom;
+  final DateTime? availableTo;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -106,6 +139,8 @@ class ExamModel {
     required this.isPublished,
     required this.shuffleQuestions,
     required this.shuffleOptions,
+    this.availableFrom,
+    this.availableTo,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -126,6 +161,8 @@ class ExamModel {
       isPublished: (json['is_published'] as bool?) ?? false,
       shuffleQuestions: (json['shuffle_questions'] as bool?) ?? false,
       shuffleOptions: (json['shuffle_options'] as bool?) ?? false,
+      availableFrom: _parseNullableDate(json['available_from']),
+      availableTo: _parseNullableDate(json['available_to']),
       createdAt: _parseDate(json['created_at']),
       updatedAt: _parseDate(json['updated_at']),
     );
@@ -433,6 +470,13 @@ double? _nullableDouble(dynamic value) {
   if (value is double) return value;
   if (value is num) return value.toDouble();
   return double.tryParse(value.toString());
+}
+
+DateTime? _parseNullableDate(dynamic value) {
+  if (value == null) return null;
+  final raw = value.toString().trim();
+  if (raw.isEmpty) return null;
+  return DateTime.tryParse(raw);
 }
 
 DateTime _parseDate(dynamic value) {

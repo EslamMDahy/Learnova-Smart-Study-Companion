@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 import 'package:learnova/core/routing/routes.dart';
 
 import '../../../../core/storage/user_storage.dart';
+import '../../../../core/ui/toast.dart';
+import '../../../../features/auth/data/auth_providers.dart';
 
 import '../../../../shared/widgets/base_dashboard_shell.dart';
 import '../../../../shared/widgets/top_header.dart';
@@ -66,27 +68,35 @@ class _StudentShellState extends ConsumerState<StudentShell> {
       return 1;
     }
 
-    if (path.startsWith(Routes.studentQuestionBank)) {
+    if (path.startsWith(Routes.studentDiscoverCourses)) {
       return 2;
     }
 
-    if (path.startsWith(Routes.studentQuizHistory)) {
+    if (path.startsWith(Routes.studentSettings)) {
       return 3;
     }
 
-    if (path.startsWith(Routes.studentRecommendations)) {
+    if (path.startsWith(Routes.studentHelp)) {
       return 4;
     }
 
-    if (path.startsWith(Routes.studentSettings)) {
-      return 5;
-    }
-
-    if (path.startsWith(Routes.studentHelp)) {
-      return 6;
-    }
-
     return 0;
+  }
+
+
+  Future<void> _logout() async {
+    try {
+      await ref.read(authRepositoryProvider).logout();
+      if (!mounted) return;
+      context.go(Routes.login);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        title: 'Logout failed',
+        message: e.toString(),
+      );
+    }
   }
 
   void _goByIndex(int index) {
@@ -100,22 +110,14 @@ class _StudentShellState extends ConsumerState<StudentShell> {
         return;
 
       case 2:
-        context.go(Routes.studentQuestionBank);
+        context.go(Routes.studentDiscoverCourses);
         return;
 
       case 3:
-        context.go(Routes.studentQuizHistory);
-        return;
-
-      case 4:
-        context.go(Routes.studentRecommendations);
-        return;
-
-      case 5:
         context.go(Routes.studentSettings);
         return;
 
-      case 6:
+      case 4:
         context.go(Routes.studentHelp);
         return;
     }
@@ -124,6 +126,15 @@ class _StudentShellState extends ConsumerState<StudentShell> {
   @override
   Widget build(BuildContext context) {
     final path = GoRouterState.of(context).uri.path;
+
+    // The course workspace has its own Figma layout: course-content sidebar,
+    // learning area, and study assistant panel. Keep it outside the default
+    // student navigation shell so the page matches the dedicated design.
+    if (path == Routes.studentCourseDetails ||
+        path == Routes.studentExamAttempt ||
+        path == Routes.studentExamResult) {
+      return widget.child;
+    }
 
     return ValueListenableBuilder<int>(
       valueListenable: UserStorage.listenable as ValueNotifier<int>,
@@ -141,7 +152,7 @@ class _StudentShellState extends ConsumerState<StudentShell> {
           header: TopHeaderWidget(
             searchController: _search,
             onSearchChanged: (_) => setState(() {}),
-            searchHint: 'Search topics, questions, or courses...',
+            searchHint: 'Search topics, questions, or student',
             userName: _displayName(),
             userSubtitle: _displaySubtitle(),
             avatarUrl: UserStorage.avatarUrl,
@@ -151,6 +162,7 @@ class _StudentShellState extends ConsumerState<StudentShell> {
             onSettings: () {
               context.go(Routes.studentSettings);
             },
+            onLogout: () async => _logout(),
           ),
 
           /// CONTENT

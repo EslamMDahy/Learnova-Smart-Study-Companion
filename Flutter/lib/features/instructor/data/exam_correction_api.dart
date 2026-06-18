@@ -9,6 +9,19 @@ class ExamCorrectionApi {
 
   ExamCorrectionApi(this._client);
 
+  Future<OcrHealthResponse> getOcrHealth({CancelToken? cancelToken}) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.ocrHealth,
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return OcrHealthResponse.fromJson(data);
+    }
+    throw const FormatException('Invalid response from OCR health endpoint.');
+  }
+
   Future<ExamScanAnalyzeResponse> analyzeExamScan({
     required List<ExamCorrectionUploadFile> files,
     required String language,
@@ -61,10 +74,18 @@ class ExamCorrectionApi {
     required ExamScanAnalyzeResponse scan,
     required int examId,
     required int studentUserId,
+    Map<String, double> pointsOverrides = const {},
+    Map<String, bool> correctnessOverrides = const {},
+    String? teacherFeedback,
     CancelToken? cancelToken,
   }) async {
-    final totalScore = scan.answers.fold<double>(0, (sum, answer) => sum + (answer.pointsEarned ?? 0));
+    final answers = scan.answers.where((answer) => answer.examQuestionId != null).toList(growable: false);
+    final totalScore = answers.fold<double>(
+      0,
+      (sum, answer) => sum + (pointsOverrides[answer.reviewKey] ?? answer.pointsEarned ?? 0),
+    );
     final percentage = scan.gradePreview.totalScore > 0 ? (totalScore / scan.gradePreview.totalScore) * 100 : null;
+    final cleanFeedback = teacherFeedback?.trim();
 
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.examScanSubmit,
@@ -72,13 +93,18 @@ class ExamCorrectionApi {
         'scan_id': scan.scanId,
         'exam_id': examId,
         'student_id': studentUserId,
-        'answers': scan.answers
-            .where((answer) => answer.examQuestionId != null)
-            .map((answer) => answer.toSubmitJson())
+        'answers': answers
+            .map(
+              (answer) => answer.toSubmitJson(
+                isCorrectOverride: correctnessOverrides[answer.reviewKey],
+                pointsEarnedOverride: pointsOverrides[answer.reviewKey],
+              ),
+            )
             .toList(growable: false),
         'total_score': totalScore,
         'percentage_score': percentage,
-      },
+        'teacher_feedback': cleanFeedback == null || cleanFeedback.isEmpty ? null : cleanFeedback,
+      }..removeWhere((key, value) => value == null),
       options: Options(
         sendTimeout: const Duration(minutes: 1),
         receiveTimeout: const Duration(minutes: 2),

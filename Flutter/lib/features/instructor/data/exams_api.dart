@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/endpoints.dart';
+import '../../../core/storage/published_exams_cache.dart';
 import 'exam_models.dart';
 
 
@@ -15,6 +16,44 @@ class ExamPdfExport {
     required this.bytes,
     required this.filename,
   });
+}
+
+
+DateTime _defaultBackendAvailableFrom() =>
+    DateTime.now().toUtc().subtract(const Duration(minutes: 5));
+
+DateTime _defaultBackendAvailableTo() =>
+    DateTime.now().toUtc().add(const Duration(days: 3650));
+
+String _backendIso(DateTime value) => value.toUtc().toIso8601String();
+
+Map<String, dynamic> _ensureBackendAvailabilityWindow(
+  Map<String, dynamic> payload,
+) {
+  final body = Map<String, dynamic>.from(payload);
+  final hasFrom = body['available_from'] != null &&
+      body['available_from'].toString().trim().isNotEmpty;
+  final hasTo = body['available_to'] != null &&
+      body['available_to'].toString().trim().isNotEmpty;
+
+  var from = hasFrom
+      ? DateTime.tryParse(body['available_from'].toString())?.toUtc()
+      : null;
+  var to = hasTo
+      ? DateTime.tryParse(body['available_to'].toString())?.toUtc()
+      : null;
+
+  final now = DateTime.now().toUtc();
+  from ??= now.subtract(const Duration(minutes: 5));
+  to ??= now.add(const Duration(days: 3650));
+
+  if (!to.isAfter(from)) {
+    to = from.add(const Duration(days: 3650));
+  }
+
+  body['available_from'] = _backendIso(from);
+  body['available_to'] = _backendIso(to);
+  return body..removeWhere((_, value) => value == null);
 }
 
 class ExamsApi {
@@ -29,7 +68,7 @@ class ExamsApi {
   }) async {
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.courseExams(courseId),
-      data: payload.toJson(),
+      data: _ensureBackendAvailabilityWindow(payload.toJson()),
       cancelToken: cancelToken,
     );
     final data = res.data;
@@ -43,7 +82,7 @@ class ExamsApi {
     required Map<String, dynamic> payload,
     CancelToken? cancelToken,
   }) async {
-    final body = Map<String, dynamic>.from(payload)..removeWhere((_, value) => value == null);
+    final body = _ensureBackendAvailabilityWindow(payload);
     final res = await _client.patch<Map<String, dynamic>>(
       Endpoints.updateExam(courseId, examId),
       data: body,
@@ -162,7 +201,13 @@ class ExamsApi {
       cancelToken: cancelToken,
     );
     final data = res.data;
-    if (data is Map<String, dynamic>) return ExamListResponse.fromJson(data);
+    if (data is Map<String, dynamic>) {
+      PublishedExamsCache.saveInstructorPayload(
+        courseId: courseId,
+        payload: data,
+      );
+      return ExamListResponse.fromJson(data);
+    }
     throw const FormatException('Invalid response from GET /courses/{id}/exams');
   }
 
@@ -185,6 +230,12 @@ class ExamsApi {
     required int examId,
     CancelToken? cancelToken,
   }) async {
+    await _ensureExamCanBeListedForStudents(
+      courseId: courseId,
+      examId: examId,
+      cancelToken: cancelToken,
+    );
+
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.publishExam(courseId, examId),
       cancelToken: cancelToken,
@@ -194,6 +245,34 @@ class ExamsApi {
     throw const FormatException('Invalid response from POST /courses/{id}/exams/{examId}/publish');
   }
 
+
+
+  Future<void> _ensureExamCanBeListedForStudents({
+    required int courseId,
+    required int examId,
+    CancelToken? cancelToken,
+  }) async {
+    final details = await getExam(
+      courseId: courseId,
+      examId: examId,
+      cancelToken: cancelToken,
+    );
+
+    final current = details.exam;
+    if (current.availableFrom != null && current.availableTo != null) {
+      return;
+    }
+
+    await updateExam(
+      courseId: courseId,
+      examId: examId,
+      payload: {
+        'available_from': current.availableFrom?.toUtc().toIso8601String(),
+        'available_to': current.availableTo?.toUtc().toIso8601String(),
+      },
+      cancelToken: cancelToken,
+    );
+  }
 
   Future<ExamPdfExport> exportExamPdf({
     required int courseId,
@@ -207,6 +286,7 @@ class ExamsApi {
     bool includePoints = true,
     bool includeStudentInfoFields = true,
     bool includeAnswerSpace = true,
+    bool includeOcrSupport = false,
     bool? shuffleQuestions,
     bool? shuffleOptions,
     CancelToken? cancelToken,
@@ -221,6 +301,7 @@ class ExamsApi {
       'include_points': includePoints,
       'include_student_info_fields': includeStudentInfoFields,
       'include_answer_space': includeAnswerSpace,
+      'include_ocr_support': includeOcrSupport,
       if (shuffleQuestions != null) 'shuffle_questions': shuffleQuestions,
       if (shuffleOptions != null) 'shuffle_options': shuffleOptions,
     };
@@ -379,6 +460,50 @@ class ExamsApi {
     final data = res.data;
     if (data is Map<String, dynamic>) return data;
     throw const FormatException('Invalid response from PATCH /courses/{id}/exams/templates/{templateId}/sections/{sectionId}');
+  }
+
+
+  Future<ExamModel> generateExamFromTemplate({
+    required int courseId,
+    required int templateId,
+    required GenerateExamFromTemplatePayload payload,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.generateExamFromTemplate(courseId, templateId),
+      data: payload.toJson(),
+      cancelToken: cancelToken,
+    );
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      final generated = ExamModel.fromJson(data);
+      return updateExam(
+        courseId: courseId,
+        examId: generated.id,
+        payload: {
+          'available_from': generated.availableFrom?.toUtc().toIso8601String(),
+          'available_to': generated.availableTo?.toUtc().toIso8601String(),
+        },
+        cancelToken: cancelToken,
+      );
+    }
+    throw const FormatException('Invalid response from POST /courses/{id}/exams/instructor/templates/{templateId}/generate-exam');
+  }
+
+  Future<Map<String, dynamic>> generateExamFromTemplateRaw({
+    required int courseId,
+    required int templateId,
+    Map<String, dynamic> payload = const <String, dynamic>{},
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.generateExamFromTemplate(courseId, templateId),
+      data: payload,
+      cancelToken: cancelToken,
+    );
+    final data = res.data;
+    if (data is Map<String, dynamic>) return data;
+    throw const FormatException('Invalid response from POST /courses/{id}/exams/instructor/templates/{templateId}/generate-exam');
   }
 
   Future<Map<String, dynamic>> deleteExamTemplateSectionRaw({

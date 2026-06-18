@@ -9,17 +9,17 @@ CreateQuestionPayload mapDraftToCreateQuestionPayload(QuestionDraftItem draft) {
       .entries
       .where((entry) => entry.value.trim().isNotEmpty)
       .map((entry) => CreateQuestionOption(
-            id: String.fromCharCode(65 + entry.key),
+            id: entry.key.toString(),
             text: entry.value.trim(),
           ),)
       .toList();
 
   Object? expectedAnswer;
   if (draft.type == QuestionType.multipleChoice && draft.correctOptionIndex != null) {
-    expectedAnswer = String.fromCharCode(65 + draft.correctOptionIndex!);
+    expectedAnswer = draft.correctOptionIndex!.toString();
   } else if (draft.type == QuestionType.multiSelect) {
     expectedAnswer = draft.correctOptionIndexes
-        .map((index) => String.fromCharCode(65 + index))
+        .map((index) => index.toString())
         .toList();
   } else if (draft.type == QuestionType.trueFalse) {
     expectedAnswer = (draft.correctBool ?? false).toString();

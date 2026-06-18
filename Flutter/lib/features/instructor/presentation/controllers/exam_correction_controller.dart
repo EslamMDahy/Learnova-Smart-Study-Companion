@@ -21,6 +21,22 @@ class ExamCorrectionController extends StateNotifier<ExamCorrectionState> {
 
   final Ref _ref;
   CancelToken? _cancel;
+  CancelToken? _healthCancel;
+
+  Future<void> refreshHealth() async {
+    _healthCancel?.cancel();
+    _healthCancel = CancelToken();
+    state = state.copyWith(healthLoading: true, clearHealthError: true);
+
+    try {
+      final health = await _ref.read(examCorrectionApiProvider).getOcrHealth(cancelToken: _healthCancel);
+      state = state.copyWith(healthLoading: false, health: health, clearHealthError: true);
+    } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) return;
+      final failure = mapApiFailure(e);
+      state = state.copyWith(healthLoading: false, healthError: failure.message, clearHealth: true);
+    }
+  }
 
   Future<void> pickFiles() async {
     final picked = await pickBrowserFiles(
@@ -62,24 +78,42 @@ class ExamCorrectionController extends StateNotifier<ExamCorrectionState> {
       clearError: rejected.isEmpty,
       clearSubmitMessage: true,
       clearResponse: true,
+      clearReviewOverrides: true,
     );
   }
 
   void removeFile(int index) {
     if (index < 0 || index >= state.files.length) return;
     final next = List<ExamCorrectionUploadFile>.from(state.files)..removeAt(index);
-    state = state.copyWith(files: List.unmodifiable(next), clearError: true, clearSubmitMessage: true, clearResponse: true);
+    state = state.copyWith(
+      files: List.unmodifiable(next),
+      clearError: true,
+      clearSubmitMessage: true,
+      clearResponse: true,
+      clearReviewOverrides: true,
+    );
   }
 
   void clearFiles() {
     _cancel?.cancel();
-    state = state.copyWith(files: const [], loading: false, submitting: false, clearError: true, clearSubmitMessage: true, clearResponse: true);
+    state = state.copyWith(
+      files: const [],
+      loading: false,
+      submitting: false,
+      clearError: true,
+      clearSubmitMessage: true,
+      clearResponse: true,
+      clearReviewOverrides: true,
+    );
   }
 
   void setLanguage(String value) => state = state.copyWith(language: value, clearError: true, clearSubmitMessage: true);
-  void setExamIdText(String value) => state = state.copyWith(examIdText: value, clearError: true, clearSubmitMessage: true, clearResponse: true);
-  void setCourseIdText(String value) => state = state.copyWith(courseIdText: value, clearError: true, clearSubmitMessage: true, clearResponse: true);
-  void setStudentIdDigits(int value) => state = state.copyWith(studentIdDigits: value.clamp(4, 12).toInt(), clearError: true, clearSubmitMessage: true, clearResponse: true);
+  void setExamIdText(String value) => state = state.copyWith(examIdText: value, clearError: true, clearSubmitMessage: true, clearResponse: true, clearReviewOverrides: true);
+  void setCourseIdText(String value) => state = state.copyWith(courseIdText: value, clearError: true, clearSubmitMessage: true, clearResponse: true, clearReviewOverrides: true);
+  void setSubmitExamIdText(String value) => state = state.copyWith(submitExamIdText: value, clearError: true, clearSubmitMessage: true);
+  void setSubmitStudentIdText(String value) => state = state.copyWith(submitStudentIdText: value, clearError: true, clearSubmitMessage: true);
+  void setTeacherFeedback(String value) => state = state.copyWith(teacherFeedback: value, clearError: true, clearSubmitMessage: true);
+  void setStudentIdDigits(int value) => state = state.copyWith(studentIdDigits: value.clamp(4, 12).toInt(), clearError: true, clearSubmitMessage: true, clearResponse: true, clearReviewOverrides: true);
 
   Future<void> analyzeScan() async {
     if (!state.canAnalyze) return;
@@ -91,7 +125,13 @@ class ExamCorrectionController extends StateNotifier<ExamCorrectionState> {
 
     _cancel?.cancel();
     _cancel = CancelToken();
-    state = state.copyWith(loading: true, clearError: true, clearSubmitMessage: true, clearResponse: true);
+    state = state.copyWith(
+      loading: true,
+      clearError: true,
+      clearSubmitMessage: true,
+      clearResponse: true,
+      clearReviewOverrides: true,
+    );
 
     try {
       final response = await _ref.read(examCorrectionApiProvider).analyzeExamScan(
@@ -102,17 +142,53 @@ class ExamCorrectionController extends StateNotifier<ExamCorrectionState> {
             studentIdDigits: state.studentIdDigits,
             cancelToken: _cancel,
           );
-      state = state.copyWith(loading: false, response: response, clearError: true);
+      state = state.copyWith(loading: false, response: response, clearError: true, clearReviewOverrides: true);
     } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) return;
       final failure = mapApiFailure(e);
       AppErrorReporter.report(_ref, failure);
       state = state.copyWith(loading: false, error: failure.message);
     }
   }
 
+  void adjustAnswerPoints(ExamScanAnswer answer, double delta) {
+    final maxScore = answer.maxScore ?? (answer.pointsEarned ?? 0);
+    final current = state.effectivePointsFor(answer);
+    final nextValue = _clampDouble(current + delta, 0, maxScore <= 0 ? double.infinity : maxScore);
+    setAnswerPoints(answer, nextValue);
+  }
+
+  void setAnswerPoints(ExamScanAnswer answer, double value) {
+    final maxScore = answer.maxScore ?? (answer.pointsEarned ?? value);
+    final nextValue = _clampDouble(value, 0, maxScore <= 0 ? double.infinity : maxScore);
+    final next = Map<String, double>.from(state.pointsOverrides)..[answer.reviewKey] = nextValue;
+    state = state.copyWith(pointsOverrides: Map.unmodifiable(next), clearError: true, clearSubmitMessage: true);
+  }
+
+  void setAnswerCorrectness(ExamScanAnswer answer, bool? value) {
+    final next = Map<String, bool>.from(state.correctnessOverrides);
+    if (value == null) {
+      next.remove(answer.reviewKey);
+    } else {
+      next[answer.reviewKey] = value;
+    }
+    state = state.copyWith(correctnessOverrides: Map.unmodifiable(next), clearError: true, clearSubmitMessage: true);
+  }
+
+  void clearReviewOverrides() {
+    state = state.copyWith(clearReviewOverrides: true, clearError: true, clearSubmitMessage: true);
+  }
+
   Future<void> submitCorrection() async {
     final scan = state.response;
     if (scan == null || !state.canSubmit) return;
+
+    final examId = state.resolvedExamId;
+    final studentUserId = state.resolvedStudentUserId;
+    if (examId == null || studentUserId == null) {
+      state = state.copyWith(error: 'Select a valid exam and student before saving the graded attempt.');
+      return;
+    }
 
     _cancel?.cancel();
     _cancel = CancelToken();
@@ -121,16 +197,26 @@ class ExamCorrectionController extends StateNotifier<ExamCorrectionState> {
     try {
       final result = await _ref.read(examCorrectionApiProvider).submitExamScan(
             scan: scan,
-            examId: scan.exam.examId!,
-            studentUserId: scan.student.userId!,
+            examId: examId,
+            studentUserId: studentUserId,
+            pointsOverrides: state.pointsOverrides,
+            correctnessOverrides: state.correctnessOverrides,
+            teacherFeedback: state.teacherFeedback,
             cancelToken: _cancel,
           );
+      final aiRequestSuffix = result.aiRequestId == null ? '' : ' (${result.aiRequestId})';
+      final message = result.aiGradingRequested
+          ? 'Scan saved as attempt #${result.attemptId}. AI essay grading was sent$aiRequestSuffix.'
+          : result.aiError != null && result.aiError!.trim().isNotEmpty
+              ? 'Scan saved as attempt #${result.attemptId}, but AI grading could not be sent: ${result.aiError}'
+              : 'Correction saved as graded attempt #${result.attemptId}.';
       state = state.copyWith(
         submitting: false,
-        submitMessage: 'Correction saved as graded attempt #${result.attemptId}.',
+        submitMessage: message,
         clearError: true,
       );
     } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) return;
       final failure = mapApiFailure(e);
       AppErrorReporter.report(_ref, failure);
       state = state.copyWith(submitting: false, error: failure.message);
@@ -150,9 +236,16 @@ class ExamCorrectionController extends StateNotifier<ExamCorrectionState> {
     return parsed;
   }
 
+  double _clampDouble(double value, double min, double max) {
+    if (value < min) return min;
+    if (value > max) return max;
+    return double.parse(value.toStringAsFixed(2));
+  }
+
   @override
   void dispose() {
     _cancel?.cancel();
+    _healthCancel?.cancel();
     super.dispose();
   }
 }

@@ -8,51 +8,92 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
   Future<void> loadMaterials(int moduleId, {bool force = false});
 // ── Topics ──────────────────────────────────────────────────────────────
 
+  bool topicsForMaterialLoaded(int materialId) {
+    return state.topicsLoadedMaterialIds.contains(materialId);
+  }
+
+  /// Eager loader kept for flows that truly need the whole module tree.
+  /// Materials page interactions should prefer [loadTopicsForMaterial].
   Future<void> loadTopics(int moduleId, {bool force = false}) async {
     if (state.topicsLoading[moduleId] ?? false) return;
-    if (state.topics.containsKey(moduleId) && !force) return;
+
+    if ((state.materials[moduleId] ?? const <MaterialItem>[]).isEmpty) {
+      await loadMaterials(moduleId, force: force);
+    }
+    final materials = state.materials[moduleId] ?? const <MaterialItem>[];
+    if (materials.isEmpty) {
+      final newTopics = Map<int, List<TopicItem>>.from(state.topics)
+        ..[moduleId] = const <TopicItem>[];
+      state = state.copyWith(topics: newTopics);
+      return;
+    }
+
+    final materialIds = materials.map((MaterialItem material) => material.id).toSet();
+    if (!force && materialIds.every(state.topicsLoadedMaterialIds.contains)) {
+      return;
+    }
+
+    for (final MaterialItem material in materials) {
+      await loadTopicsForMaterial(
+        moduleId: moduleId,
+        materialId: material.id,
+        force: force,
+      );
+    }
+  }
+
+  /// Lazy topic loader for one material/file.
+  ///
+  /// This prevents opening or refreshing the Materials tab from firing
+  /// `/topics` requests for every uploaded file in the module. The UI calls
+  /// this only when a material is opened, or when a specific material has to be
+  /// restored after refresh.
+  Future<void> loadTopicsForMaterial({
+    required int moduleId,
+    required int materialId,
+    bool force = false,
+  }) async {
+    if (state.topicsLoading[moduleId] ?? false) return;
+    if (!force && state.topicsLoadedMaterialIds.contains(materialId)) return;
 
     final newLoading = Map<int, bool>.from(state.topicsLoading)
       ..[moduleId] = true;
     state = state.copyWith(topicsLoading: newLoading);
 
     try {
-      // Topics are nested under materials — ensure materials are loaded first.
-      if ((state.materials[moduleId] ?? const <MaterialItem>[]).isEmpty) {
-        await loadMaterials(moduleId, force: force);
-      }
-      final materials = state.materials[moduleId] ?? const <MaterialItem>[];
-      final allTopics = <TopicItem>[];
-      for (final mat in materials) {
-        final res = await ref.read(topicsApiProvider).listTopics(
-              courseId: courseId,
-              moduleId: moduleId,
-              materialId: mat.id,
-            );
-        allTopics.addAll(res.topics);
-      }
+      final res = await ref.read(topicsApiProvider).listTopics(
+            courseId: courseId,
+            moduleId: moduleId,
+            materialId: materialId,
+          );
 
-      final sortedTopics = [...allTopics]
-        ..sort((a, b) {
+      final mergedTopics = <TopicItem>[
+        for (final TopicItem topic in state.topics[moduleId] ?? const <TopicItem>[])
+          if (topic.materialId != materialId) topic,
+        ...res.topics,
+      ]..sort((a, b) {
           final materialCmp = a.materialId.compareTo(b.materialId);
           if (materialCmp != 0) return materialCmp;
           return a.orderIndex.compareTo(b.orderIndex);
         });
 
       final newTopics = Map<int, List<TopicItem>>.from(state.topics)
-        ..[moduleId] = sortedTopics;
+        ..[moduleId] = mergedTopics;
       final newLoad = Map<int, bool>.from(state.topicsLoading)
         ..[moduleId] = false;
-      state = state.copyWith(topicsLoading: newLoad, topics: newTopics);
+      final loadedMaterialIds = <int>{...state.topicsLoadedMaterialIds, materialId};
+      state = state.copyWith(
+        topicsLoading: newLoad,
+        topics: newTopics,
+        topicsLoadedMaterialIds: loadedMaterialIds,
+      );
       return;
     } catch (e) {
       final failure = mapApiFailure(e);
       AppErrorReporter.report(ref, failure);
-      final newTopics = Map<int, List<TopicItem>>.from(state.topics)
-        ..[moduleId] = const [];
       final newLoad = Map<int, bool>.from(state.topicsLoading)
         ..[moduleId] = false;
-      state = state.copyWith(topicsLoading: newLoad, topics: newTopics);
+      state = state.copyWith(topicsLoading: newLoad);
       return;
     }
   }
@@ -63,18 +104,38 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
     required TopicCreateRequest payload,
   }) async {
     try {
-      final topic = await ref.read(topicsApiProvider).createTopic(
+      final created = await ref.read(topicsApiProvider).createTopic(
             courseId:   courseId,
             moduleId:   moduleId,
             materialId: materialId,
             payload:    payload,
           );
+      final requestedOutcomeIds = payload.learningOutcomeIds.isNotEmpty
+          ? payload.learningOutcomeIds
+          : payload.linkedOutcomeIds
+              .map((s) => int.tryParse(s))
+              .whereType<int>()
+              .toList();
+      final normalizedOutcomeIds = requestedOutcomeIds.isEmpty
+          ? const <int>[]
+          : <int>[requestedOutcomeIds.first];
+      final topic = created.copyWith(
+        moduleId: moduleId,
+        materialId: materialId,
+        parentTopicId: payload.parentTopicId ?? created.parentTopicId,
+        learningOutcomeIds: normalizedOutcomeIds,
+        linkedOutcomeId: normalizedOutcomeIds.isEmpty ? null : normalizedOutcomeIds.first.toString(),
+        linkedOutcomeIds: normalizedOutcomeIds.map((id) => id.toString()).toList(),
+      );
       final existing = List<TopicItem>.from(state.topics[moduleId] ?? []);
       existing.add(topic);
       existing.sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
       final newTopics = Map<int, List<TopicItem>>.from(state.topics)
         ..[moduleId] = existing;
-      state = state.copyWith(topics: newTopics);
+      state = state.copyWith(
+        topics: newTopics,
+        topicsLoadedMaterialIds: <int>{...state.topicsLoadedMaterialIds, materialId},
+      );
       return topic;
     } catch (e) {
       final failure = mapApiFailure(e);
