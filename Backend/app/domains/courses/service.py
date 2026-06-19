@@ -1972,22 +1972,35 @@ def course_search(*, q: str, limit: int, offset: int, db: Session, current_user:
         result_rows = db.execute(
             text("""
                 SELECT
-                    id,
-                    title,
-                    description,
-                    category,
-                    tags,
-                    cover_image_key,
-                    banner_image_key,
-                    enrollment_count,
-                    average_rating,
-                    requires_enrollment_approval,
-                    ts_rank(search_vector, plainto_tsquery('english', :query)) AS rank
-                FROM courses
-                WHERE status                = 'published'
-                  AND visibility_level      = 'public'
-                  AND is_open_for_enrollment = TRUE
-                  AND search_vector         @@ plainto_tsquery('english', :query)
+                    c.id,
+                    c.title,
+                    c.description,
+                    c.course_code,
+                    c.category,
+                    c.tags,
+                    c.cover_image_key,
+                    c.banner_image_key,
+                    c.course_type::text AS course_type,
+                    c.organization_id,
+                    c.visibility_level::text AS visibility_level,
+                    c.is_open_for_enrollment,
+                    c.status::text AS status,
+                    c.created_by,
+                    c.created_at,
+                    c.updated_at,
+                    c.enrollment_count,
+                    c.average_rating,
+                    c.total_ratings,
+                    c.requires_enrollment_approval,
+                    u.full_name AS instructor_name,
+                    u.avatar_key AS instructor_avatar_key,
+                    ts_rank(c.search_vector, plainto_tsquery('english', :query)) AS rank
+                FROM courses c
+                LEFT JOIN users u ON u.id = c.created_by
+                WHERE c.status                = 'published'
+                  AND c.visibility_level      = 'public'
+                  AND c.is_open_for_enrollment = TRUE
+                  AND c.search_vector         @@ plainto_tsquery('english', :query)
                 ORDER BY rank DESC
                 LIMIT  :limit
                 OFFSET :offset
@@ -1999,7 +2012,31 @@ def course_search(*, q: str, limit: int, offset: int, db: Session, current_user:
             },
         ).mappings().all()
 
-        results = [dict(row) for row in result_rows]
+        bucket = settings.supabase_public_bucket
+        results = []
+        for row in result_rows:
+            item = dict(row)
+            cover_key = item.get("cover_image_key")
+            banner_key = item.get("banner_image_key")
+            instructor_avatar_key = item.get("instructor_avatar_key")
+
+            item["cover_url"] = (
+                supabase.storage.from_(bucket).get_public_url(cover_key)
+                if cover_key
+                else None
+            )
+            item["banner_url"] = (
+                supabase.storage.from_(bucket).get_public_url(banner_key)
+                if banner_key
+                else None
+            )
+            item["instructor_avatar_url"] = (
+                supabase.storage.from_(bucket).get_public_url(instructor_avatar_key)
+                if instructor_avatar_key
+                else None
+            )
+            item.pop("instructor_avatar_key", None)
+            results.append(item)
 
         return {
             "total":   total,

@@ -1,9 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
+import json
 from typing import Any, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class ExamCreateRequest(BaseModel):
@@ -568,10 +569,61 @@ class StudentAttemptExamResponse(BaseModel):
 
 class StudentSubmitAnswerRequest(BaseModel):
     exam_question_id: int
-    selected_option_index: Optional[str] = None
-    selected_option_indices: Optional[List[str]] = None
+    selected_option_index: Optional[Union[int, str]] = None
+    selected_option_indices: Optional[List[Union[int, str]]] = None
     answer_text: Optional[str] = None
     time_taken_seconds: Optional[int] = None
+
+    @field_validator("selected_option_index", mode="before")
+    @classmethod
+    def _normalize_selected_option_index(cls, value: Any) -> Optional[Union[int, str]]:
+        if value is None:
+            return None
+        if isinstance(value, bool):
+            return str(value).lower()
+        if isinstance(value, int):
+            return value
+        normalized = str(value).strip()
+        if not normalized:
+            return None
+        return int(normalized) if normalized.isdigit() else normalized
+
+    @field_validator("selected_option_indices", mode="before")
+    @classmethod
+    def _normalize_selected_option_indices(cls, value: Any) -> Optional[List[Union[int, str]]]:
+        if value is None:
+            return None
+
+        if isinstance(value, str):
+            raw_value = value.strip()
+            if not raw_value:
+                return None
+            try:
+                decoded = json.loads(raw_value)
+            except Exception:
+                decoded = [raw_value]
+        else:
+            decoded = value
+
+        def _clean(item: Any) -> Optional[Union[int, str]]:
+            if item is None:
+                return None
+            if isinstance(item, bool):
+                return str(item).lower()
+            if isinstance(item, int):
+                return item
+            text = str(item).strip()
+            if not text:
+                return None
+            return int(text) if text.isdigit() else text
+
+        if isinstance(decoded, (list, tuple, set)):
+            normalized = [_clean(item) for item in decoded]
+            normalized = [item for item in normalized if item is not None]
+            return normalized or None
+
+        normalized = _clean(decoded)
+        return [normalized] if normalized is not None else None
 
     model_config = ConfigDict(extra="forbid")
 

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.enums import AIChatMessageType, AIChatContextType
+from .normalization import normalize_sources
 
 
 class SessionCreateRequest(BaseModel):
@@ -45,7 +46,10 @@ class SourceItem(BaseModel):
     title: str
     page: Optional[int] = None
 
-    model_config = ConfigDict(extra="forbid")
+    # AI callbacks can include extra metadata such as url, score, chunk_id, etc.
+    # The frontend only needs title/page, so ignore the rest instead of turning
+    # an otherwise valid assistant answer into a 500 response validation error.
+    model_config = ConfigDict(extra="ignore")
 
 
 class MessageResponse(BaseModel):
@@ -53,10 +57,15 @@ class MessageResponse(BaseModel):
     session_id: int
     message_type: AIChatMessageType
     content: str
-    sources: Optional[List[SourceItem]]
+    sources: List[SourceItem] = Field(default_factory=list)
     created_at: datetime
 
     model_config = ConfigDict(extra="forbid")
+
+    @field_validator("sources", mode="before")
+    @classmethod
+    def _coerce_sources(cls, value: Any) -> list[dict[str, Any]]:
+        return normalize_sources(value)
 
 
 class SessionWithMessagesResponse(BaseModel):

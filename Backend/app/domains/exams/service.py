@@ -38,6 +38,172 @@ logger = logging.getLogger(__name__)
 ALLOWED_EXAM_TYPES = {"quiz", "midterm", "final", "practice"}
 
 
+
+def _normalize_exam_answer_value(value):
+    if value is None:
+        return None
+
+    if isinstance(value, bool):
+        return "true" if value else "false"
+
+    if isinstance(value, (int, float)):
+        return str(value).strip()
+
+    if isinstance(value, (list, tuple, set)):
+        for item in value:
+            normalized_item = _normalize_exam_answer_value(item)
+            if normalized_item:
+                return normalized_item
+        return None
+
+    if isinstance(value, dict):
+        for key in (
+            "option_id",
+            "optionId",
+            "id",
+            "value",
+            "answer",
+            "correct_answer",
+            "correctAnswer",
+            "selected_option_index",
+            "selectedOptionIndex",
+        ):
+            if key in value:
+                normalized_item = _normalize_exam_answer_value(value.get(key))
+                if normalized_item:
+                    return normalized_item
+        for item in value.values():
+            normalized_item = _normalize_exam_answer_value(item)
+            if normalized_item:
+                return normalized_item
+        return None
+
+    if isinstance(value, str):
+        text_value = value.strip()
+        if not text_value:
+            return None
+        try:
+            decoded = _json.loads(text_value)
+            if decoded is not value:
+                normalized_decoded = _normalize_exam_answer_value(decoded)
+                if normalized_decoded:
+                    return normalized_decoded
+        except Exception:
+            pass
+        return text_value.strip('"').strip() or None
+
+    normalized = str(value).strip()
+    return normalized or None
+
+
+def _normalize_exam_answer_list(value):
+    if value is None:
+        return []
+
+    decoded = value
+    if isinstance(value, str):
+        text_value = value.strip()
+        if not text_value:
+            return []
+        try:
+            decoded = _json.loads(text_value)
+        except Exception:
+            decoded = [text_value]
+
+    if isinstance(decoded, dict):
+        for key in ("answers", "answer", "correct_answers", "correctAnswer", "values", "items"):
+            if key in decoded:
+                return _normalize_exam_answer_list(decoded.get(key))
+        decoded = list(decoded.values())
+
+    if isinstance(decoded, (list, tuple, set)):
+        normalized = []
+        for item in decoded:
+            item_value = _normalize_exam_answer_value(item)
+            if item_value:
+                normalized.append(item_value)
+        return normalized
+
+    item_value = _normalize_exam_answer_value(decoded)
+    return [item_value] if item_value else []
+
+
+def _selected_option_index_for_db(value):
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    text_value = str(value).strip()
+    if not text_value:
+        return None
+    return int(text_value) if text_value.isdigit() else None
+
+
+def _selected_option_indices_for_db(value):
+    values = _normalize_exam_answer_list(value)
+    if not values:
+        return None
+    normalized = []
+    for item in values:
+        item_text = str(item).strip()
+        normalized.append(int(item_text) if item_text.isdigit() else item_text)
+    return _json.dumps(normalized)
+
+
+def _answer_text_for_db(answer):
+    answer_text = (answer.answer_text or "").strip() if getattr(answer, "answer_text", None) is not None else ""
+    if answer_text:
+        return answer_text
+
+    # Backward compatibility: a previous frontend patch sent option ids (A/B/C/D)
+    # inside selected_option_index. The DB column is integer, so preserve that id
+    # in answer_text and store NULL in selected_option_index.
+    selected = getattr(answer, "selected_option_index", None)
+    if selected is not None and _selected_option_index_for_db(selected) is None:
+        selected_text = str(selected).strip()
+        if selected_text:
+            return selected_text
+
+    selected_many = getattr(answer, "selected_option_indices", None)
+    if selected_many:
+        non_numeric = [str(item).strip() for item in selected_many if str(item).strip() and not str(item).strip().isdigit()]
+        if non_numeric:
+            return _json.dumps(non_numeric)
+
+    return None
+
+
+def _single_option_is_correct(student_answer: dict, expected_answer) -> bool:
+    expected = _normalize_exam_answer_value(expected_answer)
+    if not expected:
+        return False
+
+    candidates = [
+        _normalize_exam_answer_value(student_answer.get("selected_option_index")),
+        _normalize_exam_answer_value(student_answer.get("answer_text")),
+    ]
+
+    expected_key = expected.casefold()
+    return any(candidate and candidate.casefold() == expected_key for candidate in candidates)
+
+
+def _multi_option_is_correct(student_answer: dict, expected_answer) -> bool:
+    expected_values = _normalize_exam_answer_list(expected_answer)
+    if not expected_values:
+        return False
+
+    selected_values = _normalize_exam_answer_list(student_answer.get("selected_option_indices"))
+    answer_text_values = _normalize_exam_answer_list(student_answer.get("answer_text"))
+    if answer_text_values:
+        # New Flutter sends the real option ids (A/B/C/D) in answer_text, while
+        # old attempts may still have numeric UI indices in selected_option_indices.
+        selected_values = answer_text_values
+
+    return sorted(value.casefold() for value in selected_values) == sorted(
+        value.casefold() for value in expected_values
+    )
+
+
 def create_exam(*, course_id: int, payload: ExamCreateRequest, db: Session, current_user: dict,):
     # =========================
     # 1) Authorization
@@ -5251,7 +5417,7 @@ def submit_answer(*, course_id: int, exam_id: int, attempt_id: int, payload: Stu
                 )
                 VALUES (
                     :attempt_id, :exam_question_id,
-                    :selected_option_index, :selected_option_indices,
+                    :selected_option_index, CAST(:selected_option_indices AS JSON),
                     :answer_text, :time_taken_seconds,
                     FALSE, NOW(), NOW()
                 )
@@ -5266,9 +5432,9 @@ def submit_answer(*, course_id: int, exam_id: int, attempt_id: int, payload: Stu
             {
                 "attempt_id": attempt_id,
                 "exam_question_id": payload.exam_question_id,
-                "selected_option_index": payload.selected_option_index,
-                "selected_option_indices": _json.dumps(payload.selected_option_indices) if payload.selected_option_indices else None,
-                "answer_text": payload.answer_text,
+                "selected_option_index": _selected_option_index_for_db(payload.selected_option_index),
+                "selected_option_indices": _selected_option_indices_for_db(payload.selected_option_indices),
+                "answer_text": _answer_text_for_db(payload),
                 "time_taken_seconds": payload.time_taken_seconds,
             },
         )
@@ -5393,7 +5559,7 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                         )
                         VALUES (
                             :attempt_id, :exam_question_id,
-                            :selected_option_index, :selected_option_indices,
+                            :selected_option_index, CAST(:selected_option_indices AS JSON),
                             :answer_text, :time_taken_seconds,
                             FALSE, NOW(), NOW()
                         )
@@ -5408,9 +5574,9 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                     {
                         "attempt_id": attempt_id,
                         "exam_question_id": answer.exam_question_id,
-                        "selected_option_index": answer.selected_option_index,
-                        "selected_option_indices": _json.dumps(answer.selected_option_indices) if answer.selected_option_indices else None,
-                        "answer_text": answer.answer_text,
+                        "selected_option_index": _selected_option_index_for_db(answer.selected_option_index),
+                        "selected_option_indices": _selected_option_indices_for_db(answer.selected_option_indices),
+                        "answer_text": _answer_text_for_db(answer),
                         "time_taken_seconds": answer.time_taken_seconds,
                     },
                 )
@@ -5491,18 +5657,10 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
             is_correct = False
 
             if q_type in {"multiple_choice", "true_false"}:
-                student_option = student_answer.get("selected_option_index")
-                if student_option is not None and expected is not None:
-                    is_correct = str(student_option) == str(expected).strip('"')
+                is_correct = _single_option_is_correct(student_answer, expected)
 
             elif q_type == "multi_select":
-                student_indices = student_answer.get("selected_option_indices")
-                if student_indices is not None and expected is not None:
-                    if isinstance(student_indices, str):
-                        student_indices = _json.loads(student_indices)
-                    if isinstance(expected, str):
-                        expected = _json.loads(expected)
-                    is_correct = sorted(str(x) for x in student_indices) == sorted(str(x) for x in expected)
+                is_correct = _multi_option_is_correct(student_answer, expected)
 
             points_earned = points if is_correct else 0.0
             total_score += points_earned
@@ -5575,93 +5733,105 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
             },
         )
 
-        # =========================
-        # 9) Update student_question_progress
-        # =========================
-        for eq in exam_question_rows:
-            qid = int(eq["exam_question_id"])
-            q_type = eq["type"]
-            student_answer = answers_by_question.get(qid)
-
-            if not student_answer:
-                continue
-
-            if q_type not in auto_gradable_types:
-                continue
-
-            answer_record = db.execute(
-                text("""
-                    SELECT is_correct, time_taken_seconds
-                    FROM student_answers
-                    WHERE attempt_id = :attempt_id
-                      AND exam_question_id = :exam_question_id
-                    LIMIT 1
-                """),
-                {"attempt_id": attempt_id, "exam_question_id": qid},
-            ).mappings().first()
-
-            if not answer_record:
-                continue
-
-            is_correct = bool(answer_record["is_correct"])
-            time_taken = answer_record["time_taken_seconds"] or 0
-
-            question_id_row = db.execute(
-                text("""
-                    SELECT question_id
-                    FROM exam_questions
-                    WHERE id = :exam_question_id
-                    LIMIT 1
-                """),
-                {"exam_question_id": qid},
-            ).mappings().first()
-
-            if not question_id_row:
-                continue
-
-            real_question_id = int(question_id_row["question_id"])
-
-            db.execute(
-                text("""
-                    INSERT INTO student_question_progress (
-                        student_id, question_id,
-                        times_attempted, times_correct, times_wrong,
-                        average_time_seconds, mastery_level,
-                        last_attempted_at, last_correct_at
-                    )
-                    VALUES (
-                        :student_id, :question_id,
-                        1,
-                        :times_correct,
-                        :times_wrong,
-                        :average_time_seconds,
-                        'beginner',
-                        NOW(),
-                        :last_correct_at
-                    )
-                    ON CONFLICT (student_id, question_id)
-                    DO UPDATE SET
-                        times_attempted      = student_question_progress.times_attempted + 1,
-                        times_correct        = student_question_progress.times_correct + :times_correct,
-                        times_wrong          = student_question_progress.times_wrong + :times_wrong,
-                        average_time_seconds = (
-                            (student_question_progress.average_time_seconds * student_question_progress.times_attempted) + :average_time_seconds
-                        ) / (student_question_progress.times_attempted + 1),
-                        last_attempted_at    = NOW(),
-                        last_correct_at      = CASE WHEN :is_correct THEN NOW() ELSE student_question_progress.last_correct_at END
-                """),
-                {
-                    "student_id": student_id,
-                    "question_id": real_question_id,
-                    "times_correct": 1 if is_correct else 0,
-                    "times_wrong": 0 if is_correct else 1,
-                    "average_time_seconds": float(time_taken),
-                    "last_correct_at": datetime.now(timezone.utc) if is_correct else None,
-                    "is_correct": is_correct,
-                },
-            )
-
+        # Commit the actual submission before best-effort analytics. A progress
+        # tracking failure must never make the student's final submit fail.
         db.commit()
+
+        # =========================
+        # 9) Update student_question_progress (best effort)
+        # =========================
+        try:
+            for eq in exam_question_rows:
+                qid = int(eq["exam_question_id"])
+                q_type = eq["type"]
+                student_answer = answers_by_question.get(qid)
+
+                if not student_answer:
+                    continue
+
+                if q_type not in auto_gradable_types:
+                    continue
+
+                answer_record = db.execute(
+                    text("""
+                        SELECT is_correct, time_taken_seconds
+                        FROM student_answers
+                        WHERE attempt_id = :attempt_id
+                          AND exam_question_id = :exam_question_id
+                        LIMIT 1
+                    """),
+                    {"attempt_id": attempt_id, "exam_question_id": qid},
+                ).mappings().first()
+
+                if not answer_record:
+                    continue
+
+                is_correct = bool(answer_record["is_correct"])
+                time_taken = answer_record["time_taken_seconds"] or 0
+
+                question_id_row = db.execute(
+                    text("""
+                        SELECT question_id
+                        FROM exam_questions
+                        WHERE id = :exam_question_id
+                        LIMIT 1
+                    """),
+                    {"exam_question_id": qid},
+                ).mappings().first()
+
+                if not question_id_row:
+                    continue
+
+                real_question_id = int(question_id_row["question_id"])
+
+                db.execute(
+                    text("""
+                        INSERT INTO student_question_progress (
+                            student_id, question_id,
+                            times_attempted, times_correct, times_wrong,
+                            average_time_seconds, mastery_level,
+                            last_attempted_at, last_correct_at
+                        )
+                        VALUES (
+                            :student_id, :question_id,
+                            1,
+                            :times_correct,
+                            :times_wrong,
+                            :average_time_seconds,
+                            'beginner',
+                            NOW(),
+                            :last_correct_at
+                        )
+                        ON CONFLICT (student_id, question_id)
+                        DO UPDATE SET
+                            times_attempted      = student_question_progress.times_attempted + 1,
+                            times_correct        = student_question_progress.times_correct + :times_correct,
+                            times_wrong          = student_question_progress.times_wrong + :times_wrong,
+                            average_time_seconds = (
+                                (COALESCE(student_question_progress.average_time_seconds, 0) * student_question_progress.times_attempted) + :average_time_seconds
+                            ) / (student_question_progress.times_attempted + 1),
+                            last_attempted_at    = NOW(),
+                            last_correct_at      = CASE WHEN :is_correct THEN NOW() ELSE student_question_progress.last_correct_at END
+                    """),
+                    {
+                        "student_id": student_id,
+                        "question_id": real_question_id,
+                        "times_correct": 1 if is_correct else 0,
+                        "times_wrong": 0 if is_correct else 1,
+                        "average_time_seconds": float(time_taken),
+                        "last_correct_at": datetime.now(timezone.utc) if is_correct else None,
+                        "is_correct": is_correct,
+                    },
+                )
+
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
+            logger.warning(
+                "Failed to update student question progress for attempt %s",
+                attempt_id,
+                exc_info=True,
+            )
 
         # =========================
         # 10) Send AI grading request (if needed)

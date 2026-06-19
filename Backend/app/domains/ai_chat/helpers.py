@@ -5,8 +5,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from .normalization import normalize_message_row, sources_json
 
-def save_rag_chat_response(*, db: Session, session_id: int, user_message_id: int, content: str, sources: list | None,) -> dict:
+
+def save_rag_chat_response(*, db: Session, session_id: int, user_message_id: int, content: str, sources: list | dict | str | None,) -> dict:
     try:
         # =========================
         # 1) Insert assistant message
@@ -42,7 +44,7 @@ def save_rag_chat_response(*, db: Session, session_id: int, user_message_id: int
             {
                 "session_id": session_id,
                 "content": content,
-                "sources": sources,
+                "sources": sources_json(sources),
                 "user_message_id": user_message_id,
             },
         ).mappings().first()
@@ -77,7 +79,7 @@ def save_rag_chat_response(*, db: Session, session_id: int, user_message_id: int
             {"session_id": session_id},
         )
 
-        return dict(assistant_row)
+        return normalize_message_row(assistant_row)
 
     except HTTPException:
         raise
