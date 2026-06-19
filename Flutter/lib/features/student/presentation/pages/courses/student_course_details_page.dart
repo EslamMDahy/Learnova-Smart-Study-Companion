@@ -9,11 +9,14 @@ import '../../../../../core/routing/routes.dart';
 import '../../../../../core/storage/student_exam_results_cache.dart';
 import '../../../../../core/storage/user_storage.dart';
 import '../../../../../core/ui/pdf_preview_view.dart';
+import '../../../../../core/ui/toast.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../data/student_course_assistant_models.dart';
 import '../../../data/student_course_assistant_providers.dart';
 import '../../../data/student_courses_models.dart';
+import '../../../../auth/data/auth_providers.dart';
 import '../../../../../core/ui/chat/rich_message_renderer.dart';
+import '../../../../../shared/widgets/top_header.dart';
 import '../../../data/student_courses_providers.dart';
 
 class StudentCourseDetailsPage extends ConsumerStatefulWidget {
@@ -57,6 +60,21 @@ class _StudentCourseDetailsPageState
     return int.tryParse(raw ?? '');
   }
 
+  Future<void> _logout() async {
+    try {
+      await ref.read(authRepositoryProvider).logout();
+      if (!mounted) return;
+      context.go(Routes.login);
+    } catch (e) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        title: 'Logout failed',
+        message: e.toString(),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final courseId = _courseIdFromRoute(context);
@@ -98,6 +116,8 @@ class _StudentCourseDetailsPageState
           onBackToDashboard: () => context.go(Routes.studentDashboard),
           onBackToCourses: () => context.go(Routes.studentCourses),
           onNotificationsTap: () => context.go(Routes.studentNotifications),
+          onSettings: () => context.go(Routes.studentSettings),
+          onLogout: _logout,
           onRefresh: () => ref.invalidate(studentCourseContentProvider(courseId)),
           onSelectModule: (module) {
             setState(() {
@@ -155,6 +175,8 @@ class _CourseLearningWorkspace extends StatelessWidget {
   final VoidCallback onBackToDashboard;
   final VoidCallback onBackToCourses;
   final VoidCallback onNotificationsTap;
+  final VoidCallback onSettings;
+  final Future<void> Function() onLogout;
   final VoidCallback onRefresh;
   final ValueChanged<StudentCourseModule> onSelectModule;
   final void Function(StudentCourseModule module, StudentCourseMaterial material)
@@ -180,6 +202,8 @@ class _CourseLearningWorkspace extends StatelessWidget {
     required this.onBackToDashboard,
     required this.onBackToCourses,
     required this.onNotificationsTap,
+    required this.onSettings,
+    required this.onLogout,
     required this.onRefresh,
     required this.onSelectModule,
     required this.onSelectMaterial,
@@ -243,6 +267,8 @@ class _CourseLearningWorkspace extends StatelessWidget {
                     _CourseWorkspaceHeader(
                       searchController: searchController,
                       onNotificationsTap: onNotificationsTap,
+                      onSettings: onSettings,
+                      onLogout: onLogout,
                     ),
                     Expanded(
                       child: Row(
@@ -751,160 +777,32 @@ class _WorkspaceBrandHeader extends StatelessWidget {
 class _CourseWorkspaceHeader extends StatelessWidget {
   final TextEditingController searchController;
   final VoidCallback onNotificationsTap;
+  final VoidCallback onSettings;
+  final Future<void> Function() onLogout;
 
   const _CourseWorkspaceHeader({
     required this.searchController,
     required this.onNotificationsTap,
+    required this.onSettings,
+    required this.onLogout,
   });
 
   @override
   Widget build(BuildContext context) {
-    final userName = _displayName();
-    final userSubtitle = _displaySubtitle();
-    final avatarUrl = UserStorage.avatarUrl;
-
-    return Container(
-      height: 60,
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(
-        children: [
-          SizedBox(
-            width: 250,
-            height: 34,
-            child: TextField(
-              controller: searchController,
-              style: TextStyle(
-                color: AppColors.textTitle,
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
-              ),
-              decoration: InputDecoration(
-                hintText: 'Search topics, questions, or student',
-                hintStyle: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                ),
-                prefixIcon: Icon(
-                  Icons.search_rounded,
-                  color: AppColors.textMuted,
-                  size: 20,
-                ),
-                filled: true,
-                fillColor: AppColors.headerBg,
-                contentPadding: EdgeInsets.zero,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(8),
-                  borderSide: BorderSide.none,
-                ),
-              ),
-            ),
-          ),
-          const Spacer(),
-          IconButton(
-            tooltip: 'Notifications',
-            onPressed: onNotificationsTap,
-            icon: Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(
-                  Icons.notifications_none_rounded,
-                  color: AppColors.textMuted,
-                  size: 22,
-                ),
-                Positioned(
-                  top: 1,
-                  right: 2,
-                  child: Container(
-                    width: 6,
-                    height: 6,
-                    decoration: BoxDecoration(
-                      color: AppColors.errorDot,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.cardBg, width: 1),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 14),
-          Container(width: 1, height: 26, color: AppColors.border),
-          const SizedBox(width: 18),
-          _HeaderAvatar(avatarUrl: avatarUrl, name: userName),
-          const SizedBox(width: 10),
-          Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                userName,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.textTitle,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Text(
-                userSubtitle,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.textMuted,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(width: 14),
-          Icon(
-            Icons.keyboard_arrow_down_rounded,
-            color: AppColors.textMuted,
-            size: 18,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderAvatar extends StatelessWidget {
-  final String? avatarUrl;
-  final String name;
-
-  const _HeaderAvatar({required this.avatarUrl, required this.name});
-
-  @override
-  Widget build(BuildContext context) {
-    final url = (avatarUrl ?? '').trim();
-
-    if (url.isNotEmpty) {
-      return CircleAvatar(
-        radius: 16,
-        backgroundColor: AppColors.infoBg,
-        backgroundImage: NetworkImage(url),
-      );
-    }
-
-    return CircleAvatar(
-      radius: 16,
-      backgroundColor: AppColors.infoBg,
-      child: Text(
-        _initials(name),
-        style: const TextStyle(
-          color: AppColors.primary,
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
+    return ValueListenableBuilder<int>(
+      valueListenable: UserStorage.listenable as ValueNotifier<int>,
+      builder: (context, _, __) {
+        return TopHeaderWidget(
+          searchController: searchController,
+          searchHint: 'Search topics, questions, or student',
+          userName: _displayName(),
+          userSubtitle: _displaySubtitle(),
+          avatarUrl: UserStorage.avatarUrl,
+          onNotificationsTap: onNotificationsTap,
+          onSettings: onSettings,
+          onLogout: () async => onLogout(),
+        );
+      },
     );
   }
 }
@@ -5895,14 +5793,3 @@ String _displaySubtitle() {
   return 'Student Portal';
 }
 
-String _initials(String name) {
-  final parts = name
-      .trim()
-      .split(RegExp(r'\s+'))
-      .where((part) => part.isNotEmpty)
-      .toList(growable: false);
-  if (parts.isEmpty) return 'S';
-  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-  return '${parts.first.substring(0, 1)}${parts.last.substring(0, 1)}'
-      .toUpperCase();
-}
