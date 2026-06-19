@@ -34,6 +34,14 @@ class Endpoints {
       '$_courses/$courseId/cover/initiate';
   static String courseCoverConfirm(int courseId) =>
       '$_courses/$courseId/cover/confirm';
+  static String updateCourse(int courseId) =>
+      '$_courses/$courseId';
+  static String publishCourse(int courseId) =>
+      '$_courses/$courseId/publish';
+  static String courseEnrollmentRequests(int courseId) =>
+      '$_courses/$courseId/enrollment-requests';
+  static String updateCourseEnrollmentRequest(int courseId, int enrollmentId) =>
+      '$_courses/$courseId/enrollment-requests/$enrollmentId';
   // The uploaded FastAPI router currently also exposes these doubled paths
   // because its router prefix is /courses and the route path starts with /courses.
   static String courseCoverInitiateLegacy(int courseId) =>
@@ -78,7 +86,7 @@ class Endpoints {
   static String deleteMaterial(int courseId, int moduleId, int materialId) =>
       '$_courses/$courseId/modules/$moduleId/materials/$materialId';
   static String reassignMaterial(int materialId) =>
-      '/materials/$materialId/reassign';
+      '/$materialId/reassign';
 
   // ─── TOPICS ──────────────────────────────────────────────────────────────
   static String materialTopics(int courseId, int moduleId, int materialId) =>
@@ -112,12 +120,14 @@ class Endpoints {
       '$_courses/$courseId/questions/$questionId/update';
   static String batchCreateQuestions(int courseId, int moduleId, int materialId) =>
       '$_courses/$courseId/modules/$moduleId/materials/$materialId/questions';
+  static String moduleQuestions(int courseId, int moduleId) =>
+      '$_courses/$courseId/modules/$moduleId/questions';
+  static String materialQuestions(int courseId, int moduleId, int materialId) =>
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId/questions';
   static String topicQuestions(int courseId, int moduleId, int materialId, int topicId) =>
       '$_courses/$courseId/modules/$moduleId/materials/$materialId/topics/$topicId/questions';
   static String aiGenerateQuestions(int courseId) =>
       '$_courses/$courseId/questions/ai-generate';
-  static String aiGenerateQuestionsStatus(int courseId, String requestId) =>
-      '$_courses/$courseId/questions/ai-generate/$requestId/status';
 
   // ─── EXAMS ───────────────────────────────────────────────────────────────
   static String courseExams(int courseId) =>

@@ -8,6 +8,7 @@ import '../../../../../features/auth/data/auth_providers.dart';
 import '../../../../../shared/widgets/components/dropdowns.dart';
 import '../../../../../shared/widgets/components/inputs.dart';
 import '../../../data/courses_models.dart';
+import '../../../data/courses_providers.dart';
 import '../invite_students_dialog.dart';
 
 class CourseStudentsTab extends ConsumerStatefulWidget {
@@ -23,6 +24,8 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
   final TextEditingController _searchController = TextEditingController();
 
   List<_InviteRow> _invites = <_InviteRow>[];
+  List<_EnrollmentRequestRow> _requests = <_EnrollmentRequestRow>[];
+  final Set<int> _updatingRequestIds = <int>{};
   bool _loading = true;
   String? _error;
   String _search = '';
@@ -60,16 +63,6 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
   }
 
   Future<void> _load() async {
-    if (!widget.course.isPrivate) {
-      if (!mounted) return;
-      setState(() {
-        _loading = false;
-        _error = null;
-        _invites = <_InviteRow>[];
-      });
-      return;
-    }
-
     setState(() {
       _loading = true;
       _error = null;
@@ -77,19 +70,41 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
 
     try {
       final client = ref.read(apiClientProvider);
-      final res = await client.get<Map<String, dynamic>>(
-        Endpoints.courseInvitationsList(widget.course.id.toString()),
-      );
-      final data = res.data;
-      final items = (data?['items'] as List?) ?? const <Object?>[];
+      final coursesRepository = ref.read(coursesRepositoryProvider);
+      var invites = <_InviteRow>[];
+      var requests = <_EnrollmentRequestRow>[];
 
-      if (!mounted) return;
-      setState(() {
-        _invites = items
+      if (widget.course.isPrivate) {
+        final res = await client.get<Map<String, dynamic>>(
+          Endpoints.courseInvitationsList(widget.course.id.toString()),
+        );
+        final data = res.data;
+        final items = (data?['items'] as List?) ?? const <Object?>[];
+        invites = items
             .whereType<Map>()
             .map((e) => _InviteRow.fromJson(Map<String, dynamic>.from(e)))
             .toList()
           ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      }
+
+      try {
+        final response = await coursesRepository.listEnrollmentRequests(
+          courseId: widget.course.id,
+        );
+        requests = response.requests
+            .map((item) => _EnrollmentRequestRow.fromModel(item))
+            .toList()
+          ..sort((a, b) => a.enrolledAt.compareTo(b.enrolledAt));
+      } catch (_) {
+        // Enrollment requests are a separate workflow. Keep invitations usable
+        // even if there are no self-enrollment requests or the backend denies it.
+        requests = <_EnrollmentRequestRow>[];
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _invites = invites;
+        _requests = requests;
         _loading = false;
       });
     } catch (e) {
@@ -104,8 +119,37 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
       setState(() {
         _loading = false;
         _invites = <_InviteRow>[];
+        _requests = <_EnrollmentRequestRow>[];
         _error = isEmptyOk ? null : msg;
       });
+    }
+  }
+
+  Future<void> _updateEnrollmentRequest(_EnrollmentRequestRow request, String status) async {
+    if (_updatingRequestIds.contains(request.enrollmentId)) return;
+
+    setState(() => _updatingRequestIds.add(request.enrollmentId));
+    try {
+      await ref.read(coursesRepositoryProvider).updateEnrollmentRequest(
+            courseId: widget.course.id,
+            enrollmentId: request.enrollmentId,
+            status: status,
+          );
+      if (!mounted) return;
+      setState(() {
+        _requests = _requests
+            .where((item) => item.enrollmentId != request.enrollmentId)
+            .toList(growable: false);
+      });
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(mapApiFailure(e).message)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _updatingRequestIds.remove(request.enrollmentId));
+      }
     }
   }
 
@@ -150,7 +194,7 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (!widget.course.isPrivate) {
+    if (!widget.course.isPrivate && !_loading && _requests.isEmpty) {
       return _PublicCourseMessage(course: widget.course);
     }
 
@@ -163,13 +207,22 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
         children: [
           _StudentsHeader(
             course: widget.course,
-            total: _invites.length,
+            total: _invites.length + _requests.length,
             accepted: _acceptedCount,
-            pending: _pendingCount,
+            pending: _pendingCount + _requests.length,
             onInvite: _openInviteDialog,
             onRefresh: _loading ? null : _load,
           ),
           const SizedBox(height: 16),
+          if (_requests.isNotEmpty) ...[
+            _EnrollmentRequestsPanel(
+              requests: _requests,
+              updatingRequestIds: _updatingRequestIds,
+              onApprove: (request) => _updateEnrollmentRequest(request, 'approved'),
+              onDecline: (request) => _updateEnrollmentRequest(request, 'declined'),
+            ),
+            const SizedBox(height: 16),
+          ],
           Expanded(
             child: _WorkspacePanel(
               searchController: _searchController,
@@ -934,10 +987,10 @@ class _PublicCourseMessage extends StatelessWidget {
           children: [
             const Icon(Icons.public_rounded, color: AppColors.primary, size: 34),
             const SizedBox(height: 14),
-            Text('Students tab is private-course only', style: AppTextStyles.sectionTitle),
+            Text('No pending enrollment requests', style: AppTextStyles.sectionTitle),
             const SizedBox(height: 8),
             Text(
-              '${course.safeTitle} is public. Students can join without invitation management.',
+              '${course.safeTitle} has no pending enrollment requests right now.',
               style: AppTextStyles.muted.copyWith(height: 1.45),
               textAlign: TextAlign.center,
             ),
@@ -946,6 +999,151 @@ class _PublicCourseMessage extends StatelessWidget {
       ),
     );
   }
+}
+
+
+class _EnrollmentRequestsPanel extends StatelessWidget {
+  final List<_EnrollmentRequestRow> requests;
+  final Set<int> updatingRequestIds;
+  final ValueChanged<_EnrollmentRequestRow> onApprove;
+  final ValueChanged<_EnrollmentRequestRow> onDecline;
+
+  const _EnrollmentRequestsPanel({
+    required this.requests,
+    required this.updatingRequestIds,
+    required this.onApprove,
+    required this.onDecline,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+            child: Row(
+              children: [
+                const Icon(Icons.how_to_reg_rounded, color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Pending enrollment requests',
+                    style: AppTextStyles.sectionTitle.copyWith(fontSize: 15),
+                  ),
+                ),
+                Text(
+                  '${requests.length} pending',
+                  style: AppTextStyles.mutedSmall.copyWith(fontWeight: FontWeight.w800),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border),
+          ...requests.map((request) {
+            final busy = updatingRequestIds.contains(request.enrollmentId);
+            return Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+              child: Row(
+                children: [
+                  _Avatar(email: request.email, status: 'pending'),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          request.fullName.isEmpty ? request.email : request.fullName,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.label.copyWith(fontSize: 13.5),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${request.email} • requested ${_formatDate(request.enrolledAt)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: AppTextStyles.mutedSmall.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton(
+                    onPressed: busy ? null : () => onDecline(request),
+                    child: const Text('Decline'),
+                  ),
+                  const SizedBox(width: 8),
+                  FilledButton(
+                    onPressed: busy ? null : () => onApprove(request),
+                    child: busy
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('Approve'),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _EnrollmentRequestRow {
+  final int enrollmentId;
+  final int studentId;
+  final String fullName;
+  final String email;
+  final String status;
+  final DateTime enrolledAt;
+
+  const _EnrollmentRequestRow({
+    required this.enrollmentId,
+    required this.studentId,
+    required this.fullName,
+    required this.email,
+    required this.status,
+    required this.enrolledAt,
+  });
+
+  factory _EnrollmentRequestRow.fromModel(CourseEnrollmentRequestItem item) {
+    return _EnrollmentRequestRow(
+      enrollmentId: item.enrollmentId,
+      studentId: item.studentId,
+      fullName: item.fullName,
+      email: item.email,
+      status: item.status,
+      enrolledAt: item.enrolledAt,
+    );
+  }
+
+  factory _EnrollmentRequestRow.fromJson(Map<String, dynamic> json) {
+    return _EnrollmentRequestRow(
+      enrollmentId: _asIntValue(json['enrollment_id']),
+      studentId: _asIntValue(json['student_id']),
+      fullName: (json['full_name'] ?? '').toString().trim(),
+      email: (json['email'] ?? '').toString().trim(),
+      status: (json['status'] ?? 'pending').toString().trim().toLowerCase(),
+      enrolledAt: _parseDateValue(json['enrolled_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
+int _asIntValue(Object? value) {
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value?.toString() ?? '') ?? 0;
 }
 
 class _InviteRow {
@@ -983,6 +1181,12 @@ class _InviteRow {
     if (value == null) return null;
     return DateTime.tryParse(value.toString());
   }
+}
+
+
+DateTime? _parseDateValue(Object? value) {
+  if (value == null) return null;
+  return DateTime.tryParse(value.toString());
 }
 
 String _formatDate(DateTime date) {

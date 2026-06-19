@@ -223,6 +223,8 @@ class StudentCourseAssistantApi {
     final rawData = dataLines.join('\n').trim();
     if (rawData.isEmpty) return null;
 
+    if (rawData == '[DONE]') return null;
+
     final decoded = jsonDecode(rawData);
 
     if (eventName == 'message') {
@@ -239,7 +241,12 @@ class StudentCourseAssistantApi {
 
     if (eventName == 'timeout' || eventName == 'error') {
       if (decoded is Map) {
-        final detail = decoded['detail']?.toString().trim();
+        final detail = (decoded['detail'] ??
+                decoded['message'] ??
+                decoded['error'] ??
+                decoded['reason'])
+            ?.toString()
+            .trim();
         throw FormatException(
           detail == null || detail.isEmpty ? 'AI response failed' : detail,
         );

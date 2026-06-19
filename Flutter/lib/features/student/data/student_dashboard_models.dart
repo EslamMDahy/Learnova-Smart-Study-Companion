@@ -56,12 +56,108 @@ String? _firstNonEmptyString(List<dynamic> values) {
   return null;
 }
 
+String? _extractCoverUrl(Map<String, dynamic> json) {
+  final direct = _firstNonEmptyString([
+    json['cover_url'],
+    json['coverUrl'],
+    json['cover_image_url'],
+    json['coverImageUrl'],
+    json['image_url'],
+    json['imageUrl'],
+    json['thumbnail_url'],
+    json['thumbnailUrl'],
+    json['banner_url'],
+    json['bannerUrl'],
+  ]);
+  if (direct != null) return direct;
+
+  for (final key in const ['cover', 'cover_image', 'image', 'thumbnail', 'banner']) {
+    final nested = json[key];
+    if (nested is Map) {
+      final nestedUrl = _firstNonEmptyString([
+        nested['url'],
+        nested['public_url'],
+        nested['publicUrl'],
+        nested['cover_url'],
+        nested['image_url'],
+      ]);
+      if (nestedUrl != null) return nestedUrl;
+    }
+  }
+
+  return null;
+}
+
+String? _extractInstructorName(Map<String, dynamic> json) {
+  final direct = _firstNonEmptyString([
+    json['instructor_name'],
+    json['instructorName'],
+    json['teacher_name'],
+    json['teacherName'],
+    json['owner_name'],
+    json['ownerName'],
+    json['created_by_name'],
+    json['createdByName'],
+  ]);
+  if (direct != null) return direct;
+
+  for (final key in const ['instructor', 'teacher', 'owner', 'creator', 'created_by_user']) {
+    final nested = json[key];
+    if (nested is Map) {
+      final nestedName = _firstNonEmptyString([
+        nested['full_name'],
+        nested['fullName'],
+        nested['name'],
+        nested['display_name'],
+        nested['displayName'],
+        nested['email'],
+      ]);
+      if (nestedName != null) return nestedName;
+    }
+  }
+
+  return null;
+}
+
+String? _extractInstructorAvatarUrl(Map<String, dynamic> json) {
+  final direct = _firstNonEmptyString([
+    json['instructor_avatar_url'],
+    json['instructorAvatarUrl'],
+    json['teacher_avatar_url'],
+    json['teacherAvatarUrl'],
+    json['owner_avatar_url'],
+    json['ownerAvatarUrl'],
+    json['avatar_url'],
+    json['avatarUrl'],
+  ]);
+  if (direct != null) return direct;
+
+  for (final key in const ['instructor', 'teacher', 'owner', 'creator', 'created_by_user']) {
+    final nested = json[key];
+    if (nested is Map) {
+      final nestedUrl = _firstNonEmptyString([
+        nested['avatar_url'],
+        nested['avatarUrl'],
+        nested['photo_url'],
+        nested['photoUrl'],
+        nested['image_url'],
+        nested['imageUrl'],
+      ]);
+      if (nestedUrl != null) return nestedUrl;
+    }
+  }
+
+  return null;
+}
+
 class StudentDashboardCourse {
   final int id;
   final String title;
   final String? courseCode;
   final String? category;
   final String? coverImageUrl;
+  final String? instructorName;
+  final String? instructorAvatarUrl;
   final String status;
   final String courseType;
   final int createdBy;
@@ -75,6 +171,8 @@ class StudentDashboardCourse {
     required this.courseCode,
     required this.category,
     required this.coverImageUrl,
+    required this.instructorName,
+    required this.instructorAvatarUrl,
     required this.status,
     required this.courseType,
     required this.createdBy,
@@ -94,6 +192,11 @@ class StudentDashboardCourse {
     return value.isEmpty ? 'General' : value;
   }
 
+  String get safeInstructorName {
+    final value = (instructorName ?? '').trim();
+    return value.isEmpty ? 'Course instructor' : value;
+  }
+
   bool get isActive {
     final normalized = status.toLowerCase();
     return normalized == 'published' || normalized == 'active';
@@ -109,11 +212,9 @@ class StudentDashboardCourse {
       category: _asString(json['category']).isEmpty
           ? null
           : _asString(json['category']),
-      coverImageUrl: _firstNonEmptyString([
-        json['cover_url'],
-        json['cover_image_url'],
-        json['coverImageUrl'],
-      ]),
+      coverImageUrl: _extractCoverUrl(json),
+      instructorName: _extractInstructorName(json),
+      instructorAvatarUrl: _extractInstructorAvatarUrl(json),
       status: _asString(json['status']).isEmpty ? 'unknown' : _asString(json['status']),
       courseType: _asString(json['course_type']).isEmpty
           ? 'individual'

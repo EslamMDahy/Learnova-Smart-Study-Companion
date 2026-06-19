@@ -135,7 +135,7 @@ class _MainDashboardContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final shownCourses = data.courses.take(2).toList();
+    final shownCourses = data.courses.take(3).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -392,7 +392,11 @@ class _CourseCardsGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final columns = constraints.maxWidth < 760 ? 1 : 2;
+        final columns = constraints.maxWidth < 620
+            ? 1
+            : constraints.maxWidth < 960
+                ? 2
+                : 3;
         const spacing = 16.0;
         final width = (constraints.maxWidth - spacing * (columns - 1)) / columns;
 
@@ -413,6 +417,43 @@ class _CourseCardsGrid extends StatelessWidget {
   }
 }
 
+
+class _CourseCoverFallback extends StatelessWidget {
+  final bool showPulse;
+
+  const _CourseCoverFallback({this.showPulse = false});
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          colors: [Color(0xff073B34), Color(0xff0B1D33)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+      ),
+      child: showPulse
+          ? Center(
+              child: Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.10),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Icon(
+                  Icons.image_outlined,
+                  color: Colors.white70,
+                  size: 18,
+                ),
+              ),
+            )
+          : null,
+    );
+  }
+}
+
 class _CourseCard extends StatelessWidget {
   final StudentDashboardCourse course;
 
@@ -420,8 +461,8 @@ class _CourseCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final coverUrl = (course.coverImageUrl ?? '').trim();
-    final hasCover = coverUrl.isNotEmpty;
+    final coverUrl = _normalizeNetworkImageUrl(course.coverImageUrl);
+    final hasCover = coverUrl != null;
 
     return Container(
       decoration: BoxDecoration(
@@ -448,28 +489,17 @@ class _CourseCard extends StatelessWidget {
               children: [
                 if (hasCover)
                   Image.network(
-                    coverUrl,
+                    coverUrl!,
                     fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => const DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xff073B34), Color(0xff0B1D33)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                    ),
+                    filterQuality: FilterQuality.medium,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return const _CourseCoverFallback(showPulse: true);
+                    },
+                    errorBuilder: (_, __, ___) => const _CourseCoverFallback(),
                   )
                 else
-                  const DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [Color(0xff073B34), Color(0xff0B1D33)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                  ),
+                  const _CourseCoverFallback(),
                 DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
@@ -533,12 +563,23 @@ class _CourseCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 3),
                 Text(
-                  '${course.safeCategory} • ${_titleCase(course.status)}',
+                  '${course.safeInstructorName} • ${course.safeCategory}',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                 ),
-                const SizedBox(height: 14),
+                const SizedBox(height: 4),
+                Text(
+                  _titleCase(course.status),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: AppColors.textMuted,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 12),
                 SizedBox(
                   width: double.infinity,
                   height: 38,
@@ -1246,6 +1287,21 @@ class _SkeletonBox extends StatelessWidget {
       ),
     );
   }
+}
+
+
+String? _normalizeNetworkImageUrl(String? value) {
+  final raw = (value ?? '').trim();
+  if (raw.isEmpty) return null;
+
+  final withScheme = raw.startsWith('//') ? 'https:$raw' : raw;
+  if (!withScheme.startsWith('http://') && !withScheme.startsWith('https://')) {
+    return null;
+  }
+
+  final parsed = Uri.tryParse(withScheme);
+  if (parsed == null || !parsed.hasAuthority) return null;
+  return Uri.encodeFull(withScheme);
 }
 
 String _firstName(String name) {

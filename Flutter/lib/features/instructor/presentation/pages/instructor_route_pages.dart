@@ -131,6 +131,11 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
       courses: state.items,
       onRefresh: () => controller.load(force: true),
       onCreateNewCourse: _openCreateCourse,
+      onUpdateCourse: (course, payload) => controller.updateCourse(
+        course: course,
+        payload: payload,
+      ),
+      onPublishCourse: controller.publishCourse,
       onUploadCover: ({
         required MyCourseItem course,
         required List<int> bytes,

@@ -332,19 +332,15 @@ class CourseUpdateRequest {
       map['category'] = cleanCategory.isEmpty ? null : cleanCategory;
     }
 
-    if (courseType != null) {
-      map['course_type'] = parseCourseAccessType(courseType).backendValue;
-    }
-    if (organizationId != null) map['organization_id'] = organizationId;
+    // Backend CourseUpdateRequest accepts only metadata/access fields.
+    // Do not send course_type, organization_id, or status here; publish has its
+    // own endpoint and archive/delete are not exposed by the current backend.
     if (isPublic != null) map['is_open_for_enrollment'] = isPublic;
     if (visibilityLevel != null) {
       map['visibility_level'] = parseCourseVisibility(visibilityLevel).backendValue;
     }
     if (requiresEnrollmentApproval != null) {
       map['requires_enrollment_approval'] = requiresEnrollmentApproval;
-    }
-    if (status != null) {
-      map['status'] = parseCourseLifecycleStatus(status).backendValue;
     }
 
     return map;
@@ -396,7 +392,6 @@ class CourseCreateRequest {
 
   // UI-only fields (NOT sent to backend because backend schema forbids extra fields)
   final String? courseCode;
-  final String? academicTerm;
   final String? localStatus;
 
   const CourseCreateRequest({
@@ -417,14 +412,13 @@ class CourseCreateRequest {
     this.status,
 
     this.courseCode,
-    this.academicTerm,
     this.localStatus,
   });
 
   Map<String, dynamic> toJson() {
     // IMPORTANT: backend uses extra="forbid" — only send fields the schema accepts.
     // Excluded: learning_outcomes (commented out in backend), cover_image_url,
-    //           banner_image_url, academicTerm, localStatus (UI-only).
+    //           banner_image_url and localStatus (UI-only).
     final map = <String, dynamic>{
       'course_type': parseCourseAccessType(courseType).backendValue,
       'title': title,
@@ -446,5 +440,100 @@ class CourseCreateRequest {
     if (status != null) map['status'] = parseCourseLifecycleStatus(status).backendValue;
 
     return map;
+  }
+}
+
+
+class PublishCourseResponse {
+  final int id;
+  final String status;
+  final String message;
+
+  const PublishCourseResponse({
+    required this.id,
+    required this.status,
+    required this.message,
+  });
+
+  factory PublishCourseResponse.fromJson(Map<String, dynamic> json) {
+    return PublishCourseResponse(
+      id: _asInt(json['id']) ?? 0,
+      status: (json['status'] ?? '').toString().trim(),
+      message: (json['message'] ?? '').toString().trim(),
+    );
+  }
+}
+
+class CourseEnrollmentRequestItem {
+  final int enrollmentId;
+  final int studentId;
+  final String fullName;
+  final String email;
+  final String status;
+  final DateTime enrolledAt;
+
+  const CourseEnrollmentRequestItem({
+    required this.enrollmentId,
+    required this.studentId,
+    required this.fullName,
+    required this.email,
+    required this.status,
+    required this.enrolledAt,
+  });
+
+  factory CourseEnrollmentRequestItem.fromJson(Map<String, dynamic> json) {
+    return CourseEnrollmentRequestItem(
+      enrollmentId: _asInt(json['enrollment_id']) ?? 0,
+      studentId: _asInt(json['student_id']) ?? 0,
+      fullName: (json['full_name'] ?? '').toString().trim(),
+      email: (json['email'] ?? '').toString().trim(),
+      status: (json['status'] ?? 'pending').toString().trim().toLowerCase(),
+      enrolledAt: DateTime.tryParse((json['enrolled_at'] ?? '').toString()) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
+class CourseEnrollmentRequestsResponse {
+  final int courseId;
+  final int total;
+  final List<CourseEnrollmentRequestItem> requests;
+
+  const CourseEnrollmentRequestsResponse({
+    required this.courseId,
+    required this.total,
+    required this.requests,
+  });
+
+  factory CourseEnrollmentRequestsResponse.fromJson(Map<String, dynamic> json) {
+    final raw = (json['requests'] as List?) ?? const <dynamic>[];
+    final requests = raw
+        .whereType<Map>()
+        .map((item) => CourseEnrollmentRequestItem.fromJson(
+              Map<String, dynamic>.from(item),
+            ))
+        .toList(growable: false);
+    return CourseEnrollmentRequestsResponse(
+      courseId: _asInt(json['course_id']) ?? 0,
+      total: _asInt(json['total']) ?? requests.length,
+      requests: requests,
+    );
+  }
+}
+
+class EnrollmentRequestUpdateResponse {
+  final int enrollmentId;
+  final String status;
+
+  const EnrollmentRequestUpdateResponse({
+    required this.enrollmentId,
+    required this.status,
+  });
+
+  factory EnrollmentRequestUpdateResponse.fromJson(Map<String, dynamic> json) {
+    return EnrollmentRequestUpdateResponse(
+      enrollmentId: _asInt(json['enrollment_id']) ?? 0,
+      status: (json['status'] ?? '').toString().trim(),
+    );
   }
 }

@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 DateTime _asDate(dynamic value) {
   if (value is DateTime) return value;
   final raw = (value ?? '').toString().trim();
@@ -25,6 +27,44 @@ bool _asBool(dynamic value) {
 
 String _asString(dynamic value) => (value ?? '').toString().trim();
 
+
+List<StudentAssistantSource> _parseAssistantSources(dynamic rawSources) {
+  if (rawSources == null) return const <StudentAssistantSource>[];
+
+  dynamic value = rawSources;
+  if (value is String) {
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return const <StudentAssistantSource>[];
+    try {
+      value = jsonDecode(trimmed);
+    } catch (_) {
+      return const <StudentAssistantSource>[];
+    }
+  }
+
+  if (value is Map) {
+    final map = Map<String, dynamic>.from(value);
+    final nested = map['sources'] ?? map['items'] ?? map['results'];
+    if (nested is List || nested is Map || nested is String) {
+      return _parseAssistantSources(nested);
+    }
+    if (map.isEmpty) return const <StudentAssistantSource>[];
+
+    final source = StudentAssistantSource.fromJson(map);
+    return source.title.isEmpty ? const <StudentAssistantSource>[] : [source];
+  }
+
+  if (value is! List) return const <StudentAssistantSource>[];
+
+  return value
+      .whereType<Map>()
+      .map((item) => StudentAssistantSource.fromJson(
+            Map<String, dynamic>.from(item),
+          ))
+      .where((item) => item.title.isNotEmpty)
+      .toList(growable: false);
+}
+
 String _newMessageId(String prefix) {
   final micros = DateTime.now().microsecondsSinceEpoch;
   return '$prefix-$micros';
@@ -42,10 +82,29 @@ class StudentAssistantSource {
   });
 
   factory StudentAssistantSource.fromJson(Map<String, dynamic> json) {
-    return StudentAssistantSource(
-      title: _asString(json['title']),
-      page: _asNullableInt(json['page']),
+    final title = _asString(
+      json['title'] ??
+          json['source_title'] ??
+          json['document_title'] ??
+          json['file_name'] ??
+          json['filename'] ??
+          json['source'] ??
+          json['name'],
     );
+
+    return StudentAssistantSource(
+      title: title,
+      page: _asNullableInt(
+        json['page'] ?? json['page_number'] ?? json['pageIndex'],
+      ),
+    );
+  }
+
+  Map<String, dynamic> toCacheJson() {
+    return {
+      'title': title,
+      if (page != null) 'page': page,
+    };
   }
 
   String get label {
@@ -140,6 +199,44 @@ class StudentAssistantMessage {
       sources: response.sources,
     );
   }
+
+  factory StudentAssistantMessage.fromCache(Map<String, dynamic> json) {
+    final roleRaw = _asString(json['role'] ?? json['message_type']).toLowerCase();
+    final role = roleRaw == 'user'
+        ? StudentAssistantMessageRole.user
+        : StudentAssistantMessageRole.assistant;
+    final sources = _parseAssistantSources(json['sources']);
+
+    return StudentAssistantMessage(
+      id: _asString(json['id']).isEmpty
+          ? _newMessageId(role == StudentAssistantMessageRole.user ? 'user' : 'assistant')
+          : _asString(json['id']),
+      backendId: _asNullableInt(json['backend_id'] ?? json['backendId']),
+      sessionId: _asNullableInt(json['session_id'] ?? json['sessionId']),
+      role: role,
+      content: _asString(json['content']),
+      createdAt: _asDate(json['created_at'] ?? json['createdAt']),
+      moduleId: _asNullableInt(json['module_id'] ?? json['moduleId']),
+      materialId: _asNullableInt(json['material_id'] ?? json['materialId']),
+      sources: sources,
+      isError: _asBool(json['is_error'] ?? json['isError']),
+    );
+  }
+
+  Map<String, dynamic> toCacheJson() {
+    return {
+      'id': id,
+      'backend_id': backendId,
+      'session_id': sessionId,
+      'role': role == StudentAssistantMessageRole.user ? 'user' : 'assistant',
+      'content': content,
+      'created_at': createdAt.toIso8601String(),
+      'module_id': moduleId,
+      'material_id': materialId,
+      'sources': sources.map((source) => source.toCacheJson()).toList(growable: false),
+      'is_error': isError,
+    };
+  }
 }
 
 class StudentCourseAssistantSessionResponse {
@@ -192,8 +289,6 @@ class StudentCourseAssistantMessageResponse {
   });
 
   factory StudentCourseAssistantMessageResponse.fromJson(Map<String, dynamic> json) {
-    final rawSources = json['sources'];
-
     return StudentCourseAssistantMessageResponse(
       id: _asInt(json['id']),
       sessionId: _asInt(json['session_id']),
@@ -201,13 +296,7 @@ class StudentCourseAssistantMessageResponse {
           ? _asString(json['role'])
           : _asString(json['message_type']),
       content: _asString(json['content'] ?? json['message'] ?? json['answer']),
-      sources: rawSources is List
-          ? rawSources
-              .whereType<Map>()
-              .map((item) => StudentAssistantSource.fromJson(Map<String, dynamic>.from(item)))
-              .where((item) => item.title.isNotEmpty)
-              .toList(growable: false)
-          : const [],
+      sources: _parseAssistantSources(json['sources']),
       createdAt: _asDate(json['created_at']),
     );
   }
@@ -328,28 +417,33 @@ class StudentCourseAssistantSessionDetailsResponse {
 class StudentCourseAssistantState {
   final List<StudentAssistantMessage> messages;
   final bool sending;
+  final bool loadingHistory;
   final int? sessionId;
   final String? error;
 
   const StudentCourseAssistantState({
     this.messages = const [],
     this.sending = false,
+    this.loadingHistory = false,
     this.sessionId,
     this.error,
   });
 
   bool get hasConversation => messages.isNotEmpty;
   bool get hasBackendSession => sessionId != null && sessionId! > 0;
+  bool get isBusy => sending || loadingHistory;
 
   StudentCourseAssistantState copyWith({
     List<StudentAssistantMessage>? messages,
     bool? sending,
+    bool? loadingHistory,
     Object? sessionId = _keepSessionId,
     Object? error = _keepError,
   }) {
     return StudentCourseAssistantState(
       messages: messages ?? this.messages,
       sending: sending ?? this.sending,
+      loadingHistory: loadingHistory ?? this.loadingHistory,
       sessionId: identical(sessionId, _keepSessionId)
           ? this.sessionId
           : sessionId as int?,

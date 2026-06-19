@@ -15,6 +15,7 @@ class _MaterialPanelWidget extends StatelessWidget {
     List<int> learningOutcomeIds,
   ) onCreateTopicManual;
   final VoidCallback onRefreshUrl;
+  final VoidCallback onDeleteMaterial;
   final bool previewInteractive;
 
   const _MaterialPanelWidget({
@@ -28,6 +29,7 @@ class _MaterialPanelWidget extends StatelessWidget {
     required this.onTopicTap,
     required this.onCreateTopicManual,
     required this.onRefreshUrl,
+    required this.onDeleteMaterial,
     required this.previewInteractive,
   });
 
@@ -51,6 +53,7 @@ class _MaterialPanelWidget extends StatelessWidget {
       urlLoading: urlLoading,
       previewInteractive: previewInteractive,
       onRefreshUrl: onRefreshUrl,
+      onDeleteMaterial: onDeleteMaterial,
       onTopicTap: onTopicTap,
       onCreateTopicManual: onCreateTopicManual,
     );
@@ -85,6 +88,7 @@ class _PdfReviewerWorkspace extends StatefulWidget {
   final bool urlLoading;
   final bool previewInteractive;
   final VoidCallback onRefreshUrl;
+  final VoidCallback onDeleteMaterial;
   final void Function(TopicItem) onTopicTap;
   final Future<bool> Function(
     String title,
@@ -104,6 +108,7 @@ class _PdfReviewerWorkspace extends StatefulWidget {
     required this.urlLoading,
     required this.previewInteractive,
     required this.onRefreshUrl,
+    required this.onDeleteMaterial,
     required this.onTopicTap,
     required this.onCreateTopicManual,
   });
@@ -179,6 +184,7 @@ class _PdfReviewerWorkspaceState extends State<_PdfReviewerWorkspace> {
                       downloadUrl: widget.downloadUrl,
                       urlLoading: widget.urlLoading,
                       onRefreshUrl: widget.onRefreshUrl,
+                      onDeleteMaterial: widget.onDeleteMaterial,
                       onAddTopic: () => _openCaptureTopicDialog(context),
                     ),
                     const SizedBox(height: 18),
@@ -222,6 +228,7 @@ class _ReviewerShellHeader extends StatelessWidget {
   final String? downloadUrl;
   final bool urlLoading;
   final VoidCallback onRefreshUrl;
+  final VoidCallback onDeleteMaterial;
   final VoidCallback onAddTopic;
 
   const _ReviewerShellHeader({
@@ -234,6 +241,7 @@ class _ReviewerShellHeader extends StatelessWidget {
     required this.downloadUrl,
     required this.urlLoading,
     required this.onRefreshUrl,
+    required this.onDeleteMaterial,
     required this.onAddTopic,
   });
 
@@ -341,6 +349,11 @@ class _ReviewerShellHeader extends StatelessWidget {
                 onTap: urlLoading ? null : onRefreshUrl,
               ),
               if (downloadUrl != null && downloadUrl!.isNotEmpty) _BlueHeaderOpenAction(url: downloadUrl!),
+              _BlueHeaderDangerButton(
+                icon: Icons.delete_outline_rounded,
+                label: 'Delete file',
+                onTap: onDeleteMaterial,
+              ),
             ],
           );
 
@@ -472,6 +485,38 @@ class _BlueHeaderPrimaryButton extends StatelessWidget {
   }
 }
 
+class _BlueHeaderDangerButton extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _BlueHeaderDangerButton({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 42,
+      child: OutlinedButton.icon(
+        onPressed: onTap,
+        icon: Icon(icon, size: 17),
+        label: Text(label),
+        style: OutlinedButton.styleFrom(
+          backgroundColor: Colors.white.withOpacity(0.10),
+          foregroundColor: Colors.white,
+          side: BorderSide(color: Colors.white.withOpacity(0.34)),
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
+        ),
+      ),
+    );
+  }
+}
+
 class _BlueHeaderIconAction extends StatelessWidget {
   final String tooltip;
   final IconData? icon;
@@ -529,8 +574,9 @@ class _BlueHeaderOpenAction extends StatelessWidget {
         icon: const Icon(Icons.open_in_new_rounded, size: 16),
         label: const Text('Open file'),
         style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.white,
-          side: BorderSide(color: Colors.white.withOpacity(0.28)),
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.primary,
+          side: BorderSide(color: Colors.white.withOpacity(0.72)),
           padding: const EdgeInsets.symmetric(horizontal: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),

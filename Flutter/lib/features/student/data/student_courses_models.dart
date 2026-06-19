@@ -58,6 +58,100 @@ String? _firstNonEmptyString(List<dynamic> values) {
   return null;
 }
 
+String? _extractCoverUrl(Map<String, dynamic> json) {
+  final direct = _firstNonEmptyString([
+    json['cover_url'],
+    json['coverUrl'],
+    json['cover_image_url'],
+    json['coverImageUrl'],
+    json['image_url'],
+    json['imageUrl'],
+    json['thumbnail_url'],
+    json['thumbnailUrl'],
+    json['banner_url'],
+    json['bannerUrl'],
+  ]);
+  if (direct != null) return direct;
+
+  for (final key in const ['cover', 'cover_image', 'image', 'thumbnail', 'banner']) {
+    final nested = json[key];
+    if (nested is Map) {
+      final nestedUrl = _firstNonEmptyString([
+        nested['url'],
+        nested['public_url'],
+        nested['publicUrl'],
+        nested['cover_url'],
+        nested['image_url'],
+      ]);
+      if (nestedUrl != null) return nestedUrl;
+    }
+  }
+
+  return null;
+}
+
+String? _extractInstructorName(Map<String, dynamic> json) {
+  final direct = _firstNonEmptyString([
+    json['instructor_name'],
+    json['instructorName'],
+    json['teacher_name'],
+    json['teacherName'],
+    json['owner_name'],
+    json['ownerName'],
+    json['created_by_name'],
+    json['createdByName'],
+  ]);
+  if (direct != null) return direct;
+
+  for (final key in const ['instructor', 'teacher', 'owner', 'creator', 'created_by_user']) {
+    final nested = json[key];
+    if (nested is Map) {
+      final nestedName = _firstNonEmptyString([
+        nested['full_name'],
+        nested['fullName'],
+        nested['name'],
+        nested['display_name'],
+        nested['displayName'],
+        nested['email'],
+      ]);
+      if (nestedName != null) return nestedName;
+    }
+  }
+
+  return null;
+}
+
+String? _extractInstructorAvatarUrl(Map<String, dynamic> json) {
+  final direct = _firstNonEmptyString([
+    json['instructor_avatar_url'],
+    json['instructorAvatarUrl'],
+    json['teacher_avatar_url'],
+    json['teacherAvatarUrl'],
+    json['owner_avatar_url'],
+    json['ownerAvatarUrl'],
+    json['avatar_url'],
+    json['avatarUrl'],
+  ]);
+  if (direct != null) return direct;
+
+  for (final key in const ['instructor', 'teacher', 'owner', 'creator', 'created_by_user']) {
+    final nested = json[key];
+    if (nested is Map) {
+      final nestedUrl = _firstNonEmptyString([
+        nested['avatar_url'],
+        nested['avatarUrl'],
+        nested['photo_url'],
+        nested['photoUrl'],
+        nested['image_url'],
+        nested['imageUrl'],
+      ]);
+      if (nestedUrl != null) return nestedUrl;
+    }
+  }
+
+  return null;
+}
+
 List<String> _asStringList(dynamic value) {
   if (value == null) return const [];
   if (value is List) {
@@ -84,6 +178,8 @@ class StudentCourse {
   final String? courseCode;
   final String? category;
   final String? coverImageUrl;
+  final String? instructorName;
+  final String? instructorAvatarUrl;
   final List<String> tags;
   final String status;
   final String? enrollmentStatus;
@@ -107,6 +203,8 @@ class StudentCourse {
     required this.courseCode,
     required this.category,
     required this.coverImageUrl,
+    required this.instructorName,
+    required this.instructorAvatarUrl,
     required this.tags,
     required this.status,
     required this.enrollmentStatus,
@@ -143,6 +241,11 @@ class StudentCourse {
         : value;
   }
 
+  String get safeInstructorName {
+    final value = (instructorName ?? '').trim();
+    return value.isEmpty ? 'Course instructor' : value;
+  }
+
   bool get isEnrolled => source == StudentCourseSource.enrolled;
 
   bool get isPendingEnrollment =>
@@ -168,6 +271,8 @@ class StudentCourse {
   StudentCourse copyWith({
     String? enrollmentStatus,
     String? coverImageUrl,
+    String? instructorName,
+    String? instructorAvatarUrl,
     StudentCourseSource? source,
   }) {
     return StudentCourse(
@@ -177,6 +282,8 @@ class StudentCourse {
       courseCode: courseCode,
       category: category,
       coverImageUrl: coverImageUrl ?? this.coverImageUrl,
+      instructorName: instructorName ?? this.instructorName,
+      instructorAvatarUrl: instructorAvatarUrl ?? this.instructorAvatarUrl,
       tags: tags,
       status: status,
       enrollmentStatus: enrollmentStatus ?? this.enrollmentStatus,
@@ -208,11 +315,9 @@ class StudentCourse {
       category: _asString(json['category']).isEmpty
           ? null
           : _asString(json['category']),
-      coverImageUrl: _firstNonEmptyString([
-        json['cover_url'],
-        json['cover_image_url'],
-        json['coverImageUrl'],
-      ]),
+      coverImageUrl: _extractCoverUrl(json),
+      instructorName: _extractInstructorName(json),
+      instructorAvatarUrl: _extractInstructorAvatarUrl(json),
       tags: _asStringList(json['tags']),
       status: _asString(json['status']).isEmpty ? 'published' : _asString(json['status']),
       enrollmentStatus: _asString(json['enrollment_status']).isEmpty
@@ -253,11 +358,9 @@ class StudentCourse {
       category: _asString(json['category']).isEmpty
           ? null
           : _asString(json['category']),
-      coverImageUrl: _firstNonEmptyString([
-        json['cover_url'],
-        json['cover_image_url'],
-        json['coverImageUrl'],
-      ]),
+      coverImageUrl: _extractCoverUrl(json),
+      instructorName: _extractInstructorName(json),
+      instructorAvatarUrl: _extractInstructorAvatarUrl(json),
       tags: _asStringList(json['tags']),
       status: _asString(json['status']).isEmpty ? 'published' : _asString(json['status']),
       enrollmentStatus: null,
@@ -1179,14 +1282,18 @@ class StudentExamAnswerDraft {
   });
 
   Map<String, dynamic> toJson() {
+    final normalizedAnswerText = (answerText ?? '').trim();
     return {
       'exam_question_id': examQuestionId,
+      // Keep the database-facing field numeric. The real option id (A/B/C/D)
+      // is carried in answer_text for grading/result display.
       if (selectedOptionIndex != null) 'selected_option_index': selectedOptionIndex,
       if (selectedOptionIndices != null) 'selected_option_indices': selectedOptionIndices,
-      if ((answerText ?? '').trim().isNotEmpty) 'answer_text': answerText!.trim(),
+      if (normalizedAnswerText.isNotEmpty) 'answer_text': normalizedAnswerText,
       if (timeTakenSeconds != null) 'time_taken_seconds': timeTakenSeconds,
     };
   }
+
 }
 
 class StudentExamSubmitResult {

@@ -1281,6 +1281,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
         ),
         onRefreshUrl: () => ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
             .fetchDownloadUrl(moduleId: mid, materialId: matId, force: true),
+        onDeleteMaterial: () => _confirmDeleteMaterial(c.module!, c.material!),
         previewInteractive: !_dialogOpen,
       );
     }
@@ -1780,22 +1781,143 @@ Future<void> _showCreateModuleDialog() async {
 }
 
   Future<void> _showUploadSheet(ModuleItem module) async {
-    final results = await _showManagedDialog<List<UploadSheetResult>>(
-        barrierColor: Colors.black.withOpacity(0.35),
-        builder: (_) => UploadMaterialSheet(moduleTitle: module.title),);
-    if (results == null || results.isEmpty || !mounted) return;
-    int ok = 0;
-    for (final r in results) {
-      if (!mounted) break;
-      final success = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
-          .uploadMaterial(moduleId: module.id, bytes: r.bytes,
-              filename: r.filename, contentType: r.contentType, title: r.title,);
-      if (success) ok++;
+    final saved = await _showManagedDialog<bool>(
+      barrierColor: Colors.black.withOpacity(0.35),
+      builder: (_) => UploadMaterialSheet(
+        moduleTitle: module.title,
+        onUpload: (file, update) => _uploadAndWaitForMaterial(
+          module: module,
+          file: file,
+          update: update,
+        ),
+      ),
+    );
+
+    await ref
+        .read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .loadMaterials(module.id, force: true);
+
+    if (!mounted || saved != true) return;
+    AppToast.success(
+      context,
+      title: 'Materials ready',
+      message: 'Uploaded files were processed and saved to the course.',
+    );
+  }
+
+  Future<UploadSheetUploadResult> _uploadAndWaitForMaterial({
+    required ModuleItem module,
+    required UploadSheetResult file,
+    required void Function(UploadSheetUploadUpdate update) update,
+  }) async {
+    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+
+    update(const UploadSheetUploadUpdate(
+      stage: UploadSheetProcessingStage.uploading,
+      progress: 0,
+      message: 'Creating upload slot...',
+    ));
+
+    final result = await notifier.uploadMaterialFlow(
+      moduleId: module.id,
+      bytes: file.bytes,
+      filename: file.filename,
+      contentType: file.contentType,
+      title: file.title,
+      onUploadProgress: (progress) {
+        update(UploadSheetUploadUpdate(
+          stage: UploadSheetProcessingStage.uploading,
+          progress: progress,
+          message: progress < 0.7
+              ? 'Uploading PDF to storage...'
+              : 'Confirming upload and starting AI...',
+        ));
+      },
+    );
+
+    if (result == null) {
+      update(const UploadSheetUploadUpdate(
+        stage: UploadSheetProcessingStage.error,
+        message: 'Upload failed before AI processing started.',
+      ));
+      return const UploadSheetUploadResult.error(
+        'Upload failed before AI processing started.',
+      );
     }
-    if (mounted && ok > 0) {
-      AppToast.success(context, title: 'Uploaded',
-          message: ok == 1 ? '"${results.first.title}" is ready.' : '$ok files uploaded.',);
+
+    update(const UploadSheetUploadUpdate(
+      stage: UploadSheetProcessingStage.processing,
+      message: 'AI is extracting topics and learning outcomes...',
+    ));
+
+    final ready = await _waitForMaterialReady(
+      moduleId: module.id,
+      materialId: result.materialId,
+      update: update,
+    );
+
+    if (ready == true) {
+      return UploadSheetUploadResult.ready(
+        materialId: result.materialId,
+        message: 'Ready to save. AI analysis completed.',
+      );
     }
+
+    return UploadSheetUploadResult.error(
+      ready == false
+          ? 'AI processing returned an error. Check the material pipeline.'
+          : 'AI processing is taking too long. Refresh materials and try again.',
+      materialId: result.materialId,
+    );
+  }
+
+  Future<bool?> _waitForMaterialReady({
+    required int moduleId,
+    required int materialId,
+    required void Function(UploadSheetUploadUpdate update) update,
+  }) async {
+    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+
+    for (var attempt = 0; attempt < 60; attempt++) {
+      if (!mounted) return null;
+      await Future<void>.delayed(const Duration(seconds: 2));
+      await notifier.loadMaterials(moduleId, force: true);
+      final state = ref.read(courseDetailsControllerProvider(widget.course.id));
+      final materials = state.materials[moduleId] ?? const <MaterialItem>[];
+      MaterialItem? material;
+      for (final item in materials) {
+        if (item.id == materialId) {
+          material = item;
+          break;
+        }
+      }
+
+      final status = material?.status.trim().toLowerCase();
+      if (status == 'ready') {
+        update(const UploadSheetUploadUpdate(
+          stage: UploadSheetProcessingStage.ready,
+          progress: 1,
+          message: 'Ready to save. AI analysis completed.',
+        ));
+        return true;
+      }
+      if (status == 'error') {
+        update(const UploadSheetUploadUpdate(
+          stage: UploadSheetProcessingStage.error,
+          message: 'AI processing failed for this file.',
+        ));
+        return false;
+      }
+
+      update(UploadSheetUploadUpdate(
+        stage: UploadSheetProcessingStage.processing,
+        message: status == null || status.isEmpty
+            ? 'Waiting for AI processing status...'
+            : 'AI processing: ${status.replaceAll('_', ' ')}...',
+      ));
+    }
+
+    return null;
   }
 
   Future<void> _showShareModuleDialog(ModuleItem m) async {
@@ -1933,6 +2055,51 @@ Future<void> _showCreateModuleDialog() async {
       AppToast.success(context, title: 'Position updated', message: 'Module moved to #$selected.');
     } else {
       AppToast.error(context, title: 'Reorder failed', message: 'Please try again.');
+    }
+  }
+
+  Future<void> _confirmDeleteMaterial(ModuleItem module, MaterialItem material) async {
+    final ok = await _showManagedDialog<bool>(
+          barrierColor: Colors.black.withOpacity(0.35),
+          builder: (_) => _ConfirmDialogWidget(
+            title: 'Delete File',
+            body: 'Delete "${material.title}"? This will remove the PDF and its generated topics.',
+            confirm: 'Delete',
+            confirmColor: AppColors.dangerText,
+          ),
+        ) ??
+        false;
+    if (!ok || !mounted) return;
+
+    final success = await ref
+        .read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .deleteMaterial(moduleId: module.id, materialId: material.id);
+    if (!mounted) return;
+
+    if (success) {
+      final refreshedState =
+          ref.read(courseDetailsControllerProvider(widget.course.id));
+      final refreshedModule = refreshedState.modules.firstWhere(
+        (item) => item.id == module.id,
+        orElse: () => module,
+      );
+      setState(() {
+        _sel = _Ctx.module(refreshedModule);
+        _stack.clear();
+        _hideFooterForActive = false;
+        _persistUiState();
+      });
+      AppToast.success(
+        context,
+        title: 'File deleted',
+        message: '"${material.title}" was removed from this module.',
+      );
+    } else {
+      AppToast.error(
+        context,
+        title: 'Delete failed',
+        message: 'Please try again.',
+      );
     }
   }
 

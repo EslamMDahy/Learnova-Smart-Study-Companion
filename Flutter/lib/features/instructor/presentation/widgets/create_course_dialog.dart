@@ -7,7 +7,6 @@ import 'package:learnova/core/utils/image_picker_bytes.dart';
 import 'package:learnova/features/instructor/data/courses_models.dart';
 import 'package:learnova/features/instructor/data/course_vocabulary.dart';
 import 'package:learnova/features/instructor/data/learning_outcomes_models.dart';
-import 'package:learnova/shared/widgets/components/dropdowns.dart';
 import 'learning_outcomes_section.dart';
 
 class CreateCourseDialogResult {
@@ -40,40 +39,40 @@ class CreateCourseDialog extends StatefulWidget {
 class _CreateCourseDialogState extends State<CreateCourseDialog> {
   final _titleCtrl = TextEditingController();
   final _codeCtrl  = TextEditingController();
+  final _categoryCtrl = TextEditingController();
   final _descCtrl  = TextEditingController();
 
-  String _selectedTerm = 'Fall 2025';
   _PublishChoice    _publish    = _PublishChoice.draft;
   _VisibilityChoice _visibility = _VisibilityChoice.privateCourse;
 
   String? _titleError;
   String? _codeError;
+  String? _categoryError;
   bool _titleTouched = false;
   bool _codeTouched  = false;
+  bool _categoryTouched = false;
 
   List<LearningOutcome> _outcomes = [];
   PickedBrowserFile? _coverFile;
 
   static final _codeRx = RegExp(r'^[A-Za-z0-9][A-Za-z0-9\-_\/ ]*$');
 
-  static const _terms = [
-    'Fall 2023', 'Spring 2024', 'Fall 2024',
-    'Spring 2025', 'Fall 2025', 'Spring 2026',
-  ];
-
   @override
   void initState() {
     super.initState();
     _titleCtrl.addListener(_onTitleChanged);
     _codeCtrl.addListener(_onCodeChanged);
+    _categoryCtrl.addListener(_onCategoryChanged);
   }
 
   @override
   void dispose() {
     _titleCtrl.removeListener(_onTitleChanged);
     _codeCtrl.removeListener(_onCodeChanged);
+    _categoryCtrl.removeListener(_onCategoryChanged);
     _titleCtrl.dispose();
     _codeCtrl.dispose();
+    _categoryCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
   }
@@ -88,8 +87,19 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
     _validateCode();
   }
 
+  void _onCategoryChanged() {
+    if (!_categoryTouched) return;
+    _validateCategory();
+  }
+
   void _validateTitle() {
-    final err = _titleCtrl.text.trim().isEmpty ? 'Course title is required.' : null;
+    final title = _titleCtrl.text.trim();
+    String? err;
+    if (title.isEmpty) {
+      err = 'Course title is required.';
+    } else if (title.length > 255) {
+      err = 'Course title must be 255 characters or less.';
+    }
     if (err == _titleError) return;
     if (mounted) setState(() => _titleError = err);
   }
@@ -98,23 +108,39 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
     final c = _codeCtrl.text.trim();
     String? err;
     if (c.isNotEmpty) {
-      if (c.length < 2 || c.length > 31) {
-        err = 'Course code must be 2–31 characters.';
-      // ignore: curly_braces_in_flow_control_structures
-      } else if (!_codeRx.hasMatch(c))       err = 'Use letters/numbers and - _ / only.';
+      if (c.length < 2 || c.length > 50) {
+        err = 'Course code must be 2–50 characters.';
+      } else if (!_codeRx.hasMatch(c)) {
+        err = 'Use letters/numbers and - _ / only.';
+      }
     }
     if (err == _codeError) return;
     if (mounted) setState(() => _codeError = err);
   }
 
+  void _validateCategory() {
+    final category = _categoryCtrl.text.trim();
+    final err = category.length > 100 ? 'Category must be 100 characters or less.' : null;
+    if (err == _categoryError) return;
+    if (mounted) setState(() => _categoryError = err);
+  }
+
   void _validateAll() {
-    setState(() { _titleTouched = true; _codeTouched = true; });
+    setState(() {
+      _titleTouched = true;
+      _codeTouched = true;
+      _categoryTouched = true;
+    });
     _validateTitle();
     _validateCode();
+    _validateCategory();
   }
 
   bool get _canSubmit =>
-      _titleCtrl.text.trim().isNotEmpty && _titleError == null && _codeError == null;
+      _titleCtrl.text.trim().isNotEmpty &&
+      _titleError == null &&
+      _codeError == null &&
+      _categoryError == null;
 
   String? _coverValidationError(PickedBrowserFile file) {
     final contentType = (file.mimeType ?? '').trim().toLowerCase();
@@ -165,7 +191,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
     _validateAll();
     if (!_canSubmit) {
       AppToast.error(context, title: 'Validation Error',
-          message: _titleError ?? _codeError ?? 'Fix highlighted fields.',);
+          message: _titleError ?? _codeError ?? _categoryError ?? 'Fix highlighted fields.',);
       return;
     }
     final isPublic = _visibility == _VisibilityChoice.publicCourse;
@@ -185,10 +211,9 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
       requiresEnrollmentApproval: !isPublic,
       learningOutcomes: _outcomes.map((o) => '${o.code}: ${o.description}').toList(),
       tags: [],
-      category: null,
+      category: _categoryCtrl.text.trim().isEmpty ? null : _categoryCtrl.text.trim(),
       status: status,
       courseCode: _codeCtrl.text.trim().isEmpty ? null : _codeCtrl.text.trim(),
-      academicTerm: _selectedTerm,
       localStatus: status,
     );
     Navigator.of(context).pop(CreateCourseDialogResult(
@@ -205,7 +230,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
   Widget build(BuildContext context) {
     Theme.of(context);
     final size = MediaQuery.of(context).size;
-    final maxW = size.width < 800 ? size.width * 0.96 : 740.0;
+    final maxW = size.width < 860 ? size.width * 0.96 : 820.0;
     final maxH = size.height * 0.92;
 
     return Dialog(
@@ -314,52 +339,48 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
           ),
           const SizedBox(height: 16),
 
-          // Code + Term row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildFieldLabel('Course Code', optional: true),
-                    const SizedBox(height: 6),
-                    _TitledInputWithError(
-                      controller: _codeCtrl,
-                      hint: 'e.g. CS-101',
-                      prefixIcon: Icons.tag_rounded,
-                      error: _codeError,
-                      onBlur: () {
-                        if (!_codeTouched) setState(() => _codeTouched = true);
-                        _validateCode();
-                      },
-                    ),
-                  ],
+          // Code + Category row
+          _ResponsiveTwoColumn(
+            spacing: 14,
+            first: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildFieldLabel('Course Code', optional: true),
+                const SizedBox(height: 6),
+                _TitledInputWithError(
+                  controller: _codeCtrl,
+                  hint: 'e.g. CS-101',
+                  prefixIcon: Icons.tag_rounded,
+                  error: _codeError,
+                  onBlur: () {
+                    if (!_codeTouched) setState(() => _codeTouched = true);
+                    _validateCode();
+                  },
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildFieldLabel('Academic Term'),
-                    const SizedBox(height: 6),
-                    // Use the shared FigmaUmDropdown40 which is already pixel-perfect
-                    FigmaUmDropdown40(
-                      width: double.infinity,
-                      value: _selectedTerm,
-                      items: _terms,
-                      onChanged: (v) => setState(() => _selectedTerm = v),
-                    ),
-                  ],
+              ],
+            ),
+            second: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildFieldLabel('Category', optional: true),
+                const SizedBox(height: 6),
+                _TitledInputWithError(
+                  controller: _categoryCtrl,
+                  hint: 'e.g. Computer Science',
+                  prefixIcon: Icons.category_outlined,
+                  error: _categoryError,
+                  onBlur: () {
+                    if (!_categoryTouched) setState(() => _categoryTouched = true);
+                    _validateCategory();
+                  },
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 16),
 
           // Description
-          _buildFieldLabel('Course Description'),
+          _buildFieldLabel('Course Description', optional: true),
           const SizedBox(height: 6),
           _DescriptionField(controller: _descCtrl),
           const SizedBox(height: 10),
@@ -416,35 +437,49 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
 
   // ── Config + Cover row ────────────────────────────────────────────────────
   Widget _buildBottomRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _SectionCard(
-            icon: Icons.tune_rounded,
-            title: 'Configuration',
-            child: _ConfigSection(
-              publish: _publish,
-              visibility: _visibility,
-              onPublishChanged: (v) => setState(() => _publish = v),
-              onVisibilityChanged: (v) => setState(() => _visibility = v),
-            ),
-          ),
-        ),
-        const SizedBox(width: 14),
-        SizedBox(
-          width: 210,
-          child: _SectionCard(
-            icon: Icons.image_outlined,
-            title: 'Course Cover',
-            child: _CoverUpload(
-              file: _coverFile,
-              onPick: _pickCover,
-              onRemove: _removeCover,
-            ),
-          ),
-        ),
-      ],
+    final config = _SectionCard(
+      icon: Icons.tune_rounded,
+      title: 'Configuration',
+      child: _ConfigSection(
+        publish: _publish,
+        visibility: _visibility,
+        onPublishChanged: (v) => setState(() => _publish = v),
+        onVisibilityChanged: (v) => setState(() => _visibility = v),
+      ),
+    );
+
+    final cover = _SectionCard(
+      icon: Icons.image_outlined,
+      title: 'Course Cover',
+      badge: 'Optional',
+      child: _CoverUpload(
+        file: _coverFile,
+        onPick: _pickCover,
+        onRemove: _removeCover,
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 620) {
+          return Column(
+            children: [
+              config,
+              const SizedBox(height: 14),
+              cover,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: config),
+            const SizedBox(width: 14),
+            SizedBox(width: 240, child: cover),
+          ],
+        );
+      },
     );
   }
 
@@ -559,6 +594,45 @@ class _SectionCard extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+
+class _ResponsiveTwoColumn extends StatelessWidget {
+  final Widget first;
+  final Widget second;
+  final double spacing;
+
+  const _ResponsiveTwoColumn({
+    required this.first,
+    required this.second,
+    this.spacing = 14,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 560) {
+          return Column(
+            children: [
+              first,
+              SizedBox(height: spacing),
+              second,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: first),
+            SizedBox(width: spacing),
+            Expanded(child: second),
+          ],
+        );
+      },
     );
   }
 }

@@ -304,25 +304,15 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
     _loadActiveTabData(course);
     final visibleTabs = course.isPrivate ? _privateTabs : _publicTabs;
     return Column(children: [
-      // ── Tab header — centered, does NOT stretch to full width ─────────────
-      Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.cardBg,
-          border: Border(bottom: BorderSide(color: AppColors.border)),
-        ),
-        child: SizedBox(
-          width: double.infinity,
-          child: _PillTabBar(
-            tabs: visibleTabs,
-            currentIndex: _currentIndex,
-            onTap: (i) {
-              if (i == _currentIndex) return;
-              SelectedCourseCache.set(course);
-              context.go(_routeForTab(course, i));
-            },
-          ),
-        ),
+      _CourseDetailsTabHeader(
+        tabs: visibleTabs,
+        currentIndex: _currentIndex,
+        onBack: _goBackFromCourseDetails,
+        onTap: (i) {
+          if (i == _currentIndex) return;
+          SelectedCourseCache.set(course);
+          context.go(_routeForTab(course, i));
+        },
       ),
       Expanded(
         child: IndexedStack(
@@ -331,6 +321,116 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
         ),
       ),
     ],);
+  }
+
+  void _goBackFromCourseDetails() {
+    SelectedCourseCache.clear();
+    if (context.canPop()) {
+      context.pop();
+      return;
+    }
+    context.go(Routes.instructorCourses);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Course details header — back action + centered tab navigation
+// ─────────────────────────────────────────────────────────────────────────────
+class _CourseDetailsTabHeader extends StatelessWidget {
+  final List<_TabDef> tabs;
+  final int currentIndex;
+  final VoidCallback onBack;
+  final ValueChanged<int> onTap;
+
+  const _CourseDetailsTabHeader({
+    required this.tabs,
+    required this.currentIndex,
+    required this.onBack,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        border: Border(bottom: BorderSide(color: AppColors.border)),
+      ),
+      child: Row(
+        children: [
+          _BackToCoursesButton(onTap: onBack),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _PillTabBar(
+              tabs: tabs,
+              currentIndex: currentIndex,
+              onTap: onTap,
+            ),
+          ),
+          const SizedBox(width: 12),
+          // Keeps the tab group visually centered even with the back button.
+          const SizedBox(width: 42),
+        ],
+      ),
+    );
+  }
+}
+
+class _BackToCoursesButton extends StatefulWidget {
+  final VoidCallback onTap;
+
+  const _BackToCoursesButton({required this.onTap});
+
+  @override
+  State<_BackToCoursesButton> createState() => _BackToCoursesButtonState();
+}
+
+class _BackToCoursesButtonState extends State<_BackToCoursesButton> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: 'Back to courses',
+      waitDuration: const Duration(milliseconds: 450),
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        onEnter: (_) => setState(() => _hovered = true),
+        onExit: (_) => setState(() => _hovered = false),
+        child: GestureDetector(
+          onTap: widget.onTap,
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeInOut,
+            width: 42,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _hovered ? AppColors.pageBg : AppColors.cardBg,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: _hovered ? AppColors.badgeBlueBorder : AppColors.border,
+              ),
+              boxShadow: _hovered
+                  ? [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.06),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ]
+                  : const [],
+            ),
+            alignment: Alignment.center,
+            child: Icon(
+              Icons.arrow_back_rounded,
+              size: 18,
+              color: _hovered ? AppColors.primary : AppColors.textMuted,
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

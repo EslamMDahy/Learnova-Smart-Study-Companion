@@ -272,54 +272,6 @@ class AiQuestionGenerationResponse {
   );
 }
 
-class AiQuestionGenerationStatusResponse {
-  final String requestId;
-  final String status;
-  final bool aiProcessingStarted;
-  final bool callbackReceived;
-  final bool completed;
-  final bool failed;
-  final bool expired;
-  final int insertedCount;
-  final List<int> questionIds;
-  final String? message;
-  final String? errorMessage;
-
-  const AiQuestionGenerationStatusResponse({
-    required this.requestId,
-    required this.status,
-    required this.aiProcessingStarted,
-    required this.callbackReceived,
-    required this.completed,
-    required this.failed,
-    required this.expired,
-    required this.insertedCount,
-    required this.questionIds,
-    this.message,
-    this.errorMessage,
-  });
-
-  factory AiQuestionGenerationStatusResponse.fromJson(Map<String,dynamic> j) {
-    final rawIds = (j['question_ids'] as List?) ?? const <dynamic>[];
-    return AiQuestionGenerationStatusResponse(
-      requestId: (j['request_id'] ?? '').toString(),
-      status: (j['status'] ?? '').toString(),
-      aiProcessingStarted: j['ai_processing_started'] == true,
-      callbackReceived: j['callback_received'] == true,
-      completed: j['completed'] == true,
-      failed: j['failed'] == true,
-      expired: j['expired'] == true,
-      insertedCount: (j['inserted_count'] as num?)?.toInt() ?? 0,
-      questionIds: rawIds
-          .map((dynamic value) => value is num ? value.toInt() : int.tryParse(value.toString()))
-          .whereType<int>()
-          .toList(),
-      message: j['message']?.toString(),
-      errorMessage: j['error_message']?.toString(),
-    );
-  }
-}
-
 class QuestionsApi {
   final ApiClient _client;
   QuestionsApi(this._client);
@@ -339,36 +291,6 @@ class QuestionsApi {
     );
   }
 
-  Future<AiQuestionGenerationStatusResponse> getAiGenerationStatus({
-    required int courseId,
-    required String requestId,
-    bool waitForCallback = false,
-    int timeoutSeconds = 600,
-    CancelToken? cancelToken,
-  }) async {
-    final int safeTimeoutSeconds = timeoutSeconds.clamp(1, 900).toInt();
-    final res = await _client.get<Map<String, dynamic>>(
-      Endpoints.aiGenerateQuestionsStatus(courseId, requestId),
-      queryParameters: waitForCallback
-          ? <String, dynamic>{
-              'wait': true,
-              'timeout_seconds': safeTimeoutSeconds,
-            }
-          : null,
-      options: waitForCallback
-          ? Options(
-              receiveTimeout: Duration(seconds: safeTimeoutSeconds + 30),
-              sendTimeout: const Duration(seconds: 30),
-              extra: const <String, dynamic>{'silent': true},
-            )
-          : null,
-      cancelToken: cancelToken,
-    );
-    return AiQuestionGenerationStatusResponse.fromJson(
-      Map<String, dynamic>.from(res.data ?? const {}),
-    );
-  }
-
 
 
   Future<CourseQuestionsResponse> getCourseQuestions({
@@ -385,6 +307,41 @@ class QuestionsApi {
       return CourseQuestionsResponse.fromJson(data);
     }
     throw const FormatException('Invalid response from GET /courses/{id}/questions');
+  }
+
+  Future<CourseQuestionsResponse> getModuleQuestions({
+    required int courseId,
+    required int moduleId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.moduleQuestions(courseId, moduleId),
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return CourseQuestionsResponse.fromJson(data);
+    }
+    throw const FormatException('Invalid response from GET /courses/{id}/modules/{moduleId}/questions');
+  }
+
+  Future<CourseQuestionsResponse> getMaterialQuestions({
+    required int courseId,
+    required int moduleId,
+    required int materialId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.materialQuestions(courseId, moduleId, materialId),
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return CourseQuestionsResponse.fromJson(data);
+    }
+    throw const FormatException('Invalid response from GET /courses/{id}/modules/{moduleId}/materials/{materialId}/questions');
   }
 
   Future<CourseQuestionsResponse> getTopicQuestions({

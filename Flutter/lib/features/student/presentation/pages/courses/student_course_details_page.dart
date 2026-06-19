@@ -13,6 +13,7 @@ import '../../../../../core/theme/app_theme.dart';
 import '../../../data/student_course_assistant_models.dart';
 import '../../../data/student_course_assistant_providers.dart';
 import '../../../data/student_courses_models.dart';
+import '../../../../../core/ui/chat/rich_message_renderer.dart';
 import '../../../data/student_courses_providers.dart';
 
 class StudentCourseDetailsPage extends ConsumerStatefulWidget {
@@ -3172,7 +3173,7 @@ class _StatusBadge extends StatelessWidget {
   }
 }
 
-class _StudyAssistantPanel extends StatelessWidget {
+class _StudyAssistantPanel extends StatefulWidget {
   final String courseTitle;
   final TextEditingController controller;
   final StudentCourseAssistantState assistantState;
@@ -3192,183 +3193,264 @@ class _StudyAssistantPanel extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    final moduleTitle = selectedModule?.safeTitle;
-    final materialTitle = selectedMaterial?.safeTitle;
-    final hasContext = materialTitle != null && materialTitle.trim().isNotEmpty;
+  State<_StudyAssistantPanel> createState() => _StudyAssistantPanelState();
+}
 
-    return Container(
-      width: 360,
+class _StudyAssistantPanelState extends State<_StudyAssistantPanel> {
+  static const double _minPanelWidth = 320;
+  static const double _defaultPanelWidth = 430;
+  static const double _maxPanelWidth = 760;
+
+  double _panelWidth = _defaultPanelWidth;
+
+  @override
+  Widget build(BuildContext context) {
+    final moduleTitle = widget.selectedModule?.safeTitle;
+    final materialTitle = widget.selectedMaterial?.safeTitle;
+    final hasContext = materialTitle != null && materialTitle.trim().isNotEmpty;
+    final isAssistantBusy = widget.assistantState.isBusy;
+    final screenWidth = MediaQuery.sizeOf(context).width;
+    final maxAllowedWidth = math.max(
+      _minPanelWidth,
+      math.min(_maxPanelWidth, screenWidth * 0.58),
+    );
+    final width = _panelWidth.clamp(_minPanelWidth, maxAllowedWidth).toDouble();
+
+    return SizedBox(
+      width: width,
       height: double.infinity,
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        border: Border(left: BorderSide(color: AppColors.border)),
-      ),
-      child: Column(
+      child: Stack(
         children: [
           Container(
-            height: 70,
-            padding: const EdgeInsets.symmetric(horizontal: 16),
+            width: width,
+            height: double.infinity,
             decoration: BoxDecoration(
-              border: Border(bottom: BorderSide(color: AppColors.border)),
+              color: AppColors.cardBg,
+              border: Border(left: BorderSide(color: AppColors.border)),
             ),
-            child: Row(
+            child: Column(
               children: [
-                _AssistantBotIcon(size: 32),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                Container(
+                  height: 70,
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  decoration: BoxDecoration(
+                    border: Border(bottom: BorderSide(color: AppColors.border)),
+                  ),
+                  child: Row(
                     children: [
-                      Text(
-                        'Course assistant',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.textTitle,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w900,
+                      _AssistantBotIcon(size: 32),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Course assistant',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppColors.textTitle,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w900,
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              widget.courseTitle,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                color: AppColors.textMuted,
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 3),
-                      Text(
-                        courseTitle,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: AppColors.textMuted,
-                          fontSize: 11.5,
-                          fontWeight: FontWeight.w700,
+                      Tooltip(
+                        message: 'Drag the left edge to resize chat',
+                        child: Icon(
+                          Icons.open_in_full_rounded,
+                          color: AppColors.textHint,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      IconButton(
+                        tooltip: 'New chat',
+                        onPressed: isAssistantBusy ? null : widget.onClear,
+                        icon: Icon(
+                          Icons.add_comment_outlined,
+                          color: isAssistantBusy ? AppColors.textHint : AppColors.primary,
+                          size: 20,
                         ),
                       ),
                     ],
                   ),
                 ),
-                IconButton(
-                  tooltip: 'New chat',
-                  onPressed: assistantState.sending ? null : onClear,
-                  icon: Icon(
-                    Icons.add_comment_outlined,
-                    color: assistantState.sending ? AppColors.textHint : AppColors.primary,
-                    size: 20,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
-              children: [
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.headerBg,
-                      borderRadius: BorderRadius.circular(999),
-                    ),
-                    child: Text(
-                      'Today',
-                      style: TextStyle(
-                        color: AppColors.textHint,
-                        fontSize: 10,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                _AssistantContextCard(
-                  moduleTitle: moduleTitle,
-                  materialTitle: materialTitle,
-                ),
-                const SizedBox(height: 14),
-                if (assistantState.messages.isEmpty) ...[
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                Expanded(
+                  child: ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
                     children: [
-                      _AssistantBotIcon(size: 26),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: _AssistantMessage(
-                          isUser: false,
+                      Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 4,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.headerBg,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
                           child: Text(
-                            hasContext
-                                ? 'Ask anything about this material. I will create a chat session from your first message, then keep the same session for follow-up questions.'
-                                : 'Ask anything about this course. Select a material first if you want the question to stay focused on one lecture.',
+                            'Today',
                             style: TextStyle(
-                              color: AppColors.textGray,
-                              fontSize: 12.5,
-                              height: 1.45,
-                              fontWeight: FontWeight.w500,
+                              color: AppColors.textHint,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
                             ),
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: [
-                      _AssistantChip(
-                        label: 'Summarize material',
-                        onTap: hasContext
-                            ? () => onSend('Summarize "${materialTitle!}" in clear bullet points.')
-                            : null,
+                      const SizedBox(height: 16),
+                      _AssistantContextCard(
+                        moduleTitle: moduleTitle,
+                        materialTitle: materialTitle,
                       ),
-                      _AssistantChip(
-                        label: 'Explain simply',
-                        onTap: hasContext
-                            ? () => onSend('Explain "${materialTitle!}" in simple terms with examples.')
-                            : null,
-                      ),
-                      _AssistantChip(
-                        label: 'Quiz me',
-                        onTap: hasContext
-                            ? () => onSend('Quiz me on "${materialTitle!}", then wait for my answers.')
-                            : null,
-                      ),
-                    ],
-                  ),
-                ] else ...[
-                  for (final message in assistantState.messages) ...[
-                    if (!message.isUser)
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _AssistantBotIcon(size: 26),
-                          const SizedBox(width: 8),
-                          Expanded(child: _AssistantBubble(message: message)),
+                      const SizedBox(height: 14),
+                      if (widget.assistantState.loadingHistory) ...[
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _AssistantBotIcon(size: 26),
+                            const SizedBox(width: 8),
+                            const _AssistantHistoryLoadingBubble(),
+                          ],
+                        ),
+                      ] else if (widget.assistantState.messages.isEmpty) ...[
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _AssistantBotIcon(size: 26),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: _AssistantMessage(
+                                isUser: false,
+                                child: Text(
+                                  hasContext
+                                      ? 'Ask anything about this material. I will create a chat session from your first message, then keep the same session for follow-up questions.'
+                                      : 'Ask anything about this course. Select a material first if you want the question to stay focused on one lecture.',
+                                  style: TextStyle(
+                                    color: AppColors.textGray,
+                                    fontSize: 12.5,
+                                    height: 1.45,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 10),
+                        Wrap(
+                          spacing: 8,
+                          runSpacing: 8,
+                          children: [
+                            _AssistantChip(
+                              label: 'Summarize material',
+                              onTap: hasContext
+                                  ? () => widget.onSend(
+                                        'Summarize "${materialTitle!}" in clear bullet points.',
+                                      )
+                                  : null,
+                            ),
+                            _AssistantChip(
+                              label: 'Explain simply',
+                              onTap: hasContext
+                                  ? () => widget.onSend(
+                                        'Explain "${materialTitle!}" in simple terms with examples.',
+                                      )
+                                  : null,
+                            ),
+                            _AssistantChip(
+                              label: 'Quiz me',
+                              onTap: hasContext
+                                  ? () => widget.onSend(
+                                        'Quiz me on "${materialTitle!}", then wait for my answers.',
+                                      )
+                                  : null,
+                            ),
+                          ],
+                        ),
+                      ] else ...[
+                        for (final message in widget.assistantState.messages) ...[
+                          if (!message.isUser)
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _AssistantBotIcon(size: 26),
+                                const SizedBox(width: 8),
+                                Expanded(child: _AssistantBubble(message: message)),
+                              ],
+                            )
+                          else
+                            _AssistantBubble(message: message),
+                          const SizedBox(height: 12),
                         ],
-                      )
-                    else
-                      _AssistantBubble(message: message),
-                    const SizedBox(height: 12),
-                  ],
-                  if (assistantState.sending)
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _AssistantBotIcon(size: 26),
-                        const SizedBox(width: 8),
-                        const _AssistantTypingBubble(),
+                        if (widget.assistantState.sending)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              _AssistantBotIcon(size: 26),
+                              const SizedBox(width: 8),
+                              const _AssistantTypingBubble(),
+                            ],
+                          ),
                       ],
-                    ),
-                ],
+                    ],
+                  ),
+                ),
+                _AssistantInputBar(
+                  controller: widget.controller,
+                  sending: widget.assistantState.sending,
+                  enabled: !widget.assistantState.loadingHistory,
+                  onSend: widget.onSend,
+                ),
               ],
             ),
           ),
-          _AssistantInputBar(
-            controller: controller,
-            sending: assistantState.sending,
-            enabled: true,
-            onSend: onSend,
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: MouseRegion(
+              cursor: SystemMouseCursors.resizeLeftRight,
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onHorizontalDragUpdate: (details) {
+                  setState(() {
+                    _panelWidth = (_panelWidth - details.delta.dx)
+                        .clamp(_minPanelWidth, maxAllowedWidth)
+                        .toDouble();
+                  });
+                },
+                child: SizedBox(
+                  width: 10,
+                  child: Center(
+                    child: Container(
+                      width: 3,
+                      height: 46,
+                      decoration: BoxDecoration(
+                        color: AppColors.border,
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -3582,14 +3664,8 @@ class _AssistantBubble extends StatelessWidget {
               ),
             )
           else
-            _AssistantMarkdownText(
-              data: message.content,
-              baseStyle: TextStyle(
-                color: AppColors.textGray,
-                fontSize: 12.5,
-                height: 1.45,
-                fontWeight: FontWeight.w500,
-              ),
+            RichMessageRenderer(
+              text: message.content,
             ),
           if (!message.isUser && message.sources.isNotEmpty) ...[
             const SizedBox(height: 10),
@@ -3625,122 +3701,11 @@ class _AssistantBubble extends StatelessWidget {
 
 
 class _AssistantMarkdownText extends StatelessWidget {
-  final String data;
-  final TextStyle baseStyle;
-
-  const _AssistantMarkdownText({
-    required this.data,
-    required this.baseStyle,
-  });
-
+  final String text;
+  const _AssistantMarkdownText({required this.text});
   @override
   Widget build(BuildContext context) {
-    final normalized = data.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-    final lines = normalized.split('\n');
-    final widgets = <Widget>[];
-
-    for (var index = 0; index < lines.length; index++) {
-      final line = lines[index].trimRight();
-      final trimmed = line.trim();
-
-      if (trimmed.isEmpty) {
-        if (widgets.isNotEmpty && index != lines.length - 1) {
-          widgets.add(const SizedBox(height: 8));
-        }
-        continue;
-      }
-
-      final heading = _MarkdownHeading.tryParse(trimmed);
-      if (heading != null) {
-        widgets.add(_AssistantMarkdownLine(
-          text: heading.text,
-          style: baseStyle.copyWith(
-            color: AppColors.textTitle,
-            fontSize: heading.fontSize,
-            height: 1.35,
-            fontWeight: FontWeight.w900,
-          ),
-        ));
-        if (index != lines.length - 1) widgets.add(const SizedBox(height: 6));
-        continue;
-      }
-
-      final unordered = RegExp(r'^[-*•]\s+(.+)$').firstMatch(trimmed);
-      if (unordered != null) {
-        widgets.add(_AssistantMarkdownBullet(
-          marker: '•',
-          text: unordered.group(1)!.trim(),
-          baseStyle: baseStyle,
-        ));
-        if (index != lines.length - 1) widgets.add(const SizedBox(height: 4));
-        continue;
-      }
-
-      final ordered = RegExp(r'^(\d+)[.)]\s+(.+)$').firstMatch(trimmed);
-      if (ordered != null) {
-        widgets.add(_AssistantMarkdownBullet(
-          marker: '${ordered.group(1)!}.',
-          text: ordered.group(2)!.trim(),
-          baseStyle: baseStyle,
-        ));
-        if (index != lines.length - 1) widgets.add(const SizedBox(height: 4));
-        continue;
-      }
-
-      final quote = RegExp(r'^>\s?(.+)$').firstMatch(trimmed);
-      if (quote != null) {
-        widgets.add(Container(
-          padding: const EdgeInsets.only(left: 10),
-          decoration: BoxDecoration(
-            border: Border(left: BorderSide(color: AppColors.border, width: 3)),
-          ),
-          child: _AssistantMarkdownLine(
-            text: quote.group(1)!.trim(),
-            style: baseStyle.copyWith(color: AppColors.textMuted),
-          ),
-        ));
-        if (index != lines.length - 1) widgets.add(const SizedBox(height: 6));
-        continue;
-      }
-
-      widgets.add(_AssistantMarkdownLine(text: trimmed, style: baseStyle));
-      if (index != lines.length - 1) widgets.add(const SizedBox(height: 4));
-    }
-
-    if (widgets.isEmpty) {
-      return Text('', style: baseStyle);
-    }
-
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: widgets,
-    );
-  }
-}
-
-class _MarkdownHeading {
-  final String text;
-  final double fontSize;
-
-  const _MarkdownHeading({required this.text, required this.fontSize});
-
-  static _MarkdownHeading? tryParse(String line) {
-    final match = RegExp(r'^(#{1,4})\s+(.+)$').firstMatch(line);
-    if (match == null) return null;
-
-    final level = match.group(1)!.length;
-    final text = match.group(2)!.trim();
-    var fontSize = 13.2;
-    if (level == 1) {
-      fontSize = 16.0;
-    } else if (level == 2) {
-      fontSize = 15.0;
-    } else if (level == 3) {
-      fontSize = 14.0;
-    }
-
-    return _MarkdownHeading(text: text, fontSize: fontSize);
+    return RichMessageRenderer(text: text);
   }
 }
 
@@ -3962,6 +3927,40 @@ class _MarkdownInlineToken {
     required this.contentEnd,
     required this.end,
   });
+}
+
+
+class _AssistantHistoryLoadingBubble extends StatelessWidget {
+  const _AssistantHistoryLoadingBubble();
+
+  @override
+  Widget build(BuildContext context) {
+    return _AssistantMessage(
+      isUser: false,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          SizedBox(
+            width: 14,
+            height: 14,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.primary,
+            ),
+          ),
+          const SizedBox(width: 9),
+          Text(
+            'Loading previous chat...',
+            style: TextStyle(
+              color: AppColors.textMuted,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _AssistantTypingBubble extends StatelessWidget {
@@ -5209,23 +5208,33 @@ class _AssistantMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 260),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: isUser ? AppColors.primary : AppColors.cardBg,
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(12),
-            topRight: const Radius.circular(12),
-            bottomLeft: isUser ? const Radius.circular(12) : Radius.zero,
-            bottomRight: isUser ? Radius.zero : const Radius.circular(12),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.hasBoundedWidth ? constraints.maxWidth : 420.0;
+        final bubbleMaxWidth = isUser ? math.min(360.0, availableWidth * 0.84) : availableWidth;
+
+        return Align(
+          alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
+          child: ConstrainedBox(
+            constraints: BoxConstraints(maxWidth: bubbleMaxWidth),
+            child: Container(
+              width: isUser ? null : double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: isUser ? AppColors.primary : AppColors.cardBg,
+                borderRadius: BorderRadius.only(
+                  topLeft: const Radius.circular(12),
+                  topRight: const Radius.circular(12),
+                  bottomLeft: isUser ? const Radius.circular(12) : Radius.zero,
+                  bottomRight: isUser ? Radius.zero : const Radius.circular(12),
+                ),
+                border: isUser ? null : Border.all(color: AppColors.border),
+              ),
+              child: child,
+            ),
           ),
-          border: isUser ? null : Border.all(color: AppColors.border),
-        ),
-        child: child,
-      ),
+        );
+      },
     );
   }
 }

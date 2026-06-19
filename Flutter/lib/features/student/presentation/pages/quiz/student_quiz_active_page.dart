@@ -28,6 +28,8 @@ class _StudentQuizActivePageState extends ConsumerState<StudentQuizActivePage> {
   final Stopwatch _stopwatch = Stopwatch();
 
   Timer? _timer;
+  final Map<int, Timer> _answerSaveDebounces = <int, Timer>{};
+  final Set<int> _savingAnswerIds = <int>{};
   DateTime _now = DateTime.now();
   int _currentIndex = 0;
   bool _submitting = false;
@@ -38,6 +40,9 @@ class _StudentQuizActivePageState extends ConsumerState<StudentQuizActivePage> {
   @override
   void dispose() {
     _timer?.cancel();
+    for (final timer in _answerSaveDebounces.values) {
+      timer.cancel();
+    }
     for (final controller in _textControllers.values) {
       controller.dispose();
     }
@@ -142,6 +147,7 @@ class _StudentQuizActivePageState extends ConsumerState<StudentQuizActivePage> {
                                   },
                                   onSingleSelected: (optionIndex) {
                                     setState(() => _singleAnswers[question.examQuestionId] = optionIndex);
+                                    _scheduleAnswerAutosave(courseId, attempt, question);
                                   },
                                   onMultiChanged: (optionIndex, selected) {
                                     setState(() {
@@ -149,8 +155,12 @@ class _StudentQuizActivePageState extends ConsumerState<StudentQuizActivePage> {
                                       selected ? values.add(optionIndex) : values.remove(optionIndex);
                                       _multiAnswers[question.examQuestionId] = values;
                                     });
+                                    _scheduleAnswerAutosave(courseId, attempt, question);
                                   },
-                                  onTextChanged: () => setState(() {}),
+                                  onTextChanged: () {
+                                    setState(() {});
+                                    _scheduleAnswerAutosave(courseId, attempt, question);
+                                  },
                                   onPrevious: clampedIndex > 0 ? () => setState(() => _currentIndex--) : null,
                                   onNext: clampedIndex < questions.length - 1 ? () => setState(() => _currentIndex++) : null,
                                   onFinish: _submitting ? null : () => _confirmSubmit(courseId, attempt),
@@ -279,6 +289,82 @@ class _StudentQuizActivePageState extends ConsumerState<StudentQuizActivePage> {
     return index.toString();
   }
 
+  StudentExamAnswerDraft? _draftForQuestion(StudentExamQuestion question) {
+    if (question.hasOptions) {
+      if (question.allowsMultipleSelection) {
+        final selected = (_multiAnswers[question.examQuestionId] ?? const <int>{}).toList()..sort();
+        if (selected.isEmpty) return null;
+        final selectedKeys = selected
+            .map((index) => _backendOptionKey(question, index))
+            .where((key) => key.isNotEmpty)
+            .toList(growable: false);
+        return StudentExamAnswerDraft(
+          examQuestionId: question.examQuestionId,
+          selectedOptionIndices: selected,
+          answerText: selectedKeys.isEmpty ? null : jsonEncode(selectedKeys),
+          timeTakenSeconds: _stopwatch.elapsed.inSeconds,
+        );
+      }
+
+      final selected = _singleAnswers[question.examQuestionId];
+      if (selected == null) return null;
+      final selectedKey = _backendOptionKey(question, selected);
+      return StudentExamAnswerDraft(
+        examQuestionId: question.examQuestionId,
+        selectedOptionIndex: selected,
+        answerText: selectedKey.isEmpty ? null : selectedKey,
+        timeTakenSeconds: _stopwatch.elapsed.inSeconds,
+      );
+    }
+
+    final text = (_textControllers[question.examQuestionId]?.text ?? '').trim();
+    if (text.isEmpty) return null;
+    return StudentExamAnswerDraft(
+      examQuestionId: question.examQuestionId,
+      answerText: text,
+      timeTakenSeconds: _stopwatch.elapsed.inSeconds,
+    );
+  }
+
+  void _scheduleAnswerAutosave(
+    int courseId,
+    StudentExamAttempt attempt,
+    StudentExamQuestion question,
+  ) {
+    if (_submitting || attempt.attemptId <= 0) return;
+    final questionId = question.examQuestionId;
+    _answerSaveDebounces[questionId]?.cancel();
+    _answerSaveDebounces[questionId] = Timer(const Duration(milliseconds: 650), () {
+      unawaited(_saveAnswerNow(courseId, attempt, question));
+    });
+  }
+
+  Future<void> _saveAnswerNow(
+    int courseId,
+    StudentExamAttempt attempt,
+    StudentExamQuestion question,
+  ) async {
+    final draft = _draftForQuestion(question);
+    if (draft == null || !mounted || _submitting) return;
+
+    final questionId = question.examQuestionId;
+    if (_savingAnswerIds.contains(questionId)) return;
+    _savingAnswerIds.add(questionId);
+    try {
+      await ref.read(studentCoursesApiProvider).saveStudentExamAnswer(
+            courseId: courseId,
+            examId: attempt.examId,
+            attemptId: attempt.attemptId,
+            answer: draft,
+            cancelToken: CancelToken(),
+          );
+    } catch (_) {
+      // Autosave stays silent. Final submit still sends the complete answer set.
+    } finally {
+      _savingAnswerIds.remove(questionId);
+    }
+  }
+
   Future<void> _confirmSubmit(int courseId, StudentExamAttempt attempt) async {
     final unanswered = attempt.questions.where((question) => !_isAnswered(question)).length;
     final submit = await showDialog<bool>(
@@ -314,6 +400,10 @@ class _StudentQuizActivePageState extends ConsumerState<StudentQuizActivePage> {
     bool forced = false,
   }) async {
     if (_submitting || !mounted) return;
+    for (final timer in _answerSaveDebounces.values) {
+      timer.cancel();
+    }
+    _answerSaveDebounces.clear();
     setState(() => _submitting = true);
 
     try {

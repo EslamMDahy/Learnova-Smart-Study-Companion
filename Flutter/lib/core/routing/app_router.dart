@@ -361,6 +361,27 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 courseDetailsPage(state, CourseDetailsTab.students),
           ),
           GoRoute(
+            path: Routes.instructorCourseQuizzes,
+            name: RouteNames.instructorCourseQuizzes,
+            pageBuilder: (_, state) {
+              final slug = state.pathParameters['courseSlug']!;
+              final cached = SelectedCourseCache.value;
+              final routeCourseId = parseCourseIdFromSlug(slug);
+              final courseId = cached != null && slugMatchesCourse(slug, cached)
+                  ? cached.id
+                  : routeCourseId ?? SelectedCourseCache.cachedCourseId;
+              return NoTransitionPage(
+                key: ValueKey<String>('course-exams-$slug'),
+                child: InstructorQuizzesScreen(
+                  courseId: courseId,
+                  courseTitle: cached != null && slugMatchesCourse(slug, cached)
+                      ? cached.safeTitle
+                      : null,
+                ),
+              );
+            },
+          ),
+          GoRoute(
             path: Routes.instructorNotifications,
             name: RouteNames.instructorNotifications,
             pageBuilder: (_, __) =>

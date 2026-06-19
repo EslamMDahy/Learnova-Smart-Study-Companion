@@ -10,7 +10,6 @@ import '../../../data/modules_models.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../controllers/selected_course_provider.dart';
 import '../../course_route_identity.dart';
-import '../generate_questions_dialog.dart';
 
 abstract final class _H {
   static String titleCase(String value) {
@@ -245,12 +244,6 @@ class CourseOverviewTab extends ConsumerWidget {
                       ),
                     ],
                   ),
-                const SizedBox(height: 14),
-                _UsefulShortcuts(
-                  course: course,
-                  slug: slug,
-                  canGenerate: materialCount > 0,
-                ),
               ],
             ),
           );
@@ -1014,159 +1007,6 @@ class _FactRow extends StatelessWidget {
   }
 }
 
-class _UsefulShortcuts extends StatelessWidget {
-  final MyCourseItem course;
-  final String slug;
-  final bool canGenerate;
-
-  const _UsefulShortcuts({
-    required this.course,
-    required this.slug,
-    required this.canGenerate,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final actions = [
-      _Shortcut(
-        icon: Icons.folder_open_outlined,
-        label: 'Materials',
-        onTap: () => _H.openTab(context, course, Routes.courseMaterials(slug)),
-      ),
-      _Shortcut(
-        icon: Icons.flag_outlined,
-        label: 'Outcomes',
-        onTap: () => _H.openTab(context, course, Routes.courseOutcomes(slug)),
-      ),
-      _Shortcut(
-        icon: Icons.quiz_outlined,
-        label: 'Question Bank',
-        onTap: () => _H.openTab(context, course, Routes.courseQuestionBank(slug)),
-      ),
-      _Shortcut(
-        icon: Icons.people_outline_rounded,
-        label: 'Students',
-        onTap: () => _H.openTab(context, course, Routes.courseStudents(slug)),
-      ),
-    ];
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: _H.cardDecoration(),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 760;
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Useful shortcuts',
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textTitle,
-                        ),
-                      ),
-                    ),
-                    if (canGenerate)
-                      _TextLink(
-                        label: 'Generate questions',
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (_) => GenerateQuestionsDialog(courseId: course.id),
-                          );
-                        },
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 10),
-              if (compact)
-                Column(
-                  children: [
-                    for (var i = 0; i < actions.length; i++) ...[
-                      _ShortcutTile(shortcut: actions[i]),
-                      if (i != actions.length - 1) const SizedBox(height: 8),
-                    ],
-                  ],
-                )
-              else
-                Row(
-                  children: [
-                    for (var i = 0; i < actions.length; i++) ...[
-                      Expanded(child: _ShortcutTile(shortcut: actions[i])),
-                      if (i != actions.length - 1) const SizedBox(width: 10),
-                    ],
-                  ],
-                ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _Shortcut {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _Shortcut({required this.icon, required this.label, required this.onTap});
-}
-
-class _ShortcutTile extends StatelessWidget {
-  final _Shortcut shortcut;
-
-  const _ShortcutTile({required this.shortcut});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(13),
-        onTap: shortcut.onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceBg,
-            borderRadius: BorderRadius.circular(13),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: Row(
-            children: [
-              Icon(shortcut.icon, size: 17, color: AppColors.primary),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Text(
-                  shortcut.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textTitle,
-                  ),
-                ),
-              ),
-              Icon(Icons.arrow_forward_ios_rounded, size: 11, color: AppColors.textHint),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _CardTitle extends StatelessWidget {
   final IconData icon;
@@ -1291,35 +1131,6 @@ class _PrimaryActionButton extends StatelessWidget {
   }
 }
 
-class _TextLink extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-
-  const _TextLink({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(9),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          child: Text(
-            label,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 12,
-              fontWeight: FontWeight.w800,
-              color: AppColors.primary,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 class _EmptyInline extends StatelessWidget {
   final IconData icon;

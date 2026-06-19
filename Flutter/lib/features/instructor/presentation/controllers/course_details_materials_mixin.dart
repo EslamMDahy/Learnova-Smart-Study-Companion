@@ -85,6 +85,53 @@ mixin _CourseDetailsMaterialsMixin on StateNotifier<CourseDetailsState> {
     }
   }
 
+
+
+  Future<bool> deleteMaterial({
+    required int moduleId,
+    required int materialId,
+  }) async {
+    try {
+      await ref.read(materialsApiProvider).deleteMaterial(
+            courseId: courseId,
+            moduleId: moduleId,
+            materialId: materialId,
+          );
+
+      final nextMaterials = Map<int, List<MaterialItem>>.from(state.materials);
+      final current = nextMaterials[moduleId] ?? const <MaterialItem>[];
+      nextMaterials[moduleId] = current
+          .where((material) => material.id != materialId)
+          .toList(growable: false);
+
+      final nextTopics = Map<int, List<TopicItem>>.from(state.topics);
+      final currentTopics = nextTopics[moduleId] ?? const <TopicItem>[];
+      nextTopics[moduleId] = currentTopics
+          .where((topic) => topic.materialId != materialId)
+          .toList(growable: false);
+
+      final nextLoadedTopicIds = <int>{...state.topicsLoadedMaterialIds}
+        ..remove(materialId);
+      final nextDownloadUrls = Map<int, String>.from(state.downloadUrls)
+        ..remove(materialId);
+      final nextDownloadLoading = Map<int, bool>.from(state.downloadUrlLoading)
+        ..remove(materialId);
+
+      state = state.copyWith(
+        materials: nextMaterials,
+        topics: nextTopics,
+        topicsLoadedMaterialIds: nextLoadedTopicIds,
+        downloadUrls: nextDownloadUrls,
+        downloadUrlLoading: nextDownloadLoading,
+      );
+      return true;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(ref, failure);
+      return false;
+    }
+  }
+
   // ── Upload ──────────────────────────────────────────────────────────────
 
   Future<bool> uploadMaterial({
@@ -94,7 +141,26 @@ mixin _CourseDetailsMaterialsMixin on StateNotifier<CourseDetailsState> {
     required String contentType,
     String? title,
   }) async {
-    state = state.copyWith(uploading: true, uploadProgress: 0.0);
+    final result = await uploadMaterialFlow(
+      moduleId: moduleId,
+      bytes: bytes,
+      filename: filename,
+      contentType: contentType,
+      title: title,
+    );
+    return result != null;
+  }
+
+  Future<MaterialUploadFlowResult?> uploadMaterialFlow({
+    required int moduleId,
+    required Uint8List bytes,
+    required String filename,
+    required String contentType,
+    String? title,
+    void Function(double progress)? onUploadProgress,
+  }) async {
+    state = state.copyWith(uploading: true, uploadProgress: 0.0, uploadError: null);
+    onUploadProgress?.call(0.0);
 
     try {
       final initResp = await ref.read(materialsApiProvider).initUpload(
@@ -109,6 +175,7 @@ mixin _CourseDetailsMaterialsMixin on StateNotifier<CourseDetailsState> {
           );
 
       state = state.copyWith(uploadProgress: 0.3);
+      onUploadProgress?.call(0.3);
 
       await ref.read(materialsApiProvider).uploadToPresignedUrl(
             uploadUrl: initResp.uploadUrl,
@@ -116,25 +183,28 @@ mixin _CourseDetailsMaterialsMixin on StateNotifier<CourseDetailsState> {
             contentType: contentType,
             onSendProgress: (sent, total) {
               if (total <= 0) return;
-              final p = (0.3 + (0.4 * sent / total)).clamp(0.0, 0.7);
+              final p = (0.3 + (0.4 * sent / total)).clamp(0.0, 0.7).toDouble();
               state = state.copyWith(uploadProgress: p);
+              onUploadProgress?.call(p);
             },
           );
 
       state = state.copyWith(uploadProgress: 0.7);
+      onUploadProgress?.call(0.7);
 
-      await ref.read(materialsApiProvider).confirmUpload(
+      final confirm = await ref.read(materialsApiProvider).confirmUpload(
             materialId: initResp.materialId,
           );
 
       state = state.copyWith(uploading: false, uploadProgress: 1.0);
-      await loadMaterials(moduleId);
-      return true;
+      onUploadProgress?.call(1.0);
+      await loadMaterials(moduleId, force: true);
+      return MaterialUploadFlowResult.fromConfirm(confirm);
     } catch (e) {
       final failure = mapApiFailure(e);
       AppErrorReporter.report(ref, failure);
       state = state.copyWith(uploading: false, uploadError: failure.message);
-      return false;
+      return null;
     }
   }
 

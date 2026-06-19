@@ -3,8 +3,10 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../../core/network/error_mapper.dart';
+import '../../../../../core/routing/routes.dart';
 import '../../../../../shared/widgets/app_ui_components.dart';
 import '../../../data/courses_models.dart';
 import '../../../data/exam_models.dart';
@@ -19,6 +21,8 @@ import '../../../data/questions_api.dart';
 import '../../../data/topics_models.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../controllers/course_details_state.dart';
+import '../../controllers/selected_course_provider.dart';
+import '../../course_route_identity.dart';
 import '../course_outcomes_panel.dart';
 import 'create_exam_flow.dart';
 
@@ -354,7 +358,7 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
     final outcomes = ref.read(courseLOProvider(widget.course.id));
     final latestState = ref.read(courseDetailsControllerProvider(widget.course.id));
     final latestTopicTargets = _topicTargetsFromState(latestState);
-    final config = await showDialog<_ExamStartConfig>(
+    final result = await showDialog<Object?>(
       context: context,
       barrierDismissible: false,
       builder: (_) => _CreateExamStartDialog(
@@ -365,14 +369,33 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
         topicTargets: latestTopicTargets,
         outcomes: outcomes,
         questions: _questions,
-        onGenerated: _loadQuestions,
       ),
     );
-    if (config == null || !mounted) return;
-    setState(() {
-      _examStartConfig = config;
-      _creatingExam = true;
-    });
+    if (result == null || !mounted) return;
+
+    if (result is _GeneratedExamResult) {
+      await _loadQuestions();
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => _GeneratedExamSuccessDialog(
+          exam: result.exam,
+          template: result.template,
+        ),
+      );
+      if (!mounted) return;
+      SelectedCourseCache.set(widget.course);
+      context.go(Routes.courseQuizzes(buildCourseRouteSlug(widget.course)));
+      return;
+    }
+
+    if (result is _ExamStartConfig) {
+      setState(() {
+        _examStartConfig = result;
+        _creatingExam = true;
+      });
+    }
   }
 
   void _clearFilters() {
@@ -503,6 +526,16 @@ class _ExamStartConfig {
   });
 }
 
+class _GeneratedExamResult {
+  final ExamModel exam;
+  final ExamTemplateModel template;
+
+  const _GeneratedExamResult({
+    required this.exam,
+    required this.template,
+  });
+}
+
 class _CreateExamStartDialog extends ConsumerStatefulWidget {
   final MyCourseItem course;
   final List<ExamTemplateModel> templates;
@@ -511,8 +544,6 @@ class _CreateExamStartDialog extends ConsumerStatefulWidget {
   final List<_TopicTarget> topicTargets;
   final List<LearningOutcome> outcomes;
   final List<QuestionModel> questions;
-  final Future<void> Function()? onGenerated;
-
   const _CreateExamStartDialog({
     required this.course,
     required this.templates,
@@ -521,7 +552,6 @@ class _CreateExamStartDialog extends ConsumerStatefulWidget {
     required this.topicTargets,
     required this.outcomes,
     required this.questions,
-    this.onGenerated,
   });
 
   @override
@@ -1073,14 +1103,7 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
           );
 
       if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        builder: (_) => _GeneratedExamSuccessDialog(exam: exam, template: savedTemplate),
-      );
-      if (!mounted) return;
-      await widget.onGenerated?.call();
-      if (!mounted) return;
-      Navigator.of(context).pop();
+      Navigator.of(context).pop(_GeneratedExamResult(exam: exam, template: savedTemplate));
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -1139,12 +1162,12 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
     );
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 28, vertical: 22),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 18),
       backgroundColor: Colors.transparent,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 1120, maxHeight: 820),
+        constraints: const BoxConstraints(maxWidth: 1160, maxHeight: 760),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(18),
           child: Material(
             color: AppColors.cardBg,
             child: Column(
@@ -1157,32 +1180,34 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
                 ),
                 if (_error != null)
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                    padding: const EdgeInsets.fromLTRB(22, 14, 22, 0),
                     child: _SetupAlert(message: _error!, tone: _SetupAlertTone.danger),
                   ),
                 if (_templatesLoading)
                   const Padding(
-                    padding: EdgeInsets.fromLTRB(24, 18, 24, 0),
+                    padding: EdgeInsets.fromLTRB(22, 14, 22, 0),
                     child: _SetupAlert(
-                      message: 'Syncing saved exam templates from the backend. You can continue with the visible options.',
+                      message: 'Syncing exam templates from the backend. You can continue with the visible options.',
                       tone: _SetupAlertTone.info,
                     ),
                   ),
                 if (treeLoading && effectiveTopicTargets.isEmpty)
                   const Padding(
-                    padding: EdgeInsets.fromLTRB(24, 18, 24, 0),
+                    padding: EdgeInsets.fromLTRB(22, 14, 22, 0),
                     child: _SetupAlert(
-                      message: 'Loading course materials and topics directly from the backend...',
+                      message: 'Loading course structure from the backend...',
                       tone: _SetupAlertTone.info,
                     ),
                   ),
                 Flexible(
                   child: LayoutBuilder(
                     builder: (context, constraints) {
-                      final compact = constraints.maxWidth < 900;
+                      final compact = constraints.maxWidth < 980;
+                      final narrow = constraints.maxWidth < 680;
+
                       final blueprintPanel = _SetupPanel(
                         title: 'Blueprint',
-                        subtitle: 'Name the exam and select the template the backend should use.',
+                        subtitle: 'Exam metadata and backend template.',
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -1192,7 +1217,7 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
                               enabled: !_generating,
                               onChanged: (_) => setState(() => _error = null),
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 12),
                             _SetupDropdownField(
                               label: 'Template',
                               width: double.infinity,
@@ -1210,70 +1235,77 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
                                 });
                               },
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 12),
                             LayoutBuilder(
                               builder: (context, inner) {
-                                final twoCols = inner.maxWidth >= 560;
-                                final width = twoCols ? (inner.maxWidth - 12) / 2 : inner.maxWidth;
-                                return Wrap(
-                                  spacing: 12,
-                                  runSpacing: 12,
+                                final stacked = inner.maxWidth < 320;
+                                final width = stacked ? inner.maxWidth : (inner.maxWidth - 10) / 2;
+                                final fields = <Widget>[
+                                  _SetupDropdownField(
+                                    label: 'Module scope',
+                                    width: width,
+                                    value: moduleValue,
+                                    items: moduleItems,
+                                    onChanged: (value) {
+                                      final module = effectiveModules.cast<ModuleItem?>().firstWhere(
+                                            (item) => item != null && _moduleLabel(item) == value,
+                                            orElse: () => null,
+                                          );
+                                      setState(() {
+                                        _moduleId = module?.id;
+                                        _materialId = null;
+                                        _topicIds.clear();
+                                        _error = null;
+                                      });
+                                    },
+                                  ),
+                                  _SetupDropdownField(
+                                    label: 'Material scope',
+                                    width: width,
+                                    value: materialValue,
+                                    items: materialItems,
+                                    onChanged: (value) {
+                                      final option = materialOptions.cast<_FilterOption?>().firstWhere(
+                                            (item) => item != null && item.label == value,
+                                            orElse: () => null,
+                                          );
+                                      setState(() {
+                                        _materialId = option?.id;
+                                        _topicIds.clear();
+                                        _error = null;
+                                      });
+                                    },
+                                  ),
+                                ];
+                                if (stacked) {
+                                  return Column(
+                                    children: [
+                                      fields[0],
+                                      const SizedBox(height: 12),
+                                      fields[1],
+                                    ],
+                                  );
+                                }
+                                return Row(
                                   children: [
-                                    _SetupDropdownField(
-                                      label: 'Module scope',
-                                      width: width,
-                                      value: moduleValue,
-                                      items: moduleItems,
-                                      onChanged: (value) {
-                                        final module = effectiveModules.cast<ModuleItem?>().firstWhere(
-                                              (item) => item != null && _moduleLabel(item) == value,
-                                              orElse: () => null,
-                                            );
-                                        setState(() {
-                                          _moduleId = module?.id;
-                                          _materialId = null;
-                                          _topicIds.clear();
-                                          _error = null;
-                                        });
-                                      },
-                                    ),
-                                    _SetupDropdownField(
-                                      label: 'Material scope',
-                                      width: width,
-                                      value: materialValue,
-                                      items: materialItems,
-                                      onChanged: (value) {
-                                        final option = materialOptions.cast<_FilterOption?>().firstWhere(
-                                              (item) => item != null && item.label == value,
-                                              orElse: () => null,
-                                            );
-                                        setState(() {
-                                          _materialId = option?.id;
-                                          _topicIds.clear();
-                                          _error = null;
-                                        });
-                                      },
-                                    ),
+                                    fields[0],
+                                    const SizedBox(width: 10),
+                                    fields[1],
                                   ],
                                 );
                               },
                             ),
-                            const SizedBox(height: 18),
-                            _TemplateInsightCard(template: _template),
                             const SizedBox(height: 14),
-                            _SetupMetricGrid(
-                              matchingCount: eligibleMatching.length,
-                              targetCount: _template.questionCount,
-                              durationMinutes: _template.durationMinutes,
-                              publishAfterSave: _template.publishAfterSave,
-                            ),
+                            _TemplateInsightCard(template: _template),
                           ],
                         ),
                       );
 
-                      final scopePanel = _SetupPanel(
-                        title: 'Question source',
-                        subtitle: 'Choose the exact scope. Generate uses topics; manual build also supports outcomes.',
+                      final sourcePanel = _SetupPanel(
+                        title: 'Source',
+                        subtitle: _scopeMode == _ExamScopeMode.topics
+                            ? 'Pick topics/subtopics for backend generation.'
+                            : 'Pick learning outcomes for manual exam building.',
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
@@ -1294,9 +1326,9 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
                                 });
                               },
                             ),
-                            const SizedBox(height: 14),
+                            const SizedBox(height: 12),
                             AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 160),
+                              duration: const Duration(milliseconds: 140),
                               child: _scopeMode == _ExamScopeMode.topics
                                   ? _SetupTopicTreePicker(
                                       key: const ValueKey<String>('topics'),
@@ -1327,34 +1359,49 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
                                       },
                                     ),
                             ),
-                            const SizedBox(height: 14),
-                            _TemplateDistributionStatus(template: _template, gaps: requirementGaps),
-                            const SizedBox(height: 14),
-                            _BackendGenerateStatus(
-                              enabled: canGenerate,
-                              templateWillBeSaved: _template.backendId == null,
-                              message: generateStatus,
-                            ),
                           ],
                         ),
                       );
 
+                      final summaryPanel = _ExamSetupSummaryPanel(
+                        titleReady: titleReady,
+                        scopeMode: _scopeMode,
+                        selectedScopeCount: _scopeMode == _ExamScopeMode.topics ? _topicIds.length : _outcomeIds.length,
+                        matchingCount: matching.length,
+                        eligibleCount: eligibleMatching.length,
+                        targetCount: _template.questionCount,
+                        durationMinutes: _template.durationMinutes,
+                        publishAfterSave: _template.publishAfterSave,
+                        template: _template,
+                        gaps: requirementGaps,
+                        canGenerate: canGenerate,
+                        canBuildManually: canBuildManually,
+                        templateWillBeSaved: _template.backendId == null,
+                        backendMessage: generateStatus,
+                      );
+
                       return SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(24, 22, 24, 24),
+                        padding: const EdgeInsets.fromLTRB(22, 18, 22, 18),
                         child: compact
                             ? Column(
                                 children: [
                                   blueprintPanel,
-                                  const SizedBox(height: 16),
-                                  scopePanel,
+                                  const SizedBox(height: 14),
+                                  sourcePanel,
+                                  const SizedBox(height: 14),
+                                  summaryPanel,
                                 ],
                               )
                             : Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  SizedBox(width: 360, child: blueprintPanel),
-                                  const SizedBox(width: 18),
-                                  Expanded(child: scopePanel),
+                                  SizedBox(width: 330, child: blueprintPanel),
+                                  const SizedBox(width: 14),
+                                  Expanded(child: sourcePanel),
+                                  if (!narrow) ...[
+                                    const SizedBox(width: 14),
+                                    SizedBox(width: 270, child: summaryPanel),
+                                  ],
                                 ],
                               ),
                       );
@@ -1362,8 +1409,9 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
                   ),
                 ),
                 Divider(height: 1, color: AppColors.borderGray),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 14, 24, 14),
+                Container(
+                  color: AppColors.cardBg,
+                  padding: const EdgeInsets.fromLTRB(22, 12, 22, 12),
                   child: Row(
                     children: [
                       TextButton(
@@ -1376,11 +1424,11 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
                         icon: const Icon(Icons.tune_rounded, size: 18),
                         label: const Text('Build manually'),
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 15),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       FilledButton.icon(
                         onPressed: canGenerate ? () => _generateExamFromBackend(effectiveTopicTargets) : null,
                         icon: _generating
@@ -1392,8 +1440,8 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
                             : const Icon(Icons.auto_awesome_rounded, size: 18),
                         label: Text(_generating ? 'Generating...' : 'Generate Exam'),
                         style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                         ),
                       ),
                     ],
@@ -1443,7 +1491,7 @@ class _ExamSetupHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.fromLTRB(24, 22, 18, 22),
+      padding: const EdgeInsets.fromLTRB(22, 18, 16, 18),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         border: Border(bottom: BorderSide(color: AppColors.borderGray)),
@@ -1451,15 +1499,15 @@ class _ExamSetupHeader extends StatelessWidget {
       child: Row(
         children: [
           Container(
-            width: 46,
-            height: 46,
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
               gradient: const LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [Color(0xFF145CCB), Color(0xFF22C1F1)],
               ),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(13),
               boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.22), blurRadius: 22, offset: const Offset(0, 10))],
             ),
             child: const Icon(Icons.assignment_turned_in_rounded, color: Colors.white, size: 24),
@@ -1479,7 +1527,7 @@ class _ExamSetupHeader extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
                           color: AppColors.textTitle,
-                          fontSize: 22,
+                          fontSize: 20,
                           height: 1.1,
                           fontWeight: FontWeight.w900,
                           letterSpacing: -0.4,
@@ -1505,7 +1553,7 @@ class _ExamSetupHeader extends StatelessWidget {
                     ),
                   ],
                 ),
-                const SizedBox(height: 5),
+                const SizedBox(height: 4),
                 Text(
                   courseTitle.trim().isEmpty
                       ? 'Generate from backend templates or build a curated set manually.'
@@ -1514,7 +1562,7 @@ class _ExamSetupHeader extends StatelessWidget {
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: AppColors.textMuted,
-                    fontSize: 12.5,
+                    fontSize: 12.2,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
@@ -1585,10 +1633,10 @@ class _SetupPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.borderGray),
       ),
       child: Column(
@@ -1611,6 +1659,242 @@ class _SetupPanel extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           child,
+        ],
+      ),
+    );
+  }
+}
+
+
+class _ExamSetupSummaryPanel extends StatelessWidget {
+  final bool titleReady;
+  final _ExamScopeMode scopeMode;
+  final int selectedScopeCount;
+  final int matchingCount;
+  final int eligibleCount;
+  final int targetCount;
+  final int durationMinutes;
+  final bool publishAfterSave;
+  final ExamTemplateModel template;
+  final List<_TemplateRequirementGap> gaps;
+  final bool canGenerate;
+  final bool canBuildManually;
+  final bool templateWillBeSaved;
+  final String backendMessage;
+
+  const _ExamSetupSummaryPanel({
+    required this.titleReady,
+    required this.scopeMode,
+    required this.selectedScopeCount,
+    required this.matchingCount,
+    required this.eligibleCount,
+    required this.targetCount,
+    required this.durationMinutes,
+    required this.publishAfterSave,
+    required this.template,
+    required this.gaps,
+    required this.canGenerate,
+    required this.canBuildManually,
+    required this.templateWillBeSaved,
+    required this.backendMessage,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final ready = canGenerate || canBuildManually;
+    final distribution = _templateDistributionText(template);
+    final sourceLabel = scopeMode == _ExamScopeMode.topics ? 'Topics' : 'Outcomes';
+    final statusColor = ready ? AppColors.successText : AppColors.warningText;
+    final statusBg = ready ? AppColors.successBg : AppColors.warningSoftBg;
+    final statusBorder = ready ? AppColors.greenBorder : AppColors.warningBorder;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.borderGray),
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 18, offset: const Offset(0, 8))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: ready ? AppColors.successBg : AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(11),
+                ),
+                child: Icon(
+                  ready ? Icons.check_circle_rounded : Icons.fact_check_outlined,
+                  color: ready ? AppColors.successText : AppColors.primary,
+                  size: 19,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Exam summary',
+                      style: TextStyle(color: AppColors.textTitle, fontSize: 14.5, fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      ready ? 'Ready to continue' : 'Complete the missing setup',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 11.4, fontWeight: FontWeight.w800),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          _ExamSummaryRow(label: 'Title', value: titleReady ? 'Ready' : 'Missing', ok: titleReady),
+          _ExamSummaryRow(label: sourceLabel, value: '$selectedScopeCount selected', ok: selectedScopeCount > 0),
+          _ExamSummaryRow(label: 'Pool', value: '$matchingCount matching', ok: matchingCount > 0),
+          _ExamSummaryRow(label: 'Template', value: '$eligibleCount / $targetCount usable', ok: gaps.isEmpty && eligibleCount >= targetCount),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 7,
+            runSpacing: 7,
+            children: [
+              _SetupChip(label: '${durationMinutes} min'),
+              _SetupChip(label: publishAfterSave ? 'Publish after save' : 'Draft first'),
+              _SetupChip(label: template.backendId == null ? 'Will sync template' : 'Backend template'),
+            ],
+          ),
+          if (distribution.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _SummaryNote(
+              icon: Icons.schema_rounded,
+              text: distribution,
+              color: AppColors.primary,
+              bg: AppColors.primarySoft,
+              border: AppColors.primary.withOpacity(0.16),
+            ),
+          ],
+          if (gaps.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            _SummaryNote(
+              icon: Icons.warning_amber_rounded,
+              text: gaps.map((gap) => '${gap.label} ${gap.availableCount}/${gap.requiredCount}').join(' • '),
+              color: AppColors.dangerText,
+              bg: AppColors.dangerBg,
+              border: AppColors.dangerBorder,
+            ),
+          ],
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: statusBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: statusBorder),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(canGenerate ? Icons.rocket_launch_rounded : Icons.info_outline_rounded, color: statusColor, size: 17),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    templateWillBeSaved && canGenerate
+                        ? '$backendMessage Template will be synced first.'
+                        : backendMessage,
+                    style: TextStyle(color: statusColor, fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ExamSummaryRow extends StatelessWidget {
+  final String label;
+  final String value;
+  final bool ok;
+
+  const _ExamSummaryRow({required this.label, required this.value, required this.ok});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Icon(ok ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded,
+              color: ok ? AppColors.successText : AppColors.textMuted, size: 16),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              label,
+              style: TextStyle(color: AppColors.textMuted, fontSize: 11.3, fontWeight: FontWeight.w900),
+            ),
+          ),
+          Text(
+            value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(color: ok ? AppColors.textTitle : AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w900),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SummaryNote extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
+  final Color bg;
+  final Color border;
+
+  const _SummaryNote({
+    required this.icon,
+    required this.text,
+    required this.color,
+    required this.bg,
+    required this.border,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+      decoration: BoxDecoration(
+        color: bg,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 16),
+          const SizedBox(width: 7),
+          Expanded(
+            child: Text(
+              text,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: color, fontSize: 11.1, height: 1.35, fontWeight: FontWeight.w800),
+            ),
+          ),
         ],
       ),
     );
@@ -1657,17 +1941,17 @@ class _SetupTextField extends StatelessWidget {
             hintText: 'e.g. Java Midterm - Chapter 1',
             hintStyle: TextStyle(color: AppColors.textHint, fontWeight: FontWeight.w600, fontSize: 13),
             prefixIcon: Icon(Icons.drive_file_rename_outline_rounded, size: 18, color: AppColors.textMuted),
-            contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
             enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(color: AppColors.borderGray),
             ),
             focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               borderSide: const BorderSide(color: AppColors.primary, width: 1.5),
             ),
             disabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               borderSide: BorderSide(color: AppColors.borderGray),
             ),
           ),
@@ -1911,7 +2195,7 @@ class _GeneratedExamSuccessDialog extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'The backend generate-exam endpoint created the exam successfully.',
+            'The exam was created successfully. Next, you will be taken to this course’s Exams page.',
             style: TextStyle(color: AppColors.textMuted, fontSize: 13, height: 1.45, fontWeight: FontWeight.w700),
           ),
           const SizedBox(height: 14),
@@ -1925,7 +2209,7 @@ class _GeneratedExamSuccessDialog extends StatelessWidget {
       actions: [
         FilledButton(
           onPressed: () => Navigator.of(context).pop(),
-          child: const Text('Done'),
+          child: const Text('Open course exams'),
         ),
       ],
     );
@@ -2156,7 +2440,7 @@ class _ScopeModeSelector extends StatelessWidget {
       padding: const EdgeInsets.all(4),
       decoration: BoxDecoration(
         color: AppColors.headerBg,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderGray),
       ),
       child: Row(
@@ -2200,14 +2484,14 @@ class _ScopeModeOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      borderRadius: BorderRadius.circular(7),
+      borderRadius: BorderRadius.circular(10),
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 120),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         decoration: BoxDecoration(
           color: selected ? Colors.white : Colors.transparent,
-          borderRadius: BorderRadius.circular(7),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: selected ? AppColors.borderGray : Colors.transparent),
           boxShadow: selected
               ? [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 10, offset: const Offset(0, 4))]
@@ -2291,7 +2575,7 @@ class _SetupTopicTreePicker extends StatelessWidget {
       child: targets.isEmpty
           ? const _SetupPickerEmpty(message: 'No topics found for the selected module/material.')
           : SizedBox(
-              height: 292,
+              height: 255,
               child: SingleChildScrollView(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -2315,16 +2599,20 @@ class _SetupTopicTreePicker extends StatelessWidget {
                       children.sort((a, b) => a.topic.orderIndex.compareTo(b.topic.orderIndex));
                     }
 
+                    final branchIdsCache = <int, Set<int>>{};
+
                     Set<int> branchIds(_TopicTarget target) {
-                      final result = <int>{target.topic.id};
-                      void collect(int parentId) {
-                        for (final child in childrenByParent[parentId] ?? const <_TopicTarget>[]) {
-                          result.add(child.topic.id);
-                          collect(child.topic.id);
+                      return branchIdsCache.putIfAbsent(target.topic.id, () {
+                        final result = <int>{target.topic.id};
+                        void collect(int parentId) {
+                          for (final child in childrenByParent[parentId] ?? const <_TopicTarget>[]) {
+                            result.add(child.topic.id);
+                            collect(child.topic.id);
+                          }
                         }
-                      }
-                      collect(target.topic.id);
-                      return result;
+                        collect(target.topic.id);
+                        return result;
+                      });
                     }
 
                     void toggleBranch(_TopicTarget target) {
@@ -2468,7 +2756,7 @@ class _SetupOutcomePicker extends StatelessWidget {
       child: outcomes.isEmpty
           ? const _SetupPickerEmpty(message: 'No learning outcomes found for this course yet.')
           : SizedBox(
-              height: 276,
+              height: 255,
               child: SingleChildScrollView(
                 child: Wrap(
                   spacing: 8,
@@ -2545,7 +2833,7 @@ class _SetupPickerFrame extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.borderGray),
       ),
       child: Column(

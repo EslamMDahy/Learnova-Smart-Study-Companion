@@ -62,9 +62,41 @@ class CoursesRepository {
 
 
 
-  /// Course update/archive/delete endpoints are not exposed by the backend
-  /// currently uploaded for this project. Keep those UI actions disabled/graceful
-  /// instead of calling guessed routes that produce 404 responses.
+  Future<MyCourseItem> updateCourse({
+    required int courseId,
+    required CourseUpdateRequest payload,
+    CancelToken? cancelToken,
+  }) =>
+      _api.updateCourse(
+        courseId: courseId,
+        payload: payload,
+        cancelToken: cancelToken,
+      );
+
+  Future<PublishCourseResponse> publishCourse({
+    required int courseId,
+    CancelToken? cancelToken,
+  }) =>
+      _api.publishCourse(courseId: courseId, cancelToken: cancelToken);
+
+  Future<CourseEnrollmentRequestsResponse> listEnrollmentRequests({
+    required int courseId,
+    CancelToken? cancelToken,
+  }) =>
+      _api.listEnrollmentRequests(courseId: courseId, cancelToken: cancelToken);
+
+  Future<EnrollmentRequestUpdateResponse> updateEnrollmentRequest({
+    required int courseId,
+    required int enrollmentId,
+    required String status,
+    CancelToken? cancelToken,
+  }) =>
+      _api.updateEnrollmentRequest(
+        courseId: courseId,
+        enrollmentId: enrollmentId,
+        status: status,
+        cancelToken: cancelToken,
+      );
 
   Future<CourseCreatedResponse> createCourse({
     required CourseCreateRequest payload,

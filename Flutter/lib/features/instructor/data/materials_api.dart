@@ -112,7 +112,7 @@ class MaterialsApi {
   }
 
   // ─── REASSIGN ─────────────────────────────────────────────────────────────
-  /// PATCH /courses/{c}/modules/{m}/materials/{mat}/reassign
+  /// PATCH /{materialId}/reassign?course_id={courseId}&module_id={moduleId}
   /// Moves a material to a different module within the same course.
   Future<MaterialReassignResponse> reassignMaterial({
     required int courseId,

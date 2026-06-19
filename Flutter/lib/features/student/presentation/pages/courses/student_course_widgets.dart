@@ -5,6 +5,18 @@ import 'package:flutter/material.dart';
 import '../../../../../core/theme/app_theme.dart';
 import '../../../data/student_courses_models.dart';
 
+
+String? _normalizeNetworkImageUrl(String? value) {
+  final raw = (value ?? '').trim();
+  if (raw.isEmpty) return null;
+  final lower = raw.toLowerCase();
+  if (lower == 'null' || lower == 'none' || lower == 'undefined') return null;
+  if (raw.startsWith('http://') || raw.startsWith('https://') || raw.startsWith('data:image/')) {
+    return raw;
+  }
+  return null;
+}
+
 class StudentCoursesSectionHeader extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -152,7 +164,7 @@ class StudentCourseCard extends StatelessWidget {
                       children: [
                         Row(
                           children: [
-                            _InstructorAvatar(seed: course.id, name: meta.instructorName),
+                            _InstructorAvatar(seed: course.id, name: meta.instructorName, avatarUrl: meta.instructorAvatarUrl),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Column(
@@ -254,8 +266,8 @@ class _CourseCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final coverUrl = (course.coverImageUrl ?? '').trim();
-    final hasCover = coverUrl.isNotEmpty;
+    final coverUrl = _normalizeNetworkImageUrl(course.coverImageUrl);
+    final hasCover = coverUrl != null;
 
     return SizedBox(
       height: 102,
@@ -265,8 +277,31 @@ class _CourseCover extends StatelessWidget {
         children: [
           if (hasCover)
             Image.network(
-              coverUrl,
+              coverUrl!,
               fit: BoxFit.cover,
+              filterQuality: FilterQuality.medium,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: visual.colors,
+                    ),
+                  ),
+                  child: const Center(
+                    child: SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: Colors.white70,
+                      ),
+                    ),
+                  ),
+                );
+              },
               errorBuilder: (_, __, ___) => DecoratedBox(
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
@@ -493,8 +528,8 @@ class StudentCourseDetailsDialog extends StatelessWidget {
     final visual = _CourseVisual.fromCourse(course);
     final status = _courseUiStatusFromCourse(course);
     final meta = _CoursePresentationMeta.fromCourse(course);
-    final coverUrl = (course.coverImageUrl ?? '').trim();
-    final hasCover = coverUrl.isNotEmpty;
+    final coverUrl = _normalizeNetworkImageUrl(course.coverImageUrl);
+    final hasCover = coverUrl != null;
 
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
@@ -514,8 +549,31 @@ class StudentCourseDetailsDialog extends StatelessWidget {
                 children: [
                   if (hasCover)
                     Image.network(
-                      coverUrl,
+                      coverUrl!,
                       fit: BoxFit.cover,
+                      filterQuality: FilterQuality.medium,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: visual.colors,
+                            ),
+                          ),
+                          child: const Center(
+                            child: SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2.2,
+                                color: Colors.white70,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                       errorBuilder: (_, __, ___) => DecoratedBox(
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
@@ -607,7 +665,7 @@ class StudentCourseDetailsDialog extends StatelessWidget {
                 children: [
                   Row(
                     children: [
-                      _InstructorAvatar(seed: course.id, name: meta.instructorName),
+                      _InstructorAvatar(seed: course.id, name: meta.instructorName, avatarUrl: meta.instructorAvatarUrl),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -673,6 +731,11 @@ class StudentCourseDetailsDialog extends StatelessWidget {
                         _InfoChip(
                           icon: Icons.groups_2_outlined,
                           label: '${course.enrollmentCount} enrolled students',
+                        ),
+                      if (course.averageRating != null)
+                        _InfoChip(
+                          icon: Icons.star_rate_rounded,
+                          label: '${course.averageRating!.toStringAsFixed(1)} rating',
                         ),
                       _InfoChip(
                         icon: Icons.public_rounded,
@@ -1032,11 +1095,17 @@ class _CourseMetaBadge extends StatelessWidget {
 class _InstructorAvatar extends StatelessWidget {
   final int seed;
   final String name;
+  final String? avatarUrl;
 
-  const _InstructorAvatar({required this.seed, required this.name});
+  const _InstructorAvatar({
+    required this.seed,
+    required this.name,
+    this.avatarUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final imageUrl = _normalizeNetworkImageUrl(avatarUrl);
     final colors = [
       const Color(0xFFD9F99D),
       const Color(0xFFBAE6FD),
@@ -1057,18 +1126,34 @@ class _InstructorAvatar extends StatelessWidget {
       width: 32,
       height: 32,
       alignment: Alignment.center,
+      clipBehavior: Clip.antiAlias,
       decoration: BoxDecoration(
         color: bg,
         shape: BoxShape.circle,
       ),
-      child: Text(
-        initials.isEmpty ? 'L' : initials,
-        style: const TextStyle(
-          color: Color(0xFF0F172A),
-          fontSize: 11,
-          fontWeight: FontWeight.w900,
-        ),
-      ),
+      child: imageUrl == null
+          ? Text(
+              initials.isEmpty ? 'L' : initials,
+              style: const TextStyle(
+                color: Color(0xFF0F172A),
+                fontSize: 11,
+                fontWeight: FontWeight.w900,
+              ),
+            )
+          : Image.network(
+              imageUrl,
+              width: 32,
+              height: 32,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => Text(
+                initials.isEmpty ? 'L' : initials,
+                style: const TextStyle(
+                  color: Color(0xFF0F172A),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+            ),
     );
   }
 }
@@ -1480,6 +1565,7 @@ class _StatusPalette {
 
 class _CoursePresentationMeta {
   final String instructorName;
+  final String? instructorAvatarUrl;
   final String department;
   final String primaryMeta;
   final String secondaryMeta;
@@ -1488,6 +1574,7 @@ class _CoursePresentationMeta {
 
   const _CoursePresentationMeta({
     required this.instructorName,
+    required this.instructorAvatarUrl,
     required this.department,
     required this.primaryMeta,
     required this.secondaryMeta,
@@ -1497,18 +1584,24 @@ class _CoursePresentationMeta {
 
   factory _CoursePresentationMeta.fromCourse(StudentCourse course) {
     return _CoursePresentationMeta(
-      instructorName: _instructorLabel(course.createdBy),
+      instructorName: _instructorLabel(course),
+      instructorAvatarUrl: course.instructorAvatarUrl,
       department: _departmentLabel(course),
-      primaryMeta: _createdAtLabel(course.createdAt),
-      secondaryMeta: _visibilityLabel(course.visibilityLevel),
-      secondaryIcon: _visibilityIcon(course.visibilityLevel),
+      primaryMeta: course.isEnrolled
+          ? _createdAtLabel(course.createdAt)
+          : _enrollmentLabel(course.enrollmentCount),
+      secondaryMeta: course.isEnrolled
+          ? _visibilityLabel(course.visibilityLevel)
+          : _ratingOrApprovalLabel(course),
+      secondaryIcon: course.isEnrolled
+          ? _visibilityIcon(course.visibilityLevel)
+          : _ratingOrApprovalIcon(course),
       badgeLabel: _badgeLabel(course),
     );
   }
 
-  static String _instructorLabel(int? createdBy) {
-    if (createdBy == null || createdBy <= 0) return 'Course instructor';
-    return 'Instructor #$createdBy';
+  static String _instructorLabel(StudentCourse course) {
+    return course.safeInstructorName;
   }
 
   static String _departmentLabel(StudentCourse course) {
@@ -1525,6 +1618,31 @@ class _CoursePresentationMeta {
       return category;
     }
     return _titleCase(course.courseType.replaceAll('_', ' '));
+  }
+
+
+  static String _enrollmentLabel(int? count) {
+    if (count == null) return 'Enrollment not available';
+    if (count == 1) return '1 enrolled student';
+    return '$count enrolled students';
+  }
+
+  static String _ratingOrApprovalLabel(StudentCourse course) {
+    final rating = course.averageRating;
+    if (rating != null && rating > 0) {
+      return '${rating.toStringAsFixed(1)} rating';
+    }
+    if (course.requiresEnrollmentApproval) return 'Approval required';
+    if (course.isOpenForEnrollment) return 'Open enrollment';
+    return 'Enrollment closed';
+  }
+
+  static IconData _ratingOrApprovalIcon(StudentCourse course) {
+    final rating = course.averageRating;
+    if (rating != null && rating > 0) return Icons.star_rate_rounded;
+    if (course.requiresEnrollmentApproval) return Icons.hourglass_bottom_rounded;
+    if (course.isOpenForEnrollment) return Icons.how_to_reg_rounded;
+    return Icons.lock_outline_rounded;
   }
 
   static String _visibilityLabel(String raw) {

@@ -16,6 +16,7 @@ typedef CourseUpdateAction = Future<MyCourseItem> Function(
   MyCourseItem course,
   CourseUpdateRequest payload,
 );
+typedef CoursePublishAction = Future<MyCourseItem> Function(MyCourseItem course);
 typedef CourseArchiveAction = Future<MyCourseItem> Function(MyCourseItem course);
 typedef CourseDeleteAction = Future<void> Function(MyCourseItem course);
 typedef CourseCoverUploadAction = Future<MyCourseItem> Function({
@@ -32,6 +33,7 @@ class InstructorCourseContent extends StatefulWidget {
   final String? errorText;
   final List<MyCourseItem> courses;
   final CourseUpdateAction? onUpdateCourse;
+  final CoursePublishAction? onPublishCourse;
   final CourseArchiveAction? onArchiveCourse;
   final CourseDeleteAction? onDeleteCourse;
   final CourseCoverUploadAction? onUploadCover;
@@ -44,6 +46,7 @@ class InstructorCourseContent extends StatefulWidget {
     this.errorText,
     this.courses = const [],
     this.onUpdateCourse,
+    this.onPublishCourse,
     this.onArchiveCourse,
     this.onDeleteCourse,
     this.onUploadCover,
@@ -292,6 +295,7 @@ class _InstructorCourseContentState extends State<InstructorCourseContent> {
                         onClearFilters: _clearAll,
                         onCreateFirstCourse: widget.onCreateNewCourse,
                         onUpdateCourse: widget.onUpdateCourse,
+                        onPublishCourse: widget.onPublishCourse,
                         onArchiveCourse: widget.onArchiveCourse,
                         onDeleteCourse: widget.onDeleteCourse,
                         onUploadCover: widget.onUploadCover,
@@ -802,6 +806,7 @@ class _CoursesGrid extends StatelessWidget {
   final VoidCallback? onClearFilters;
   final VoidCallback? onCreateFirstCourse;
   final CourseUpdateAction? onUpdateCourse;
+  final CoursePublishAction? onPublishCourse;
   final CourseArchiveAction? onArchiveCourse;
   final CourseDeleteAction? onDeleteCourse;
   final CourseCoverUploadAction? onUploadCover;
@@ -815,6 +820,7 @@ class _CoursesGrid extends StatelessWidget {
     this.onClearFilters,
     this.onCreateFirstCourse,
     this.onUpdateCourse,
+    this.onPublishCourse,
     this.onArchiveCourse,
     this.onDeleteCourse,
     this.onUploadCover,
@@ -852,6 +858,7 @@ class _CoursesGrid extends StatelessWidget {
             child: _ApiCourseCard(
               course: course,
               onUpdateCourse: onUpdateCourse,
+              onPublishCourse: onPublishCourse,
               onArchiveCourse: onArchiveCourse,
               onDeleteCourse: onDeleteCourse,
               onUploadCover: onUploadCover,
@@ -1136,6 +1143,7 @@ class _SkeletonCardState extends State<_SkeletonCard>
 class _ApiCourseCard extends StatefulWidget {
   final MyCourseItem course;
   final CourseUpdateAction? onUpdateCourse;
+  final CoursePublishAction? onPublishCourse;
   final CourseArchiveAction? onArchiveCourse;
   final CourseDeleteAction? onDeleteCourse;
   final CourseCoverUploadAction? onUploadCover;
@@ -1143,6 +1151,7 @@ class _ApiCourseCard extends StatefulWidget {
   const _ApiCourseCard({
     required this.course,
     this.onUpdateCourse,
+    this.onPublishCourse,
     this.onArchiveCourse,
     this.onDeleteCourse,
     this.onUploadCover,
@@ -1218,6 +1227,11 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
           icon: Icons.edit_rounded,
         ),
         FigmaUmMenuEntry.item(
+          value: 'publish',
+          label: 'Publish course',
+          icon: Icons.publish_rounded,
+        ),
+        FigmaUmMenuEntry.item(
           value: 'cover',
           label: 'Change course cover',
           icon: Icons.add_photo_alternate_outlined,
@@ -1259,6 +1273,9 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
         return;
       case 'edit':
         await _editCourse(c);
+        return;
+      case 'publish':
+        await _publishCourse(c);
         return;
       case 'cover':
         await _changeCourseCover(c);
@@ -1372,6 +1389,59 @@ class _ApiCourseCardState extends State<_ApiCourseCard> {
         context,
         title: 'Update failed',
         message: 'The course could not be updated.',
+      );
+    }
+  }
+
+  Future<void> _publishCourse(MyCourseItem course) async {
+    final action = widget.onPublishCourse;
+    if (action == null) {
+      AppToast.warning(
+        context,
+        title: 'Unavailable',
+        message: 'Course publishing is not available in this build.',
+      );
+      return;
+    }
+
+    if (course.lifecycleStatus == CourseLifecycleStatus.published ||
+        course.lifecycleStatus == CourseLifecycleStatus.active) {
+      AppToast.info(
+        context,
+        title: 'Already published',
+        message: 'This course is already visible according to its current status.',
+      );
+      return;
+    }
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => _CourseActionConfirmDialog(
+        icon: Icons.publish_rounded,
+        title: 'Publish course?',
+        message:
+            '“${course.safeTitle}” will become available according to its visibility and enrollment settings.',
+        confirmLabel: 'Publish course',
+      ),
+    );
+
+    if (!mounted || confirmed != true) return;
+
+    try {
+      final updated = await action(course);
+      SelectedCourseCache.set(updated);
+      if (!mounted) return;
+      AppToast.success(
+        context,
+        title: 'Course published',
+        message: 'The course was published successfully.',
+      );
+    } catch (_) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        title: 'Publish failed',
+        message: 'The course could not be published.',
       );
     }
   }
@@ -1692,7 +1762,6 @@ class _EditCourseDialogState extends State<_EditCourseDialog> {
   late final TextEditingController _categoryCtrl;
 
   late String _visibility;
-  late String _status;
   bool _approvalRequired = false;
 
   @override
@@ -1702,9 +1771,6 @@ class _EditCourseDialogState extends State<_EditCourseDialog> {
     _codeCtrl = TextEditingController(text: widget.course.courseCode ?? '');
     _categoryCtrl = TextEditingController(text: widget.course.category ?? '');
     _visibility = widget.course.visibility.backendValue;
-    _status = widget.course.lifecycleStatus == CourseLifecycleStatus.active
-        ? CourseLifecycleStatus.published.backendValue
-        : widget.course.lifecycleStatus.backendValue;
     _approvalRequired = widget.course.isPrivate;
   }
 
@@ -1737,7 +1803,6 @@ class _EditCourseDialogState extends State<_EditCourseDialog> {
         isPublic: _isPublic,
         visibilityLevel: _visibility,
         requiresEnrollmentApproval: _approvalRequired,
-        status: _status,
       ),
     );
   }
@@ -1795,7 +1860,7 @@ class _EditCourseDialogState extends State<_EditCourseDialog> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            'Update the course name, code, visibility, and status.',
+                            'Update the course name, code, category, and visibility.',
                             style: TextStyle(
                               color: AppColors.textMuted,
                               fontSize: 12,
@@ -1861,40 +1926,20 @@ class _EditCourseDialogState extends State<_EditCourseDialog> {
                         ],
                       ),
                       const SizedBox(height: 14),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _EditCourseDropdown(
-                              label: 'Visibility',
-                              value: _visibility,
-                              items: const [
-                                'private',
-                                'public',
-                                'unlisted',
-                              ],
-                              onChanged: (value) {
-                                setState(() {
-                                  _visibility = value;
-                                  _approvalRequired = value != 'public';
-                                });
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _EditCourseDropdown(
-                              label: 'Status',
-                              value: _status,
-                              items: const [
-                                'draft',
-                                'published',
-                                'archived',
-                              ],
-                              onChanged: (value) =>
-                                  setState(() => _status = value),
-                            ),
-                          ),
+                      _EditCourseDropdown(
+                        label: 'Visibility',
+                        value: _visibility,
+                        items: const [
+                          'private',
+                          'public',
+                          'unlisted',
                         ],
+                        onChanged: (value) {
+                          setState(() {
+                            _visibility = value;
+                            _approvalRequired = value != 'public';
+                          });
+                        },
                       ),
                       const SizedBox(height: 10),
                       Container(

@@ -47,9 +47,79 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
   }
 
 
-  /// Course update/archive/delete are intentionally not implemented here because
-  /// the uploaded FastAPI backend exposes create/list/invite endpoints only.
-  /// Leaving guessed mutation calls here causes real 404 errors in the UI.
+
+  Future<MyCourseItem> updateCourse({
+    required MyCourseItem course,
+    required CourseUpdateRequest payload,
+  }) async {
+    _cancel?.cancel();
+    _cancel = CancelToken();
+
+    final previousItems = state.items;
+    state = state.copyWith(loading: true);
+
+    try {
+      final updated = await _ref.read(coursesRepositoryProvider).updateCourse(
+            courseId: course.id,
+            payload: payload,
+            cancelToken: _cancel,
+          );
+
+      state = state.copyWith(
+        loading: false,
+        items: previousItems
+            .map((item) => item.id == updated.id ? updated : item)
+            .toList(growable: false),
+      );
+      return updated;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+      state = state.copyWith(
+        loading: false,
+        error: failure.message,
+        items: previousItems,
+      );
+      rethrow;
+    }
+  }
+
+  Future<MyCourseItem> publishCourse(MyCourseItem course) async {
+    _cancel?.cancel();
+    _cancel = CancelToken();
+
+    final previousItems = state.items;
+    state = state.copyWith(loading: true);
+
+    try {
+      final response = await _ref.read(coursesRepositoryProvider).publishCourse(
+            courseId: course.id,
+            cancelToken: _cancel,
+          );
+
+      final updated = course.copyWith(
+        status: response.status.isEmpty ? 'published' : response.status,
+        updatedAt: DateTime.now(),
+      );
+
+      state = state.copyWith(
+        loading: false,
+        items: previousItems
+            .map((item) => item.id == updated.id ? updated : item)
+            .toList(growable: false),
+      );
+      return updated;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(_ref, failure);
+      state = state.copyWith(
+        loading: false,
+        error: failure.message,
+        items: previousItems,
+      );
+      rethrow;
+    }
+  }
 
   /// Creates a course and returns the typed backend response.
   ///

@@ -396,6 +396,23 @@ class StudentCoursesApi {
     );
   }
 
+  Future<void> saveStudentExamAnswer({
+    required int courseId,
+    required int examId,
+    required int attemptId,
+    required StudentExamAnswerDraft answer,
+    CancelToken? cancelToken,
+  }) async {
+    await _client.put<Map<String, dynamic>>(
+      Endpoints.submitStudentExamAnswer(courseId, examId, attemptId),
+      data: answer.toJson(),
+      options: Options(
+        extra: const <String, dynamic>{'silent': true},
+      ),
+      cancelToken: cancelToken,
+    );
+  }
+
   Future<StudentExamSubmitResult> submitStudentExam({
     required int courseId,
     required int examId,

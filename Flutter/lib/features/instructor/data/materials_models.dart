@@ -116,6 +116,7 @@ class MaterialInitUploadRequest {
   final int fileSizeBytes;
   final String? title;
   final String? description;
+  final bool useAiProcessing;
 
   const MaterialInitUploadRequest({
     required this.filename,
@@ -123,6 +124,7 @@ class MaterialInitUploadRequest {
     required this.fileSizeBytes,
     this.title,
     this.description,
+    this.useAiProcessing = true,
   });
 
   Map<String, dynamic> toJson() {
@@ -130,6 +132,7 @@ class MaterialInitUploadRequest {
       'filename': filename,
       'content_type': contentType,
       'file_size_bytes': fileSizeBytes,
+      'use_ai_processing': useAiProcessing,
     };
     if (title != null) m['title'] = title;
     if (description != null) m['description'] = description;
@@ -223,6 +226,37 @@ class MaterialReassignResponse {
       id: (json['id'] as num).toInt(),
       moduleId: (json['module_id'] as num).toInt(),
       storageKey: (json['storage_key'] ?? '').toString(),
+    );
+  }
+}
+
+
+/// Frontend-only helper for the full browser upload flow.
+/// It keeps the controller/presentation layer from losing the material id
+/// returned by init-upload/confirm-upload, so the UI can poll until AI
+/// processing marks the material as ready.
+class MaterialUploadFlowResult {
+  final int materialId;
+  final int moduleId;
+  final int courseId;
+  final String status;
+  final String? downloadUrl;
+
+  const MaterialUploadFlowResult({
+    required this.materialId,
+    required this.moduleId,
+    required this.courseId,
+    required this.status,
+    this.downloadUrl,
+  });
+
+  factory MaterialUploadFlowResult.fromConfirm(MaterialConfirmUploadResponse response) {
+    return MaterialUploadFlowResult(
+      materialId: response.materialId,
+      moduleId: response.moduleId,
+      courseId: response.courseId,
+      status: response.status,
+      downloadUrl: response.downloadUrl,
     );
   }
 }

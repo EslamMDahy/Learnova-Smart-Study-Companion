@@ -191,8 +191,96 @@ class CoursesApi {
     );
   }
 
-  /// Course update/archive/delete endpoints are not exposed by the backend
-  /// currently uploaded for this project. Do not call guessed routes here.
+
+
+  /// PATCH /courses/{courseId}
+  Future<MyCourseItem> updateCourse({
+    required int courseId,
+    required CourseUpdateRequest payload,
+    CancelToken? cancelToken,
+  }) async {
+    if (courseId <= 0) throw ArgumentError('Invalid course id.');
+    final body = payload.toJson();
+    if (body.isEmpty) throw ArgumentError('No course changes to save.');
+
+    final res = await _client.patch<Map<String, dynamic>>(
+      Endpoints.updateCourse(courseId),
+      data: body,
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return MyCourseItem.fromJson(data);
+    }
+    throw const FormatException('Invalid response from PATCH /courses/{course_id}');
+  }
+
+  /// POST /courses/{courseId}/publish
+  Future<PublishCourseResponse> publishCourse({
+    required int courseId,
+    CancelToken? cancelToken,
+  }) async {
+    if (courseId <= 0) throw ArgumentError('Invalid course id.');
+
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.publishCourse(courseId),
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return PublishCourseResponse.fromJson(data);
+    }
+    throw const FormatException('Invalid response from POST /courses/{course_id}/publish');
+  }
+
+  /// GET /courses/{courseId}/enrollment-requests
+  Future<CourseEnrollmentRequestsResponse> listEnrollmentRequests({
+    required int courseId,
+    CancelToken? cancelToken,
+  }) async {
+    if (courseId <= 0) throw ArgumentError('Invalid course id.');
+
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.courseEnrollmentRequests(courseId),
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return CourseEnrollmentRequestsResponse.fromJson(data);
+    }
+    throw const FormatException('Invalid response from GET /courses/{course_id}/enrollment-requests');
+  }
+
+  /// PATCH /courses/{courseId}/enrollment-requests/{enrollmentId}
+  Future<EnrollmentRequestUpdateResponse> updateEnrollmentRequest({
+    required int courseId,
+    required int enrollmentId,
+    required String status,
+    CancelToken? cancelToken,
+  }) async {
+    if (courseId <= 0) throw ArgumentError('Invalid course id.');
+    if (enrollmentId <= 0) throw ArgumentError('Invalid enrollment request id.');
+    final normalizedStatus = status.trim().toLowerCase();
+    if (normalizedStatus != 'approved' && normalizedStatus != 'declined') {
+      throw ArgumentError('Enrollment request status must be approved or declined.');
+    }
+
+    final res = await _client.patch<Map<String, dynamic>>(
+      Endpoints.updateCourseEnrollmentRequest(courseId, enrollmentId),
+      data: {'status': normalizedStatus},
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return EnrollmentRequestUpdateResponse.fromJson(data);
+    }
+    throw const FormatException('Invalid response from PATCH enrollment request endpoint');
+  }
+
 
   /// POST /courses/{courseId}/invitations/upload
   ///
