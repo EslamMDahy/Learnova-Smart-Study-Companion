@@ -9,8 +9,7 @@ import '../controllers/signup_controller.dart';
 
 import '../../../../shared/widgets/app_ui_components.dart';
 
-enum AccountType { user, owner }
-enum UserKind { student, instructor, assistant }
+enum SignUpRole { student, instructor }
 
 class SignUpForm extends ConsumerStatefulWidget {
   final bool isMobile;
@@ -24,8 +23,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
   final _formKey = GlobalKey<FormState>();
   AutovalidateMode _autoValidate = AutovalidateMode.disabled;
 
-  AccountType accountType = AccountType.user;
-  UserKind userKind = UserKind.student;
+  SignUpRole selectedRole = SignUpRole.student;
 
   bool isChecked = false;
   bool _obscurePassword = true;
@@ -56,17 +54,12 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
     ref.read(signupControllerProvider.notifier).clearError();
   }
 
-  void _onSwitchAccountType(AccountType type) {
-    if (accountType == type) return;
+  void _onSelectRole(SignUpRole role) {
+    if (selectedRole == role) return;
 
     setState(() {
-      accountType = type;
+      selectedRole = role;
       _localError = null;
-
-      
-      if (type == AccountType.owner) {
-        userKind = UserKind.student; // irrelevant for owner
-      }
     });
 
     ref.read(signupControllerProvider.notifier).clearError();
@@ -86,6 +79,123 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
     return null;
   }
 
+
+  Future<void> _showTermsDialog() async {
+    await _showLegalDialog(
+      title: 'Terms of Service',
+      sections: const [
+        _LegalSection(
+          heading: 'Account responsibility',
+          body:
+              'You are responsible for keeping your account details accurate and protecting your password. Do not share access with anyone else.',
+        ),
+        _LegalSection(
+          heading: 'Learning content',
+          body:
+              'Courses, materials, questions, and AI-generated outputs are provided for learning support. Users should review important academic outputs before relying on them.',
+        ),
+        _LegalSection(
+          heading: 'Acceptable use',
+          body:
+              'Do not upload illegal, harmful, plagiarized, or unauthorized content. Do not attempt to disrupt the platform or access data you are not allowed to view.',
+        ),
+        _LegalSection(
+          heading: 'Platform changes',
+          body:
+              'Features may change as the product evolves. Continued use of Learnova means you accept the latest terms shown in the application.',
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showPrivacyDialog() async {
+    await _showLegalDialog(
+      title: 'Privacy Policy',
+      sections: const [
+        _LegalSection(
+          heading: 'Data we use',
+          body:
+              'Learnova may process your name, email, role, profile settings, course activity, uploaded learning materials, assessments, and usage data needed to operate the platform.',
+        ),
+        _LegalSection(
+          heading: 'Why we use it',
+          body:
+              'This data is used to create your account, secure access, personalize learning, manage courses, generate insights, and improve the learning experience.',
+        ),
+        _LegalSection(
+          heading: 'Data protection',
+          body:
+              'Access to your data should be limited to authorized users and platform services. Avoid uploading sensitive information that is not required for learning.',
+        ),
+        _LegalSection(
+          heading: 'Your choices',
+          body:
+              'You can manage your profile information from settings. Contact the platform administrator for account or data access requests.',
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showLegalDialog({
+    required String title,
+    required List<_LegalSection> sections,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) {
+        return AlertDialog(
+          backgroundColor: AppColors.cardBg,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          title: Text(
+            title,
+            style: AppText.sectionTitle.copyWith(fontSize: 20),
+          ),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 520),
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final section in sections) ...[
+                    Text(
+                      section.heading,
+                      style: AppText.input.copyWith(
+                        color: AppColors.title,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      section.body,
+                      style: AppText.input.copyWith(
+                        color: AppColors.textGray500,
+                        height: 1.45,
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  Text(
+                    'Last updated: shown in-app for the current Learnova release.',
+                    style: AppText.mutedSmall.copyWith(fontStyle: FontStyle.italic),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(),
+              child: const Text('Close'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   Future<void> _onCreateAccount() async {
     if (_autoValidate != AutovalidateMode.onUserInteraction) {
       setState(() => _autoValidate = AutovalidateMode.onUserInteraction);
@@ -97,7 +207,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
     if (!okForm) return;
 
     if (!isChecked) {
-      setState(() => _localError = 'Please accept Terms and Privacy Policy.');
+      setState(() => _localError = 'Please accept the Terms of Service and Privacy Policy.');
       return;
     }
 
@@ -105,8 +215,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
         '${firstNameController.text.trim()} ${lastNameController.text.trim()}'
             .trim();
 
-    final systemRole =
-        accountType == AccountType.owner ? 'owner' : userKind.name;
+    final systemRole = selectedRole.name;
 
     final ok = await ref.read(signupControllerProvider.notifier).signup(
           fullName: fullName,
@@ -160,31 +269,17 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                     const SizedBox(height: 14),
                   ],
 
-                  AppSegmentedControl<AccountType>(
+                  AppSegmentedControl<SignUpRole>(
                     disabled: state.loading,
-                    value: accountType,
-                    onChanged: _onSwitchAccountType,
-                    options: [
-                      const AppSegmentOption(label: 'User', value: AccountType.user),
-                      const AppSegmentOption(label: 'Owner', value: AccountType.owner),
+                    value: selectedRole,
+                    onChanged: _onSelectRole,
+                    options: const [
+                      AppSegmentOption(label: 'Student', value: SignUpRole.student),
+                      AppSegmentOption(label: 'Instructor', value: SignUpRole.instructor),
                     ],
                   ),
 
                   const SizedBox(height: 12),
-
-                  if (accountType == AccountType.user) ...[
-                    AppSegmentedControl<UserKind>(
-                      disabled: state.loading,
-                      value: userKind,
-                      onChanged: (k) => setState(() => userKind = k),
-                      options: [
-                        const AppSegmentOption(label: 'Student', value: UserKind.student),
-                        const AppSegmentOption(label: 'Instructor', value: UserKind.instructor),
-                        const AppSegmentOption(label: 'Assistant', value: UserKind.assistant),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                  ],
 
                   Row(
                     children: [
@@ -287,7 +382,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               style: AppText.input.copyWith(fontSize: 14),
                             ),
                             InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
-                              onTap: state.loading ? null : () {},
+                              onTap: state.loading ? null : _showTermsDialog,
                               child: Text(
                                 'Terms',
                                 style: AppText.input.copyWith(
@@ -302,7 +397,7 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
                               style: AppText.input.copyWith(fontSize: 14),
                             ),
                             InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
-                              onTap: state.loading ? null : () {},
+                              onTap: state.loading ? null : _showPrivacyDialog,
                               child: Text(
                                 'Privacy Policy',
                                 style: AppText.input.copyWith(
@@ -378,4 +473,14 @@ class _SignUpFormState extends ConsumerState<SignUpForm> {
       ),
     );
   }
+}
+
+class _LegalSection {
+  final String heading;
+  final String body;
+
+  const _LegalSection({
+    required this.heading,
+    required this.body,
+  });
 }

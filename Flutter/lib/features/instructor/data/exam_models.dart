@@ -99,7 +99,7 @@ class GenerateExamFromTemplatePayload {
       'title': cleanedTitle,
       if (uniqueTopicIds.isNotEmpty) 'topic_ids': uniqueTopicIds,
       if (sectionDifficultyDistribution != null && sectionDifficultyDistribution!.isNotEmpty)
-        'section_difficulty_distribution': sectionDifficultyDistribution,
+        'difficulty_config': sectionDifficultyDistribution,
     };
   }
 }

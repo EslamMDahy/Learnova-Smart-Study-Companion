@@ -31,6 +31,9 @@ import '../../features/student/presentation/pages/courses/student_courses_page.d
 import '../../features/student/presentation/pages/courses/student_discover_courses_page.dart';
 import '../../features/student/presentation/pages/courses/student_course_invite_page.dart';
 import '../../features/student/presentation/pages/courses/student_course_details_page.dart';
+import '../../features/student/presentation/pages/question_bank/student_question_bank_page.dart';
+import '../../features/student/presentation/pages/quiz_history/student_quiz_history_page.dart';
+import '../../features/student/presentation/pages/recommendations/student_recommendations_page.dart';
 import '../../features/student/presentation/pages/quiz/student_quiz_active_page.dart';
 import '../../features/student/presentation/pages/quiz/student_quiz_result_page.dart';
 import '../../shared/pages/error_page.dart';
@@ -472,11 +475,17 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: Routes.studentQuestionBank,
-            redirect: (_, __) => Routes.studentDashboard,
+            name: RouteNames.studentQuestionBank,
+            pageBuilder: (_, __) => const NoTransitionPage(
+              child: StudentQuestionBankPage(),
+            ),
           ),
           GoRoute(
             path: Routes.studentQuizHistory,
-            redirect: (_, __) => Routes.studentDashboard,
+            name: RouteNames.studentQuizHistory,
+            pageBuilder: (_, __) => const NoTransitionPage(
+              child: StudentQuizHistoryPage(),
+            ),
           ),
           GoRoute(
             path: Routes.studentExamAttempt,
@@ -492,7 +501,10 @@ final appRouterProvider = Provider<GoRouter>((ref) {
           ),
           GoRoute(
             path: Routes.studentRecommendations,
-            redirect: (_, __) => Routes.studentDashboard,
+            name: RouteNames.studentRecommendations,
+            pageBuilder: (_, __) => const NoTransitionPage(
+              child: StudentRecommendationsPage(),
+            ),
           ),
           GoRoute(
             path: Routes.studentNotifications,

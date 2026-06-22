@@ -3,10 +3,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-
 import '../../../../../core/network/error_mapper.dart';
-import '../../../../../core/routing/routes.dart';
 import '../../../../../shared/widgets/app_ui_components.dart';
 import '../../../data/courses_models.dart';
 import '../../../data/exam_models.dart';
@@ -21,10 +18,141 @@ import '../../../data/questions_api.dart';
 import '../../../data/topics_models.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../controllers/course_details_state.dart';
-import '../../controllers/selected_course_provider.dart';
-import '../../course_route_identity.dart';
+import '../add_question_sheet.dart' as add_question_sheet;
 import '../course_outcomes_panel.dart';
+import '../question_bank/question_bank_authoring_flow.dart';
 import 'create_exam_flow.dart';
+
+
+Future<void> showCourseCreateExamDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+  required MyCourseItem course,
+  List<QuestionModel>? initialQuestions,
+  VoidCallback? onChanged,
+}) async {
+  final questions = initialQuestions ?? await _loadCourseQuestionsForCreateExam(context, ref, course.id);
+  if (questions == null) return;
+
+  try {
+    await ref
+        .read(courseDetailsControllerProvider(course.id).notifier)
+        .loadModulesAndAllMaterials(force: true);
+  } catch (_) {
+    // The dialog can still fall back to metadata already attached to questions.
+  }
+  try {
+    await ensureCourseLearningOutcomesLoaded(ref, course.id, force: true);
+  } catch (_) {
+    // Outcomes are optional for topic-based backend generation.
+  }
+
+  if (!context.mounted) return;
+  final templatesFuture = ref
+      .read(examTemplatesStorageProvider)
+      .load(course.id)
+      .catchError((Object _) => ExamTemplateModel.defaults(course.id));
+  final outcomes = ref.read(courseLOProvider(course.id));
+  final latestState = ref.read(courseDetailsControllerProvider(course.id));
+  final latestTopicTargets = _topicTargetsFromCourseDetailsState(latestState);
+
+  final result = await showDialog<Object?>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => _CreateExamStartDialog(
+      course: course,
+      templates: ExamTemplateModel.defaults(course.id),
+      templatesFuture: templatesFuture,
+      modules: latestState.modules,
+      topicTargets: latestTopicTargets,
+      outcomes: outcomes,
+      questions: questions,
+    ),
+  );
+  if (result == null || !context.mounted) return;
+
+  if (result is _GeneratedExamResult) {
+    onChanged?.call();
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _GeneratedExamSuccessDialog(
+        exam: result.exam,
+        template: result.template,
+      ),
+    );
+    return;
+  }
+
+  if (result is _ExamStartConfig) {
+    await showCreateExamFlowDialog(
+      context: context,
+      course: course,
+      questions: questions,
+      initialTemplate: result.template,
+      initialScopeModuleId: result.moduleId,
+      initialScopeMaterialId: result.materialId,
+      initialScopeTopicIds: result.topicIds,
+      initialScopeOutcomeIds: result.outcomeIds,
+      initialTitle: result.title,
+      onCreated: onChanged,
+    );
+  }
+}
+
+Future<List<QuestionModel>?> _loadCourseQuestionsForCreateExam(
+  BuildContext context,
+  WidgetRef ref,
+  int courseId,
+) async {
+  try {
+    final response = await ref.read(questionsApiProvider).getCourseQuestions(courseId: courseId);
+    return response.questions;
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load course questions: ${mapApiFailure(e).message}')),
+      );
+    }
+    return null;
+  }
+}
+
+List<_TopicTarget> _topicTargetsFromCourseDetailsState(CourseDetailsState courseState) {
+  final result = <_TopicTarget>[];
+  for (final module in courseState.modules) {
+    final materials = courseState.materials[module.id] ?? const <MaterialItem>[];
+    final materialsById = {for (final material in materials) material.id: material};
+    final topics = courseState.topics[module.id] ?? const <TopicItem>[];
+    for (final topic in topics) {
+      final material = materialsById[topic.materialId];
+      if (material == null) continue;
+      String? parentTitle;
+      if (topic.parentTopicId != null) {
+        for (final candidate in topics) {
+          if (candidate.id == topic.parentTopicId) {
+            parentTitle = candidate.title;
+            break;
+          }
+        }
+      }
+      result.add(_TopicTarget(
+        module: module,
+        material: material,
+        topic: topic,
+        parentTopicTitle: parentTitle,
+      ));
+    }
+  }
+  result.sort((a, b) {
+    final moduleCmp = a.module.orderIndex.compareTo(b.module.orderIndex);
+    if (moduleCmp != 0) return moduleCmp;
+    final materialCmp = a.material.displayTitle.compareTo(b.material.displayTitle);
+    if (materialCmp != 0) return materialCmp;
+    return a.topic.orderIndex.compareTo(b.topic.orderIndex);
+  });
+  return result;
+}
 
 class CourseQuestionBankTab extends ConsumerStatefulWidget {
   final MyCourseItem course;
@@ -50,6 +178,11 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
   int? _filterOutcomeId;
   String? _selectedQuestionId;
   _ExamStartConfig? _examStartConfig;
+  bool _showQuestionAuthoring = false;
+  Set<int> _authoringModuleIds = const <int>{};
+  Set<int> _authoringMaterialIds = const <int>{};
+  Set<int> _authoringTopicIds = const <int>{};
+  QuestionAuthoringLaunchContext? _authoringLaunchContext;
 
   bool _loading = true;
   bool _creatingExam = false;
@@ -233,6 +366,20 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
       );
     }
 
+    if (_showQuestionAuthoring) {
+      return QuestionBankAuthoringFlow(
+        course: widget.course,
+        initialModuleIds: _authoringModuleIds,
+        initialMaterialIds: _authoringMaterialIds,
+        initialTopicIds: _authoringTopicIds,
+        embedded: true,
+        startInAiMode: true,
+        launchContext: _authoringLaunchContext,
+        onClose: _closeQuestionAuthoring,
+        onSavedToQuestionBank: _closeQuestionAuthoringAfterSave,
+      );
+    }
+
     return Container(
       color: AppColors.pageBg,
       child: SingleChildScrollView(
@@ -251,6 +398,7 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
                   visibleQuestionsCount: filtered.length,
                   examReadyCount: examReadyCount,
                   onRefresh: _loadQuestions,
+                  onGenerateQuestions: _openGenerateQuestionsTopicPicker,
                   onCreateExam: _openCreateExamStart,
                 ),
                 const SizedBox(height: 16),
@@ -345,57 +493,102 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
     );
   }
 
-  Future<void> _openCreateExamStart() async {
-    if (_questions.isEmpty || _creatingExam) return;
-    _loadCourseTree();
-    ensureCourseLearningOutcomesLoaded(ref, widget.course.id);
+  Future<void> _openGenerateQuestionsTopicPicker() async {
+    try {
+      await ref
+          .read(courseDetailsControllerProvider(widget.course.id).notifier)
+          .loadModulesAndAllMaterials();
+    } catch (_) {
+      // The dialog below will still use whatever data is already cached.
+    }
 
-    final Future<List<ExamTemplateModel>> templatesFuture = ref
-        .read(examTemplatesStorageProvider)
-        .load(widget.course.id)
-        .catchError((Object _) => ExamTemplateModel.defaults(widget.course.id));
-
-    final outcomes = ref.read(courseLOProvider(widget.course.id));
+    if (!mounted) return;
     final latestState = ref.read(courseDetailsControllerProvider(widget.course.id));
-    final latestTopicTargets = _topicTargetsFromState(latestState);
-    final result = await showDialog<Object?>(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => _CreateExamStartDialog(
-        course: widget.course,
-        templates: ExamTemplateModel.defaults(widget.course.id),
-        templatesFuture: templatesFuture,
-        modules: latestState.modules,
-        topicTargets: latestTopicTargets,
-        outcomes: outcomes,
-        questions: _questions,
-      ),
-    );
-    if (result == null || !mounted) return;
+    final topicTargets = _topicTargetsFromState(latestState);
 
-    if (result is _GeneratedExamResult) {
-      await _loadQuestions();
-      if (!mounted) return;
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => _GeneratedExamSuccessDialog(
-          exam: result.exam,
-          template: result.template,
+    if (topicTargets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No topics found yet. Upload a material and wait for topics before generating questions.'),
         ),
       );
-      if (!mounted) return;
-      SelectedCourseCache.set(widget.course);
-      context.go(Routes.courseQuizzes(buildCourseRouteSlug(widget.course)));
       return;
     }
 
-    if (result is _ExamStartConfig) {
-      setState(() {
-        _examStartConfig = result;
-        _creatingExam = true;
-      });
-    }
+    final selected = await showDialog<_TopicTarget>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _QuestionGenerationTopicPickerDialog(topicTargets: topicTargets),
+    );
+    if (selected == null || !mounted) return;
+    _openQuestionAuthoringForTopic(selected);
+  }
+
+  void _openQuestionAuthoringForTopic(_TopicTarget target) {
+    final isSubtopic = target.topic.parentTopicId != null;
+    final moduleIds = <int>{target.module.id};
+    final materialIds = <int>{target.material.id};
+    final topicIds = <int>{target.topic.id};
+    final targetSnapshot = add_question_sheet.QuestionAuthoringTarget(
+      moduleId: target.module.id,
+      moduleName: target.module.title,
+      materialId: target.material.id,
+      materialName: target.material.displayTitle,
+      topicId: target.topic.id,
+      topicName: target.topic.title,
+      isSubtopic: isSubtopic,
+      parentTopicName: target.parentTopicTitle,
+    );
+
+    setState(() {
+      _authoringModuleIds = moduleIds;
+      _authoringMaterialIds = materialIds;
+      _authoringTopicIds = topicIds;
+      _authoringLaunchContext = QuestionAuthoringLaunchContext(
+        kind: isSubtopic
+            ? QuestionAuthoringScopeKind.subtopic
+            : QuestionAuthoringScopeKind.topic,
+        title: targetSnapshot.label,
+        subtitle: '${target.module.title} • ${target.material.displayTitle}',
+        selectedModuleId: target.module.id,
+        selectedMaterialId: target.material.id,
+        selectedTopicId: target.topic.id,
+        selectedModuleIds: moduleIds,
+        selectedMaterialIds: materialIds,
+        selectedTopicIds: topicIds,
+        targetSnapshots: <add_question_sheet.QuestionAuthoringTarget>[targetSnapshot],
+      );
+      _showQuestionAuthoring = true;
+    });
+  }
+
+  void _closeQuestionAuthoring() {
+    if (!mounted) return;
+    setState(() {
+      _showQuestionAuthoring = false;
+      _authoringModuleIds = const <int>{};
+      _authoringMaterialIds = const <int>{};
+      _authoringTopicIds = const <int>{};
+      _authoringLaunchContext = null;
+    });
+  }
+
+  void _closeQuestionAuthoringAfterSave() {
+    _closeQuestionAuthoring();
+    unawaited(_loadQuestions());
+  }
+
+  Future<void> _openCreateExamStart() async {
+    if (_questions.isEmpty || _creatingExam) return;
+    await showCourseCreateExamDialog(
+      context: context,
+      ref: ref,
+      course: widget.course,
+      initialQuestions: _questions,
+      onChanged: () {
+        unawaited(_loadQuestions());
+      },
+    );
   }
 
   void _clearFilters() {
@@ -564,6 +757,7 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
   late ExamTemplateModel _template;
   bool _templatesLoading = false;
   bool _generating = false;
+  Map<String, _GenerationDifficultyDraft> _difficultyDrafts = <String, _GenerationDifficultyDraft>{};
   int? _moduleId;
   int? _materialId;
   final Set<int> _topicIds = <int>{};
@@ -579,6 +773,7 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
         ? List<ExamTemplateModel>.from(widget.templates)
         : ExamTemplateModel.defaults(widget.course.id);
     _template = _preferredTemplate(_templates);
+    _difficultyDrafts = _buildDifficultyDrafts(_template);
     _titleCtrl.text = _defaultExamTitle(_template);
     _loadTemplatesInPlace();
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureDialogCourseTreeLoaded());
@@ -587,6 +782,7 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
   @override
   void dispose() {
     _titleCtrl.dispose();
+    _disposeDifficultyDrafts();
     super.dispose();
   }
 
@@ -767,9 +963,77 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
     final previousDefault = _defaultExamTitle(_template);
     final currentTitle = _titleCtrl.text.trim();
     _template = template;
+    _disposeDifficultyDrafts();
+    _difficultyDrafts = _buildDifficultyDrafts(template);
     if (currentTitle.isEmpty || currentTitle == previousDefault) {
       _titleCtrl.text = _defaultExamTitle(template);
     }
+  }
+
+  Map<String, _GenerationDifficultyDraft> _buildDifficultyDrafts(ExamTemplateModel template) {
+    final drafts = <String, _GenerationDifficultyDraft>{};
+    final sections = _effectiveDistributionSections(template);
+    for (var index = 0; index < sections.length; index++) {
+      final section = sections[index];
+      final orderIndex = section.orderIndex > 0 ? section.orderIndex : index + 1;
+      drafts['$orderIndex'] = _GenerationDifficultyDraft(
+        sectionLabel: _templateQuestionTypeLabel(section.questionType),
+        questionCount: section.questionCount,
+      );
+    }
+    return drafts;
+  }
+
+  void _disposeDifficultyDrafts() {
+    for (final draft in _difficultyDrafts.values) {
+      draft.dispose();
+    }
+    _difficultyDrafts = <String, _GenerationDifficultyDraft>{};
+  }
+
+  String? _difficultyConfigError() {
+    final sections = _effectiveDistributionSections(_template);
+    for (var index = 0; index < sections.length; index++) {
+      final section = sections[index];
+      final orderIndex = section.orderIndex > 0 ? section.orderIndex : index + 1;
+      final draft = _difficultyDrafts['$orderIndex'];
+      if (draft == null) continue;
+      if (draft.hasNegativeValue) return '${draft.sectionLabel} difficulty percentages cannot be negative.';
+      final total = draft.totalPercent;
+      if (total != 100) {
+        return '${draft.sectionLabel} difficulty mix must sum to 100%. Current total is $total%.';
+      }
+    }
+    return null;
+  }
+
+  Map<String, int> _difficultyPercentagesForSection(ExamTemplateSectionModel section, int index) {
+    final orderIndex = section.orderIndex > 0 ? section.orderIndex : index + 1;
+    return _difficultyDrafts['$orderIndex']?.percentages ?? const <String, int>{'medium': 100};
+  }
+
+  Map<String, int> _requiredDifficultyCountsForSection(ExamTemplateSectionModel section, int index) {
+    return _countsFromDifficultyPercentages(section.questionCount, _difficultyPercentagesForSection(section, index));
+  }
+
+  Map<String, int> _countsFromDifficultyPercentages(int total, Map<String, int> percentages) {
+    if (total <= 0) return const <String, int>{};
+    final entries = <MapEntry<String, int>>[];
+    for (final key in const ['easy', 'medium', 'hard']) {
+      final value = percentages[key] ?? 0;
+      if (value > 0) entries.add(MapEntry(key, value));
+    }
+    if (entries.isEmpty) return <String, int>{'medium': total};
+
+    var assigned = 0;
+    final result = <String, int>{};
+    for (var i = 0; i < entries.length; i++) {
+      final entry = entries[i];
+      final count = i == entries.length - 1 ? total - assigned : (total * entry.value / 100).round();
+      if (count > 0) result[entry.key] = count;
+      assigned += count;
+    }
+    return result;
   }
 
   ExamTemplateModel _preferredTemplate(List<ExamTemplateModel> templates) {
@@ -849,29 +1113,46 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
     return matching.where((question) => question.difficulty == difficulty).toList();
   }
 
-  List<_TemplateRequirementGap> _templateRequirementGaps(List<QuestionModel> matching) {
+  List<_TemplateRequirementGap> _templateTypeRequirementGaps(List<QuestionModel> matching) {
     final activeSections = _template.sections.where((section) => section.questionCount > 0).toList()
       ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
     if (activeSections.isEmpty) {
-      final available = _eligibleQuestionsForTemplate(matching).length;
-      return available >= _template.questionCount
+      return matching.length >= _template.questionCount
           ? const <_TemplateRequirementGap>[]
           : [
               _TemplateRequirementGap(
                 label: 'Total questions',
                 requiredCount: _template.questionCount,
-                availableCount: available,
+                availableCount: matching.length,
               ),
             ];
     }
 
-    final eligible = _eligibleQuestionsForTemplate(matching);
     final gaps = <_TemplateRequirementGap>[];
     for (final section in activeSections) {
       final type = parseQuestionType(section.questionType);
-      final difficultyCounts = _sectionDifficultyDistribution(section);
+      final available = matching.where((question) => question.type == type).length;
+      if (available < section.questionCount) {
+        gaps.add(_TemplateRequirementGap(
+          label: _templateQuestionTypeLabel(section.questionType),
+          requiredCount: section.questionCount,
+          availableCount: available,
+        ));
+      }
+    }
+    return gaps;
+  }
+
+  List<_TemplateRequirementGap> _templateRequirementGaps(List<QuestionModel> matching) {
+    final activeSections = _effectiveDistributionSections(_template);
+    final gaps = <_TemplateRequirementGap>[];
+    for (var index = 0; index < activeSections.length; index++) {
+      final section = activeSections[index];
+      if (section.questionCount <= 0) continue;
+      final type = parseQuestionType(section.questionType);
+      final difficultyCounts = _requiredDifficultyCountsForSection(section, index);
       if (difficultyCounts.isEmpty) {
-        final available = eligible.where((question) => question.type == type).length;
+        final available = matching.where((question) => question.type == type).length;
         if (available < section.questionCount) {
           gaps.add(_TemplateRequirementGap(
             label: _templateQuestionTypeLabel(section.questionType),
@@ -932,7 +1213,17 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
       return null;
     }
 
-    final gaps = _templateRequirementGaps(matching);
+    if (backendGenerate) {
+      final difficultyError = _difficultyConfigError();
+      if (difficultyError != null) {
+        setState(() => _error = difficultyError);
+        return null;
+      }
+    }
+
+    final gaps = backendGenerate
+        ? _templateRequirementGaps(matching)
+        : _templateTypeRequirementGaps(matching);
     if (gaps.isNotEmpty) {
       setState(() => _error = _gapsMessage(gaps));
       return null;
@@ -944,11 +1235,14 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
   void _continue(List<_TopicTarget> topicTargets) {
     final title = _validatedExamTitle();
     if (title == null) return;
-    final validation = _validateScopeAndDistribution(
-      backendGenerate: false,
-      topicTargets: topicTargets,
-    );
-    if (validation == null) return;
+
+    if (_hasRequiredScope) {
+      final validation = _validateScopeAndDistribution(
+        backendGenerate: false,
+        topicTargets: topicTargets,
+      );
+      if (validation == null) return;
+    }
 
     Navigator.of(context).pop(_ExamStartConfig(
       template: _template,
@@ -960,24 +1254,14 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
     ),);
   }
 
-  Map<String, dynamic> _difficultyDistributionForTemplate(
-    ExamTemplateModel template,
-    List<QuestionModel> matching,
-  ) {
+  Map<String, dynamic> _difficultyDistributionForTemplate(ExamTemplateModel template) {
     final sections = _effectiveDistributionSections(template);
     final result = <String, dynamic>{};
 
     for (var index = 0; index < sections.length; index++) {
       final section = sections[index];
       final orderIndex = section.orderIndex > 0 ? section.orderIndex : index + 1;
-      final type = parseQuestionType(section.questionType);
-      final configured = _difficultyPercentagesFromCounts(_sectionDifficultyDistribution(section));
-      if (configured.isNotEmpty) {
-        result['$orderIndex'] = configured;
-      } else {
-        final candidates = matching.where((question) => question.type == type).toList();
-        result['$orderIndex'] = _difficultyPercentages(candidates);
-      }
+      result['$orderIndex'] = _difficultyPercentagesForSection(section, index);
     }
 
     if (result.isEmpty) {
@@ -1008,61 +1292,6 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
     ];
   }
 
-  Map<String, int> _difficultyPercentages(List<QuestionModel> questions) {
-    final counts = <String, int>{
-      'easy': questions.where((question) => question.difficulty == QuestionDifficulty.easy).length,
-      'medium': questions.where((question) => question.difficulty == QuestionDifficulty.medium).length,
-      'hard': questions.where((question) => question.difficulty == QuestionDifficulty.hard).length,
-    };
-    final total = counts.values.fold<int>(0, (sum, count) => sum + count);
-    if (total <= 0) return const <String, int>{'medium': 100};
-
-    final nonZeroKeys = counts.entries.where((entry) => entry.value > 0).map((entry) => entry.key).toList();
-    var assigned = 0;
-    final distribution = <String, int>{};
-    for (var i = 0; i < nonZeroKeys.length; i++) {
-      final key = nonZeroKeys[i];
-      final value = counts[key] ?? 0;
-      final percent = i == nonZeroKeys.length - 1 ? 100 - assigned : (value * 100 / total).round();
-      distribution[key] = percent;
-      assigned += percent;
-    }
-
-    if (distribution.isEmpty) return const <String, int>{'medium': 100};
-    final sum = distribution.values.fold<int>(0, (a, b) => a + b);
-    if (sum != 100) {
-      final adjustKey = distribution.containsKey('medium') ? 'medium' : distribution.keys.first;
-      distribution[adjustKey] = (distribution[adjustKey] ?? 0) + (100 - sum);
-    }
-    return distribution;
-  }
-
-  Map<String, int> _difficultyPercentagesFromCounts(Map<String, int> counts) {
-    final positive = <String, int>{};
-    for (final entry in counts.entries) {
-      if (entry.value > 0) positive[entry.key] = entry.value;
-    }
-    final total = positive.values.fold<int>(0, (sum, count) => sum + count);
-    if (total <= 0) return const <String, int>{};
-
-    var assigned = 0;
-    final result = <String, int>{};
-    final entries = positive.entries.toList();
-    for (var i = 0; i < entries.length; i++) {
-      final entry = entries[i];
-      final percent = i == entries.length - 1 ? 100 - assigned : (entry.value * 100 / total).round();
-      if (percent > 0) result[entry.key] = percent;
-      assigned += percent;
-    }
-    if (result.isEmpty) return const <String, int>{'medium': 100};
-    final sum = result.values.fold<int>(0, (a, b) => a + b);
-    if (sum != 100) {
-      final adjustKey = result.containsKey('medium') ? 'medium' : result.keys.first;
-      result[adjustKey] = (result[adjustKey] ?? 0) + (100 - sum);
-    }
-    return result;
-  }
-
   Future<void> _generateExamFromBackend(List<_TopicTarget> topicTargets) async {
     if (_generating) return;
     final title = _validatedExamTitle();
@@ -1088,10 +1317,7 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
       }
 
       final topicIds = _topicIds.toList()..sort();
-      final distribution = _difficultyDistributionForTemplate(
-        savedTemplate,
-        _matchingQuestions(topicTargets),
-      );
+      final distribution = _difficultyDistributionForTemplate(savedTemplate);
       final exam = await ref.read(examsApiProvider).generateExamFromTemplate(
             courseId: widget.course.id,
             templateId: templateId,
@@ -1141,7 +1367,9 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
     final outcomeOptions = _learningOutcomeSetupOptions(widget.questions, effectiveOutcomes);
     final matching = _matchingQuestions(effectiveTopicTargets);
     final eligibleMatching = _eligibleQuestionsForTemplate(matching);
+    final manualGaps = _templateTypeRequirementGaps(matching);
     final requirementGaps = _templateRequirementGaps(matching);
+    final difficultyError = _difficultyConfigError();
     final templateItems = _templates.isNotEmpty ? _templates : <ExamTemplateModel>[_template];
 
     final templateValue = _template.name;
@@ -1151,14 +1379,16 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
     final materialValue = _selectedMaterialFilterLabel(materialOptions, _materialId);
     final materialItems = <String>['All materials', ...materialOptions.map((option) => option.label)];
     final titleReady = _titleCtrl.text.trim().isNotEmpty;
-    final scopeReady = _hasRequiredScope && matching.isNotEmpty && requirementGaps.isEmpty;
-    final canBuildManually = titleReady && scopeReady && !_generating;
-    final canGenerate = canBuildManually && _scopeMode == _ExamScopeMode.topics;
+    final manualReady = _hasRequiredScope && matching.isNotEmpty && manualGaps.isEmpty;
+    final generateReady = manualReady && requirementGaps.isEmpty && difficultyError == null;
+    final canBuildManually = titleReady && !_generating;
+    final canGenerate = titleReady && generateReady && _scopeMode == _ExamScopeMode.topics && !_generating;
 
     final generateStatus = _generateStatusText(
       titleReady: titleReady,
       matchingCount: matching.length,
       gaps: requirementGaps,
+      difficultyError: difficultyError,
     );
 
     return Dialog(
@@ -1236,6 +1466,13 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
                               },
                             ),
                             const SizedBox(height: 12),
+                            _GenerationDifficultyPanel(
+                              sections: _effectiveDistributionSections(_template),
+                              drafts: _difficultyDrafts,
+                              enabled: !_generating,
+                              onChanged: () => setState(() => _error = null),
+                            ),
+                            const SizedBox(height: 14),
                             LayoutBuilder(
                               builder: (context, inner) {
                                 final stacked = inner.maxWidth < 320;
@@ -1459,12 +1696,14 @@ class _CreateExamStartDialogState extends ConsumerState<_CreateExamStartDialog> 
     required bool titleReady,
     required int matchingCount,
     required List<_TemplateRequirementGap> gaps,
+    required String? difficultyError,
   }) {
     if (!titleReady) return 'Add an exam title first.';
     if (_scopeMode != _ExamScopeMode.topics) {
       return 'Backend generate-exam accepts topic/subtopic IDs. Learning outcomes can still be used in the manual builder.';
     }
     if (_topicIds.isEmpty) return 'Select one or more topics/subtopics to enable backend generation.';
+    if (difficultyError != null) return difficultyError;
     if (matchingCount == 0) return 'No backend-saved questions match this scope.';
     if (gaps.isNotEmpty) return _gapsMessage(gaps);
     if (_template.backendId == null) {
@@ -1661,6 +1900,322 @@ class _SetupPanel extends StatelessWidget {
           child,
         ],
       ),
+    );
+  }
+}
+
+
+class _GenerationDifficultyDraft {
+  final String sectionLabel;
+  final int questionCount;
+  final TextEditingController easyCtrl;
+  final TextEditingController mediumCtrl;
+  final TextEditingController hardCtrl;
+
+  _GenerationDifficultyDraft({required this.sectionLabel, required this.questionCount})
+      : easyCtrl = TextEditingController(text: '30'),
+        mediumCtrl = TextEditingController(text: '50'),
+        hardCtrl = TextEditingController(text: '20');
+
+  int get easyPercent => int.tryParse(easyCtrl.text.trim()) ?? 0;
+  int get mediumPercent => int.tryParse(mediumCtrl.text.trim()) ?? 0;
+  int get hardPercent => int.tryParse(hardCtrl.text.trim()) ?? 0;
+  int get totalPercent => easyPercent + mediumPercent + hardPercent;
+
+  void setEasy(int value) => easyCtrl.text = _boundedPercent(value).toString();
+  void setMedium(int value) => mediumCtrl.text = _boundedPercent(value).toString();
+  void setHard(int value) => hardCtrl.text = _boundedPercent(value).toString();
+
+  void setMix({required int easy, required int medium, required int hard}) {
+    easyCtrl.text = _boundedPercent(easy).toString();
+    mediumCtrl.text = _boundedPercent(medium).toString();
+    hardCtrl.text = _boundedPercent(hard).toString();
+  }
+
+  int _boundedPercent(int value) => value.clamp(0, 100).toInt();
+
+  bool get hasNegativeValue {
+    return _isNegativeNumber(easyCtrl.text) || _isNegativeNumber(mediumCtrl.text) || _isNegativeNumber(hardCtrl.text);
+  }
+
+  Map<String, int> get percentages {
+    final result = <String, int>{};
+    if (easyPercent > 0) result['easy'] = easyPercent;
+    if (mediumPercent > 0) result['medium'] = mediumPercent;
+    if (hardPercent > 0) result['hard'] = hardPercent;
+    return result.isEmpty ? const <String, int>{'medium': 100} : result;
+  }
+
+  void dispose() {
+    easyCtrl.dispose();
+    mediumCtrl.dispose();
+    hardCtrl.dispose();
+  }
+}
+
+class _GenerationDifficultyPanel extends StatelessWidget {
+  final List<ExamTemplateSectionModel> sections;
+  final Map<String, _GenerationDifficultyDraft> drafts;
+  final bool enabled;
+  final VoidCallback onChanged;
+
+  const _GenerationDifficultyPanel({
+    required this.sections,
+    required this.drafts,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    void applyPreset(int easy, int medium, int hard) {
+      for (final draft in drafts.values) {
+        draft.setMix(easy: easy, medium: medium, hard: hard);
+      }
+      onChanged();
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.warningSoftBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.warningBorder),
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 16, offset: const Offset(0, 8))],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 38,
+                height: 38,
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child:  Icon(Icons.tune_rounded, color: AppColors.warningText, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Exam difficulty mix',
+                      style: TextStyle(color: AppColors.textTitle, fontSize: 13.5, fontWeight: FontWeight.w900),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Type Easy / Medium / Hard percentages here before Generate. This is not saved inside the template.',
+                      style: TextStyle(color: AppColors.textMuted, fontSize: 11.7, height: 1.35, fontWeight: FontWeight.w700),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              _DifficultyPresetChip(
+                label: 'Easy exam',
+                enabled: enabled,
+                onPressed: () => applyPreset(70, 20, 10),
+              ),
+              _DifficultyPresetChip(
+                label: 'Balanced',
+                enabled: enabled,
+                onPressed: () => applyPreset(30, 50, 20),
+              ),
+              _DifficultyPresetChip(
+                label: 'Hard exam',
+                enabled: enabled,
+                onPressed: () => applyPreset(10, 30, 60),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          for (var index = 0; index < sections.length; index++) ...[
+            _GenerationDifficultyRow(
+              section: sections[index],
+              draft: drafts['${sections[index].orderIndex > 0 ? sections[index].orderIndex : index + 1}'],
+              enabled: enabled,
+              onChanged: onChanged,
+            ),
+            if (index != sections.length - 1) Divider(height: 16, color: AppColors.borderGray),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _GenerationDifficultyRow extends StatelessWidget {
+  final ExamTemplateSectionModel section;
+  final _GenerationDifficultyDraft? draft;
+  final bool enabled;
+  final VoidCallback onChanged;
+
+  const _GenerationDifficultyRow({
+    required this.section,
+    required this.draft,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final item = draft;
+    if (item == null) return const SizedBox.shrink();
+    final totalOk = item.totalPercent == 100;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                '${section.questionCount} ${_shortTemplateQuestionTypeLabel(section.questionType)}',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(color: AppColors.textTitle, fontSize: 12.2, fontWeight: FontWeight.w900),
+              ),
+            ),
+            Text(
+              '${item.totalPercent}%',
+              style: TextStyle(
+                color: totalOk ? AppColors.successText : AppColors.dangerText,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final stacked = constraints.maxWidth < 260;
+            final fields = [
+              _DifficultyPercentField(
+                label: 'Easy',
+                controller: item.easyCtrl,
+                enabled: enabled,
+                onChanged: onChanged,
+              ),
+              _DifficultyPercentField(
+                label: 'Medium',
+                controller: item.mediumCtrl,
+                enabled: enabled,
+                onChanged: onChanged,
+              ),
+              _DifficultyPercentField(
+                label: 'Hard',
+                controller: item.hardCtrl,
+                enabled: enabled,
+                onChanged: onChanged,
+              ),
+            ];
+            if (stacked) {
+              return Column(
+                children: [
+                  for (var i = 0; i < fields.length; i++) ...[
+                    fields[i],
+                    if (i != fields.length - 1) const SizedBox(height: 8),
+                  ],
+                ],
+              );
+            }
+            return Row(
+              children: [
+                for (var i = 0; i < fields.length; i++) ...[
+                  Expanded(child: fields[i]),
+                  if (i != fields.length - 1) const SizedBox(width: 8),
+                ],
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+class _DifficultyPresetChip extends StatelessWidget {
+  final String label;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  const _DifficultyPresetChip({
+    required this.label,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: enabled ? onPressed : null,
+      style: OutlinedButton.styleFrom(
+        visualDensity: VisualDensity.compact,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        foregroundColor: AppColors.warningText,
+        side: BorderSide(color: enabled ? AppColors.warningBorder : AppColors.borderGray),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
+      ),
+      child: Text(label, style: const TextStyle(fontSize: 11.2, fontWeight: FontWeight.w900)),
+    );
+  }
+}
+
+class _DifficultyPercentField extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final bool enabled;
+  final VoidCallback onChanged;
+
+  const _DifficultyPercentField({
+    required this.label,
+    required this.controller,
+    required this.enabled,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(label, style: TextStyle(color: AppColors.textMuted, fontSize: 10.5, fontWeight: FontWeight.w900)),
+        const SizedBox(height: 5),
+        TextField(
+          controller: controller,
+          enabled: enabled,
+          textAlign: TextAlign.center,
+          keyboardType: TextInputType.number,
+          onChanged: (_) => onChanged(),
+          style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w900, fontSize: 12.4),
+          decoration: InputDecoration(
+            isDense: true,
+            suffixText: '%',
+            filled: true,
+            fillColor: enabled ? AppColors.fieldBg : AppColors.fieldDisabledBg,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 9),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.borderGray)),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.primary, width: 1.4)),
+            disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.borderGray)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: AppColors.borderGray)),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -2004,7 +2559,7 @@ class _TemplateInsightCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  distribution.isEmpty ? 'Uses total question count.' : 'Distribution: $distribution',
+                  distribution.isEmpty ? 'Uses total question count.' : 'Sections: $distribution',
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: AppColors.textMuted, fontSize: 11.7, height: 1.35, fontWeight: FontWeight.w700),
@@ -2279,7 +2834,7 @@ class _TemplateDistributionStatus extends StatelessWidget {
         border: Border.all(color: ok ? AppColors.successText.withOpacity(0.24) : AppColors.dangerBorder),
       ),
       child: Text(
-        ok ? 'Distribution ready: $distribution' : 'Distribution shortage: ${gaps.map((gap) => '${gap.label} ${gap.availableCount}/${gap.requiredCount}').join(' • ')}',
+        ok ? 'Section plan ready: $distribution' : 'Section shortage: ${gaps.map((gap) => '${gap.label} ${gap.availableCount}/${gap.requiredCount}').join(' • ')}',
         style: TextStyle(
           color: ok ? AppColors.successText : AppColors.dangerText,
           fontSize: 11.5,
@@ -2288,28 +2843,6 @@ class _TemplateDistributionStatus extends StatelessWidget {
       ),
     );
   }
-}
-
-Map<String, int> _sectionDifficultyDistribution(ExamTemplateSectionModel section) {
-  final result = <String, int>{};
-  for (final entry in section.difficultyDistribution.entries) {
-    final key = entry.key.trim().toLowerCase();
-    if (entry.value <= 0) continue;
-    if (key == 'easy' || key == 'medium' || key == 'hard') result[key] = entry.value;
-  }
-  return result;
-}
-
-String _difficultyCountsText(Map<String, int> counts) {
-  if (counts.isEmpty) return '';
-  final parts = <String>[];
-  final easy = counts['easy'] ?? 0;
-  final medium = counts['medium'] ?? 0;
-  final hard = counts['hard'] ?? 0;
-  if (easy > 0) parts.add('E$easy');
-  if (medium > 0) parts.add('M$medium');
-  if (hard > 0) parts.add('H$hard');
-  return parts.join('/');
 }
 
 String _difficultyLabelFromKey(String key) {
@@ -2328,8 +2861,7 @@ String _templateDistributionText(ExamTemplateModel template) {
     ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
   if (sections.isEmpty) return '';
   return sections.map((section) {
-    final difficulty = _difficultyCountsText(_sectionDifficultyDistribution(section));
-    return '${section.questionCount} ${_shortTemplateQuestionTypeLabel(section.questionType)}${difficulty.isEmpty ? '' : ' ($difficulty)'}';
+    return '${section.questionCount} ${_shortTemplateQuestionTypeLabel(section.questionType)}';
   }).join(' / ');
 }
 
@@ -3297,6 +3829,320 @@ class _StartPreview extends StatelessWidget {
   }
 }
 
+class _QuestionGenerationTopicPickerDialog extends StatefulWidget {
+  final List<_TopicTarget> topicTargets;
+
+  const _QuestionGenerationTopicPickerDialog({required this.topicTargets});
+
+  @override
+  State<_QuestionGenerationTopicPickerDialog> createState() =>
+      _QuestionGenerationTopicPickerDialogState();
+}
+
+class _QuestionGenerationTopicPickerDialogState
+    extends State<_QuestionGenerationTopicPickerDialog> {
+  final TextEditingController _searchCtrl = TextEditingController();
+  int? _selectedTopicId;
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<_TopicTarget> get _filteredTargets {
+    final query = _searchCtrl.text.trim().toLowerCase();
+    if (query.isEmpty) return widget.topicTargets;
+    return widget.topicTargets.where((target) {
+      final label = _topicDisplayTitle(target).toLowerCase();
+      final module = target.module.title.toLowerCase();
+      final material = target.material.displayTitle.toLowerCase();
+      final parent = (target.parentTopicTitle ?? '').toLowerCase();
+      return label.contains(query) ||
+          module.contains(query) ||
+          material.contains(query) ||
+          parent.contains(query);
+    }).toList();
+  }
+
+  _TopicTarget? get _selectedTarget {
+    final id = _selectedTopicId;
+    if (id == null) return null;
+    for (final target in widget.topicTargets) {
+      if (target.topic.id == id) return target;
+    }
+    return null;
+  }
+
+  String _topicDisplayTitle(_TopicTarget target) {
+    final parent = target.parentTopicTitle;
+    if (parent != null && parent.trim().isNotEmpty) {
+      return '$parent / ${target.topic.title}';
+    }
+    return target.topic.title;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final filtered = _filteredTargets;
+    final selected = _selectedTarget;
+    return Dialog(
+      elevation: 0,
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 620, maxHeight: 720),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.cardBg,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.16),
+                  blurRadius: 42,
+                  spreadRadius: 2,
+                  offset: const Offset(0, 20),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(22, 20, 18, 16),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          color: AppColors.primarySoft,
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        alignment: Alignment.center,
+                        child: const Icon(Icons.auto_awesome_rounded, color: AppColors.primary),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Generate questions',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w900,
+                                color: AppColors.textTitle,
+                                letterSpacing: -0.3,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Choose the topic you want to use as the AI generation scope.',
+                              style: TextStyle(
+                                fontSize: 12.5,
+                                height: 1.35,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: const Icon(Icons.close_rounded),
+                      ),
+                    ],
+                  ),
+                ),
+                 Divider(height: 1, color: AppColors.borderGray),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 12),
+                  child: TextField(
+                    controller: _searchCtrl,
+                    onChanged: (_) => setState(() {}),
+                    decoration: InputDecoration(
+                      hintText: 'Search topic, material, or module...',
+                      prefixIcon: const Icon(Icons.search_rounded),
+                      filled: true,
+                      fillColor: AppColors.pageBg,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide:  BorderSide(color: AppColors.borderGray),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide:  BorderSide(color: AppColors.borderGray),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(14),
+                        borderSide: const BorderSide(color: AppColors.primary),
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                    ),
+                  ),
+                ),
+                Flexible(
+                  child: filtered.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.fromLTRB(24, 28, 24, 34),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.search_off_rounded, size: 42, color: AppColors.textMuted.withOpacity(0.65)),
+                              const SizedBox(height: 12),
+                              Text(
+                                'No matching topics',
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.textTitle,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                'Try a different topic, module, or material keyword.',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                        )
+                      : ListView.separated(
+                          shrinkWrap: true,
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                          itemCount: filtered.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 10),
+                          itemBuilder: (context, index) {
+                            final target = filtered[index];
+                            final selected = _selectedTopicId == target.topic.id;
+                            final isSubtopic = target.topic.parentTopicId != null;
+                            return InkWell(
+                              borderRadius: BorderRadius.circular(14),
+                              onTap: () => setState(() => _selectedTopicId = target.topic.id),
+                              onDoubleTap: () => Navigator.of(context).pop(target),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 140),
+                                padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                                decoration: BoxDecoration(
+                                  color: selected ? AppColors.primarySoft : AppColors.cardBg,
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: selected ? AppColors.primary : AppColors.borderGray,
+                                  ),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      width: 34,
+                                      height: 34,
+                                      decoration: BoxDecoration(
+                                        color: selected ? AppColors.primary : AppColors.pageBg,
+                                        borderRadius: BorderRadius.circular(11),
+                                      ),
+                                      alignment: Alignment.center,
+                                      child: Icon(
+                                        isSubtopic ? Icons.subdirectory_arrow_right_rounded : Icons.tag_rounded,
+                                        size: 18,
+                                        color: selected ? Colors.white : AppColors.primary,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            _topicDisplayTitle(target),
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 13.5,
+                                              fontWeight: FontWeight.w900,
+                                              color: AppColors.textTitle,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            '${target.module.title} • ${target.material.displayTitle}',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: TextStyle(
+                                              fontSize: 11.8,
+                                              fontWeight: FontWeight.w700,
+                                              color: AppColors.textMuted,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Radio<int>(
+                                      value: target.topic.id,
+                                      groupValue: _selectedTopicId,
+                                      onChanged: (value) => setState(() => _selectedTopicId = value),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                ),
+                Container(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 20, 20),
+                  decoration:  BoxDecoration(
+                    border: Border(top: BorderSide(color: AppColors.borderGray)),
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          selected == null
+                              ? '${widget.topicTargets.length} topic${widget.topicTargets.length == 1 ? '' : 's'} available'
+                              : _topicDisplayTitle(selected),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12.5,
+                            fontWeight: FontWeight.w800,
+                            color: selected == null ? AppColors.textMuted : AppColors.textTitle,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      const SizedBox(width: 10),
+                      FilledButton.icon(
+                        onPressed: selected == null
+                            ? null
+                            : () => Navigator.of(context).pop(selected),
+                        icon: const Icon(Icons.arrow_forward_rounded, size: 18),
+                        label: const Text('Open Workspace'),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _QuestionBankHeader extends StatelessWidget {
   final bool loading;
   final bool canCreateExam;
@@ -3304,6 +4150,7 @@ class _QuestionBankHeader extends StatelessWidget {
   final int visibleQuestionsCount;
   final int examReadyCount;
   final VoidCallback onRefresh;
+  final VoidCallback onGenerateQuestions;
   final VoidCallback onCreateExam;
 
   const _QuestionBankHeader({
@@ -3313,6 +4160,7 @@ class _QuestionBankHeader extends StatelessWidget {
     required this.visibleQuestionsCount,
     required this.examReadyCount,
     required this.onRefresh,
+    required this.onGenerateQuestions,
     required this.onCreateExam,
   });
 
@@ -3343,6 +4191,19 @@ class _QuestionBankHeader extends StatelessWidget {
             runSpacing: 10,
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
+              FilledButton.icon(
+                onPressed: loading ? null : onGenerateQuestions,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primary,
+                  disabledBackgroundColor: Colors.white.withOpacity(0.45),
+                  disabledForegroundColor: AppColors.primary.withOpacity(0.45),
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                label: const Text('Generate Questions'),
+              ),
               OutlinedButton.icon(
                 onPressed: loading ? null : onRefresh,
                 style: OutlinedButton.styleFrom(
@@ -7397,6 +8258,11 @@ List<_EditableOption> _initialOptions(QuestionModel q) {
       correct: correct,
     );
   }).toList();
+}
+
+bool _isNegativeNumber(String raw) {
+  final parsed = int.tryParse(raw.trim());
+  return parsed != null && parsed < 0;
 }
 
 String? _topicPickerLabel(List<_TopicTarget> targets, int? topicId) {

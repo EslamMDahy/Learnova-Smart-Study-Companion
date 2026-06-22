@@ -13,12 +13,14 @@ class _XhrRefreshClient implements RefreshClient {
 
     final xhr = html.HttpRequest()
       ..open('POST', url)
+      ..timeout = 15000
       ..setRequestHeader('Content-Type', 'application/json')
       ..setRequestHeader('Accept', 'application/json')
       ..setRequestHeader('ngrok-skip-browser-warning', 'true')
       ..withCredentials = true; // sends HttpOnly cookie cross-origin
 
     xhr.onLoad.listen((_) {
+      if (completer.isCompleted) return;
       try {
         final status = xhr.status ?? 0;
         if (status < 200 || status >= 400) {
@@ -26,7 +28,7 @@ class _XhrRefreshClient implements RefreshClient {
             ApiException(
               'Refresh failed: HTTP $status',
               statusCode: status,
-              code: 'REFRESH_FAILED',
+              code: _refreshErrorCode(status),
             ),
           );
           return;
@@ -60,13 +62,33 @@ class _XhrRefreshClient implements RefreshClient {
     });
 
     xhr.onError.listen((_) {
+      if (completer.isCompleted) return;
       completer.completeError(
-        ApiException('Network error during token refresh.', code: 'REFRESH_NET'),
+        ApiException(
+          'Network error during token refresh.',
+          code: 'REFRESH_NETWORK',
+        ),
+      );
+    });
+
+    xhr.onTimeout.listen((_) {
+      if (completer.isCompleted) return;
+      completer.completeError(
+        ApiException(
+          'Token refresh timed out.',
+          code: 'REFRESH_TIMEOUT',
+        ),
       );
     });
 
     xhr.send(); // no body needed — cookie is sent automatically
     return completer.future;
+  }
+
+  String _refreshErrorCode(int status) {
+    if (status == 401 || status == 403) return 'REFRESH_AUTH_FAILED';
+    if (status >= 500) return 'REFRESH_SERVER';
+    return 'REFRESH_FAILED';
   }
 
   Map<String, dynamic> _parseJsonBody(String body) {

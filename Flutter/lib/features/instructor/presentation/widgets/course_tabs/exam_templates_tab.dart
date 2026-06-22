@@ -432,7 +432,7 @@ class _ExamTemplateEditorDialogState extends State<_ExamTemplateEditorDialog> {
 
   void _clearDistribution() {
     for (final draft in _sectionDrafts) {
-      draft.setCounts(easy: 0, medium: 0, hard: 0);
+      draft.setQuestionCount(0);
     }
     setState(() => _error = null);
   }
@@ -446,8 +446,8 @@ class _ExamTemplateEditorDialogState extends State<_ExamTemplateEditorDialog> {
     final now = DateTime.now();
 
     for (final draft in _sectionDrafts) {
-      if (draft.hasNegativeDifficulty) {
-        setState(() => _error = '${draft.label} difficulty counts cannot be negative.');
+      if (draft.hasNegativeQuestionCount) {
+        setState(() => _error = '${draft.label} question count cannot be negative.');
         return;
       }
       final count = draft.questionCount;
@@ -467,7 +467,7 @@ class _ExamTemplateEditorDialogState extends State<_ExamTemplateEditorDialog> {
       return;
     }
     if (qCount <= 0) {
-      setState(() => _error = 'Add at least one question in the difficulty blueprint.');
+      setState(() => _error = 'Add at least one question in the template blueprint.');
       return;
     }
     if (duration <= 0) {
@@ -671,7 +671,7 @@ class _TemplateEditorHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  'Define backend-ready settings, supported question types, difficulty counts, and points.',
+                  'Define reusable settings, supported question types, question counts, and points. Difficulty is chosen only when generating an exam.',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: AppColors.textMuted, fontSize: 12.5, fontWeight: FontWeight.w700),
@@ -767,7 +767,7 @@ class _TemplateEssentialsPanel extends StatelessWidget {
                 const SizedBox(width: 9),
                 Expanded(
                   child: Text(
-                    'Backend templates store total count and points per section. The Easy / Medium / Hard split is kept with the template locally and sent as section_difficulty_distribution when Generate Exam runs.',
+                    'Templates stay reusable: they store the exam metadata and each section shape only. Easy / Medium / Hard is selected later in Generate Exam.',
                     style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, height: 1.35, fontWeight: FontWeight.w800),
                   ),
                 ),
@@ -826,8 +826,8 @@ class _TemplateDistributionEditor extends StatelessWidget {
   Widget build(BuildContext context) {
     return _EditorCard(
       icon: Icons.grid_view_rounded,
-      title: 'Question & score plan',
-      subtitle: 'Backend-supported types only: Multiple Choice, True / False, Short Answer, Essay, and Multi-Select.',
+      title: 'Template section blueprint',
+      subtitle: 'Static section shape only: choose question type counts and score rules. Difficulty is not part of the template.',
       trailing: _PresetChip(label: 'Clear all', danger: true, onPressed: onClear),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -856,17 +856,11 @@ class _TemplateDistributionEditor extends StatelessWidget {
                   children: [
                     Expanded(flex: 34, child: _DistributionHeader('Question type')),
                     SizedBox(width: 8),
-                    SizedBox(width: 78, child: _DistributionHeader('Easy')),
+                    SizedBox(width: 96, child: _DistributionHeader('Questions')),
                     SizedBox(width: 8),
-                    SizedBox(width: 78, child: _DistributionHeader('Medium')),
+                    SizedBox(width: 96, child: _DistributionHeader('Point / Q')),
                     SizedBox(width: 8),
-                    SizedBox(width: 78, child: _DistributionHeader('Hard')),
-                    SizedBox(width: 8),
-                    SizedBox(width: 82, child: _DistributionHeader('Point / Q')),
-                    SizedBox(width: 8),
-                    SizedBox(width: 72, child: _DistributionHeader('Questions')),
-                    SizedBox(width: 8),
-                    SizedBox(width: 72, child: _DistributionHeader('Score')),
+                    SizedBox(width: 82, child: _DistributionHeader('Score')),
                   ],
                 ),
                 const SizedBox(height: 8),
@@ -879,7 +873,7 @@ class _TemplateDistributionEditor extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'How grading works: total score = questions in each active row × point per question. Generate Exam also receives the Easy / Medium / Hard percentages derived from the counts above.',
+            'How grading works: total score = questions in each active row × point per question. Difficulty mix is configured at generation time, so the same template can produce easy or hard exams.',
             style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, height: 1.4, fontWeight: FontWeight.w700),
           ),
         ],
@@ -940,7 +934,7 @@ class _TemplateDistributionRow extends StatelessWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      active ? '${draft.questionCount} questions • ${_difficultyCountsSummary(draft.difficultyCounts)}' : 'Disabled',
+                      active ? '${draft.questionCount} questions • ${_formatPoints(draft.sectionScore)} pts' : 'Disabled',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(color: AppColors.textMuted, fontSize: 10.5, fontWeight: FontWeight.w700),
@@ -952,17 +946,11 @@ class _TemplateDistributionRow extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        SizedBox(width: 78, child: _SmallDistributionField(controller: draft.easyCtrl, hint: '0', onChanged: onChanged)),
+        SizedBox(width: 96, child: _SmallDistributionField(controller: draft.questionCountCtrl, hint: '0', onChanged: onChanged)),
         const SizedBox(width: 8),
-        SizedBox(width: 78, child: _SmallDistributionField(controller: draft.mediumCtrl, hint: '0', onChanged: onChanged)),
+        SizedBox(width: 96, child: _SmallDistributionField(controller: draft.pointsCtrl, hint: '1', onChanged: onChanged, decimal: true)),
         const SizedBox(width: 8),
-        SizedBox(width: 78, child: _SmallDistributionField(controller: draft.hardCtrl, hint: '0', onChanged: onChanged)),
-        const SizedBox(width: 8),
-        SizedBox(width: 82, child: _SmallDistributionField(controller: draft.pointsCtrl, hint: '1', onChanged: onChanged, decimal: true)),
-        const SizedBox(width: 8),
-        SizedBox(width: 72, child: _ReadonlyDistributionValue(value: '${draft.questionCount}', active: active)),
-        const SizedBox(width: 8),
-        SizedBox(width: 72, child: _ReadonlyDistributionValue(value: _formatPoints(draft.sectionScore), active: active)),
+        SizedBox(width: 82, child: _ReadonlyDistributionValue(value: _formatPoints(draft.sectionScore), active: active)),
       ],
     );
   }
@@ -1031,9 +1019,7 @@ class _TemplateSectionDraft {
   final String questionType;
   final String label;
   final IconData icon;
-  final TextEditingController easyCtrl;
-  final TextEditingController mediumCtrl;
-  final TextEditingController hardCtrl;
+  final TextEditingController questionCountCtrl;
   final TextEditingController pointsCtrl;
 
   _TemplateSectionDraft({
@@ -1042,31 +1028,16 @@ class _TemplateSectionDraft {
     required this.questionType,
     required this.label,
     required this.icon,
-    required Map<String, int> difficultyCounts,
+    required int questionCount,
     required double pointsPerQuestion,
-  })  : easyCtrl = TextEditingController(text: _difficultyInitial(difficultyCounts, 'easy')),
-        mediumCtrl = TextEditingController(text: _difficultyInitial(difficultyCounts, 'medium')),
-        hardCtrl = TextEditingController(text: _difficultyInitial(difficultyCounts, 'hard')),
+  })  : questionCountCtrl = TextEditingController(text: questionCount.toString()),
         pointsCtrl = TextEditingController(text: _formatPoints(pointsPerQuestion));
 
-  int get easyCount => int.tryParse(easyCtrl.text.trim()) ?? 0;
-  int get mediumCount => int.tryParse(mediumCtrl.text.trim()) ?? 0;
-  int get hardCount => int.tryParse(hardCtrl.text.trim()) ?? 0;
-  int get questionCount => easyCount + mediumCount + hardCount;
+  int get questionCount => int.tryParse(questionCountCtrl.text.trim()) ?? 0;
   double get pointsPerQuestion => double.tryParse(pointsCtrl.text.trim()) ?? 0;
   double get sectionScore => questionCount * (pointsPerQuestion > 0 ? pointsPerQuestion : 0);
 
-  bool get hasNegativeDifficulty {
-    return _isNegative(easyCtrl.text) || _isNegative(mediumCtrl.text) || _isNegative(hardCtrl.text);
-  }
-
-  Map<String, int> get difficultyCounts {
-    final counts = <String, int>{};
-    if (easyCount > 0) counts['easy'] = easyCount;
-    if (mediumCount > 0) counts['medium'] = mediumCount;
-    if (hardCount > 0) counts['hard'] = hardCount;
-    return counts;
-  }
+  bool get hasNegativeQuestionCount => _isNegative(questionCountCtrl.text);
 
   ExamTemplateSectionModel toModel({required int orderIndex, required DateTime now}) {
     final points = pointsPerQuestion > 0 ? pointsPerQuestion : 1.0;
@@ -1080,22 +1051,18 @@ class _TemplateSectionDraft {
       pointsPerQuestion: points,
       sectionScore: count * points,
       orderIndex: orderIndex,
-      difficultyDistribution: difficultyCounts,
+      difficultyDistribution: const <String, int>{},
       createdAt: now,
       updatedAt: now,
     );
   }
 
-  void setCounts({required int easy, required int medium, required int hard}) {
-    easyCtrl.text = easy.toString();
-    mediumCtrl.text = medium.toString();
-    hardCtrl.text = hard.toString();
+  void setQuestionCount(int value) {
+    questionCountCtrl.text = value.toString();
   }
 
   void dispose() {
-    easyCtrl.dispose();
-    mediumCtrl.dispose();
-    hardCtrl.dispose();
+    questionCountCtrl.dispose();
     pointsCtrl.dispose();
   }
 
@@ -1112,24 +1079,18 @@ class _TemplateSectionDraft {
     return _supportedTemplateSectionTypes.map((spec) {
       final section = byType[spec.questionType];
       final fallbackCount = section == null && spec.questionType == 'multiple_choice' ? template.questionCount : 0;
-      final counts = section == null
-          ? _defaultDifficultyCounts(fallbackCount)
-          : section.difficultyDistribution.isNotEmpty
-              ? section.difficultyDistribution
-              : _defaultDifficultyCounts(section.questionCount);
       return _TemplateSectionDraft(
         id: section?.id,
         templateId: section?.templateId,
         questionType: spec.questionType,
         label: spec.label,
         icon: spec.icon,
-        difficultyCounts: counts,
+        questionCount: section?.questionCount ?? fallbackCount,
         pointsPerQuestion: section?.pointsPerQuestion ?? 1,
       );
     }).toList();
   }
 }
-
 class _TemplateSectionSpec {
   final String questionType;
   final String label;
@@ -1150,8 +1111,7 @@ String _templateRowSubtitle(ExamTemplateModel template) {
   final sections = template.distributionSections;
   if (sections.isEmpty) return '${template.examType.toUpperCase()} • ${template.questionCount} questions • ${_formatPoints(template.questionCount.toDouble())} pts';
   final types = sections.map((section) {
-    final diff = _difficultyCountsSummary(section.difficultyDistribution);
-    return '${section.questionCount} ${_shortTypeLabel(section.questionType)}${diff.isEmpty ? '' : ' ($diff)'}';
+    return '${section.questionCount} ${_shortTypeLabel(section.questionType)}';
   }).join(' / ');
   return types;
 }
@@ -1161,8 +1121,6 @@ List<Widget> _distributionBadges(ExamTemplateModel template) {
   final result = <Widget>[_MiniBadge('${template.questionCount} Q')];
   for (final section in sections.take(2)) {
     result.add(_MiniBadge('${section.questionCount} ${_shortTypeLabel(section.questionType)}'));
-    final summary = _difficultyCountsSummary(section.difficultyDistribution);
-    if (summary.isNotEmpty) result.add(_MiniBadge(summary));
   }
   if (sections.length > 2) result.add(_MiniBadge('+${sections.length - 2} types'));
   return result;
@@ -1201,35 +1159,6 @@ String _sectionTitle(String questionType) {
 String _formatPoints(double value) {
   if (value % 1 == 0) return value.toInt().toString();
   return value.toStringAsFixed(2).replaceFirst(RegExp(r'0+$'), '').replaceFirst(RegExp(r'\.$'), '');
-}
-
-String _difficultyInitial(Map<String, int> counts, String key) {
-  final value = counts[key] ?? 0;
-  return value.toString();
-}
-
-String _difficultyCountsSummary(Map<String, int> counts) {
-  if (counts.isEmpty) return '';
-  final parts = <String>[];
-  final easy = counts['easy'] ?? 0;
-  final medium = counts['medium'] ?? 0;
-  final hard = counts['hard'] ?? 0;
-  if (easy > 0) parts.add('E$easy');
-  if (medium > 0) parts.add('M$medium');
-  if (hard > 0) parts.add('H$hard');
-  return parts.join(' / ');
-}
-
-Map<String, int> _defaultDifficultyCounts(int total) {
-  if (total <= 0) return const <String, int>{};
-  final easy = (total * 0.30).round();
-  final medium = (total * 0.50).round();
-  final hard = total - easy - medium;
-  final result = <String, int>{};
-  if (easy > 0) result['easy'] = easy;
-  if (medium > 0) result['medium'] = medium;
-  if (hard > 0) result['hard'] = hard;
-  return result;
 }
 
 bool _isNegative(String raw) {

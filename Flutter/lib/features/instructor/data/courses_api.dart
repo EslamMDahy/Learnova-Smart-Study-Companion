@@ -140,13 +140,18 @@ class CoursesApi {
   /// POST /courses/{courseId}/cover/confirm
   Future<CourseCoverConfirmResponse> confirmCourseCoverUpload({
     required int courseId,
+    String? storageKey,
     CancelToken? cancelToken,
   }) async {
     if (courseId <= 0) throw ArgumentError('Invalid course id.');
 
+    final trimmedStorageKey = storageKey?.trim();
     final res = await _postWithLegacyFallback(
       primaryPath: Endpoints.courseCoverConfirm(courseId),
       legacyPath: Endpoints.courseCoverConfirmLegacy(courseId),
+      data: (trimmedStorageKey == null || trimmedStorageKey.isEmpty)
+          ? const <String, dynamic>{}
+          : {'storage_key': trimmedStorageKey},
       cancelToken: cancelToken,
     );
 
@@ -182,11 +187,11 @@ class CoursesApi {
       uploadUrl: init.uploadUrl,
       bodyBytes: Uint8List.fromList(bytes),
       contentType: normalizedContentType,
-      headers: const {'x-upsert': 'true'},
     );
 
     return confirmCourseCoverUpload(
       courseId: courseId,
+      storageKey: init.storageKey,
       cancelToken: cancelToken,
     );
   }

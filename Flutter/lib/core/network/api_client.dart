@@ -80,24 +80,36 @@ class ApiClient implements ITokenRefreshScheduler {
             String newAccess;
             try {
               newAccess = await _refreshAccessToken();
-            } catch (_) {
-              // Refresh failed → clear session, propagate 401.
-              TokenStorage.clear();
+            } catch (refreshError) {
               GlobalLoadingBus.endIfNeeded(e.requestOptions);
 
-              return handler.reject(
-                DioException(
-                  requestOptions: e.requestOptions,
-                  response: e.response,
-                  type: e.type,
-                  error: ApiException(
-                    'Your session expired. Please login again.',
-                    statusCode: status,
-                    code: 'TOKEN_EXPIRED',
+              // Only destroy the local session when the refresh endpoint
+              // explicitly says the refresh credential is invalid/expired.
+              // Network errors, timeouts, server restarts, or 5xx responses are
+              // transient infrastructure failures; clearing tokens here creates
+              // a fake logout while the user may still have a valid refresh
+              // cookie once the backend is reachable again.
+              if (_isRefreshAuthFailure(refreshError)) {
+                TokenStorage.clear();
+
+                return handler.reject(
+                  DioException(
+                    requestOptions: e.requestOptions,
+                    response: e.response,
+                    type: e.type,
+                    error: ApiException(
+                      'Your session expired. Please login again.',
+                      statusCode: status,
+                      code: 'TOKEN_EXPIRED',
+                    ),
+                    message: e.message,
                   ),
-                  message: e.message,
-                ),
-              );
+                );
+              }
+
+              final refreshUnavailable =
+                  _mapRefreshUnavailableError(e.requestOptions, refreshError);
+              return handler.reject(refreshUnavailable);
             }
 
             TokenStorage.saveSession(
@@ -344,41 +356,89 @@ class ApiClient implements ITokenRefreshScheduler {
 
   // ── Refresh token (single-flight) ──────────────────────────────────────────
 
-  Completer<String>? _refreshCompleter;
+  Future<String>? _refreshFuture;
 
-  Future<String> _refreshAccessToken() async {
-    if (_refreshCompleter != null) return _refreshCompleter!.future;
+  Future<String> _refreshAccessToken({bool logFailure = true}) {
+    final inFlight = _refreshFuture;
+    if (inFlight != null) return inFlight;
 
-    final c = Completer<String>();
-    _refreshCompleter = c;
+    final future = _callRefreshEndpoint(logFailure: logFailure).whenComplete(() {
+      _refreshFuture = null;
+    });
 
-    try {
-      final newToken = await _callRefreshEndpoint();
-      c.complete(newToken);
-      return newToken;
-    } catch (e) {
-      c.completeError(e);
-      rethrow;
-    } finally {
-      _refreshCompleter = null;
-    }
+    _refreshFuture = future;
+    return future;
   }
 
-  Future<String> refreshAccessToken() => _refreshAccessToken();
+  Future<String> refreshAccessToken({bool logFailure = true}) =>
+      _refreshAccessToken(logFailure: logFailure);
 
-  Future<String> _callRefreshEndpoint() async {
+  Future<String> _callRefreshEndpoint({bool logFailure = true}) async {
     final url = '${Env.baseUrl}${Endpoints.refresh}';
     try {
       return await _refreshClient.refresh(url: url);
     } catch (e, st) {
-      AppLogger.log(
-        'Refresh token call failed.',
-        level: LogLevel.warn,
-        error: e,
-        stackTrace: st,
-      );
+      // 401/403 from /auth/refresh is an expected auth state, not an
+      // infrastructure error. During app startup this simply means there is no
+      // valid HttpOnly refresh cookie, especially after manually clearing
+      // cookies/storage in DevTools. Do not spam the console with a warning.
+      if (logFailure && !_isRefreshAuthFailure(e)) {
+        AppLogger.log(
+          'Refresh token call failed.',
+          level: LogLevel.warn,
+          error: e,
+          stackTrace: st,
+        );
+      }
       rethrow;
     }
+  }
+
+  bool _isRefreshAuthFailure(Object error) {
+    final ex = _extractApiException(error);
+    final status = ex?.statusCode;
+    final code = ex?.cleanCode;
+
+    return status == 401 ||
+        status == 403 ||
+        code == 'REFRESH_AUTH_FAILED' ||
+        code == 'REFRESH_EXPIRED' ||
+        code == 'REFRESH_REVOKED';
+  }
+
+  ApiException? _extractApiException(Object error) {
+    if (error is ApiException) return error;
+    if (error is DioException && error.error is ApiException) {
+      return error.error as ApiException;
+    }
+    return null;
+  }
+
+  DioException _mapRefreshUnavailableError(
+    RequestOptions originalRequest,
+    Object refreshError,
+  ) {
+    final ex = _extractApiException(refreshError);
+    final code = ex?.cleanCode;
+    final status = ex?.statusCode;
+
+    final isTimeout = code == 'REFRESH_TIMEOUT';
+    final message = isTimeout
+        ? 'Could not refresh your session because the server timed out. Please try again.'
+        : 'Could not refresh your session because the server is unavailable. Please try again.';
+
+    return DioException(
+      requestOptions: originalRequest,
+      type: isTimeout
+          ? DioExceptionType.receiveTimeout
+          : DioExceptionType.connectionError,
+      error: ApiException(
+        message,
+        statusCode: status,
+        code: code ?? 'REFRESH_UNAVAILABLE',
+      ),
+      message: message,
+    );
   }
 
 

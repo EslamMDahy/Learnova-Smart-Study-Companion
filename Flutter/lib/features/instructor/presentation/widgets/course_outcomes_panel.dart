@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../../../core/theme/app_theme.dart';
-import '../../../../../core/ui/toast.dart';
+import 'package:learnova/core/theme/app_theme.dart';
+import 'package:learnova/core/ui/toast.dart';
 import '../../data/learning_outcomes_models.dart';
 import '../../data/modules_materials_providers.dart';
 

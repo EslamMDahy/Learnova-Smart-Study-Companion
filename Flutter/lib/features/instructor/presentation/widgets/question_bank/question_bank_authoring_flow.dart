@@ -75,6 +75,7 @@ class QuestionBankAuthoringFlow extends ConsumerStatefulWidget {
   final Set<int> initialMaterialIds;
   final Set<int> initialTopicIds;
   final bool embedded;
+  final bool startInAiMode;
   final QuestionAuthoringLaunchContext? launchContext;
   final VoidCallback? onClose;
   final VoidCallback? onSavedToQuestionBank;
@@ -86,6 +87,7 @@ class QuestionBankAuthoringFlow extends ConsumerStatefulWidget {
     this.initialMaterialIds = const <int>{},
     this.initialTopicIds = const <int>{},
     this.embedded = false,
+    this.startInAiMode = false,
     this.launchContext,
     this.onClose,
     this.onSavedToQuestionBank,
@@ -99,7 +101,7 @@ class QuestionBankAuthoringFlow extends ConsumerStatefulWidget {
 class _QuestionBankAuthoringFlowState
     extends ConsumerState<QuestionBankAuthoringFlow> {
   bool _loading = false;
-  _WorkspaceMode _mode = _WorkspaceMode.manual;
+  late _WorkspaceMode _mode;
 
   List<add_question_sheet.QuestionAuthoringTarget> _targets =
       const <add_question_sheet.QuestionAuthoringTarget>[];
@@ -166,6 +168,7 @@ class _QuestionBankAuthoringFlowState
   @override
   void initState() {
     super.initState();
+    _mode = widget.startInAiMode ? _WorkspaceMode.ai : _WorkspaceMode.manual;
     _bootstrapLocalState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
@@ -226,6 +229,12 @@ class _QuestionBankAuthoringFlowState
         ...stored.knownRemoteIds,
         ...stored.questions.map((QuestionModel question) => question.remoteId).whereType<int>(),
       };
+    }
+
+    if (widget.startInAiMode &&
+        (stored == null || stored.questions.isEmpty) &&
+        !_aiPolling) {
+      _mode = _WorkspaceMode.ai;
     }
 
     _loading = false;

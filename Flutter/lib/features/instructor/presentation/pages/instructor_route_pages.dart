@@ -5,9 +5,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:learnova/features/instructor/presentation/widgets/create_course_dialog.dart';
 import 'package:learnova/features/instructor/presentation/widgets/invite_students_dialog.dart';
-import 'package:learnova/features/instructor/data/mock_services.dart';
-import 'package:learnova/features/instructor/data/authoring_mode.dart';
 import 'package:learnova/features/instructor/data/courses_models.dart';
+import 'package:learnova/features/instructor/data/modules_materials_providers.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_course_widgets.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_dashboard_content.dart';
 
@@ -99,12 +98,31 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
       }
     }
 
-    // 3) Seed locally-managed learning outcomes for the dedicated Outcomes tab.
-    if (result.learningOutcomes.isNotEmpty &&
-        ref.read(enableLocalAuthoringFallbackProvider)) {
-      await ref
-          .read(learningOutcomeMockServiceProvider)
-          .seedOutcomes(courseId, result.learningOutcomes);
+    // 3) Persist initial learning outcomes through the backend so the
+    // dedicated Outcomes tab stays consistent after refresh/navigation.
+    if (result.learningOutcomes.isNotEmpty) {
+      var failedOutcomes = 0;
+      final api = ref.read(learningOutcomesApiProvider);
+
+      for (final outcome in result.learningOutcomes) {
+        try {
+          await api.createOutcome(
+            courseId: courseId,
+            outcome: outcome.copyWith(courseId: courseId),
+          );
+        } catch (_) {
+          failedOutcomes += 1;
+        }
+      }
+
+      if (failedOutcomes > 0 && mounted) {
+        AppToast.warning(
+          context,
+          title: 'Learning outcomes not fully saved',
+          message:
+              '$failedOutcomes learning outcome${failedOutcomes == 1 ? '' : 's'} could not be saved. You can add them from the Outcomes tab.',
+        );
+      }
     }
 
     // 4) If course is PRIVATE (needs invites), open upload dialog with courseId

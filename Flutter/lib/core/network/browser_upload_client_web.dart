@@ -13,6 +13,7 @@ Future<void> uploadBinaryToSignedUrlImpl({
 
   final xhr = html.HttpRequest()
     ..open('PUT', uploadUrl)
+    ..timeout = 30000
     ..setRequestHeader('Content-Type', contentType);
 
   for (final entry in headers.entries) {
@@ -20,6 +21,7 @@ Future<void> uploadBinaryToSignedUrlImpl({
   }
 
   xhr.onLoad.listen((_) {
+    if (completer.isCompleted) return;
     final status = xhr.status ?? 0;
     if (status >= 200 && status < 400) {
       completer.complete();
@@ -31,9 +33,15 @@ Future<void> uploadBinaryToSignedUrlImpl({
   });
 
   xhr.onError.listen((_) {
+    if (completer.isCompleted) return;
     completer.completeError(Exception('Signed upload network error'));
   });
 
-  xhr.send(bodyBytes.buffer);
+  xhr.onTimeout.listen((_) {
+    if (completer.isCompleted) return;
+    completer.completeError(Exception('Signed upload timed out'));
+  });
+
+  xhr.send(bodyBytes);
   return completer.future;
 }

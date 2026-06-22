@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:learnova/shared/widgets/components/dropdowns.dart';
 
-import '../../../../../core/theme/app_theme.dart';
+import 'package:learnova/core/theme/app_theme.dart';
 import '../../data/modules_models.dart';
 import '../../data/question_models.dart';
 

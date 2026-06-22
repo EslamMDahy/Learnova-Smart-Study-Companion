@@ -222,24 +222,6 @@ class _LoginFormState extends ConsumerState<LoginForm> {
             ),
 
             const SizedBox(height: 28),
-            const AppAuthOrDivider(),
-            const SizedBox(height: 24),
-
-            AppSocialButton(
-              label: 'Google',
-              imagePath: 'assets/google.png',
-              disabled: isLoading,
-              onTap: () {},
-            ),
-            const SizedBox(height: 12),
-            AppSocialButton(
-              label: 'Microsoft',
-              imagePath: 'assets/microsoft.png',
-              disabled: isLoading,
-              onTap: () {},
-            ),
-
-            const SizedBox(height: 20),
 
             Row(
               mainAxisAlignment: MainAxisAlignment.center,

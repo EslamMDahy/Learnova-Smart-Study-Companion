@@ -82,7 +82,7 @@ class SignupLeftPanel extends StatelessWidget {
               ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxTextWidth),
                 child: const Text(
-                  'Experience personalized assessments, adaptive question banks, and intelligent insights designed for students, instructors, and administrators.',
+                  'Experience personalized assessments, adaptive question banks, and intelligent insights designed for students and instructors.',
                   style: TextStyle(
                     color: Colors.white70,
                     fontSize: 15,

@@ -10,6 +10,18 @@ class _DioRefreshClient implements RefreshClient {
 
   final Dio _dio;
 
+  String _refreshErrorCode(int? status, DioExceptionType type) {
+    if (status == 401 || status == 403) return 'REFRESH_AUTH_FAILED';
+    if (status != null && status >= 500) return 'REFRESH_SERVER';
+    if (type == DioExceptionType.connectionTimeout ||
+        type == DioExceptionType.receiveTimeout ||
+        type == DioExceptionType.sendTimeout) {
+      return 'REFRESH_TIMEOUT';
+    }
+    if (type == DioExceptionType.connectionError) return 'REFRESH_NETWORK';
+    return 'REFRESH_FAILED';
+  }
+
   @override
   Future<String> refresh({required String url}) async {
     try {
@@ -17,6 +29,8 @@ class _DioRefreshClient implements RefreshClient {
         url,
         data: const {},
         options: Options(
+          sendTimeout: const Duration(seconds: 15),
+          receiveTimeout: const Duration(seconds: 15),
           headers: const {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -51,7 +65,7 @@ class _DioRefreshClient implements RefreshClient {
       throw ApiException(
         'Refresh failed.',
         statusCode: status,
-        code: 'REFRESH_FAILED',
+        code: _refreshErrorCode(status, e.type),
       );
     }
   }

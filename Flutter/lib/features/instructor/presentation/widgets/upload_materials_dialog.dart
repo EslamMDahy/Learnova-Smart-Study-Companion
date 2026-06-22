@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../../../core/theme/app_theme.dart';
+import 'package:learnova/core/theme/app_theme.dart';
 
 /// Upload Course Materials dialog.
 /// NOTE: Backend currently validates PDF only (max 50MB).

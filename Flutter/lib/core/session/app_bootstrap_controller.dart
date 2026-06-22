@@ -1,8 +1,9 @@
 import 'dart:convert';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 
+import '../network/api_exceptions.dart';
 import '../storage/token_storage.dart';
 import '../storage/user_storage.dart';
 import '../../features/auth/data/auth_providers.dart';
@@ -25,9 +26,7 @@ class AppBootstrapController extends Notifier<AppBootstrapState> {
       final hasToken = TokenStorage.hasToken;
       final isPersisted = TokenStorage.isPersisted;
 
-      const mightHaveCookie = kIsWeb;
-
-      if (!hasToken && !isPersisted && !mightHaveCookie) {
+      if (!hasToken && !isPersisted) {
         state = AppBootstrapState.done;
         return;
       }
@@ -47,15 +46,21 @@ class AppBootstrapController extends Notifier<AppBootstrapState> {
 
       if (needsRefresh) {
         try {
-          final newToken = await api.refresh();
+          final newToken = await api.refresh(logFailure: false);
           TokenStorage.saveSession(
             accessToken: newToken,
             persist: isPersisted,
           );
           ref.read(apiClientProvider).scheduleProactiveRefresh(newToken);
-        } catch (_) {
-          TokenStorage.clear();
-          UserStorage.clear();
+        } catch (e) {
+          // Refresh auth failure means the cookie/token is invalid, so logout.
+          // Infrastructure failure (server down/restarting/timeout) must not
+          // destroy the saved session; the user can recover when the backend
+          // is available again.
+          if (_isRefreshAuthFailure(e)) {
+            TokenStorage.clear();
+            UserStorage.clear();
+          }
           state = AppBootstrapState.done;
           return;
         }
@@ -93,12 +98,52 @@ class AppBootstrapController extends Notifier<AppBootstrapState> {
       }
 
       UserStorage.saveMe(merged, persist: TokenStorage.isPersisted);
-    } catch (_) {
-      TokenStorage.clear();
-      UserStorage.clear();
+    } catch (e) {
+      // Do not log the user out just because /auth/me could not be reached
+      // during startup. Only explicit 401/403 auth responses should clear the
+      // local session.
+      if (_isAuthFailure(e)) {
+        TokenStorage.clear();
+        UserStorage.clear();
+      }
     } finally {
       state = AppBootstrapState.done;
     }
+  }
+
+  static bool _isRefreshAuthFailure(Object error) {
+    final ex = _extractApiException(error);
+    final status = ex?.statusCode;
+    final code = ex?.cleanCode;
+
+    return status == 401 ||
+        status == 403 ||
+        code == 'REFRESH_AUTH_FAILED' ||
+        code == 'REFRESH_EXPIRED' ||
+        code == 'REFRESH_REVOKED';
+  }
+
+  static bool _isAuthFailure(Object error) {
+    final ex = _extractApiException(error);
+    final status = ex?.statusCode;
+    return status == 401 || status == 403;
+  }
+
+  static ApiException? _extractApiException(Object error) {
+    if (error is ApiException) return error;
+    if (error is DioException && error.error is ApiException) {
+      return error.error as ApiException;
+    }
+    if (error is DioException) {
+      final status = error.response?.statusCode;
+      if (status != null) {
+        return ApiException(
+          error.message ?? 'Request failed.',
+          statusCode: status,
+        );
+      }
+    }
+    return null;
   }
 
   static bool _shouldRefreshAccessToken(String token) {

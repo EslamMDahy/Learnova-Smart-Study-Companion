@@ -1,8 +1,9 @@
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
-import '../../../../../core/theme/app_theme.dart';
-import '../../../../../core/utils/browser_file_picker.dart';
+import 'package:learnova/core/theme/app_theme.dart';
+import 'package:learnova/core/utils/browser_file_drop.dart';
+import 'package:learnova/core/utils/browser_file_picker.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Public contracts
@@ -145,7 +146,10 @@ class UploadMaterialSheet extends StatefulWidget {
 class _UploadMaterialSheetState extends State<UploadMaterialSheet>
     with TickerProviderStateMixin {
   final List<_QueuedFile> _queue = [];
+  final GlobalKey _dropZoneKey = GlobalKey();
+  BrowserFileDropSubscription? _dropSubscription;
   bool _hovering = false;
+  bool _dropHovering = false;
   bool _processing = false;
   late final AnimationController _pulseCtrl;
   late final Animation<double> _pulse;
@@ -159,10 +163,17 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
     _pulse = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
+    _dropSubscription = listenForBrowserFileDrops(
+      acceptedExtensions: const ['pdf'],
+      isInsideDropZone: _isPointInsideDropZone,
+      onHoverChanged: _setDropHovering,
+      onDrop: _queueDroppedFiles,
+    );
   }
 
   @override
   void dispose() {
+    _dropSubscription?.dispose();
     _pulseCtrl.dispose();
     super.dispose();
   }
@@ -172,6 +183,33 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
     final files = await pickBrowserFiles(acceptedExtensions: ['pdf']);
     if (!mounted) return;
     for (final file in files) {
+      _queuePickedFile(file);
+    }
+  }
+
+
+  bool _isPointInsideDropZone(double clientX, double clientY) {
+    if (!mounted || _processing) return false;
+    final context = _dropZoneKey.currentContext;
+    final renderObject = context?.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) return false;
+
+    final topLeft = renderObject.localToGlobal(Offset.zero);
+    final rect = topLeft & renderObject.size;
+    return rect.contains(Offset(clientX, clientY));
+  }
+
+  void _setDropHovering(bool hovering) {
+    if (!mounted || _processing) return;
+    if (_dropHovering == hovering) return;
+    setState(() => _dropHovering = hovering);
+  }
+
+  Future<void> _queueDroppedFiles(List<PickedBrowserFile> files) async {
+    if (!mounted || _processing || files.isEmpty) return;
+    setState(() => _dropHovering = false);
+    for (final file in files) {
+      if (!mounted || _processing) return;
       _queuePickedFile(file);
     }
   }
@@ -361,7 +399,9 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
                 flex: 54,
                 child: _LeftPanel(
                   moduleTitle: widget.moduleTitle,
+                  dropZoneKey: _dropZoneKey,
                   hovering: _hovering,
+                  dropHovering: _dropHovering,
                   pulse: _pulse,
                   queueCount: _queue.length,
                   processing: _processing,
@@ -418,7 +458,9 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
 // ─────────────────────────────────────────────────────────────────────────────
 class _LeftPanel extends StatelessWidget {
   final String moduleTitle;
+  final GlobalKey dropZoneKey;
   final bool hovering;
+  final bool dropHovering;
   final Animation<double> pulse;
   final int queueCount;
   final bool processing;
@@ -428,7 +470,9 @@ class _LeftPanel extends StatelessWidget {
 
   const _LeftPanel({
     required this.moduleTitle,
+    required this.dropZoneKey,
     required this.hovering,
+    required this.dropHovering,
     required this.pulse,
     required this.queueCount,
     required this.processing,
@@ -440,6 +484,7 @@ class _LeftPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final activeHover = (hovering || dropHovering) && !processing;
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
@@ -536,18 +581,19 @@ class _LeftPanel extends StatelessWidget {
                     child: AnimatedBuilder(
                       animation: pulse,
                       builder: (_, __) => AnimatedContainer(
+                        key: dropZoneKey,
                         duration: const Duration(milliseconds: 180),
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: hovering && !processing
+                          color: activeHover
                               ? AppColors.primary.withOpacity(0.12)
                               : Colors.white.withOpacity(0.04 + pulse.value * 0.015),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: hovering && !processing
+                            color: activeHover
                                 ? AppColors.primary
                                 : Colors.white.withOpacity(0.12 + pulse.value * 0.05),
-                            width: hovering && !processing ? 2 : 1.3,
+                            width: activeHover ? 2 : 1.3,
                           ),
                         ),
                         child: Column(
@@ -562,11 +608,11 @@ class _LeftPanel extends StatelessWidget {
                                   height: 74,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: hovering && !processing
+                                    color: activeHover
                                         ? AppColors.primary.withOpacity(0.24)
                                         : Colors.white.withOpacity(0.07),
                                     border: Border.all(
-                                      color: hovering && !processing
+                                      color: activeHover
                                           ? AppColors.infoText.withOpacity(0.58)
                                           : Colors.white.withOpacity(0.15),
                                     ),
@@ -585,13 +631,15 @@ class _LeftPanel extends StatelessWidget {
                             Text(
                               processing
                                   ? 'Queue is locked while processing'
-                                  : hovering
-                                      ? 'Click to add PDFs'
-                                      : 'Drag & drop PDFs',
+                                  : dropHovering
+                                      ? 'Drop PDFs to add them'
+                                      : hovering
+                                          ? 'Click to add PDFs'
+                                          : 'Drag & drop PDFs',
                               style: TextStyle(
                                 fontSize: 17,
                                 fontWeight: FontWeight.w800,
-                                color: hovering && !processing
+                                color: activeHover
                                     ? AppColors.infoText
                                     : Colors.white.withOpacity(0.86),
                                 letterSpacing: -0.2,

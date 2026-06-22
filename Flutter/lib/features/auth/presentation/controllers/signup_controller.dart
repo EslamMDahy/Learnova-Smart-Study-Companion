@@ -20,7 +20,7 @@ class SignupController extends Notifier<SignupState> {
 
   void clearError() {
     if (state.error != null) {
-      state = state.copyWith();
+      state = SignupState(loading: state.loading);
     }
   }
 
@@ -64,9 +64,9 @@ class SignupController extends Notifier<SignupState> {
       return false;
     }
 
-    const allowed = {'student', 'instructor', 'assistant', 'owner'};
+    const allowed = {'student', 'instructor'};
     if (!allowed.contains(cleanSystemRole)) {
-      state = state.copyWith(loading: false, error: 'Invalid System Role.');
+      state = state.copyWith(loading: false, error: 'Please choose Student or Instructor.');
       return false;
     }
 

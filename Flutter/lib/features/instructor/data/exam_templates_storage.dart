@@ -48,12 +48,8 @@ class ExamTemplateSectionModel {
       pointsPerQuestion: pointsPerQuestion,
       sectionScore: _nullableDouble(json['section_score']) ?? questionCount * pointsPerQuestion,
       orderIndex: _nullableInt(json['order_index']) ?? 1,
-      difficultyDistribution: _parseDifficultyDistribution(
-        json['difficulty_distribution'] ??
-            json['difficultyDistribution'] ??
-            json['difficulty_counts'] ??
-            json['difficultyCounts'],
-      ),
+      // Template sections are a static blueprint only. Difficulty is supplied at exam generation time.
+      difficultyDistribution: const <String, int>{},
       createdAt: _parseDate(json['created_at']),
       updatedAt: _parseDate(json['updated_at']),
     );
@@ -138,7 +134,6 @@ class ExamTemplateModel {
         pointsPerQuestion: 1,
         sectionScore: questionCount.toDouble(),
         orderIndex: 1,
-        difficultyDistribution: _balancedDifficultyCounts(questionCount),
         createdAt: now,
         updatedAt: now,
       ),
@@ -213,7 +208,6 @@ class ExamTemplateModel {
         'publish_after_save': publishAfterSave,
         'is_default': isDefault,
         'preferred_type': preferredType?.backendValue,
-        'preferred_difficulty': preferredDifficulty?.backendValue,
         'instructions': instructions,
         'created_at': createdAt.toIso8601String(),
         'updated_at': updatedAt.toIso8601String(),
@@ -226,8 +220,6 @@ class ExamTemplateModel {
               'points_per_question': section.pointsPerQuestion,
               'section_score': section.sectionScore,
               'order_index': section.orderIndex,
-              if (section.difficultyDistribution.isNotEmpty)
-                'difficulty_distribution': section.difficultyDistribution,
               'created_at': section.createdAt.toIso8601String(),
               'updated_at': section.updatedAt.toIso8601String(),
             }).toList(),
@@ -276,7 +268,7 @@ class ExamTemplateModel {
       publishAfterSave: (json['publish_after_save'] as bool?) ?? false,
       isDefault: (json['is_default'] as bool?) ?? false,
       preferredType: _questionTypeFromBackend(rawPreferredType),
-      preferredDifficulty: _difficultyFromBackend(json['preferred_difficulty']?.toString()),
+      preferredDifficulty: null,
       instructions: (json['instructions'] ?? '').toString(),
       createdAt: _parseDate(json['created_at']),
       updatedAt: _parseDate(json['updated_at']),
@@ -397,18 +389,6 @@ QuestionType? _questionTypeFromBackend(String? raw) {
       return QuestionType.essay;
     case 'multi_select':
       return QuestionType.multiSelect;
-  }
-  return null;
-}
-
-QuestionDifficulty? _difficultyFromBackend(String? raw) {
-  switch ((raw ?? '').trim()) {
-    case 'easy':
-      return QuestionDifficulty.easy;
-    case 'medium':
-      return QuestionDifficulty.medium;
-    case 'hard':
-      return QuestionDifficulty.hard;
   }
   return null;
 }
@@ -603,44 +583,12 @@ class ExamTemplatesStorage {
     if (extra is! Map) return template;
     final map = Map<String, dynamic>.from(extra);
 
-    final rawSections = (map['sections'] as List?) ?? const [];
-    final supplementalSections = rawSections.whereType<Map>().map((item) => Map<String, dynamic>.from(item)).toList();
-    final sections = template.sections.map((section) {
-      final match = supplementalSections.cast<Map<String, dynamic>?>().firstWhere(
-            (item) => item != null &&
-                (_nullableInt(item['id']) == section.id ||
-                    item['question_type']?.toString() == section.questionType ||
-                    item['questionType']?.toString() == section.questionType),
-            orElse: () => null,
-          );
-      if (match == null) return section;
-      final difficulty = _parseDifficultyDistribution(
-        match['difficulty_distribution'] ?? match['difficultyDistribution'] ?? match['difficulty_counts'] ?? match['difficultyCounts'],
-      );
-      if (difficulty.isEmpty) return section;
-      return ExamTemplateSectionModel(
-        id: section.id,
-        templateId: section.templateId,
-        title: section.title,
-        questionType: section.questionType,
-        questionCount: section.questionCount,
-        pointsPerQuestion: section.pointsPerQuestion,
-        sectionScore: section.sectionScore,
-        orderIndex: section.orderIndex,
-        difficultyDistribution: difficulty,
-        createdAt: section.createdAt,
-        updatedAt: section.updatedAt,
-      );
-    }).toList();
-
     return template.copyWith(
       description: (map['description'] ?? template.description).toString(),
       instructions: (map['instructions'] ?? template.instructions).toString(),
       showResultImmediately: (map['show_result_immediately'] as bool?) ?? template.showResultImmediately,
       allowReview: (map['allow_review'] as bool?) ?? template.allowReview,
       publishAfterSave: (map['publish_after_save'] as bool?) ?? template.publishAfterSave,
-      preferredDifficulty: _difficultyFromBackend(map['preferred_difficulty']?.toString()) ?? template.preferredDifficulty,
-      sections: sections,
     );
   }
 
@@ -666,15 +614,6 @@ class ExamTemplatesStorage {
       'show_result_immediately': template.showResultImmediately,
       'allow_review': template.allowReview,
       'publish_after_save': template.publishAfterSave,
-      'preferred_difficulty': template.preferredDifficulty?.backendValue,
-      'sections': template.sections
-          .where((section) => section.questionCount > 0 && section.difficultyDistribution.isNotEmpty && _isSupportedBackendQuestionType(section.questionType))
-          .map((section) => {
-                if (section.id != null) 'id': section.id,
-                'question_type': section.questionType,
-                'difficulty_distribution': _normalizeDifficultyCounts(section.difficultyDistribution),
-              })
-          .toList(),
     };
     _localStore.setString(_supplementKey(courseId), jsonEncode(supplements));
   }
@@ -739,7 +678,6 @@ List<ExamTemplateSectionModel> _desiredTemplateSections(ExamTemplateModel desire
       pointsPerQuestion: pointsPerQuestion,
       sectionScore: section.questionCount * pointsPerQuestion,
       orderIndex: result.length + 1,
-      difficultyDistribution: _normalizeDifficultyCounts(section.difficultyDistribution),
       createdAt: section.createdAt,
       updatedAt: now,
     ));
@@ -757,7 +695,6 @@ List<ExamTemplateSectionModel> _desiredTemplateSections(ExamTemplateModel desire
       pointsPerQuestion: 1,
       sectionScore: count.toDouble(),
       orderIndex: 1,
-      difficultyDistribution: _balancedDifficultyCounts(count),
       createdAt: now,
       updatedAt: now,
     ),
@@ -819,61 +756,6 @@ String _backendTemplateQuestionType(QuestionType? type) {
 }
 
 String _supplementKey(int courseId) => 'learnova.exam_templates.$courseId.supplement.v2';
-
-Map<String, int> _parseDifficultyDistribution(dynamic raw) {
-  if (raw is Map) {
-    final parsed = <String, int>{};
-    for (final entry in raw.entries) {
-      final key = _normalizeDifficultyKey(entry.key.toString());
-      if (key == null) continue;
-      final value = _nullableInt(entry.value) ?? 0;
-      if (value > 0) parsed[key] = value;
-    }
-    return _normalizeDifficultyCounts(parsed);
-  }
-  if (raw is List) {
-    final parsed = <String, int>{};
-    for (final item in raw.whereType<Map>()) {
-      final key = _normalizeDifficultyKey((item['difficulty'] ?? item['level'] ?? '').toString());
-      if (key == null) continue;
-      final value = _nullableInt(item['count'] ?? item['questions'] ?? item['value']) ?? 0;
-      if (value > 0) parsed[key] = value;
-    }
-    return _normalizeDifficultyCounts(parsed);
-  }
-  return const <String, int>{};
-}
-
-Map<String, int> _normalizeDifficultyCounts(Map<String, int> raw) {
-  final normalized = <String, int>{};
-  for (final entry in raw.entries) {
-    final key = _normalizeDifficultyKey(entry.key);
-    if (key == null || entry.value <= 0) continue;
-    normalized[key] = (normalized[key] ?? 0) + entry.value;
-  }
-  return normalized;
-}
-
-Map<String, int> _balancedDifficultyCounts(int total) {
-  if (total <= 0) return const <String, int>{};
-  return <String, int>{'medium': total};
-}
-
-String? _normalizeDifficultyKey(String raw) {
-  switch (raw.trim().toLowerCase()) {
-    case 'easy':
-    case 'e':
-      return 'easy';
-    case 'hard':
-    case 'h':
-      return 'hard';
-    case 'medium':
-    case 'med':
-    case 'm':
-      return 'medium';
-  }
-  return null;
-}
 
 String _sectionTitle(String questionType) {
   switch (questionType) {

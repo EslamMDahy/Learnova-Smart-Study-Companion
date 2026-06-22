@@ -97,7 +97,8 @@ class AuthApi {
     return (res.data ?? <String, dynamic>{}).cast<String, dynamic>();
   }
 
-  Future<String> refresh() => _client.refreshAccessToken();
+  Future<String> refresh({bool logFailure = true}) =>
+      _client.refreshAccessToken(logFailure: logFailure);
 
   Future<void> logout() async {
     await _client.post(Endpoints.logout);

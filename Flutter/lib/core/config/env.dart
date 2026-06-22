@@ -1,35 +1,34 @@
-import 'package:flutter/foundation.dart';
-
 class Env {
   Env._();
 
   static const bool isProd = bool.fromEnvironment('dart.vm.product');
   static const bool enableRefreshToken = true;
 
-  /// Optional override, intended for build-time configuration:
-  /// `flutter run/build --dart-define=API_BASE_URL=https://...`
+  /// Current FastAPI domain.
+  ///
+  /// You can still override it without changing code:
+  ///
+  ///   flutter run/build --dart-define=API_BASE_URL=https://your-api-domain
+  static const String _defaultApiBaseUrl =
+      'https://collision-catchable-vitalize.ngrok-free.dev';
+
   static const String _overrideBaseUrl =
       String.fromEnvironment('API_BASE_URL');
 
-  /// IMPORTANT (web dev):
-  /// To make HttpOnly refresh cookies work, frontend and backend must share the SAME host.
-  /// We therefore build the API URL using the current page hostname (localhost vs 127.0.0.1).
   static String get baseUrl {
-    if (_overrideBaseUrl.trim().isNotEmpty) {
-      return _overrideBaseUrl.trim();
-    }
+    final override = _normalizeBaseUrl(_overrideBaseUrl);
+    if (override.isNotEmpty) return override;
 
-    if (isProd) return 'https://api.learnova.app';
+    // The project is currently using an external FastAPI/ngrok endpoint, so the
+    // frontend must not fall back to localhost or same-origin in web builds.
+    return _normalizeBaseUrl(_defaultApiBaseUrl);
+  }
 
-    if (kIsWeb) {
-      final proto = Uri.base.scheme;
-      final host = Uri.base.host;
-      if (proto.isNotEmpty && host.isNotEmpty) {
-        return 'https://collision-catchable-vitalize.ngrok-free.dev';
-      }
-    }
-
-    // Non-web development fallback.
-    return 'https://collision-catchable-vitalize.ngrok-free.dev';
+  static String _normalizeBaseUrl(String raw) {
+    final trimmed = raw.trim();
+    if (trimmed.isEmpty) return '';
+    return trimmed.endsWith('/')
+        ? trimmed.substring(0, trimmed.length - 1)
+        : trimmed;
   }
 }
