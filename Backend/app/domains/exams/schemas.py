@@ -423,8 +423,12 @@ class ExamTemplateSectionDeleteResponse(BaseModel):
 class GenerateExamFromTemplateRequest(BaseModel):
     title: str
     topic_ids: Optional[List[int]] = None
+    # Runtime-only difficulty mix. This must be supplied when generating an exam, not when saving a template.
+    # Supported shape:
+    # {"1": {"easy": 30, "medium": 50, "hard": 20}, "2": {...}}
+    difficulty_config: Optional[dict] = None
+    # Backward compatibility for older Flutter builds. Do not store this on templates.
     section_difficulty_distribution: Optional[dict] = None
-    # override_settings: Optional[dict] = None
 
     model_config = ConfigDict(extra="forbid")
 

@@ -36,6 +36,89 @@ from .helpers import (build_exam_export_context,
 logger = logging.getLogger(__name__)
 
 ALLOWED_EXAM_TYPES = {"quiz", "midterm", "final", "practice"}
+ALLOWED_DIFFICULTIES = ("easy", "medium", "hard")
+
+
+def _coerce_percent(value) -> int:
+    if isinstance(value, bool):
+        raise ValueError("percent must be a number")
+    if isinstance(value, (int, float)):
+        return int(round(value))
+    return int(round(float(str(value).strip())))
+
+
+def _normalize_difficulty_percentages(raw, *, section_label: str) -> dict[str, int]:
+    if not isinstance(raw, dict):
+        raise HTTPException(status_code=422, detail=f"difficulty_config for {section_label} must be an object")
+
+    normalized: dict[str, int] = {}
+    for key, value in raw.items():
+        difficulty = str(key).strip().lower()
+        if difficulty not in ALLOWED_DIFFICULTIES:
+            continue
+        try:
+            percent = _coerce_percent(value)
+        except Exception as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid {difficulty} percent for {section_label}") from exc
+        if percent < 0:
+            raise HTTPException(status_code=422, detail=f"{difficulty} percent for {section_label} cannot be negative")
+        if percent > 0:
+            normalized[difficulty] = percent
+
+    if not normalized:
+        raise HTTPException(status_code=422, detail=f"difficulty_config for {section_label} must include easy, medium, or hard percentages")
+
+    total_percent = sum(normalized.values())
+    if not (99 <= total_percent <= 101):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Difficulty percentages for {section_label} must sum to 100 (got {total_percent})",
+        )
+
+    # Normalize harmless rounding drift so downstream counts always receive exactly 100.
+    if total_percent != 100:
+        adjust_key = "medium" if "medium" in normalized else next(iter(normalized))
+        normalized[adjust_key] = max(0, normalized[adjust_key] + (100 - total_percent))
+
+    return normalized
+
+
+def _normalize_generation_difficulty_config(payload: GenerateExamFromTemplateRequest, section_rows) -> dict[str, dict[str, int]]:
+    raw_config = payload.difficulty_config
+    if raw_config is None:
+        raw_config = payload.section_difficulty_distribution
+
+    if raw_config is None:
+        raise HTTPException(status_code=422, detail="difficulty_config is required when generating an exam")
+
+    if not isinstance(raw_config, dict):
+        raise HTTPException(status_code=422, detail="difficulty_config must be an object")
+
+    result: dict[str, dict[str, int]] = {}
+
+    # Global shortcut: {"easy": 30, "medium": 50, "hard": 20}
+    lower_keys = {str(key).strip().lower() for key in raw_config.keys()}
+    if lower_keys.intersection(ALLOWED_DIFFICULTIES):
+        global_config = _normalize_difficulty_percentages(raw_config, section_label="all sections")
+        for section in section_rows:
+            result[str(section["order_index"])] = dict(global_config)
+        return result
+
+    for section in section_rows:
+        order_key = str(section["order_index"])
+        raw_section = raw_config.get(order_key)
+        if raw_section is None:
+            raw_section = raw_config.get(section["order_index"])
+        if raw_section is None:
+            raw_section = raw_config.get(str(section["id"]))
+        if raw_section is None:
+            raise HTTPException(
+                status_code=422,
+                detail=f"Missing difficulty_config for section with order_index={section['order_index']}",
+            )
+        result[order_key] = _normalize_difficulty_percentages(raw_section, section_label=f"section order_index={section['order_index']}")
+
+    return result
 
 
 
@@ -4464,28 +4547,9 @@ def generate_exam_from_template(*, course_id: int, template_id: int, payload: Ge
             raise HTTPException(status_code=400, detail="Template has no sections")
 
         # =========================
-        # 4) Validate difficulty distribution
+        # 4) Validate runtime difficulty config
         # =========================
-        if payload.section_difficulty_distribution is None:
-            raise HTTPException(
-                status_code=422,
-                detail="section_difficulty_distribution is required",
-            )
-
-        for section in section_rows:
-            key = str(section["order_index"])
-            if key not in payload.section_difficulty_distribution:
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Missing difficulty distribution for section with order_index={section['order_index']}",
-                )
-            dist = payload.section_difficulty_distribution[key]
-            total_percent = sum(dist.values())
-            if not (99 <= total_percent <= 101):
-                raise HTTPException(
-                    status_code=422,
-                    detail=f"Difficulty percentages for section order_index={section['order_index']} must sum to 100 (got {total_percent})",
-                )
+        difficulty_config = _normalize_generation_difficulty_config(payload, section_rows)
 
         # =========================
         # 5) Create exam row
@@ -4535,7 +4599,7 @@ def generate_exam_from_template(*, course_id: int, template_id: int, payload: Ge
         # =========================
         for section in section_rows:
             key = str(section["order_index"])
-            difficulty_dist = payload.section_difficulty_distribution[key]
+            difficulty_dist = difficulty_config[key]
             needed = int(section["question_count"])
 
             # توزيع النسب مع تصحيح rounding error في آخر level
