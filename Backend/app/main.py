@@ -19,6 +19,7 @@ from app.domains.ai_chat.router                 import router as ai_chat_router
 from app.domains.organizations.router           import router as organizations_router
 from app.domains.settings.router                import router as settings_router
 from app.domains.ai.router                      import router as ai_router
+from app.domains.ocr.router                     import router as ocr_router
 
 
 @asynccontextmanager
@@ -54,3 +55,4 @@ app.include_router(ai_chat_router)
 app.include_router(organizations_router)
 app.include_router(settings_router)
 app.include_router(ai_router)
+app.include_router(ocr_router)

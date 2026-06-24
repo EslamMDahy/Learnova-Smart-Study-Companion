@@ -420,10 +420,11 @@ def confirm_material_upload(*, material_id: int, db: Session, current_user: dict
                 text("""
                     UPDATE materials
                     SET
+                        status = CAST(:new_status AS material_status_enum),
                         updated_at = NOW()
                     WHERE id = :mid
                 """),
-                {"mid": material_id},
+                {"mid": material_id, "new_status": "processing"},
             )
             db.commit()
 
@@ -749,13 +750,21 @@ def list_module_materials(*, course_id: int, module_id: int, db: Session, curren
         if enrollment_status not in allowed_statuses:
             raise HTTPException(status_code=403, detail=f"Enrollment status '{enrollment_status}' is not allowed")
 
-        # student sees only published/available materials
-        # IMPORTANT: لازم تختار status value موجود فعلاً في enum عندك
-        # أنا هسميها "uploaded" هنا لأنك استخدمتها قبل كده. عدّلها لو enum عندك اسم مختلف.
-        student_visible_status = "uploaded"
+        # Student-visible materials are files that are actually usable.
+        # `uploaded` covers files confirmed without AI processing.
+        # `ready` covers files that finished the AI pipeline.
+        student_visible_statuses = ("uploaded", "ready")
 
-        material_filter_sql = "AND mt.status = CAST(:visible_status AS material_status_enum)"
-        filter_params = {"visible_status": student_visible_status}
+        material_filter_sql = """
+            AND mt.status IN (
+                CAST(:visible_status_uploaded AS material_status_enum),
+                CAST(:visible_status_ready AS material_status_enum)
+            )
+        """
+        filter_params = {
+            "visible_status_uploaded": student_visible_statuses[0],
+            "visible_status_ready": student_visible_statuses[1],
+        }
 
     # =========================
     # 3) Fetch materials (metadata only)
@@ -903,10 +912,11 @@ def get_material_download_url(*, course_id: int, module_id: int, material_id: in
         if enrollment_status not in allowed_enrollment_statuses:
             raise HTTPException(status_code=403, detail=f"Enrollment status '{enrollment_status}' is not allowed")
 
-        # Student should only access "published/available" materials
-        # أنت عندك status "uploaded" شغال. لو غيرته لاحقًا عدّل هنا.
-        student_visible_status = "uploaded"
-        if (row["status"] or "").strip() != student_visible_status:
+        # Student can open files that are actually usable.
+        # `uploaded` covers files confirmed without AI processing.
+        # `ready` covers files that finished the AI pipeline.
+        student_visible_statuses = {"uploaded", "ready"}
+        if (row["status"] or "").strip() not in student_visible_statuses:
             raise HTTPException(status_code=403, detail="Material is not available")
 
     # =========================
