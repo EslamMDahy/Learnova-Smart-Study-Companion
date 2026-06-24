@@ -12,12 +12,9 @@ from sqlalchemy.exc import SQLAlchemyError, IntegrityError
 from typing import Any
 
 from app.db.session import SessionLocal
-from app.core.config import settings
 from app.core.event_bus.subscribe import subscribe
 from app.core.ai_service_integration.ai_transport import send_ai_request
 
-from .helpers import save_rag_chat_response
-from .normalization import normalize_message_row, normalize_sources
 from .schemas import SessionCreateRequest
 
 
@@ -190,19 +187,15 @@ def create_session(*, course_id: int, payload: SessionCreateRequest, db: Session
                     "history": [],
                 },
             )
-        except Exception as exc:
-            _save_ai_dispatch_failure_response(
-                db=db,
-                session_id=int(session_row["id"]),
-                user_message_id=int(message_row["id"]),
-                exc=exc,
-            )
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=503, detail="Failed to send AI request")
 
         db.commit()
 
         return {
             "session": dict(session_row),
-            "message": normalize_message_row(message_row),
+            "message": dict(message_row),
         }
 
     except IntegrityError as e:
@@ -218,24 +211,6 @@ def create_session(*, course_id: int, payload: SessionCreateRequest, db: Session
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
 
-
-
-def _save_ai_dispatch_failure_response(*, db: Session, session_id: int, user_message_id: int, exc: Exception,) -> None:
-    # Keep the chat flow usable even when the external AI worker is down or
-    # misconfigured. The user message is saved, the frontend can still call the
-    # stream endpoint, and the stream returns this completed assistant message
-    # immediately instead of failing the whole POST with 503. The real root
-    # cause is still stored in ai_request_logs by send_ai_request when possible.
-    save_rag_chat_response(
-        db=db,
-        session_id=session_id,
-        user_message_id=user_message_id,
-        content=(
-            "AI service is currently unavailable. Please make sure the AI "
-            "worker is running and AI_SERVICE_BASE_URL points to it, then try again."
-        ),
-        sources=[],
-    )
 
 
 def list_sessions(*, course_id: int, db: Session, current_user: dict,):
@@ -435,7 +410,7 @@ def get_session(*, course_id: int, session_id: int, db: Session, current_user: d
 
         return {
             **dict(session_row),
-            "messages": [normalize_message_row(row) for row in message_rows],
+            "messages": [dict(row) for row in message_rows],
         }
 
     except HTTPException:
@@ -620,17 +595,13 @@ def send_message(*, course_id: int, session_id: int, payload: SessionCreateReque
                     "history": history,
                 },
             )
-        except Exception as exc:
-            _save_ai_dispatch_failure_response(
-                db=db,
-                session_id=session_id,
-                user_message_id=int(message_row["id"]),
-                exc=exc,
-            )
+        except Exception:
+            db.rollback()
+            raise HTTPException(status_code=503, detail="Failed to send AI request")
 
         db.commit()
 
-        return normalize_message_row(message_row)
+        return dict(message_row)
 
     except IntegrityError as e:
         db.rollback()
@@ -780,7 +751,7 @@ async def stream_message(*, course_id: int, session_id: int, message_id: int, db
                 "session_id": assistant_data["session_id"],
                 "message_type": assistant_data["message_type"],
                 "content": assistant_data["content"],
-                "sources": normalize_sources(assistant_data["sources"]),
+                "sources": assistant_data["sources"],
                 "created_at": assistant_data["created_at"].isoformat(),
             })
             yield f"event: message\ndata: {data}\n\n"
@@ -798,10 +769,7 @@ async def stream_message(*, course_id: int, session_id: int, message_id: int, db
     # 6) Stream response
     # =========================
     async def event_generator():
-        async for payload in subscribe(
-            channel=f"chat_{message_id}",
-            timeout=float(settings.ai_request_timeout_seconds),
-        ):
+        async for payload in subscribe(channel=f"chat_{message_id}"):
             if not payload:
                 # =========================
                 # 7) Timeout — mark message as failed
@@ -856,7 +824,7 @@ async def stream_message(*, course_id: int, session_id: int, message_id: int, db
                     "session_id": assistant_row["session_id"],
                     "message_type": assistant_row["message_type"],
                     "content": assistant_row["content"],
-                    "sources": normalize_sources(assistant_row["sources"]),
+                    "sources": assistant_row["sources"],
                     "created_at": assistant_row["created_at"].isoformat(),
                 })
 

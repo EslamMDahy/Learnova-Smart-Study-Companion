@@ -11,7 +11,6 @@ from app.domains.learningOutcomes.helpers import bulk_insert_ai_learning_outcome
 from app.domains.questions.helpers import validate_and_prepare_ai_generated_questions, insert_ai_generated_questions
 from app.domains.exams.helpers import save_ai_exam_grading_results
 from app.domains.ai_chat.helpers import save_rag_chat_response
-from app.domains.ai_chat.normalization import normalize_sources
 from app.domains.ai.helpers import (
     insert_topic_learning_outcome_relations,
     mark_material_ai_processing_completed,)
@@ -437,10 +436,13 @@ def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest
     # =========================
     # 6) Extract optional sources
     # =========================
-    # The AI service has historically returned sources as [], null, {}, or a
-    # wrapped object. Normalize that shape here so callbacks do not leave the
-    # user message stuck in pending state and so history responses remain valid.
-    sources = normalize_sources(body.get("sources"))
+    sources = body.get("sources")
+
+    if sources is not None and not isinstance(sources, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="sources must be a list or null",
+        )
 
     # =========================
     # 7) Save response and publish event
