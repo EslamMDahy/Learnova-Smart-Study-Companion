@@ -419,14 +419,19 @@ class ExamTemplateSectionDeleteResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class GenerateExamFromTemplateRequest(BaseModel):
-    title: str
-    topic_ids: Optional[List[int]] = None
-    section_difficulty_distribution: Optional[dict] = None
-    # override_settings: Optional[dict] = None
+class SectionDifficultyDistribution(BaseModel):
+    easy: float = 0
+    medium: float = 0
+    hard: float = 0
 
     model_config = ConfigDict(extra="forbid")
 
+class GenerateExamFromTemplateRequest(BaseModel):
+    title: str
+    topic_ids: Optional[List[int]] = None
+    section_difficulty_distribution: dict[str, SectionDifficultyDistribution]
+
+    model_config = ConfigDict(extra="forbid")
 
 class GeneratedExamQuestionItemResponse(BaseModel):
     question_id: int

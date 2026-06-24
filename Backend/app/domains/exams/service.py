@@ -4314,7 +4314,7 @@ def generate_exam_from_template(*, course_id: int, template_id: int, payload: Ge
                     detail=f"Missing difficulty distribution for section with order_index={section['order_index']}",
                 )
             dist = payload.section_difficulty_distribution[key]
-            total_percent = sum(dist.values())
+            total_percent = dist.easy + dist.medium + dist.hard
             if not (99 <= total_percent <= 101):
                 raise HTTPException(
                     status_code=422,
@@ -4369,22 +4369,21 @@ def generate_exam_from_template(*, course_id: int, template_id: int, payload: Ge
         # =========================
         for section in section_rows:
             key = str(section["order_index"])
-            difficulty_dist = payload.section_difficulty_distribution[key]
+            dist = payload.section_difficulty_distribution[key]
+            difficulty_dist_dict = dist.model_dump()  # {"easy": 50, "medium": 50, "hard": 0}
             needed = int(section["question_count"])
 
-            # توزيع النسب مع تصحيح rounding error في آخر level
             counts: dict[str, int] = {}
             assigned = 0
-            levels = list(difficulty_dist.keys())
+            levels = list(difficulty_dist_dict.keys())
             for i, level in enumerate(levels):
                 if i < len(levels) - 1:
-                    c = round(needed * difficulty_dist[level] / 100)
+                    c = round(needed * difficulty_dist_dict[level] / 100)
                 else:
                     c = needed - assigned
                 counts[level] = max(c, 0)
                 assigned += counts[level]
 
-            # جلب الأسئلة لكل difficulty
             section_questions: list[dict] = []
             seen_question_ids: set[int] = set()
 
@@ -4405,16 +4404,16 @@ def generate_exam_from_template(*, course_id: int, template_id: int, payload: Ge
                     rows = db.execute(
                         text("""
                             SELECT id, type, difficulty, question_text,
-                                   topic_id, course_id,
-                                   explanation, options, expected_answer,
-                                   max_score, auto_gradable, tags,
-                                   updated_at
+                                topic_id, course_id,
+                                explanation, options, expected_answer,
+                                max_score, auto_gradable, tags,
+                                updated_at
                             FROM questions
                             WHERE course_id  = :course_id
-                              AND topic_id   = ANY(:topic_ids)
-                              AND type       = :question_type
-                              AND difficulty = :difficulty
-                              AND id != ALL(:excluded)
+                            AND topic_id   = ANY(:topic_ids)
+                            AND type       = :question_type
+                            AND difficulty = :difficulty
+                            AND id != ALL(:excluded)
                             ORDER BY RANDOM()
                             LIMIT :lim
                         """),
@@ -4423,16 +4422,16 @@ def generate_exam_from_template(*, course_id: int, template_id: int, payload: Ge
                 else:
                     rows = db.execute(
                         text("""
-                            SELECT id, type, difficulty, content,
-                                   topic_id, course_id, points,
-                                   explanation, options, expected_answer,
-                                   max_score, auto_gradable, tags,
-                                   updated_at
+                            SELECT id, type, difficulty, question_text,
+                                topic_id, course_id,
+                                explanation, options, expected_answer,
+                                max_score, auto_gradable, tags,
+                                updated_at
                             FROM questions
                             WHERE course_id  = :course_id
-                              AND type       = :question_type
-                              AND difficulty = :difficulty
-                              AND id != ALL(:excluded)
+                            AND type       = :question_type
+                            AND difficulty = :difficulty
+                            AND id != ALL(:excluded)
                             ORDER BY RANDOM()
                             LIMIT :lim
                         """),
@@ -5575,93 +5574,98 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
             },
         )
 
-        # =========================
-        # 9) Update student_question_progress
-        # =========================
-        for eq in exam_question_rows:
-            qid = int(eq["exam_question_id"])
-            q_type = eq["type"]
-            student_answer = answers_by_question.get(qid)
-
-            if not student_answer:
-                continue
-
-            if q_type not in auto_gradable_types:
-                continue
-
-            answer_record = db.execute(
-                text("""
-                    SELECT is_correct, time_taken_seconds
-                    FROM student_answers
-                    WHERE attempt_id = :attempt_id
-                      AND exam_question_id = :exam_question_id
-                    LIMIT 1
-                """),
-                {"attempt_id": attempt_id, "exam_question_id": qid},
-            ).mappings().first()
-
-            if not answer_record:
-                continue
-
-            is_correct = bool(answer_record["is_correct"])
-            time_taken = answer_record["time_taken_seconds"] or 0
-
-            question_id_row = db.execute(
-                text("""
-                    SELECT question_id
-                    FROM exam_questions
-                    WHERE id = :exam_question_id
-                    LIMIT 1
-                """),
-                {"exam_question_id": qid},
-            ).mappings().first()
-
-            if not question_id_row:
-                continue
-
-            real_question_id = int(question_id_row["question_id"])
-
-            db.execute(
-                text("""
-                    INSERT INTO student_question_progress (
-                        student_id, question_id,
-                        times_attempted, times_correct, times_wrong,
-                        average_time_seconds, mastery_level,
-                        last_attempted_at, last_correct_at
-                    )
-                    VALUES (
-                        :student_id, :question_id,
-                        1,
-                        :times_correct,
-                        :times_wrong,
-                        :average_time_seconds,
-                        'beginner',
-                        NOW(),
-                        :last_correct_at
-                    )
-                    ON CONFLICT (student_id, question_id)
-                    DO UPDATE SET
-                        times_attempted      = student_question_progress.times_attempted + 1,
-                        times_correct        = student_question_progress.times_correct + :times_correct,
-                        times_wrong          = student_question_progress.times_wrong + :times_wrong,
-                        average_time_seconds = (
-                            (student_question_progress.average_time_seconds * student_question_progress.times_attempted) + :average_time_seconds
-                        ) / (student_question_progress.times_attempted + 1),
-                        last_attempted_at    = NOW(),
-                        last_correct_at      = CASE WHEN :is_correct THEN NOW() ELSE student_question_progress.last_correct_at END
-                """),
-                {
-                    "student_id": student_id,
-                    "question_id": real_question_id,
-                    "times_correct": 1 if is_correct else 0,
-                    "times_wrong": 0 if is_correct else 1,
-                    "average_time_seconds": float(time_taken),
-                    "last_correct_at": datetime.now(timezone.utc) if is_correct else None,
-                    "is_correct": is_correct,
-                },
-            )
-
         db.commit()
+
+        # =========================
+        # 9) Update student_question_progress (best effort)
+        # =========================
+        try:
+            for eq in exam_question_rows:
+                qid = int(eq["exam_question_id"])
+                q_type = eq["type"]
+                student_answer = answers_by_question.get(qid)
+
+                if not student_answer:
+                    continue
+
+                if q_type not in auto_gradable_types:
+                    continue
+
+                answer_record = db.execute(
+                    text("""
+                        SELECT is_correct, time_taken_seconds
+                        FROM student_answers
+                        WHERE attempt_id = :attempt_id
+                          AND exam_question_id = :exam_question_id
+                        LIMIT 1
+                    """),
+                    {"attempt_id": attempt_id, "exam_question_id": qid},
+                ).mappings().first()
+
+                if not answer_record:
+                    continue
+
+                is_correct = bool(answer_record["is_correct"])
+                time_taken = answer_record["time_taken_seconds"] or 0
+
+                question_id_row = db.execute(
+                    text("""
+                        SELECT question_id
+                        FROM exam_questions
+                        WHERE id = :exam_question_id
+                        LIMIT 1
+                    """),
+                    {"exam_question_id": qid},
+                ).mappings().first()
+
+                if not question_id_row:
+                    continue
+
+                real_question_id = int(question_id_row["question_id"])
+
+                db.execute(
+                    text("""
+                        INSERT INTO student_question_progress (
+                            student_id, question_id,
+                            times_attempted, times_correct, times_wrong,
+                            average_time_seconds, mastery_level,
+                            last_attempted_at, last_correct_at
+                        )
+                        VALUES (
+                            :student_id, :question_id,
+                            1,
+                            :times_correct,
+                            :times_wrong,
+                            :average_time_seconds,
+                            'beginner',
+                            NOW(),
+                            :last_correct_at
+                        )
+                        ON CONFLICT (student_id, question_id)
+                        DO UPDATE SET
+                            times_attempted      = student_question_progress.times_attempted + 1,
+                            times_correct        = student_question_progress.times_correct + :times_correct,
+                            times_wrong          = student_question_progress.times_wrong + :times_wrong,
+                            average_time_seconds = (
+                                (COALESCE(student_question_progress.average_time_seconds, 0) * student_question_progress.times_attempted) + :average_time_seconds
+                            ) / (student_question_progress.times_attempted + 1),
+                            last_attempted_at    = NOW(),
+                            last_correct_at      = CASE WHEN :is_correct THEN NOW() ELSE student_question_progress.last_correct_at END
+                    """),
+                    {
+                        "student_id": student_id,
+                        "question_id": real_question_id,
+                        "times_correct": 1 if is_correct else 0,
+                        "times_wrong": 0 if is_correct else 1,
+                        "average_time_seconds": float(time_taken),
+                        "last_correct_at": datetime.now(timezone.utc) if is_correct else None,
+                        "is_correct": is_correct,
+                    },
+                )
+
+            db.commit()
+        except SQLAlchemyError:
+            db.rollback()
 
         # =========================
         # 10) Send AI grading request (if needed)

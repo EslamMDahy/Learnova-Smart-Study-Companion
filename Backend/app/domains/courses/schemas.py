@@ -308,14 +308,29 @@ class CourseAutocompleteResponse(BaseModel):
 class CourseSearchResult(BaseModel):
     id: int
     title: str
-    description: str | None
-    category: str | None
-    tags: list | None
-    cover_image_key: str | None
-    banner_image_key: str | None
-    enrollment_count: int
-    average_rating: float | None
-    requires_enrollment_approval: bool
+    description: str | None = None
+    course_code: str | None = None
+    category: str | None = None
+    tags: list | None = None
+    cover_image_key: str | None = None
+    banner_image_key: str | None = None
+    cover_url: str | None = None
+    banner_url: str | None = None
+    course_type: str | None = None
+    organization_id: int | None = None
+    visibility_level: str | None = None
+    is_open_for_enrollment: bool = True
+    status: str | None = None
+    created_by: int | None = None
+    created_at: datetime | None = None
+    updated_at: datetime | None = None
+    enrollment_count: int | None = None
+    average_rating: float | None = None
+    total_ratings: int | None = None
+    requires_enrollment_approval: bool = False
+    instructor_name: str | None = None
+    instructor_avatar_url: str | None = None
+    rank: float | None = None
 
     model_config = ConfigDict(from_attributes=True)
 
