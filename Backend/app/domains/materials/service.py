@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from fastapi import HTTPException
 from datetime import datetime, timezone
+from fastapi.responses import StreamingResponse
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from app.core.config import settings
 from app.core.ai_service_integration.ai_transport import send_ai_request
+from app.core.event_bus.subscribe import subscribe
 from app.core.storage_utils import split_object_key, sanitize_filename, delete_storage_object
 from app.core.supabase_client import supabase  # عدّل import حسب مكان supabase client عندك
 
@@ -1251,6 +1253,91 @@ def delete_material(*, course_id: int, module_id: int, material_id: int, db: Ses
     except Exception as e:
         db.rollback()
         raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+
+async def stream_content_structure_generation(*, course_id: int, material_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can stream content structure generation")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    # =========================
+    # 2) Validate course exists + ownership
+    # =========================
+    course_row = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if int(course_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only stream content structure generation for your own course")
+
+    # =========================
+    # 3) Validate material belongs to course
+    # =========================
+    material_row = db.execute(
+        text("""
+            SELECT mat.id
+            FROM materials mat
+            JOIN modules m
+              ON m.id = mat.module_id
+            WHERE mat.id = :material_id
+              AND m.course_id = :course_id
+            LIMIT 1
+        """),
+        {"material_id": material_id, "course_id": course_id},
+    ).mappings().first()
+
+    if not material_row:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    # =========================
+    # 4) Close DB session before streaming
+    # =========================
+    db.close()
+
+    # =========================
+    # 5) Stream response
+    # =========================
+    async def event_generator():
+        async for payload in subscribe(channel=f"content_structure_generation_{material_id}"):
+            if not payload:
+                yield "event: timeout\ndata: {\"detail\": \"Content structure generation timed out\"}\n\n"
+                return
+
+            yield "event: ready\ndata: {\"detail\": \"Content structure generated successfully\"}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 
 
 

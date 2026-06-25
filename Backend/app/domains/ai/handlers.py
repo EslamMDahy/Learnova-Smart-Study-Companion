@@ -76,13 +76,141 @@ def handle_content_structure_generation(*, db: Session, verified_callback: Verif
         material_id=material_id,
     )
 
-    topic_temp_ids = _validate_topics_payload(topics)
-    learning_outcome_temp_ids = _validate_learning_outcomes_payload(learning_outcomes)
-    _validate_relations_payload(
-        relations=relations,
-        topic_temp_ids=topic_temp_ids,
-        learning_outcome_temp_ids=learning_outcome_temp_ids,
-    )
+    # =========================
+    # 1) Validate topics payload
+    # =========================
+    seen_topic_temp_ids: set[str] = set()
+
+    for item in topics:
+        if not isinstance(item, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each topic item must be an object",
+            )
+
+        temp_id = _extract_required_str(
+            item,
+            "temp_id",
+            "Each topic must include a non-empty temp_id",
+        )
+
+        _extract_required_str(
+            item,
+            "title",
+            "Each topic must include a non-empty title",
+        )
+
+        order_index = item.get("order_index")
+        if not isinstance(order_index, int) or order_index < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each topic must include a valid non-negative order_index",
+            )
+
+        parent_temp_id = item.get("parent_temp_id")
+        if parent_temp_id is not None:
+            if not isinstance(parent_temp_id, str) or not parent_temp_id.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="topic.parent_temp_id must be null or a non-empty string",
+                )
+
+        if temp_id in seen_topic_temp_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate topic temp_id: {temp_id}",
+            )
+
+        seen_topic_temp_ids.add(temp_id)
+
+    # =========================
+    # 2) Validate learning outcomes payload
+    # =========================
+    seen_lo_temp_ids: set[str] = set()
+
+    for item in learning_outcomes:
+        if not isinstance(item, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each learning outcome item must be an object",
+            )
+
+        temp_id = _extract_required_str(
+            item,
+            "temp_id",
+            "Each learning outcome must include a non-empty temp_id",
+        )
+
+        _extract_required_str(
+            item,
+            "title",
+            "Each learning outcome must include a non-empty title",
+        )
+
+        _extract_required_str(
+            item,
+            "level",
+            "Each learning outcome must include a non-empty level",
+        )
+
+        if temp_id in seen_lo_temp_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate learning outcome temp_id: {temp_id}",
+            )
+
+        seen_lo_temp_ids.add(temp_id)
+
+    # =========================
+    # 3) Validate relations payload
+    # =========================
+    seen_relation_pairs: set[tuple[str, str]] = set()
+
+    for item in relations:
+        if not isinstance(item, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each topic-learning-outcome relation item must be an object",
+            )
+
+        topic_temp_id = _extract_required_str(
+            item,
+            "topic_temp_id",
+            "Each relation must include a non-empty topic_temp_id",
+        )
+
+        learning_outcome_temp_id = _extract_required_str(
+            item,
+            "learning_outcome_temp_id",
+            "Each relation must include a non-empty learning_outcome_temp_id",
+        )
+
+        if topic_temp_id not in seen_topic_temp_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Relation references unknown topic_temp_id: {topic_temp_id}",
+            )
+
+        if learning_outcome_temp_id not in seen_lo_temp_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Relation references unknown learning_outcome_temp_id: "
+                    f"{learning_outcome_temp_id}"
+                ),
+            )
+
+        pair = (topic_temp_id, learning_outcome_temp_id)
+        if pair in seen_relation_pairs:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Duplicate topic-learning-outcome relation: "
+                    f"{topic_temp_id} -> {learning_outcome_temp_id}"
+                ),
+            )
+
+        seen_relation_pairs.add(pair)
 
     learning_outcome_id_map = bulk_insert_ai_learning_outcomes(
         db=db,
@@ -106,6 +234,11 @@ def handle_content_structure_generation(*, db: Session, verified_callback: Verif
     mark_material_ai_processing_completed(
         db=db,
         material_id=material_id,
+    )
+
+    publish_sync(
+        channel=f"content_structure_generation_{material_id}",
+        payload="ready",
     )
 
     return {
@@ -703,144 +836,252 @@ def _validate_question_generation_request_log_context(
         )
 
 
-def _validate_topics_payload(topics: list[dict]) -> set[str]:
-    seen_temp_ids: set[str] = set()
+# def _validate_topics_payload(topics: list[dict]) -> set[str]:
+#     seen_temp_ids: set[str] = set()
 
-    for item in topics:
-        if not isinstance(item, dict):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Each topic item must be an object",
-            )
+#     for item in topics:
+#         if not isinstance(item, dict):
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Each topic item must be an object",
+#             )
 
-        temp_id = _extract_required_str(
-            item,
-            "temp_id",
-            "Each topic must include a non-empty temp_id",
-        )
+#         temp_id = _extract_required_str(
+#             item,
+#             "temp_id",
+#             "Each topic must include a non-empty temp_id",
+#         )
 
-        _extract_required_str(
-            item,
-            "title",
-            "Each topic must include a non-empty title",
-        )
+#         _extract_required_str(
+#             item,
+#             "title",
+#             "Each topic must include a non-empty title",
+#         )
 
-        order_index = item.get("order_index")
-        if not isinstance(order_index, int) or order_index < 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Each topic must include a valid non-negative order_index",
-            )
+#         order_index = item.get("order_index")
+#         if not isinstance(order_index, int) or order_index < 0:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Each topic must include a valid non-negative order_index",
+#             )
 
-        parent_temp_id = item.get("parent_temp_id")
-        if parent_temp_id is not None:
-            if not isinstance(parent_temp_id, str) or not parent_temp_id.strip():
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="topic.parent_temp_id must be null or a non-empty string",
-                )
+#         parent_temp_id = item.get("parent_temp_id")
+#         if parent_temp_id is not None:
+#             if not isinstance(parent_temp_id, str) or not parent_temp_id.strip():
+#                 raise HTTPException(
+#                     status_code=status.HTTP_400_BAD_REQUEST,
+#                     detail="topic.parent_temp_id must be null or a non-empty string",
+#                 )
 
-        if temp_id in seen_temp_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Duplicate topic temp_id: {temp_id}",
-            )
+#         if temp_id in seen_temp_ids:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail=f"Duplicate topic temp_id: {temp_id}",
+#             )
 
-        seen_temp_ids.add(temp_id)
+#         seen_temp_ids.add(temp_id)
 
-    return seen_temp_ids
-
-
-def _validate_learning_outcomes_payload(learning_outcomes: list[dict]) -> set[str]:
-    seen_temp_ids: set[str] = set()
-
-    for item in learning_outcomes:
-        if not isinstance(item, dict):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Each learning outcome item must be an object",
-            )
-
-        temp_id = _extract_required_str(
-            item,
-            "temp_id",
-            "Each learning outcome must include a non-empty temp_id",
-        )
-
-        _extract_required_str(
-            item,
-            "title",
-            "Each learning outcome must include a non-empty title",
-        )
-
-        _extract_required_str(
-            item,
-            "level",
-            "Each learning outcome must include a non-empty level",
-        )
-
-        if temp_id in seen_temp_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Duplicate learning outcome temp_id: {temp_id}",
-            )
-
-        seen_temp_ids.add(temp_id)
-
-    return seen_temp_ids
+#     return seen_temp_ids
 
 
-def _validate_relations_payload(
-    *,
-    relations: list[dict],
-    topic_temp_ids: set[str],
-    learning_outcome_temp_ids: set[str],
-) -> None:
-    seen_pairs: set[tuple[str, str]] = set()
+# def _validate_learning_outcomes_payload(learning_outcomes: list[dict]) -> set[str]:
+#     seen_temp_ids: set[str] = set()
 
-    for item in relations:
-        if not isinstance(item, dict):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Each topic-learning-outcome relation item must be an object",
-            )
+#     for item in learning_outcomes:
+#         if not isinstance(item, dict):
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Each learning outcome item must be an object",
+#             )
 
-        topic_temp_id = _extract_required_str(
-            item,
-            "topic_temp_id",
-            "Each relation must include a non-empty topic_temp_id",
-        )
+#         temp_id = _extract_required_str(
+#             item,
+#             "temp_id",
+#             "Each learning outcome must include a non-empty temp_id",
+#         )
 
-        learning_outcome_temp_id = _extract_required_str(
-            item,
-            "learning_outcome_temp_id",
-            "Each relation must include a non-empty learning_outcome_temp_id",
-        )
+#         _extract_required_str(
+#             item,
+#             "title",
+#             "Each learning outcome must include a non-empty title",
+#         )
 
-        if topic_temp_id not in topic_temp_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Relation references unknown topic_temp_id: {topic_temp_id}",
-            )
+#         _extract_required_str(
+#             item,
+#             "level",
+#             "Each learning outcome must include a non-empty level",
+#         )
 
-        if learning_outcome_temp_id not in learning_outcome_temp_ids:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "Relation references unknown learning_outcome_temp_id: "
-                    f"{learning_outcome_temp_id}"
-                ),
-            )
+#         if temp_id in seen_temp_ids:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail=f"Duplicate learning outcome temp_id: {temp_id}",
+#             )
 
-        pair = (topic_temp_id, learning_outcome_temp_id)
-        if pair in seen_pairs:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=(
-                    "Duplicate topic-learning-outcome relation: "
-                    f"{topic_temp_id} -> {learning_outcome_temp_id}"
-                ),
-            )
+#         seen_temp_ids.add(temp_id)
 
-        seen_pairs.add(pair)
+#     return seen_temp_ids
+
+
+# def _validate_relations_payload(
+#     *,
+#     relations: list[dict],
+#     topic_temp_ids: set[str],
+#     learning_outcome_temp_ids: set[str],
+# ) -> None:
+#     seen_pairs: set[tuple[str, str]] = set()
+
+#     for item in relations:
+#         if not isinstance(item, dict):
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Each topic-learning-outcome relation item must be an object",
+#             )
+
+#         topic_temp_id = _extract_required_str(
+#             item,
+#             "topic_temp_id",
+#             "Each relation must include a non-empty topic_temp_id",
+#         )
+
+#         learning_outcome_temp_id = _extract_required_str(
+#             item,
+#             "learning_outcome_temp_id",
+#             "Each relation must include a non-empty learning_outcome_temp_id",
+#         )
+
+#         if topic_temp_id not in topic_temp_ids:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail=f"Relation references unknown topic_temp_id: {topic_temp_id}",
+#             )
+
+#         if learning_outcome_temp_id not in learning_outcome_temp_ids:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail=(
+#                     "Relation references unknown learning_outcome_temp_id: "
+#                     f"{learning_outcome_temp_id}"
+#                 ),
+#             )
+
+#         pair = (topic_temp_id, learning_outcome_temp_id)
+#         if pair in seen_pairs:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail=(
+#                     "Duplicate topic-learning-outcome relation: "
+#                     f"{topic_temp_id} -> {learning_outcome_temp_id}"
+#                 ),
+#             )
+
+#         seen_pairs.add(pair)
         
+
+
+
+
+# def handle_question_generation(
+#     *,
+#     db: Session,
+#     verified_callback: VerifiedAICallbackRequest,
+#     request_log: dict,
+# ) -> dict:
+#     payload = verified_callback.payload
+#     body = _extract_callback_body(payload)
+
+#     # =========================
+#     # 1) Validate status
+#     # =========================
+#     callback_status = _extract_required_str(
+#         payload,
+#         "status",
+#         "Missing status in callback payload",
+#     ).lower()
+
+#     if callback_status != "completed":
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="question_generation callback status must be 'completed'",
+#         )
+
+#     # =========================
+#     # 2) Extract course_id
+#     # =========================
+#     course_id = _extract_required_positive_int(
+#         payload,
+#         "course_id",
+#         "Missing or invalid course_id in callback payload",
+#     )
+
+#     # =========================
+#     # 3) Extract questions
+#     # =========================
+#     questions = _extract_required_list(
+#         body,
+#         "questions",
+#         "Missing questions list in callback body",
+#     )
+
+#     # =========================
+#     # 4) Verify request_log context
+#     # =========================
+#     request_log_course_id = request_log.get("course_id")
+#     request_log_primary_entity_type = (
+#         request_log.get("primary_entity_type") or ""
+#     ).strip().lower()
+#     request_log_primary_entity_id = request_log.get("primary_entity_id")
+
+#     if request_log_course_id is None or int(request_log_course_id) != int(course_id):
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="Callback course_id does not match AI request log",
+#         )
+
+#     if request_log_primary_entity_type != "course":
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="AI request log primary_entity_type must be 'course'",
+#         )
+
+#     if request_log_primary_entity_id is None or int(request_log_primary_entity_id) != int(course_id):
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="Callback course_id does not match AI request log primary_entity_id",
+#         )
+
+#     # =========================
+#     # 5) Validate + normalize all questions
+#     # =========================
+#     prepared_questions = validate_and_prepare_ai_generated_questions(
+#         course_id=course_id,
+#         questions=questions,
+#         db=db,
+#     )
+
+#     # =========================
+#     # 6) Insert questions into DB
+#     # =========================
+#     insert_result = insert_ai_generated_questions(
+#         course_id=course_id,
+#         prepared_questions=prepared_questions,
+#         db=db,
+#         created_by=request_log.get("created_by"),
+#     )
+
+#     # =========================
+#     # 7) Notify SSE subscribers
+#     # =========================
+#     publish_sync(
+#         channel=f"question_generation_{course_id}",
+#         payload="ready",
+#     )
+
+#     # =========================
+#     # 8) Return summary
+#     # =========================
+#     return {
+#         "course_id": course_id,
+#         "inserted_count": insert_result["inserted_count"],
+#         "question_ids": insert_result["question_ids"],
+#     }
