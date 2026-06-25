@@ -6,7 +6,6 @@ from typing import Any, List, Optional
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.enums import AIChatMessageType, AIChatContextType
-from .normalization import normalize_sources
 
 
 class SessionCreateRequest(BaseModel):
@@ -62,10 +61,6 @@ class MessageResponse(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    @field_validator("sources", mode="before")
-    @classmethod
-    def _coerce_sources(cls, value: Any) -> list[dict[str, Any]]:
-        return normalize_sources(value)
 
 
 class SessionWithMessagesResponse(BaseModel):

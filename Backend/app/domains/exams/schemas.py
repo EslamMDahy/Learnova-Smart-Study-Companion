@@ -1,10 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
-import json
 from typing import Any, List, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class ExamCreateRequest(BaseModel):
@@ -420,18 +419,19 @@ class ExamTemplateSectionDeleteResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class GenerateExamFromTemplateRequest(BaseModel):
-    title: str
-    topic_ids: Optional[List[int]] = None
-    # Runtime-only difficulty mix. This must be supplied when generating an exam, not when saving a template.
-    # Supported shape:
-    # {"1": {"easy": 30, "medium": 50, "hard": 20}, "2": {...}}
-    difficulty_config: Optional[dict] = None
-    # Backward compatibility for older Flutter builds. Do not store this on templates.
-    section_difficulty_distribution: Optional[dict] = None
+class SectionDifficultyDistribution(BaseModel):
+    easy: float = 0
+    medium: float = 0
+    hard: float = 0
 
     model_config = ConfigDict(extra="forbid")
 
+class GenerateExamFromTemplateRequest(BaseModel):
+    title: str
+    topic_ids: Optional[List[int]] = None
+    section_difficulty_distribution: dict[str, SectionDifficultyDistribution]
+
+    model_config = ConfigDict(extra="forbid")
 
 class GeneratedExamQuestionItemResponse(BaseModel):
     question_id: int
@@ -573,61 +573,10 @@ class StudentAttemptExamResponse(BaseModel):
 
 class StudentSubmitAnswerRequest(BaseModel):
     exam_question_id: int
-    selected_option_index: Optional[Union[int, str]] = None
-    selected_option_indices: Optional[List[Union[int, str]]] = None
+    selected_option_index: Optional[str] = None
+    selected_option_indices: Optional[List[str]] = None
     answer_text: Optional[str] = None
     time_taken_seconds: Optional[int] = None
-
-    @field_validator("selected_option_index", mode="before")
-    @classmethod
-    def _normalize_selected_option_index(cls, value: Any) -> Optional[Union[int, str]]:
-        if value is None:
-            return None
-        if isinstance(value, bool):
-            return str(value).lower()
-        if isinstance(value, int):
-            return value
-        normalized = str(value).strip()
-        if not normalized:
-            return None
-        return int(normalized) if normalized.isdigit() else normalized
-
-    @field_validator("selected_option_indices", mode="before")
-    @classmethod
-    def _normalize_selected_option_indices(cls, value: Any) -> Optional[List[Union[int, str]]]:
-        if value is None:
-            return None
-
-        if isinstance(value, str):
-            raw_value = value.strip()
-            if not raw_value:
-                return None
-            try:
-                decoded = json.loads(raw_value)
-            except Exception:
-                decoded = [raw_value]
-        else:
-            decoded = value
-
-        def _clean(item: Any) -> Optional[Union[int, str]]:
-            if item is None:
-                return None
-            if isinstance(item, bool):
-                return str(item).lower()
-            if isinstance(item, int):
-                return item
-            text = str(item).strip()
-            if not text:
-                return None
-            return int(text) if text.isdigit() else text
-
-        if isinstance(decoded, (list, tuple, set)):
-            normalized = [_clean(item) for item in decoded]
-            normalized = [item for item in normalized if item is not None]
-            return normalized or None
-
-        normalized = _clean(decoded)
-        return [normalized] if normalized is not None else None
 
     model_config = ConfigDict(extra="forbid")
 

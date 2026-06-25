@@ -45,90 +45,181 @@ COMMON_EMAIL_HEADERS = (
 
 
 def create_course(*, payload: CourseCreateRequest, db: Session, current_user: dict):
-    role = current_user.get("system_role")
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
     if role != "instructor":
         raise HTTPException(status_code=403, detail="Only instructors can create courses")
 
-    instructor_id = current_user["id"]
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
 
-    # ✅ NEW: status optional
-    status_value = (payload.status.value if payload.status is not None else "draft")
-
-    stmt = text("""
-        INSERT INTO courses (
-            organization_id,
-            created_by,
-            title,
-            course_code,
-            description,
-            is_open_for_enrollment,
-            visibility_level,
-            requires_enrollment_approval,
-            category,
-            tags,
-            course_type,
-            enrollment_count,
-            total_ratings,
-            status,
-            published_at,
-            created_at,
-            updated_at
-        )
-        VALUES (
-            :organization_id,
-            :created_by,
-            :title,
-            :course_code,
-            :description,
-            :is_open_for_enrollment,
-            :visibility_level,
-            :requires_enrollment_approval,
-            :category,
-            :tags,
-            :course_type,
-            0,
-            0,
-            CAST(:status AS course_status_enum),
-            CASE WHEN CAST(:status AS course_status_enum) = 'published'::course_status_enum THEN NOW() ELSE NULL END,
-            NOW(),
-            NOW()
-        )
-        RETURNING
-            id, title, course_code, course_type, organization_id, is_open_for_enrollment, visibility_level,
-            requires_enrollment_approval, status, published_at
-    """).bindparams(
-        # bindparam("learning_outcomes", type_=JSONB),
-        bindparam("tags", type_=JSONB),
-    )
-
-    params = {
-        "organization_id": payload.organization_id,
-        "created_by": instructor_id,
-        "title": payload.title,
-        "course_code": payload.course_code,
-        "description": payload.description,
-        "is_open_for_enrollment": payload.is_open_for_enrollment,
-        "visibility_level": payload.visibility_level.value,
-        "requires_enrollment_approval": payload.requires_enrollment_approval,
-        "category": payload.category,
-        "tags": payload.tags or [],
-        "course_type": payload.course_type.value,
-        "status": status_value,  # ✅ هنا التغيير
-    }
+    status_value = payload.status.value if payload.status is not None else "draft"
 
     try:
-        row = db.execute(stmt, params).mappings().first()
-        if not row:
+        # =========================
+        # 2) Insert course
+        # =========================
+        course_row = db.execute(
+            text("""
+                INSERT INTO courses (
+                    organization_id,
+                    created_by,
+                    title,
+                    course_code,
+                    description,
+                    is_open_for_enrollment,
+                    visibility_level,
+                    requires_enrollment_approval,
+                    category,
+                    tags,
+                    course_type,
+                    enrollment_count,
+                    total_ratings,
+                    status,
+                    published_at,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    :organization_id,
+                    :created_by,
+                    :title,
+                    :course_code,
+                    :description,
+                    :is_open_for_enrollment,
+                    :visibility_level,
+                    :requires_enrollment_approval,
+                    :category,
+                    :tags,
+                    :course_type,
+                    0,
+                    0,
+                    CAST(:status AS course_status_enum),
+                    CASE WHEN CAST(:status AS course_status_enum) = 'published'::course_status_enum THEN NOW() ELSE NULL END,
+                    NOW(),
+                    NOW()
+                )
+                RETURNING
+                    id, title, course_code, course_type, organization_id,
+                    is_open_for_enrollment, visibility_level,
+                    requires_enrollment_approval, status, published_at
+            """).bindparams(bindparam("tags", type_=JSONB)),
+            {
+                "organization_id": payload.organization_id,
+                "created_by": instructor_id,
+                "title": payload.title,
+                "course_code": payload.course_code,
+                "description": payload.description,
+                "is_open_for_enrollment": payload.is_open_for_enrollment,
+                "visibility_level": payload.visibility_level.value,
+                "requires_enrollment_approval": payload.requires_enrollment_approval,
+                "category": payload.category,
+                "tags": payload.tags or [],
+                "course_type": payload.course_type.value,
+                "status": status_value,
+            },
+        ).mappings().first()
+
+        if not course_row:
             raise HTTPException(status_code=503, detail="Failed to create course")
+
+        course_id = int(course_row["id"])
+
+        # =========================
+        # 3) Create default exam templates
+        # =========================
+        default_templates = [
+            {
+                "name": "Practice",
+                "exam_type": "practice",
+                "duration_minutes": None,
+                "max_attempts": 0,
+                "passing_score": None,
+            },
+            {
+                "name": "Quiz",
+                "exam_type": "quiz",
+                "duration_minutes": 30,
+                "max_attempts": 3,
+                "passing_score": 60,
+            },
+            {
+                "name": "Midterm",
+                "exam_type": "midterm",
+                "duration_minutes": 90,
+                "max_attempts": 1,
+                "passing_score": 50,
+            },
+            {
+                "name": "Final",
+                "exam_type": "final",
+                "duration_minutes": 120,
+                "max_attempts": 1,
+                "passing_score": 50,
+            },
+        ]
+
+        for template in default_templates:
+            db.execute(
+                text("""
+                    INSERT INTO exam_templates (
+                        course_id,
+                        name,
+                        exam_type,
+                        is_default,
+                        duration_minutes,
+                        max_attempts,
+                        passing_score,
+                        shuffle_questions,
+                        shuffle_options,
+                        total_questions,
+                        total_score,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (
+                        :course_id,
+                        :name,
+                        :exam_type,
+                        TRUE,
+                        :duration_minutes,
+                        :max_attempts,
+                        :passing_score,
+                        TRUE,
+                        TRUE,
+                        0,
+                        0,
+                        NOW(),
+                        NOW()
+                    )
+                """),
+                {
+                    "course_id": course_id,
+                    "name": template["name"],
+                    "exam_type": template["exam_type"],
+                    "duration_minutes": template["duration_minutes"],
+                    "max_attempts": template["max_attempts"],
+                    "passing_score": template["passing_score"],
+                },
+            )
+
         db.commit()
-        return dict(row)
+
+        return dict(course_row)
+
+    except HTTPException:
+        db.rollback()
+        raise
     except IntegrityError as e:
         db.rollback()
         raise HTTPException(status_code=400, detail="Invalid course data") from e
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
-
+    
 
 
 def update_course(*, course_id: int, payload: CourseUpdateRequest, db: Session, current_user: dict):

@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
+
 from sqlalchemy.orm import Session
 from sqlalchemy import text, bindparam
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
 import json
+
+from app.core.ai_service_integration.ai_transport import send_ai_request
+from app.core.event_bus.subscribe import subscribe
+from .handlers import validate_and_normalize_question_payload
 
 from .schemas import (QuestionCreateRequest, 
                       QuestionGenerationRequest)
-from app.core.ai_service_integration.ai_transport import send_ai_request
-from .handlers import validate_and_normalize_question_payload
 
 
 def create_question(*, course_id: int, payload: QuestionCreateRequest, db: Session, current_user: dict,):
@@ -1230,6 +1235,276 @@ def generate_questions_for_topics(*, course_id: int, payload: QuestionGeneration
             status_code=503,
             detail="Failed to send AI question generation request"
         ) from e
-    
+
+
+
+def extract_native_questions_from_material(*, course_id: int, material_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can extract questions from materials")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    # =========================
+    # 2) Validate course exists + ownership
+    # =========================
+    course_row = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if int(course_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only extract questions from your own course")
+
+    # =========================
+    # 3) Validate material belongs to course
+    # =========================
+    material_row = db.execute(
+        text("""
+            SELECT
+                mat.id,
+                mat.module_id,
+                m.course_id
+            FROM materials mat
+            JOIN modules m
+            ON m.id = mat.module_id
+            WHERE mat.id = :material_id
+            LIMIT 1
+        """),
+        {"material_id": material_id},
+    ).mappings().first()
+
+    if not material_row:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    if int(material_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this course")
+
+    # =========================
+    # 4) Fetch subtopics under material
+    # =========================
+    subtopic_rows = db.execute(
+        text("""
+            SELECT id, title
+            FROM topics
+            WHERE material_id = :material_id
+              AND parent_topic_id IS NOT NULL
+            ORDER BY order_index ASC
+        """),
+        {"material_id": material_id},
+    ).mappings().all()
+
+    if not subtopic_rows:
+        raise HTTPException(status_code=400, detail="No subtopics found under this material")
+
+    # =========================
+    # 5) Build AI request body
+    # =========================
+    ai_request_body = {
+        "module_id": material_row["module_id"],
+        "material_id": material_id,
+        "topics": [
+            {"id": row["id"], "title": row["title"]}
+            for row in subtopic_rows
+        ],
+    }
+
+    # =========================
+    # 6) Send AI request
+    # =========================
+    try:
+        send_ai_request(
+            db,
+            operation_type="extract_native_questions",
+            endpoint_path="api/v1/courses/extraction/questions",
+            course_id=course_id,
+            primary_entity_type="material",
+            primary_entity_id=material_id,
+            body=ai_request_body,
+        )
+
+        db.commit()
+
+        return {
+            "status": "processing",
+            "ai_processing_started": True,
+            "message": "Native question extraction request sent successfully",
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=503, detail="Failed to send native question extraction request") from e
+
+
+
+async def stream_native_questions(*, course_id: int, material_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can stream native question extraction")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    # =========================
+    # 2) Validate course exists + ownership
+    # =========================
+    course_row = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if int(course_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only access your own course materials")
+
+    # =========================
+    # 3) Validate material belongs to course
+    # =========================
+    material_row = db.execute(
+        text("""
+            SELECT mat.id
+            FROM materials mat
+            JOIN modules m
+              ON m.id = mat.module_id
+            WHERE mat.id = :material_id
+              AND m.course_id = :course_id
+            LIMIT 1
+        """),
+        {"material_id": material_id, "course_id": course_id},
+    ).mappings().first()
+
+    if not material_row:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    # =========================
+    # 4) Close DB session before streaming
+    # =========================
+    db.close()
+
+    # =========================
+    # 5) Stream response
+    # =========================
+    async def event_generator():
+        async for payload in subscribe(channel=f"material_questions_{material_id}"):
+            if not payload:
+                yield "event: timeout\ndata: {\"detail\": \"Question extraction timed out\"}\n\n"
+                return
+
+            yield "event: ready\ndata: {\"detail\": \"Questions extracted successfully\"}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
+
+async def stream_question_generation(*, course_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can stream question generation")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    # =========================
+    # 2) Validate course exists + ownership
+    # =========================
+    course_row = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if int(course_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only stream question generation for your own course")
+
+    # =========================
+    # 3) Close DB session before streaming
+    # =========================
+    db.close()
+
+    # =========================
+    # 4) Stream response
+    # =========================
+    async def event_generator():
+        async for payload in subscribe(channel=f"question_generation_{course_id}"):
+            if not payload:
+                yield "event: timeout\ndata: {\"detail\": \"Question generation timed out\"}\n\n"
+                return
+
+            yield "event: ready\ndata: {\"detail\": \"Questions generated successfully\"}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
 
     

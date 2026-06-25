@@ -36,255 +36,6 @@ from .helpers import (build_exam_export_context,
 logger = logging.getLogger(__name__)
 
 ALLOWED_EXAM_TYPES = {"quiz", "midterm", "final", "practice"}
-ALLOWED_DIFFICULTIES = ("easy", "medium", "hard")
-
-
-def _coerce_percent(value) -> int:
-    if isinstance(value, bool):
-        raise ValueError("percent must be a number")
-    if isinstance(value, (int, float)):
-        return int(round(value))
-    return int(round(float(str(value).strip())))
-
-
-def _normalize_difficulty_percentages(raw, *, section_label: str) -> dict[str, int]:
-    if not isinstance(raw, dict):
-        raise HTTPException(status_code=422, detail=f"difficulty_config for {section_label} must be an object")
-
-    normalized: dict[str, int] = {}
-    for key, value in raw.items():
-        difficulty = str(key).strip().lower()
-        if difficulty not in ALLOWED_DIFFICULTIES:
-            continue
-        try:
-            percent = _coerce_percent(value)
-        except Exception as exc:
-            raise HTTPException(status_code=422, detail=f"Invalid {difficulty} percent for {section_label}") from exc
-        if percent < 0:
-            raise HTTPException(status_code=422, detail=f"{difficulty} percent for {section_label} cannot be negative")
-        if percent > 0:
-            normalized[difficulty] = percent
-
-    if not normalized:
-        raise HTTPException(status_code=422, detail=f"difficulty_config for {section_label} must include easy, medium, or hard percentages")
-
-    total_percent = sum(normalized.values())
-    if not (99 <= total_percent <= 101):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Difficulty percentages for {section_label} must sum to 100 (got {total_percent})",
-        )
-
-    # Normalize harmless rounding drift so downstream counts always receive exactly 100.
-    if total_percent != 100:
-        adjust_key = "medium" if "medium" in normalized else next(iter(normalized))
-        normalized[adjust_key] = max(0, normalized[adjust_key] + (100 - total_percent))
-
-    return normalized
-
-
-def _normalize_generation_difficulty_config(payload: GenerateExamFromTemplateRequest, section_rows) -> dict[str, dict[str, int]]:
-    raw_config = payload.difficulty_config
-    if raw_config is None:
-        raw_config = payload.section_difficulty_distribution
-
-    if raw_config is None:
-        raise HTTPException(status_code=422, detail="difficulty_config is required when generating an exam")
-
-    if not isinstance(raw_config, dict):
-        raise HTTPException(status_code=422, detail="difficulty_config must be an object")
-
-    result: dict[str, dict[str, int]] = {}
-
-    # Global shortcut: {"easy": 30, "medium": 50, "hard": 20}
-    lower_keys = {str(key).strip().lower() for key in raw_config.keys()}
-    if lower_keys.intersection(ALLOWED_DIFFICULTIES):
-        global_config = _normalize_difficulty_percentages(raw_config, section_label="all sections")
-        for section in section_rows:
-            result[str(section["order_index"])] = dict(global_config)
-        return result
-
-    for section in section_rows:
-        order_key = str(section["order_index"])
-        raw_section = raw_config.get(order_key)
-        if raw_section is None:
-            raw_section = raw_config.get(section["order_index"])
-        if raw_section is None:
-            raw_section = raw_config.get(str(section["id"]))
-        if raw_section is None:
-            raise HTTPException(
-                status_code=422,
-                detail=f"Missing difficulty_config for section with order_index={section['order_index']}",
-            )
-        result[order_key] = _normalize_difficulty_percentages(raw_section, section_label=f"section order_index={section['order_index']}")
-
-    return result
-
-
-
-def _normalize_exam_answer_value(value):
-    if value is None:
-        return None
-
-    if isinstance(value, bool):
-        return "true" if value else "false"
-
-    if isinstance(value, (int, float)):
-        return str(value).strip()
-
-    if isinstance(value, (list, tuple, set)):
-        for item in value:
-            normalized_item = _normalize_exam_answer_value(item)
-            if normalized_item:
-                return normalized_item
-        return None
-
-    if isinstance(value, dict):
-        for key in (
-            "option_id",
-            "optionId",
-            "id",
-            "value",
-            "answer",
-            "correct_answer",
-            "correctAnswer",
-            "selected_option_index",
-            "selectedOptionIndex",
-        ):
-            if key in value:
-                normalized_item = _normalize_exam_answer_value(value.get(key))
-                if normalized_item:
-                    return normalized_item
-        for item in value.values():
-            normalized_item = _normalize_exam_answer_value(item)
-            if normalized_item:
-                return normalized_item
-        return None
-
-    if isinstance(value, str):
-        text_value = value.strip()
-        if not text_value:
-            return None
-        try:
-            decoded = _json.loads(text_value)
-            if decoded is not value:
-                normalized_decoded = _normalize_exam_answer_value(decoded)
-                if normalized_decoded:
-                    return normalized_decoded
-        except Exception:
-            pass
-        return text_value.strip('"').strip() or None
-
-    normalized = str(value).strip()
-    return normalized or None
-
-
-def _normalize_exam_answer_list(value):
-    if value is None:
-        return []
-
-    decoded = value
-    if isinstance(value, str):
-        text_value = value.strip()
-        if not text_value:
-            return []
-        try:
-            decoded = _json.loads(text_value)
-        except Exception:
-            decoded = [text_value]
-
-    if isinstance(decoded, dict):
-        for key in ("answers", "answer", "correct_answers", "correctAnswer", "values", "items"):
-            if key in decoded:
-                return _normalize_exam_answer_list(decoded.get(key))
-        decoded = list(decoded.values())
-
-    if isinstance(decoded, (list, tuple, set)):
-        normalized = []
-        for item in decoded:
-            item_value = _normalize_exam_answer_value(item)
-            if item_value:
-                normalized.append(item_value)
-        return normalized
-
-    item_value = _normalize_exam_answer_value(decoded)
-    return [item_value] if item_value else []
-
-
-def _selected_option_index_for_db(value):
-    if value is None or isinstance(value, bool):
-        return None
-    if isinstance(value, int):
-        return value
-    text_value = str(value).strip()
-    if not text_value:
-        return None
-    return int(text_value) if text_value.isdigit() else None
-
-
-def _selected_option_indices_for_db(value):
-    values = _normalize_exam_answer_list(value)
-    if not values:
-        return None
-    normalized = []
-    for item in values:
-        item_text = str(item).strip()
-        normalized.append(int(item_text) if item_text.isdigit() else item_text)
-    return _json.dumps(normalized)
-
-
-def _answer_text_for_db(answer):
-    answer_text = (answer.answer_text or "").strip() if getattr(answer, "answer_text", None) is not None else ""
-    if answer_text:
-        return answer_text
-
-    # Backward compatibility: a previous frontend patch sent option ids (A/B/C/D)
-    # inside selected_option_index. The DB column is integer, so preserve that id
-    # in answer_text and store NULL in selected_option_index.
-    selected = getattr(answer, "selected_option_index", None)
-    if selected is not None and _selected_option_index_for_db(selected) is None:
-        selected_text = str(selected).strip()
-        if selected_text:
-            return selected_text
-
-    selected_many = getattr(answer, "selected_option_indices", None)
-    if selected_many:
-        non_numeric = [str(item).strip() for item in selected_many if str(item).strip() and not str(item).strip().isdigit()]
-        if non_numeric:
-            return _json.dumps(non_numeric)
-
-    return None
-
-
-def _single_option_is_correct(student_answer: dict, expected_answer) -> bool:
-    expected = _normalize_exam_answer_value(expected_answer)
-    if not expected:
-        return False
-
-    candidates = [
-        _normalize_exam_answer_value(student_answer.get("selected_option_index")),
-        _normalize_exam_answer_value(student_answer.get("answer_text")),
-    ]
-
-    expected_key = expected.casefold()
-    return any(candidate and candidate.casefold() == expected_key for candidate in candidates)
-
-
-def _multi_option_is_correct(student_answer: dict, expected_answer) -> bool:
-    expected_values = _normalize_exam_answer_list(expected_answer)
-    if not expected_values:
-        return False
-
-    selected_values = _normalize_exam_answer_list(student_answer.get("selected_option_indices"))
-    answer_text_values = _normalize_exam_answer_list(student_answer.get("answer_text"))
-    if answer_text_values:
-        # New Flutter sends the real option ids (A/B/C/D) in answer_text, while
-        # old attempts may still have numeric UI indices in selected_option_indices.
-        selected_values = answer_text_values
-
-    return sorted(value.casefold() for value in selected_values) == sorted(
-        value.casefold() for value in expected_values
-    )
 
 
 def create_exam(*, course_id: int, payload: ExamCreateRequest, db: Session, current_user: dict,):
@@ -4547,9 +4298,28 @@ def generate_exam_from_template(*, course_id: int, template_id: int, payload: Ge
             raise HTTPException(status_code=400, detail="Template has no sections")
 
         # =========================
-        # 4) Validate runtime difficulty config
+        # 4) Validate difficulty distribution
         # =========================
-        difficulty_config = _normalize_generation_difficulty_config(payload, section_rows)
+        if payload.section_difficulty_distribution is None:
+            raise HTTPException(
+                status_code=422,
+                detail="section_difficulty_distribution is required",
+            )
+
+        for section in section_rows:
+            key = str(section["order_index"])
+            if key not in payload.section_difficulty_distribution:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Missing difficulty distribution for section with order_index={section['order_index']}",
+                )
+            dist = payload.section_difficulty_distribution[key]
+            total_percent = dist.easy + dist.medium + dist.hard
+            if not (99 <= total_percent <= 101):
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"Difficulty percentages for section order_index={section['order_index']} must sum to 100 (got {total_percent})",
+                )
 
         # =========================
         # 5) Create exam row
@@ -4599,22 +4369,21 @@ def generate_exam_from_template(*, course_id: int, template_id: int, payload: Ge
         # =========================
         for section in section_rows:
             key = str(section["order_index"])
-            difficulty_dist = difficulty_config[key]
+            dist = payload.section_difficulty_distribution[key]
+            difficulty_dist_dict = dist.model_dump()  # {"easy": 50, "medium": 50, "hard": 0}
             needed = int(section["question_count"])
 
-            # توزيع النسب مع تصحيح rounding error في آخر level
             counts: dict[str, int] = {}
             assigned = 0
-            levels = list(difficulty_dist.keys())
+            levels = list(difficulty_dist_dict.keys())
             for i, level in enumerate(levels):
                 if i < len(levels) - 1:
-                    c = round(needed * difficulty_dist[level] / 100)
+                    c = round(needed * difficulty_dist_dict[level] / 100)
                 else:
                     c = needed - assigned
                 counts[level] = max(c, 0)
                 assigned += counts[level]
 
-            # جلب الأسئلة لكل difficulty
             section_questions: list[dict] = []
             seen_question_ids: set[int] = set()
 
@@ -4635,16 +4404,16 @@ def generate_exam_from_template(*, course_id: int, template_id: int, payload: Ge
                     rows = db.execute(
                         text("""
                             SELECT id, type, difficulty, question_text,
-                                   topic_id, course_id,
-                                   explanation, options, expected_answer,
-                                   max_score, auto_gradable, tags,
-                                   updated_at
+                                topic_id, course_id,
+                                explanation, options, expected_answer,
+                                max_score, auto_gradable, tags,
+                                updated_at
                             FROM questions
                             WHERE course_id  = :course_id
-                              AND topic_id   = ANY(:topic_ids)
-                              AND type       = :question_type
-                              AND difficulty = :difficulty
-                              AND id != ALL(:excluded)
+                            AND topic_id   = ANY(:topic_ids)
+                            AND type       = :question_type
+                            AND difficulty = :difficulty
+                            AND id != ALL(:excluded)
                             ORDER BY RANDOM()
                             LIMIT :lim
                         """),
@@ -4653,16 +4422,16 @@ def generate_exam_from_template(*, course_id: int, template_id: int, payload: Ge
                 else:
                     rows = db.execute(
                         text("""
-                            SELECT id, type, difficulty, content,
-                                   topic_id, course_id, points,
-                                   explanation, options, expected_answer,
-                                   max_score, auto_gradable, tags,
-                                   updated_at
+                            SELECT id, type, difficulty, question_text,
+                                topic_id, course_id,
+                                explanation, options, expected_answer,
+                                max_score, auto_gradable, tags,
+                                updated_at
                             FROM questions
                             WHERE course_id  = :course_id
-                              AND type       = :question_type
-                              AND difficulty = :difficulty
-                              AND id != ALL(:excluded)
+                            AND type       = :question_type
+                            AND difficulty = :difficulty
+                            AND id != ALL(:excluded)
                             ORDER BY RANDOM()
                             LIMIT :lim
                         """),
@@ -5481,7 +5250,7 @@ def submit_answer(*, course_id: int, exam_id: int, attempt_id: int, payload: Stu
                 )
                 VALUES (
                     :attempt_id, :exam_question_id,
-                    :selected_option_index, CAST(:selected_option_indices AS JSON),
+                    :selected_option_index, :selected_option_indices,
                     :answer_text, :time_taken_seconds,
                     FALSE, NOW(), NOW()
                 )
@@ -5496,9 +5265,9 @@ def submit_answer(*, course_id: int, exam_id: int, attempt_id: int, payload: Stu
             {
                 "attempt_id": attempt_id,
                 "exam_question_id": payload.exam_question_id,
-                "selected_option_index": _selected_option_index_for_db(payload.selected_option_index),
-                "selected_option_indices": _selected_option_indices_for_db(payload.selected_option_indices),
-                "answer_text": _answer_text_for_db(payload),
+                "selected_option_index": payload.selected_option_index,
+                "selected_option_indices": _json.dumps(payload.selected_option_indices) if payload.selected_option_indices else None,
+                "answer_text": payload.answer_text,
                 "time_taken_seconds": payload.time_taken_seconds,
             },
         )
@@ -5623,7 +5392,7 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                         )
                         VALUES (
                             :attempt_id, :exam_question_id,
-                            :selected_option_index, CAST(:selected_option_indices AS JSON),
+                            :selected_option_index, :selected_option_indices,
                             :answer_text, :time_taken_seconds,
                             FALSE, NOW(), NOW()
                         )
@@ -5638,9 +5407,9 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                     {
                         "attempt_id": attempt_id,
                         "exam_question_id": answer.exam_question_id,
-                        "selected_option_index": _selected_option_index_for_db(answer.selected_option_index),
-                        "selected_option_indices": _selected_option_indices_for_db(answer.selected_option_indices),
-                        "answer_text": _answer_text_for_db(answer),
+                        "selected_option_index": answer.selected_option_index,
+                        "selected_option_indices": _json.dumps(answer.selected_option_indices) if answer.selected_option_indices else None,
+                        "answer_text": answer.answer_text,
                         "time_taken_seconds": answer.time_taken_seconds,
                     },
                 )
@@ -5721,10 +5490,18 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
             is_correct = False
 
             if q_type in {"multiple_choice", "true_false"}:
-                is_correct = _single_option_is_correct(student_answer, expected)
+                student_option = student_answer.get("selected_option_index")
+                if student_option is not None and expected is not None:
+                    is_correct = str(student_option) == str(expected).strip('"')
 
             elif q_type == "multi_select":
-                is_correct = _multi_option_is_correct(student_answer, expected)
+                student_indices = student_answer.get("selected_option_indices")
+                if student_indices is not None and expected is not None:
+                    if isinstance(student_indices, str):
+                        student_indices = _json.loads(student_indices)
+                    if isinstance(expected, str):
+                        expected = _json.loads(expected)
+                    is_correct = sorted(str(x) for x in student_indices) == sorted(str(x) for x in expected)
 
             points_earned = points if is_correct else 0.0
             total_score += points_earned
@@ -5797,8 +5574,6 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
             },
         )
 
-        # Commit the actual submission before best-effort analytics. A progress
-        # tracking failure must never make the student's final submit fail.
         db.commit()
 
         # =========================
@@ -5891,11 +5666,6 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
             db.commit()
         except SQLAlchemyError:
             db.rollback()
-            logger.warning(
-                "Failed to update student question progress for attempt %s",
-                attempt_id,
-                exc_info=True,
-            )
 
         # =========================
         # 10) Send AI grading request (if needed)

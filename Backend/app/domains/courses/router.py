@@ -49,7 +49,7 @@ def update_course(
         db=db,
         current_user=current_user,)
 
-@router.post("/courses/{course_id}/cover/initiate", status_code=200)
+@router.post("/{course_id}/cover/initiate", status_code=200)
 def initiate_course_cover_upload_route(
     course_id: int,
     payload: CourseAssetUploadRequest,
@@ -61,7 +61,7 @@ def initiate_course_cover_upload_route(
         db=db,
         current_user=current_user,)
 
-@router.post("/courses/{course_id}/cover/confirm", status_code=200, response_model=CourseCoverConfirmResponse)
+@router.post("/{course_id}/cover/confirm", status_code=200, response_model=CourseCoverConfirmResponse)
 def confirm_course_cover_upload_route(
     course_id: int,
     db: Session = Depends(get_db),
