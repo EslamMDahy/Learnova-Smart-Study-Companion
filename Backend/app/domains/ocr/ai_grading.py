@@ -90,12 +90,12 @@ def grade_written_answers_with_ai(
             course_id=int(course_id),
             body=body,
         )
-    except Exception as exc:
-        warnings.append(f"AI grading could not be completed during scan analysis: {exc}")
+    except Exception:
+        warnings.append("AI grading service is unavailable; written answers are marked for manual review.")
         for answer in written:
-            preview = estimate_written_ai_preview(answer)
-            answer["ai_status"] = preview["status"]
-            answer["ai_feedback"] = preview["feedback"]
+            answer["ai_status"] = "needs_review"
+            answer["status"] = "needs_review"
+            answer["ai_feedback"] = "AI grading is unavailable right now. Review this written answer manually."
         return answers, warnings
 
     results = _extract_results(payload)
@@ -134,9 +134,11 @@ def _send_ai_grading_preview_request(*, request_id: str, course_id: int, body: d
     headers = build_ai_request_headers(request_id=request_id, timestamp=timestamp, signature=signature)
 
     timeout = int(getattr(settings, "ocr_ai_grading_timeout_seconds", min(settings.ai_request_timeout_seconds, 90)))
-    with httpx.Client(base_url=settings.ai_service_base_url, timeout=timeout) as client:
+    with httpx.Client(base_url=settings.ai_service_base_url, timeout=timeout, follow_redirects=False) as client:
         response = client.request(method=method, url=endpoint_path, content=serialized, headers=headers)
 
+    if 300 <= response.status_code < 400:
+        raise RuntimeError("AI grading endpoint redirected instead of returning a grading result")
     response.raise_for_status()
     try:
         data = response.json()

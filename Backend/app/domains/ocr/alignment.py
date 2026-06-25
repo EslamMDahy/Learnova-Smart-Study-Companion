@@ -53,8 +53,17 @@ def align_exam_page(image: Any) -> AlignmentResult:
         return AlignmentResult(image=image, confidence=70.0, status="fallback", warnings=["Stable page contour not detected; used original scan."])
 
     ordered = _order_points(best)
-    target_width = 2480
-    target_height = 3508
+
+    # Keep OCR pages at screen/scan resolution instead of upscaling every page
+    # to a full 300-DPI A4 canvas. Upscaling was the main reason bubble
+    # detection took minutes on photographed PDFs.
+    aspect = 2480 / 3508
+    target_height = min(max(height, 900), 1800)
+    target_width = int(target_height * aspect)
+    if target_width > width * 1.15 and height <= 2000:
+        target_width = width
+        target_height = height
+
     destination = np.array(
         [[0, 0], [target_width - 1, 0], [target_width - 1, target_height - 1], [0, target_height - 1]],
         dtype="float32",
