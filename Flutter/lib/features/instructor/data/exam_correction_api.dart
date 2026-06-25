@@ -25,13 +25,10 @@ class ExamCorrectionApi {
   Future<ExamScanAnalyzeResponse> analyzeExamScan({
     required List<ExamCorrectionUploadFile> files,
     required String language,
-    int? examId,
-    int? courseId,
-    int studentIdDigits = 6,
     CancelToken? cancelToken,
   }) async {
     if (files.isEmpty) {
-      throw ArgumentError('Select at least one solved exam scan.');
+      throw ArgumentError('Select one exam PDF.');
     }
 
     final form = FormData();
@@ -41,16 +38,12 @@ class ExamCorrectionApi {
           'files',
           MultipartFile.fromBytes(
             file.bytes,
-            filename: file.name.isNotEmpty ? file.name : 'exam-scan.png',
+            filename: file.name.isNotEmpty ? file.name : 'exam.pdf',
           ),
         ),
       );
     }
-
     form.fields.add(MapEntry('lang', language));
-    form.fields.add(MapEntry('student_id_digits', studentIdDigits.toString()));
-    if (examId != null) form.fields.add(MapEntry('exam_id', examId.toString()));
-    if (courseId != null) form.fields.add(MapEntry('course_id', courseId.toString()));
 
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.examScanAnalyze,
@@ -58,7 +51,7 @@ class ExamCorrectionApi {
       options: Options(
         contentType: 'multipart/form-data',
         sendTimeout: const Duration(minutes: 3),
-        receiveTimeout: const Duration(minutes: 6),
+        receiveTimeout: const Duration(minutes: 10),
       ),
       cancelToken: cancelToken,
     );
@@ -70,10 +63,27 @@ class ExamCorrectionApi {
     throw const FormatException('Invalid response from exam scan analyzer.');
   }
 
+
+  Future<ExamScanAnalyzeResponse> getExamScanAttemptResult({
+    required int attemptId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.examScanAttemptResult(attemptId),
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return ExamScanAnalyzeResponse.fromJson(data);
+    }
+    throw const FormatException('Invalid response from exam scan result endpoint.');
+  }
+
   Future<ExamScanSubmitResponse> submitExamScan({
     required ExamScanAnalyzeResponse scan,
     required int examId,
-    required int studentUserId,
+    int? studentUserId,
     Map<String, double> pointsOverrides = const {},
     Map<String, bool> correctnessOverrides = const {},
     String? teacherFeedback,
@@ -92,7 +102,7 @@ class ExamCorrectionApi {
       data: {
         'scan_id': scan.scanId,
         'exam_id': examId,
-        'student_id': studentUserId,
+        if (studentUserId != null) 'student_id': studentUserId,
         'answers': answers
             .map(
               (answer) => answer.toSubmitJson(

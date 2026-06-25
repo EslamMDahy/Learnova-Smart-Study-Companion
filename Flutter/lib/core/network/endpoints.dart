@@ -199,6 +199,7 @@ class Endpoints {
   static const examCorrection = '$_ocr/exam-correction';
   static const examScanAnalyze = '$_ocr/exam-scan/analyze';
   static const examScanSubmit = '$_ocr/exam-scan/submit';
+  static String examScanAttemptResult(int attemptId) => '$_ocr/exam-scan/attempts/$attemptId/result';
   static const ocrHealth = '$_ocr/health';
 
   // ─── SETTINGS ────────────────────────────────────────────────────────────

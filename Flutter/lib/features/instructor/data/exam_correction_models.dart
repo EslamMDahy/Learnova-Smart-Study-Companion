@@ -26,15 +26,7 @@ class ExamCorrectionUploadFile {
   }
 
   bool get isSupported {
-    final lower = name.toLowerCase();
-    return lower.endsWith('.pdf') ||
-        lower.endsWith('.png') ||
-        lower.endsWith('.jpg') ||
-        lower.endsWith('.jpeg') ||
-        lower.endsWith('.webp') ||
-        lower.endsWith('.tif') ||
-        lower.endsWith('.tiff') ||
-        lower.endsWith('.bmp');
+    return name.toLowerCase().endsWith('.pdf');
   }
 }
 
@@ -73,6 +65,11 @@ class ExamScanAnalyzeResponse {
   final List<ExamScanPage> pages;
   final List<ExamScanAnswer> answers;
   final ExamScanGradePreview gradePreview;
+  final double? processingTimeSeconds;
+  final int? attemptId;
+  final String? attemptStatus;
+  final bool aiGradingRequested;
+  final String? aiRequestId;
   final List<String> warnings;
 
   const ExamScanAnalyzeResponse({
@@ -84,8 +81,19 @@ class ExamScanAnalyzeResponse {
     required this.pages,
     required this.answers,
     required this.gradePreview,
+    required this.processingTimeSeconds,
+    required this.attemptId,
+    required this.attemptStatus,
+    required this.aiGradingRequested,
+    required this.aiRequestId,
     required this.warnings,
   });
+
+  bool get isOcrPreviewOnly {
+    final version = exam.templateVersion.toLowerCase();
+    final type = (exam.examType ?? '').toLowerCase();
+    return version == 'ocr_only' || type == 'ocr_only' || gradePreview.totalScore <= 0;
+  }
 
   factory ExamScanAnalyzeResponse.fromJson(Map<String, dynamic> json) {
     return ExamScanAnalyzeResponse(
@@ -103,6 +111,11 @@ class ExamScanAnalyzeResponse {
           .map((item) => ExamScanAnswer.fromJson(item.cast<String, dynamic>()))
           .toList(growable: false),
       gradePreview: ExamScanGradePreview.fromJson((json['grade_preview'] as Map?)?.cast<String, dynamic>() ?? const {}),
+      processingTimeSeconds: _nullableDouble(json['processing_time_seconds']),
+      attemptId: _nullableInt(json['attempt_id']),
+      attemptStatus: json['attempt_status']?.toString(),
+      aiGradingRequested: json['ai_grading_requested'] == true,
+      aiRequestId: json['ai_request_id']?.toString(),
       warnings: ((json['warnings'] as List?) ?? const []).map((item) => item.toString()).toList(growable: false),
     );
   }
@@ -167,6 +180,9 @@ class ExamScanPage {
   final double alignmentConfidence;
   final bool qrDetected;
   final int bubbleCount;
+  final String? ocrText;
+  final double? ocrConfidence;
+  final int? wordCount;
   final List<String> warnings;
 
   const ExamScanPage({
@@ -176,6 +192,9 @@ class ExamScanPage {
     required this.alignmentConfidence,
     required this.qrDetected,
     required this.bubbleCount,
+    required this.ocrText,
+    required this.ocrConfidence,
+    required this.wordCount,
     required this.warnings,
   });
 
@@ -187,6 +206,9 @@ class ExamScanPage {
       alignmentConfidence: _asDouble(json['alignment_confidence']),
       qrDetected: json['qr_detected'] == true,
       bubbleCount: _asInt(json['bubble_count']),
+      ocrText: json['ocr_text']?.toString(),
+      ocrConfidence: _nullableDouble(json['ocr_confidence']),
+      wordCount: _nullableInt(json['word_count']),
       warnings: ((json['warnings'] as List?) ?? const []).map((item) => item.toString()).toList(growable: false),
     );
   }
@@ -196,6 +218,10 @@ class ExamScanAnswer {
   final int? examQuestionId;
   final int questionNumber;
   final String type;
+  final String? questionText;
+  final List<Map<String, dynamic>> options;
+  final String? correctAnswer;
+  final dynamic expectedAnswer;
   final String? detectedAnswer;
   final List<String> detectedAnswers;
   final int? selectedOptionIndex;
@@ -218,6 +244,10 @@ class ExamScanAnswer {
     required this.examQuestionId,
     required this.questionNumber,
     required this.type,
+    required this.questionText,
+    required this.options,
+    required this.correctAnswer,
+    required this.expectedAnswer,
     required this.detectedAnswer,
     required this.detectedAnswers,
     required this.selectedOptionIndex,
@@ -239,10 +269,17 @@ class ExamScanAnswer {
 
   bool get hasAiGrade => aiStatus == 'completed' || status == 'ai_graded' || aiScore != null;
   bool get isAiPending => aiStatus == 'pending' || aiStatus == 'sent';
+  bool get shouldShowAiFeedback =>
+      aiFeedback?.trim().isNotEmpty == true &&
+      aiStatus != null &&
+      aiStatus != 'skipped';
   bool get needsReview => status == 'needs_review' || isAiPending || confidence < 45 || (isWritten && pointsEarned == null && !hasAiGrade);
   bool get isWritten => type == 'essay' || type == 'short_answer';
   String get reviewKey => examQuestionId != null ? 'eq_$examQuestionId' : 'q_${questionNumber}_$type';
   String get typeLabel => type.replaceAll('_', ' ');
+
+  String get displayQuestion => questionText?.trim().isNotEmpty == true ? questionText!.trim() : 'Question $questionNumber';
+  String get displayCorrectAnswer => correctAnswer?.trim().isNotEmpty == true ? correctAnswer!.trim() : '—';
 
   String get displayAnswer {
     if (isWritten) return (answerText ?? '').trim().isEmpty ? 'No text extracted' : answerText!.trim();
@@ -255,6 +292,13 @@ class ExamScanAnswer {
       examQuestionId: _nullableInt(json['exam_question_id']),
       questionNumber: _asInt(json['question_number']),
       type: (json['type'] ?? '').toString(),
+      questionText: json['question_text']?.toString(),
+      options: ((json['options'] as List?) ?? const [])
+          .whereType<Map>()
+          .map((item) => item.cast<String, dynamic>())
+          .toList(growable: false),
+      correctAnswer: json['correct_answer']?.toString(),
+      expectedAnswer: json['expected_answer'],
       detectedAnswer: json['detected_answer']?.toString(),
       detectedAnswers: ((json['detected_answers'] as List?) ?? const []).map((item) => item.toString()).toList(growable: false),
       selectedOptionIndex: _nullableInt(json['selected_option_index']),
@@ -305,6 +349,11 @@ class ExamScanAnswer {
 class ExamScanGradePreview {
   final double scoreSoFar;
   final double totalScore;
+  final double? percentageScore;
+  final int gradedQuestions;
+  final int correctCount;
+  final int incorrectCount;
+  final int unansweredCount;
   final int autoGradableQuestions;
   final int detectedQuestions;
   final int writtenQuestions;
@@ -316,6 +365,11 @@ class ExamScanGradePreview {
   const ExamScanGradePreview({
     required this.scoreSoFar,
     required this.totalScore,
+    required this.percentageScore,
+    required this.gradedQuestions,
+    required this.correctCount,
+    required this.incorrectCount,
+    required this.unansweredCount,
     required this.autoGradableQuestions,
     required this.detectedQuestions,
     required this.writtenQuestions,
@@ -326,9 +380,17 @@ class ExamScanGradePreview {
   });
 
   factory ExamScanGradePreview.fromJson(Map<String, dynamic> json) {
+    final score = _asDouble(json['score_so_far']);
+    final total = _asDouble(json['total_score']);
+
     return ExamScanGradePreview(
-      scoreSoFar: _asDouble(json['score_so_far']),
-      totalScore: _asDouble(json['total_score']),
+      scoreSoFar: score,
+      totalScore: total,
+      percentageScore: _nullableDouble(json['percentage_score']) ?? (total > 0 ? (score / total) * 100 : null),
+      gradedQuestions: _asInt(json['graded_questions']),
+      correctCount: _asInt(json['correct_count']),
+      incorrectCount: _asInt(json['incorrect_count']),
+      unansweredCount: _asInt(json['unanswered_count']),
       autoGradableQuestions: _asInt(json['auto_gradable_questions']),
       detectedQuestions: _asInt(json['detected_questions']),
       writtenQuestions: _asInt(json['written_questions']),
