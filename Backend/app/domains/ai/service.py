@@ -18,7 +18,8 @@ from app.core.ai_service_integration.ai_request_tracking import (
 from .handlers import (handle_content_structure_generation,
                        handle_question_generation,
                        handle_exam_grading,
-                       handle_rag_chat,)
+                       handle_rag_chat,
+                       handle_extract_native_questions,)
 
 
 _HANDLER_REGISTRY = {
@@ -26,6 +27,7 @@ _HANDLER_REGISTRY = {
     "question_generation": handle_question_generation,
     "exam_grading": handle_exam_grading,
     "rag_chat": handle_rag_chat,
+    "extract_native_questions": handle_extract_native_questions,
 }
 
 

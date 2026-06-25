@@ -175,3 +175,10 @@ class QuestionGenerationResponse(BaseModel):
     message: Optional[str] = None
 
     model_config = ConfigDict(extra="forbid")
+
+class ExtractNativeQuestionsResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    status: str
+    ai_processing_started: bool
+    message: str

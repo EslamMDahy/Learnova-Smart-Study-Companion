@@ -189,6 +189,7 @@ class QuestionDifficulty(str, Enum):
 class QuestionSource(str, Enum):
     manual = "manual"
     ai_generated = "ai_generated"
+    native_extraction = "native_extraction"
     imported = "imported"
 
 class QuestionApprovalStatus(str, Enum):
