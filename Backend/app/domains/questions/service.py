@@ -1446,4 +1446,65 @@ async def stream_native_questions(*, course_id: int, material_id: int, db: Sessi
     )
 
 
+
+async def stream_question_generation(*, course_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can stream question generation")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    # =========================
+    # 2) Validate course exists + ownership
+    # =========================
+    course_row = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if int(course_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only stream question generation for your own course")
+
+    # =========================
+    # 3) Close DB session before streaming
+    # =========================
+    db.close()
+
+    # =========================
+    # 4) Stream response
+    # =========================
+    async def event_generator():
+        async for payload in subscribe(channel=f"question_generation_{course_id}"):
+            if not payload:
+                yield "event: timeout\ndata: {\"detail\": \"Question generation timed out\"}\n\n"
+                return
+
+            yield "event: ready\ndata: {\"detail\": \"Questions generated successfully\"}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
     

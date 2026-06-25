@@ -148,3 +148,13 @@ async def stream_native_questions_endpoint(
         db=db,
         current_user=current_user,)
 
+@router.get("/questions/generation/stream", status_code=status.HTTP_200_OK,)
+async def stream_question_generation_endpoint(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return await service.stream_question_generation(
+        course_id=course_id,
+        db=db,
+        current_user=current_user,)
+
