@@ -8,6 +8,10 @@ from pydantic import BaseModel, Field, ConfigDict
 class TopicCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="Topic title")
     description: Optional[str] = Field(default=None, description="Optional topic description")
+    
+    page_start: Optional[int] = Field(default=None, gt=0)
+    page_end: Optional[int] = Field(default=None, gt=0)
+
     parent_topic_id: Optional[int] = Field(
         default=None,
         gt=0,
@@ -25,6 +29,10 @@ class TopicCreateResponse(BaseModel):
     material_id: int
     title: str
     description: Optional[str] = None
+
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
+
     order_index: int
     parent_topic_id: Optional[int] = None
 
@@ -73,6 +81,10 @@ class TopicGetResponse(BaseModel):
     material_id: int
     title: str
     description: Optional[str] = None
+
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
+
     order_index: int
     parent_topic_id: Optional[int] = None
 
@@ -98,6 +110,10 @@ class TopicUpdateRequest(BaseModel):
         default=None,
         description="Updated topic description"
     )
+
+    page_start: Optional[int] = Field(default=None, gt=0)
+    page_end: Optional[int] = Field(default=None, gt=0)
+
     parent_topic_id: Optional[int] = Field(
         default=None,
         gt=0,
@@ -115,6 +131,10 @@ class TopicUpdateResponse(BaseModel):
     material_id: int
     title: str
     description: Optional[str] = None
+    
+    page_start: Optional[int] = None
+    page_end: Optional[int] = None
+    
     order_index: int
     parent_topic_id: Optional[int] = None
 

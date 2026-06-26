@@ -73,7 +73,11 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
     if isinstance(description, str):
         description = description.strip() or None
 
+    page_start = payload.page_start
+    page_end = payload.page_end
+
     parent_topic_id = payload.parent_topic_id
+
     learning_outcome_ids = payload.learning_outcome_ids or []
 
     # remove duplicates while preserving order
@@ -87,7 +91,32 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
             normalized_learning_outcome_ids.append(lo_id)
 
     # =========================
-    # 4) Validate parent_topic_id (if provided)
+    # 4) Validate page range (if provided)
+    # =========================           
+    if (page_start is None) != (page_end is None):
+        raise HTTPException(422, "page_start and page_end must both be provided or both be null")
+
+    if page_start is not None and page_end is not None:
+        if page_start > page_end:
+            raise HTTPException(422, "page_start must be less than or equal to page_end")
+        
+        if parent_topic_id is not None:
+            parent_range = db.execute(
+                text("SELECT page_start, page_end FROM topics WHERE id = :id"),
+                {"id": parent_topic_id}
+            ).mappings().first()
+            
+            if parent_range is None:
+                raise HTTPException(404, "Parent topic not found")
+            
+            if parent_range["page_start"] is None:
+                raise HTTPException(422, "Cannot set page range on subtopic when parent has no page range")
+            
+            if page_start < parent_range["page_start"] or page_end > parent_range["page_end"]:
+                raise HTTPException(422, "Subtopic page range must be within parent topic page range")
+
+    # =========================
+    # 5) Validate parent_topic_id (if provided)
     # =========================
     if parent_topic_id is not None:
         parent_row = db.execute(
@@ -107,7 +136,7 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
             raise HTTPException(status_code=400, detail="Parent topic must belong to the same material")
 
     # =========================
-    # 5) Validate learning outcomes belong to same course
+    # 6) Validate learning outcomes belong to same course
     # =========================
     if normalized_learning_outcome_ids:
         lo_rows = db.execute(
@@ -130,7 +159,7 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
                 )
 
     # =========================
-    # 6) Compute order_index inside same material
+    # 7) Compute order_index inside same material
     # =========================
     next_order_index = db.execute(
         text("""
@@ -145,7 +174,7 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
         next_order_index = 0
 
     # =========================
-    # 7) Insert topic
+    # 8) Insert topic
     # =========================
     try:
         topic_row = db.execute(
@@ -154,6 +183,8 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
                     material_id,
                     title,
                     description,
+                    page_start,
+                    page_end,
                     order_index,
                     parent_topic_id,
                     is_ai_generated,
@@ -165,6 +196,8 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
                     :material_id,
                     :title,
                     :description,
+                    :page_start,
+                    :page_end,
                     :order_index,
                     :parent_topic_id,
                     :is_ai_generated,
@@ -177,6 +210,8 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
                     material_id,
                     title,
                     description,
+                    page_start,
+                    page_end,
                     order_index,
                     parent_topic_id,
                     is_ai_generated,
@@ -188,6 +223,8 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
                 "material_id": material_id,
                 "title": title,
                 "description": description,
+                "page_start": page_start,
+                "page_end": page_end,
                 "order_index": int(next_order_index),
                 "parent_topic_id": parent_topic_id,
                 "is_ai_generated": False,
@@ -202,7 +239,7 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
         topic_id = int(topic_row["id"])
 
         # =========================
-        # 8) Insert topic-learning_outcome relations (optional)
+        # 9) Insert topic-learning_outcome relations (optional)
         # =========================
         if normalized_learning_outcome_ids:
             for lo_id in normalized_learning_outcome_ids:
@@ -398,6 +435,8 @@ def get_topic(*, course_id: int, module_id: int, material_id: int, topic_id: int
                     t.material_id,
                     t.title,
                     t.description,
+                    t.page_start,
+                    t.page_end,
                     t.order_index,
                     t.parent_topic_id,
                     t.is_ai_generated,
@@ -493,6 +532,8 @@ def get_topic(*, course_id: int, module_id: int, material_id: int, topic_id: int
             "material_id": topic_row["material_id"],
             "title": topic_row["title"],
             "description": topic_row["description"],
+            "page_start": topic_row["page_start"],
+            "page_end": topic_row["page_end"],
             "order_index": topic_row["order_index"],
             "parent_topic_id": topic_row["parent_topic_id"],
             "is_ai_generated": topic_row["is_ai_generated"],
@@ -545,6 +586,8 @@ def update_topic(*, course_id: int, module_id: int, material_id: int, topic_id: 
                 t.id,
                 t.material_id,
                 t.parent_topic_id,
+                t.page_start,
+                t.page_end,
                 m.module_id,
                 mo.course_id,
                 c.created_by
@@ -640,6 +683,75 @@ def update_topic(*, course_id: int, module_id: int, material_id: int, topic_id: 
 
         update_fields["parent_topic_id"] = parent_topic_id
 
+    page_start_provided = "page_start" in provided_fields
+    page_end_provided = "page_end" in provided_fields
+
+    if page_start_provided != page_end_provided:
+        raise HTTPException(422, "page_start and page_end must both be provided or both be null")
+
+    if page_start_provided and page_end_provided:
+        page_start = payload.page_start
+        page_end = payload.page_end
+
+        if (page_start is None) != (page_end is None):
+            raise HTTPException(422, "page_start and page_end must both be provided or both be null")
+
+        if page_start is None and page_end is None:
+            is_subtopic = (update_fields.get("parent_topic_id") or topic_row["parent_topic_id"]) is not None
+
+            if not is_subtopic:
+                has_subtopics = db.execute(
+                    text("""
+                        SELECT 1 FROM topics
+                        WHERE parent_topic_id = :topic_id
+                        AND page_start IS NOT NULL
+                        LIMIT 1
+                    """),
+                    {"topic_id": topic_id}
+                ).scalar()
+
+                if has_subtopics:
+                    raise HTTPException(422, "Cannot clear page range on topic that has subtopics with page ranges")
+
+        if page_start is not None and page_end is not None:
+            if page_start > page_end:
+                raise HTTPException(422, "page_start must be less than or equal to page_end")
+
+            subtopics_range = db.execute(
+                text("""
+                    SELECT MIN(page_start) AS min_start, MAX(page_end) AS max_end
+                    FROM topics
+                    WHERE parent_topic_id = :topic_id
+                    AND page_start IS NOT NULL
+                    AND page_end IS NOT NULL
+                """),
+                {"topic_id": topic_id}
+            ).mappings().first()
+
+            if subtopics_range and subtopics_range["min_start"] is not None:
+                if page_start > subtopics_range["min_start"] or page_end < subtopics_range["max_end"]:
+                    raise HTTPException(422, "Topic page range must cover all its subtopics ranges")
+
+            current_parent_id = update_fields.get("parent_topic_id") or topic_row["parent_topic_id"]
+
+            if current_parent_id is not None:
+                parent_range = db.execute(
+                    text("SELECT page_start, page_end FROM topics WHERE id = :id"),
+                    {"id": current_parent_id}
+                ).mappings().first()
+
+                if parent_range is None:
+                    raise HTTPException(404, "Parent topic not found")
+
+                if parent_range["page_start"] is None or parent_range["page_end"] is None:
+                    raise HTTPException(422, "Cannot set page range on subtopic when parent has no page range")
+
+                if page_start < parent_range["page_start"] or page_end > parent_range["page_end"]:
+                    raise HTTPException(422, "Subtopic page range must be within parent topic page range")
+
+        update_fields["page_start"] = page_start
+        update_fields["page_end"] = page_end
+
     # =========================
     # 4) Validate learning outcomes if provided
     # =========================
@@ -693,7 +805,7 @@ def update_topic(*, course_id: int, module_id: int, material_id: int, topic_id: 
             set_clauses = []
             params = {"topic_id": topic_id}
 
-            for col in ["title", "description", "parent_topic_id"]:
+            for col in ["title", "description", "parent_topic_id", "page_start", "page_end"]:
                 if col in update_fields:
                     set_clauses.append(f"{col} = :{col}")
                     params[col] = update_fields[col]
@@ -710,6 +822,8 @@ def update_topic(*, course_id: int, module_id: int, material_id: int, topic_id: 
                         material_id,
                         title,
                         description,
+                        page_start,
+                        page_end,
                         order_index,
                         parent_topic_id,
                         is_ai_generated,
@@ -731,6 +845,8 @@ def update_topic(*, course_id: int, module_id: int, material_id: int, topic_id: 
                         material_id,
                         title,
                         description,
+                        page_start,
+                        page_end,
                         order_index,
                         parent_topic_id,
                         is_ai_generated,

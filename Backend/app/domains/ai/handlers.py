@@ -115,6 +115,32 @@ def handle_content_structure_generation(*, db: Session, verified_callback: Verif
                     detail="topic.parent_temp_id must be null or a non-empty string",
                 )
 
+        page_start = item.get("page_start")
+        page_end = item.get("page_end")
+
+        if (page_start is None) != (page_end is None):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="page_start and page_end must both be provided or both be null",
+            )
+
+        if page_start is not None and page_end is not None:
+            if not isinstance(page_start, int) or page_start <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="page_start must be a positive integer",
+                )
+            if not isinstance(page_end, int) or page_end <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="page_end must be a positive integer",
+                )
+            if page_start > page_end:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="page_start must be less than or equal to page_end",
+                )
+
         if temp_id in seen_topic_temp_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
