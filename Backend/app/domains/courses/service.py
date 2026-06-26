@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text, bindparam
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-
+from storage3.types import CreateSignedUploadUrlOptions
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from openpyxl import load_workbook
@@ -442,10 +442,11 @@ def initiate_course_cover_upload(*, course_id: int, payload, db: Session, curren
     bucket = settings.supabase_public_bucket
     storage_key = f"courses/{course_id}/assets/cover"
 
+    options = CreateSignedUploadUrlOptions(upsert="true")
     try:
+        signed = supabase.storage.from_(bucket).create_signed_upload_url(storage_key, options)
+    except TypeError:
         signed = supabase.storage.from_(bucket).create_signed_upload_url(storage_key)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Failed to create signed upload url: {str(e)}")
 
     data = None
     error = None

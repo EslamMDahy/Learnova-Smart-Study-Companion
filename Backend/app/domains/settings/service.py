@@ -4,7 +4,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 import secrets
-import os
 
 from datetime import datetime, timezone, timedelta
 from storage3.types import CreateSignedUploadUrlOptions
@@ -114,6 +113,7 @@ def update_profile(*, payload: UpdateProfileRequest, db: Session, current_user):
     }
 
 
+
 def create_avatar_upload_url(*, payload, db: Session, current_user):
     """
     payload متوقع منه (في schemas عندك):
@@ -216,6 +216,7 @@ def create_avatar_upload_url(*, payload, db: Session, current_user):
     }
 
 
+
 def confirm_avatar_upload(*, payload, db: Session, current_user):
     """
     Endpoint الفرونت يناديه بعد الرفع.
@@ -291,6 +292,7 @@ def confirm_avatar_upload(*, payload, db: Session, current_user):
         "avatar_url": avatar_url,
         "updated_at": updated_at,
     }
+
 
 
 def change_password(*, payload, db: Session, current_user):
@@ -532,6 +534,7 @@ def change_password(*, payload, db: Session, current_user):
     }
 
 
+
 def request_delete_account(*, payload, db: Session, current_user):
     user_id = current_user.get("id")
     if not user_id:
@@ -733,6 +736,7 @@ def request_delete_account(*, payload, db: Session, current_user):
         "message": "Deletion OTP sent to your email.",
         "email_sent": sent,
     }
+
 
 
 def confirm_delete_account(*, payload, db: Session, current_user):
