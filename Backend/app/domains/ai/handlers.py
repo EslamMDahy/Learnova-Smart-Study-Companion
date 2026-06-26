@@ -528,6 +528,14 @@ def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest
     print(f"[rag_chat] payload keys: {list(payload.keys())}")
     print(f"[rag_chat] body keys: {list(body.keys())}")
 
+    message_id = _extract_required_positive_int(
+        body,
+        "message_id",
+        "Missing or invalid message_id in callback body",
+    )
+
+    print(f"[rag_chat] message_id: {message_id}")
+
     # =========================
     # 1) Validate callback status
     # =========================
@@ -540,11 +548,12 @@ def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest
     print(f"[rag_chat] callback_status: {callback_status}")
 
     if callback_status != "completed":
+        publish_sync(channel=f"chat_{message_id}", payload="failed")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="rag_chat callback status must be 'completed'",
+            detail=f"rag_chat callback status {callback_status}, status must be 'completed'",
         )
-
+    
     # =========================
     # 2) Validate course_id matches request log
     # =========================
@@ -583,11 +592,6 @@ def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest
         "Missing or invalid session_id in callback body",
     )
 
-    message_id = _extract_required_positive_int(
-        body,
-        "message_id",
-        "Missing or invalid message_id in callback body",
-    )
 
     print(f"[rag_chat] course_id: {course_id}, session_id: {session_id}, message_id: {message_id}")
 
