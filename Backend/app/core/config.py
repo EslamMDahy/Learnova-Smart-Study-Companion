@@ -10,7 +10,7 @@ class Settings:
 
         # App URLs
         self.api_base_url: str = os.getenv("API_BASE_URL", "http://127.0.0.1:8000")
-        self.frontend_base_url: str = os.getenv("FRONTEND_BASE_URL", "http://localhost:5173")
+        self.frontend_base_url: str = os.getenv("FRONTEND_BASE_URL", "https://learnova-edu.com")
 
         # JWT
         self.jwt_secret: str = os.getenv("JWT_SECRET", "")

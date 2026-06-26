@@ -1,7 +1,10 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import time
+import traceback
 from dataclasses import dataclass
 from io import BytesIO
 from pathlib import Path
@@ -137,6 +140,74 @@ def ocr_health() -> dict[str, Any]:
             "languages": [],
             "detail": str(exc),
         }
+
+
+def _ocr_perf_enabled() -> bool:
+    value = getattr(settings, "ocr_debug_timing", True)
+    return str(value).strip().lower() not in {"0", "false", "no", "off"}
+
+
+def _mark_ocr_step(label: str, start: float, **details: Any) -> float:
+    now = time.perf_counter()
+    if _ocr_perf_enabled():
+        suffix = ""
+        if details:
+            rendered = ", ".join(f"{key}={value}" for key, value in details.items() if value is not None)
+            suffix = f" ({rendered})" if rendered else ""
+        print(f"[OCR_TIMING] {label}: {now - start:.2f}s{suffix}", flush=True)
+    return now
+
+
+def _env_bool(name: str, default: bool = False) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return str(value).strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _ocr_submit_verbose_enabled() -> bool:
+    # Keep this on by default while debugging the OCR submit/grading bridge.
+    return _env_bool("OCR_SUBMIT_VERBOSE_LOGS", True)
+
+
+def _jsonable(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, dict):
+        return {str(key): _jsonable(val) for key, val in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [_jsonable(item) for item in value]
+    if hasattr(value, "items"):
+        try:
+            return {str(key): _jsonable(val) for key, val in value.items()}
+        except Exception:
+            pass
+    if hasattr(value, "_mapping"):
+        try:
+            return {str(key): _jsonable(val) for key, val in value._mapping.items()}
+        except Exception:
+            pass
+    return str(value)
+
+
+def _debug_dump(label: str, payload: Any, *, always: bool = False, max_chars: int | None = None) -> None:
+    if not always and not _ocr_submit_verbose_enabled():
+        return
+    try:
+        text_payload = json.dumps(_jsonable(payload), ensure_ascii=False, indent=2, default=str)
+    except Exception:
+        text_payload = repr(payload)
+    limit = max_chars
+    if limit is None:
+        try:
+            limit = int(os.getenv("OCR_SUBMIT_VERBOSE_MAX_CHARS", "30000"))
+        except Exception:
+            limit = 30000
+    if limit > 0 and len(text_payload) > limit:
+        text_payload = text_payload[:limit] + f"\n... <truncated {len(text_payload) - limit} chars>"
+    print(f"\n========== {label} ==========", flush=True)
+    print(text_payload, flush=True)
+    print(f"========== END {label} ==========\n", flush=True)
 
 
 def correct_exam_files(
@@ -279,7 +350,9 @@ def _load_pdf(raw: bytes) -> _LoadedDocument:
 
     cv2, np = _import_cv2_numpy()
     max_pages = int(getattr(settings, "ocr_max_pdf_pages", 8))
-    dpi = int(getattr(settings, "ocr_pdf_render_dpi", 300))
+    # 150 DPI is enough for text OCR preview and much faster for photographed
+    # PDF uploads. Increase OCR_PDF_RENDER_DPI only when scans are too blurry.
+    dpi = int(getattr(settings, "ocr_pdf_render_dpi", 150))
     warnings: list[str] = []
 
     try:
@@ -296,15 +369,21 @@ def _load_pdf(raw: bytes) -> _LoadedDocument:
     for page_index in range(min(document.page_count, max_pages)):
         page = document.load_page(page_index)
         pixmap = page.get_pixmap(matrix=matrix, alpha=False)
-        png_bytes = pixmap.tobytes("png")
-        arr = np.frombuffer(png_bytes, np.uint8)
-        image = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+
+        # Avoid encoding each rendered page to PNG and decoding it again with
+        # OpenCV. Direct sample conversion saves seconds on multi-page scans.
+        arr = np.frombuffer(pixmap.samples, dtype=np.uint8).reshape(pixmap.height, pixmap.width, pixmap.n)
+        if pixmap.n == 1:
+            image = cv2.cvtColor(arr, cv2.COLOR_GRAY2BGR)
+        elif pixmap.n >= 3:
+            image = cv2.cvtColor(arr[:, :, :3], cv2.COLOR_RGB2BGR)
+        else:
+            image = None
         if image is not None:
-            pages.append(image)
+            pages.append(image.copy())
 
     document.close()
     return _LoadedDocument(pages=pages, warnings=warnings)
-
 
 def _ocr_page(image: Any, lang: str) -> _PageOcr:
     pytesseract = _import_pytesseract()
@@ -314,7 +393,16 @@ def _ocr_page(image: Any, lang: str) -> _PageOcr:
     image = _normalise_orientation(image)
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     gray = _resize_for_ocr(gray)
-    gray = cv2.fastNlMeansDenoising(gray, None, 10, 7, 21)
+
+    # Fast mode is the default for exam uploads. The previous path ran OSD +
+    # three full Tesseract passes for each page/answer crop, which can take
+    # minutes for a photographed multi-page PDF. Set OCR_TESSERACT_MODE=accurate
+    # only when you need the old multi-candidate behavior.
+    mode = str(getattr(settings, "ocr_tesseract_mode", "fast") or "fast").strip().lower()
+    if mode in {"accurate", "full", "slow"}:
+        gray = cv2.fastNlMeansDenoising(gray, None, 10, 7, 21)
+    else:
+        gray = cv2.GaussianBlur(gray, (3, 3), 0)
 
     clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
     enhanced = clahe.apply(gray)
@@ -327,16 +415,35 @@ def _ocr_page(image: Any, lang: str) -> _PageOcr:
         11,
     )
 
-    candidates = [
-        (thresholded, "--oem 3 --psm 6"),
-        (enhanced, "--oem 3 --psm 6"),
-        (thresholded, "--oem 3 --psm 11"),
-    ]
+    if mode in {"accurate", "full", "slow"}:
+        candidates = [
+            (thresholded, "--oem 3 --psm 6"),
+            (enhanced, "--oem 3 --psm 6"),
+            (thresholded, "--oem 3 --psm 11"),
+        ]
+    else:
+        candidates = [(thresholded, "--oem 3 --psm 6")]
 
     best: _PageOcr | None = None
+    timeout_seconds = int(getattr(settings, "ocr_tesseract_timeout_seconds", 45))
     for candidate, config in candidates:
         try:
-            data = pytesseract.image_to_data(candidate, lang=lang, config=config, output_type=Output.DICT)
+            kwargs = {
+                "lang": lang,
+                "config": config,
+                "output_type": Output.DICT,
+            }
+            if timeout_seconds > 0:
+                kwargs["timeout"] = timeout_seconds
+            data = pytesseract.image_to_data(candidate, **kwargs)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=504, detail=f"OCR engine timed out: {exc}") from exc
+        except TypeError:
+            # Older pytesseract versions may not support timeout=.
+            try:
+                data = pytesseract.image_to_data(candidate, lang=lang, config=config, output_type=Output.DICT)
+            except Exception as exc:
+                raise HTTPException(status_code=503, detail=f"OCR engine failed: {exc}") from exc
         except Exception as exc:
             raise HTTPException(status_code=503, detail=f"OCR engine failed: {exc}") from exc
         current = _page_from_tesseract_data(data)
@@ -347,6 +454,10 @@ def _ocr_page(image: Any, lang: str) -> _PageOcr:
 
 
 def _normalise_orientation(image: Any) -> Any:
+    enabled = str(getattr(settings, "ocr_enable_orientation_detection", False)).strip().lower() in {"1", "true", "yes", "on"}
+    if not enabled:
+        return image
+
     pytesseract = _import_pytesseract()
     cv2, _ = _import_cv2_numpy()
     try:
@@ -374,8 +485,8 @@ def _resize_for_ocr(gray: Any) -> Any:
     longest = max(height, width)
     if longest < 1600:
         scale = 1600 / longest
-    elif longest > 3600:
-        scale = 3600 / longest
+    elif longest > 2600:
+        scale = 2600 / longest
     else:
         scale = 1.0
     if abs(scale - 1.0) < 0.01:
@@ -495,6 +606,15 @@ def _assert_engine_ready(lang: str) -> None:
 def _import_pytesseract():
     try:
         import pytesseract
+
+        configured_path = str(getattr(settings, "tesseract_cmd", "") or "").strip()
+        candidates = [configured_path] if configured_path else []
+        candidates.append(r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+        for candidate in candidates:
+            if candidate and Path(candidate).exists():
+                pytesseract.pytesseract.tesseract_cmd = candidate
+                break
+
         return pytesseract
     except Exception as exc:
         raise HTTPException(status_code=503, detail="OCR requires pytesseract and Tesseract to be installed") from exc
@@ -522,22 +642,27 @@ def analyze_exam_scan_files(
     current_user: dict,
     fallback_exam_id: int | None = None,
     fallback_course_id: int | None = None,
-    student_id_digits: int = 6,
 ) -> dict[str, Any]:
-    """Analyze printed Learnova answer sheets.
+    """Analyze a solved Learnova OCR exam PDF.
 
-    This is intentionally template-aware. Objective answers and the Student ID are
-    read with OMR; handwritten/free-text answers are cropped and OCR'd for the AI
-    grading service.
+    The endpoint returns question-level grading preview only. It reads QR
+    metadata, detects objective bubbles, OCRs written answer boxes for AI
+    grading, and never saves a student attempt from this analyze call.
     """
+    # This endpoint is intentionally question-correction only. Do not fall back
+    # to raw page OCR preview from environment flags; the instructor needs one
+    # row per exam question with the detected answer and correct answer.
+
     import uuid
     from sqlalchemy import text
 
     from .alignment import align_exam_page
-    from .omr import detect_bubbles, extract_objective_answers, read_student_id
+    from .omr import detect_bubbles, extract_objective_answers_from_pages
     from .qr import read_qr_from_image, verify_payload
-    from .written_ocr import extract_written_answers
+    from .written_ocr import extract_written_answers_from_pages
 
+    total_timer = time.perf_counter()
+    step_timer = total_timer
     ensure_instructor(current_user)
     if not uploaded_files:
         raise HTTPException(status_code=400, detail="At least one file is required")
@@ -548,12 +673,12 @@ def analyze_exam_scan_files(
 
     lang = normalise_lang(lang)
     _assert_engine_ready(lang)
+    step_timer = _mark_ocr_step("engine_ready", step_timer, lang=lang)
 
     scan_id = f"scan_{uuid.uuid4().hex[:16]}"
     warnings: list[str] = []
     page_payloads: list[dict[str, Any]] = []
     detected_metadata: dict[str, Any] = {}
-    detected_student: dict[str, Any] | None = None
     all_objective_answers: list[dict[str, Any]] = []
     all_written_answers: list[dict[str, Any]] = []
 
@@ -570,6 +695,7 @@ def analyze_exam_scan_files(
             raise HTTPException(status_code=413, detail=f"{filename}: file exceeds {mb} MB limit")
 
         document = _load_document(raw=raw, filename=filename, mime_type=mime_type)
+        step_timer = _mark_ocr_step("load_document", step_timer, filename=filename, pages=len(document.pages))
         for raw_page in document.pages:
             page_number += 1
             page_warnings = list(document.warnings)
@@ -586,6 +712,7 @@ def analyze_exam_scan_files(
                     page_warnings.append("QR code was detected but its signature is invalid.")
 
             bubbles = detect_bubbles(alignment.image)
+            step_timer = _mark_ocr_step("prepare_page", step_timer, page=page_number, bubbles=len(bubbles), qr=qr_detected)
             page_payloads.append({
                 "page_number": page_number,
                 "filename": filename,
@@ -611,110 +738,173 @@ def analyze_exam_scan_files(
 
     exam_payload = _load_exam_payload(db=db, exam_id=exam_id, course_id=course_id) if exam_id and course_id else {}
     questions = _load_exam_questions_for_scan(db=db, exam_id=exam_id, course_id=course_id) if exam_id and course_id else []
+    step_timer = _mark_ocr_step("metadata_and_questions", step_timer, exam_id=exam_id, course_id=course_id, questions=len(questions))
 
-    # Student ID appears on the first page only in the new print template.
-    if page_payloads:
-        student_result = read_student_id(
-            page_payloads[0]["image"],
-            page_payloads[0]["bubbles"],
-            digits=max(1, int(student_id_digits or 6)),
-        )
-        if student_result.warnings:
-            warnings.extend(student_result.warnings)
-        detected_student = {
-            "student_id": student_result.value,
-            "user_id": None,
-            "name": None,
-            "source": "id_bubbles",
-            "confidence": student_result.confidence,
-            "digits": student_result.digits,
-        }
-        if student_result.value:
-            student_row = _lookup_student(db=db, student_identifier=student_result.value, course_id=course_id)
-            if student_row:
-                detected_student.update({
-                    "user_id": student_row.get("id"),
-                    "student_id": student_row.get("student_id") or str(student_row.get("id")),
-                    "name": student_row.get("full_name"),
-                })
-            else:
-                warnings.append(f"Student ID {student_result.value} was read but no matching student was found.")
+    # Student ID is deliberately ignored in this flow. The instructor only needs
+    # a preview of the corrected scan; no student attempt is saved or linked.
+    detected_student = {
+        "student_id": None,
+        "user_id": None,
+        "name": None,
+        "source": "not_used",
+        "confidence": 0,
+        "digits": [],
+    }
+    step_timer = _mark_ocr_step("student_id_skipped", step_timer)
 
-    # Extract objective answers with OMR. Dedupe across pages by question id/order.
-    for page in page_payloads:
-        objective_results = extract_objective_answers(
-            image=page["image"],
-            bubbles=page["bubbles"],
-            questions=questions,
-            student_digits=max(1, int(student_id_digits or 6)),
-        )
-        for item in objective_results:
-            payload = {
-                "exam_question_id": item.exam_question_id,
-                "question_number": item.question_number,
-                "type": item.type,
-                "detected_answer": item.detected_answer,
-                "detected_answers": item.detected_answers,
-                "selected_option_index": item.selected_option_index,
-                "selected_option_indices": item.selected_option_indices,
-                "answer_text": None,
-                "confidence": item.confidence,
-                "status": item.status,
-                "regions": item.regions,
-                "answer_region": None,
-                "ai_grading_payload": None,
-                "ai_score": None,
-            }
-            _apply_objective_grade(payload, questions)
-            all_objective_answers.append(payload)
-
-    # OCR free-text boxes for AI grading. Dedupe by question id/order.
-    for page in page_payloads:
-        written_results = extract_written_answers(
-            image=page["image"],
-            questions=questions,
-            lang=lang,
-        )
-        for item in written_results:
-            all_written_answers.append({
-                "exam_question_id": item.exam_question_id,
-                "question_number": item.question_number,
-                "type": item.type,
-                "detected_answer": None,
-                "detected_answers": [],
-                "selected_option_index": None,
-                "selected_option_indices": None,
-                "answer_text": item.answer_text,
-                "confidence": item.confidence,
-                "status": item.status,
-                "is_correct": None,
-                "points_earned": None,
-                "max_score": _question_points(item.exam_question_id, questions),
-                "regions": [],
-                "answer_region": item.region,
-                "ai_grading_payload": item.ai_grading_payload,
-                "ai_score": None,
-            })
-
-    answers = _dedupe_answers(all_objective_answers + all_written_answers)
-
-    # Best-effort AI grading for written answers during analysis. If the AI
-    # service only accepts async jobs or is unavailable, answers remain
-    # reviewable and submit can still send the saved attempt to the async AI
-    # grading flow.
-    from .ai_grading import grade_written_answers_with_ai
-
-    answers, ai_warnings = grade_written_answers_with_ai(
-        db=db,
-        course_id=course_id,
-        exam_id=exam_id,
-        scan_id=scan_id,
-        answers=answers,
+    # Extract objective answers with OMR once across all pages. This prevents
+    # page-3 bubbles being mapped again to Q1/Q2.
+    objective_results = extract_objective_answers_from_pages(
+        pages=page_payloads,
         questions=questions,
     )
-    warnings.extend(ai_warnings)
+    for item in objective_results:
+        payload = {
+            "exam_question_id": item.exam_question_id,
+            "question_number": item.question_number,
+            "type": item.type,
+            "detected_answer": item.detected_answer,
+            "detected_answers": item.detected_answers,
+            "selected_option_index": item.selected_option_index,
+            "selected_option_indices": item.selected_option_indices,
+            "answer_text": None,
+            "confidence": item.confidence,
+            "status": item.status,
+            "regions": item.regions,
+            "answer_region": None,
+            "ai_grading_payload": None,
+            "ai_score": None,
+        }
+        _apply_objective_grade(payload, questions)
+        all_objective_answers.append(payload)
+    step_timer = _mark_ocr_step("objective_omr", step_timer, answers=len(all_objective_answers))
+
+    # OCR free-text boxes once across all pages in reading/question order.
+    written_results = extract_written_answers_from_pages(
+        pages=page_payloads,
+        questions=questions,
+        lang=lang,
+    )
+    for item in written_results:
+        all_written_answers.append({
+            "exam_question_id": item.exam_question_id,
+            "question_number": item.question_number,
+            "type": item.type,
+            "detected_answer": None,
+            "detected_answers": [],
+            "selected_option_index": None,
+            "selected_option_indices": None,
+            "answer_text": item.answer_text,
+            "confidence": item.confidence,
+            "status": item.status,
+            "is_correct": None,
+            "points_earned": None,
+            "max_score": _question_points(item.exam_question_id, questions),
+            "regions": [],
+            "answer_region": item.region,
+            "ai_grading_payload": item.ai_grading_payload,
+            "ai_score": None,
+        })
+    step_timer = _mark_ocr_step("written_ocr", step_timer, answers=len(all_written_answers))
+
+    answers = _dedupe_answers(all_objective_answers + all_written_answers)
+    answers = _ensure_answers_for_all_questions(answers=answers, questions=questions)
+    _attach_question_context(answers=answers, questions=questions)
+
+    _debug_dump("OCR_SCAN_METADATA", {
+        "scan_id": scan_id,
+        "exam_id": exam_id,
+        "course_id": course_id,
+        "template_version": template_version,
+        "detected_metadata": detected_metadata,
+        "pages": [
+            {
+                "page_number": page.get("page_number"),
+                "filename": page.get("filename"),
+                "qr_detected": page.get("qr_detected"),
+                "bubble_count": len(page.get("bubbles") or []),
+                "alignment_status": page.get("alignment_status"),
+                "alignment_confidence": page.get("alignment_confidence"),
+                "warnings": page.get("warnings"),
+            }
+            for page in page_payloads
+        ],
+    })
+    _debug_dump("OCR_SCAN_QUESTIONS_LOADED", [
+        {
+            "exam_question_id": q.get("exam_question_id"),
+            "question_id": q.get("question_id"),
+            "question_number": q.get("question_number"),
+            "order_index": q.get("order_index"),
+            "type": q.get("type"),
+            "points": q.get("points"),
+            "max_score": q.get("max_score"),
+            "has_expected_answer": bool(q.get("expected_answer")),
+            "has_grading_rubric": bool(q.get("grading_rubric")),
+            "question_text_preview": str(q.get("question_text") or "")[:250],
+        }
+        for q in questions
+    ])
+    _debug_dump("OCR_SCAN_EXTRACTED_ANSWERS", [
+        {
+            "exam_question_id": a.get("exam_question_id"),
+            "question_number": a.get("question_number"),
+            "type": a.get("type"),
+            "status": a.get("status"),
+            "selected_option_index": a.get("selected_option_index"),
+            "selected_option_indices": a.get("selected_option_indices"),
+            "detected_answer": a.get("detected_answer"),
+            "answer_text": a.get("answer_text"),
+            "confidence": a.get("confidence"),
+            "is_correct": a.get("is_correct"),
+            "points_earned": a.get("points_earned"),
+            "max_score": a.get("max_score"),
+        }
+        for a in answers
+    ])
+
+    # OCR extraction stops here. From this point we use the exact same grading
+    # contract as the normal student submit flow: objective answers are already
+    # locally graded, and essay/short-answer rows are saved to a scan attempt so
+    # the existing async AI callback can grade them by attempt_id.
+    auto_submit_scan = str(
+        getattr(settings, "ocr_auto_submit_scan", os.getenv("OCR_AUTO_SUBMIT_SCAN", "true"))
+    ).strip().lower() in {"1", "true", "yes", "on"}
+
+    submit_meta: dict[str, Any] = {
+        "attempt_id": None,
+        "attempt_status": None,
+        "ai_grading_requested": False,
+        "ai_request_id": None,
+    }
+    if auto_submit_scan and exam_id and course_id and questions:
+        submit_meta = _create_scan_attempt_like_student_submit(
+            db=db,
+            scan_id=scan_id,
+            exam_id=int(exam_id),
+            course_id=int(course_id),
+            answers=answers,
+            questions=questions,
+            exam_payload=exam_payload,
+            current_user=current_user,
+        )
+        step_timer = _mark_ocr_step(
+            "normal_submit_grading_started",
+            step_timer,
+            attempt_id=submit_meta.get("attempt_id"),
+            ai=submit_meta.get("ai_grading_requested"),
+        )
+    else:
+        for answer in answers:
+            if str(answer.get("type") or "").strip().lower() in {"short_answer", "essay"}:
+                answer["status"] = "detected" if str(answer.get("answer_text") or "").strip() else "needs_review"
+                answer["ai_status"] = "not_submitted"
+                answer["ai_feedback"] = None
+        step_timer = _mark_ocr_step("normal_submit_grading_skipped", step_timer)
 
     grade_preview = _build_scan_grade_preview(answers=answers, questions=questions, exam_payload=exam_payload)
+    total_elapsed = round(time.perf_counter() - total_timer, 2)
+    step_timer = _mark_ocr_step("build_response", step_timer, total_seconds=total_elapsed)
 
     page_responses = [
         {
@@ -729,13 +919,7 @@ def analyze_exam_scan_files(
         for page in page_payloads
     ]
 
-    scan_status = "ready" if (
-        answers
-        and grade_preview["needs_review"] == 0
-        and grade_preview.get("ai_pending", 0) == 0
-        and detected_student
-        and detected_student.get("user_id")
-    ) else "needs_review"
+    scan_status = "graded" if answers and grade_preview.get("needs_review", 0) == 0 and grade_preview.get("ai_pending", 0) == 0 else "needs_review"
     return {
         "scan_id": scan_id,
         "status": scan_status,
@@ -747,13 +931,157 @@ def analyze_exam_scan_files(
             "exam_type": exam_payload.get("exam_type"),
             "template_version": template_version,
         },
-        "student": detected_student or {"student_id": None, "user_id": None, "name": None, "source": "id_bubbles", "confidence": 0, "digits": []},
+        "student": detected_student,
         "pages": page_responses,
         "answers": answers,
         "grade_preview": grade_preview,
+        "processing_time_seconds": total_elapsed,
+        "attempt_id": submit_meta.get("attempt_id"),
+        "attempt_status": submit_meta.get("attempt_status"),
+        "ai_grading_requested": bool(submit_meta.get("ai_grading_requested")),
+        "ai_request_id": submit_meta.get("ai_request_id"),
         "warnings": warnings,
     }
 
+
+
+def _analyze_exam_scan_files_ocr_only(
+    *,
+    uploaded_files: list[UploadFile],
+    file_payloads: list[bytes],
+    lang: str,
+    db: Any,
+    current_user: dict,
+    fallback_exam_id: int | None = None,
+    fallback_course_id: int | None = None,
+) -> dict[str, Any]:
+    """Fast PDF OCR preview used by the Flutter OCR upload page.
+
+    It deliberately skips page alignment, Student ID OMR, answer-bubble OMR and
+    synchronous AI grading. Those steps are useful for a full answer-sheet
+    submission flow, but they are the reason a 3-page photographed PDF can take
+    several minutes. This endpoint now returns page-level OCR text as read-only
+    preview answers and never saves an attempt.
+    """
+    import uuid
+
+    from .qr import read_qr_from_image, verify_payload
+
+    total_timer = time.perf_counter()
+    step_timer = total_timer
+    ensure_instructor(current_user)
+    if not uploaded_files:
+        raise HTTPException(status_code=400, detail="At least one file is required")
+
+    max_files = int(getattr(settings, "ocr_max_files", 12))
+    if len(uploaded_files) > max_files:
+        raise HTTPException(status_code=400, detail=f"A maximum of {max_files} files is allowed per request")
+
+    lang = normalise_lang(lang)
+    _assert_engine_ready(lang)
+    step_timer = _mark_ocr_step("engine_ready", step_timer, lang=lang, mode="ocr_only")
+
+    scan_id = f"scan_{uuid.uuid4().hex[:16]}"
+    warnings: list[str] = ["OCR-only mode: Student ID, answer bubbles, saving attempts, and AI grading are skipped."]
+    detected_metadata: dict[str, Any] = {}
+    pages: list[dict[str, Any]] = []
+    answers: list[dict[str, Any]] = []
+
+    page_number = 0
+    for upload, raw in zip(uploaded_files, file_payloads, strict=True):
+        filename = (upload.filename or "scan").strip() or "scan"
+        mime_type = (upload.content_type or "").strip().lower()
+        max_file_bytes = int(getattr(settings, "ocr_max_file_bytes", 15 * 1024 * 1024))
+        if not raw:
+            raise HTTPException(status_code=400, detail=f"{filename}: empty file")
+        if len(raw) > max_file_bytes:
+            mb = max_file_bytes // (1024 * 1024)
+            raise HTTPException(status_code=413, detail=f"{filename}: file exceeds {mb} MB limit")
+
+        document = _load_document(raw=raw, filename=filename, mime_type=mime_type)
+        step_timer = _mark_ocr_step("load_document", step_timer, filename=filename, pages=len(document.pages))
+        if not document.pages:
+            raise HTTPException(status_code=400, detail=f"{filename}: no readable pages found")
+
+        for raw_page in document.pages:
+            page_number += 1
+            page_warnings = list(document.warnings)
+            qr_payload = read_qr_from_image(raw_page)
+            qr_detected = bool(qr_payload)
+            if qr_payload:
+                if verify_payload(qr_payload):
+                    detected_metadata.update(qr_payload)
+                else:
+                    page_warnings.append("QR code was detected but its signature is invalid.")
+
+            ocr_result = _ocr_page(raw_page, lang)
+            extracted_text = ocr_result.text.strip()
+            status = "detected" if extracted_text and ocr_result.confidence >= 35 else "needs_review"
+            if not extracted_text:
+                page_warnings.append("No OCR text was extracted from this page.")
+
+            pages.append({
+                "page_number": page_number,
+                "filename": filename,
+                "alignment_status": "skipped",
+                "alignment_confidence": 100.0,
+                "qr_detected": qr_detected,
+                "bubble_count": 0,
+                "ocr_text": extracted_text,
+                "ocr_confidence": round(float(ocr_result.confidence), 2),
+                "word_count": int(ocr_result.word_count),
+                "warnings": page_warnings,
+            })
+
+            # OCR-only mode returns page text in pages[].ocr_text.
+            # Do not invent answers here; answer extraction/grading belongs to the full OMR flow.
+            step_timer = _mark_ocr_step("page_ocr", step_timer, page=page_number, words=ocr_result.word_count, confidence=round(float(ocr_result.confidence), 2), qr=qr_detected)
+
+    exam_id = _safe_int(detected_metadata.get("exam_id")) or fallback_exam_id
+    course_id = _safe_int(detected_metadata.get("course_id")) or fallback_course_id
+    template_version = str(detected_metadata.get("template_version") or "ocr_only")
+
+    if exam_id and not course_id:
+        course_id = _lookup_course_id_for_exam(db=db, exam_id=exam_id)
+    if course_id:
+        _assert_instructor_owns_course(db=db, course_id=course_id, current_user=current_user)
+    exam_payload = _load_exam_payload(db=db, exam_id=exam_id, course_id=course_id) if exam_id and course_id else {}
+
+    pages_with_text = sum(1 for item in pages if str(item.get("ocr_text") or "").strip())
+    needs_review = sum(1 for item in pages if str(item.get("ocr_text") or "").strip() == "")
+    grade_preview = {
+        "score_so_far": 0.0,
+        "total_score": 0.0,
+        "auto_gradable_questions": 0,
+        "detected_questions": pages_with_text,
+        "written_questions": 0,
+        "needs_review": needs_review,
+        "ai_ready": 0,
+        "ai_graded": 0,
+        "ai_pending": 0,
+    }
+
+    total_elapsed = round(time.perf_counter() - total_timer, 2)
+    _mark_ocr_step("build_response", step_timer, total_seconds=total_elapsed)
+
+    return {
+        "scan_id": scan_id,
+        "status": "needs_review" if needs_review else "ready",
+        "language": lang,
+        "exam": {
+            "exam_id": exam_id,
+            "course_id": course_id,
+            "title": exam_payload.get("title") or (f"Exam {exam_id}" if exam_id else "OCR preview"),
+            "exam_type": exam_payload.get("exam_type") or "ocr_only",
+            "template_version": template_version,
+        },
+        "student": {"student_id": None, "user_id": None, "name": None, "source": "not_required", "confidence": 0, "digits": []},
+        "pages": pages,
+        "answers": answers,
+        "grade_preview": grade_preview,
+        "processing_time_seconds": total_elapsed,
+        "warnings": warnings,
+    }
 
 def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, Any]:
     from sqlalchemy import text
@@ -765,7 +1093,7 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
 
     exam_row = db.execute(
         text("""
-            SELECT e.id, e.course_id, e.passing_score, e.total_score, e.created_by
+            SELECT e.id, e.course_id, e.passing_score, e.total_score, c.created_by
             FROM exams e
             JOIN courses c ON c.id = e.course_id
             WHERE e.id = :exam_id
@@ -778,6 +1106,17 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
     if int(exam_row["created_by"]) != int(instructor_id):
         raise HTTPException(status_code=403, detail="You can only submit scans for your own exams")
 
+    # Student ID bubbles are not used in the OCR flow. If the caller does not
+    # pass a real student_id, create/use a hidden dummy student for this course.
+    # This keeps OCR correction on the exact same DB contract as normal student
+    # submit without relying on the instructor user as student_id.
+    explicit_student_id = _safe_int(getattr(payload, "student_id", None))
+    scan_owner_user_id = explicit_student_id or _get_or_create_ocr_dummy_student(
+        db=db,
+        course_id=int(exam_row["course_id"]),
+        instructor_id=int(instructor_id),
+    )
+
     answers_need_ai = [answer for answer in payload.answers if _answer_needs_ai_grading(answer)]
     has_ai_grading = bool(answers_need_ai)
     attempt_status = "submitted" if has_ai_grading else "graded"
@@ -789,7 +1128,7 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
                 FROM student_exam_attempts
                 WHERE student_id = :student_id AND exam_id = :exam_id
             """),
-            {"student_id": payload.student_id, "exam_id": payload.exam_id},
+            {"student_id": scan_owner_user_id, "exam_id": payload.exam_id},
         ).mappings().first()
         attempt_number = int(next_attempt["attempt_number"] if next_attempt else 1)
 
@@ -816,19 +1155,20 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
                     correct_count, incorrect_count, unanswered_count,
                     teacher_feedback, teacher_reviewed_at, session_data
                 ) VALUES (
-                    :student_id, :exam_id, :attempt_number, :status,
-                    NOW(), NOW(), CASE WHEN :status = 'graded' THEN NOW() ELSE NULL END,
+                    :student_id, :exam_id, :attempt_number, CAST(:status AS exam_attempt_status_enum),
+                    NOW(), NOW(), CASE WHEN :is_graded THEN NOW() ELSE NULL END,
                     :total_score, :percentage_score, :is_passed,
                     :correct_count, :incorrect_count, :unanswered_count,
-                    :teacher_feedback, CASE WHEN :status = 'graded' THEN NOW() ELSE NULL END,
+                    :teacher_feedback, CASE WHEN :is_graded THEN NOW() ELSE NULL END,
                     CAST(:session_data AS JSONB)
                 ) RETURNING id
             """),
             {
-                "student_id": payload.student_id,
+                "student_id": scan_owner_user_id,
                 "exam_id": payload.exam_id,
                 "attempt_number": attempt_number,
                 "status": attempt_status,
+                "is_graded": attempt_status == "graded",
                 "total_score": total_score,
                 "percentage_score": percentage_score,
                 "is_passed": is_passed,
@@ -837,8 +1177,11 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
                 "unanswered_count": unanswered_count,
                 "teacher_feedback": payload.teacher_feedback,
                 "session_data": json.dumps({
-                    "source": "learnova_exam_scan",
+                    "source": "learnova_ocr_scan",
                     "scan_id": payload.scan_id,
+                    "uploaded_by_instructor_id": instructor_id,
+                    "student_id_from_paper_used": False,
+                    "ocr_dummy_student_id": scan_owner_user_id,
                     "ai_grading_required": has_ai_grading,
                 }),
             },
@@ -873,7 +1216,18 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
                     "teacher_reviewed": bool(answer.teacher_feedback or answer.is_correct is not None),
                 },
             )
+            saved_answer_debug.append({
+                "exam_question_id": int(answer["exam_question_id"]),
+                "resolved_type": _answer_question_type(answer),
+                "selected_option_index": answer.get("selected_option_index"),
+                "selected_option_indices": selected_many,
+                "answer_text": answer.get("answer_text") or answer.get("detected_answer"),
+                "is_correct": answer.get("is_correct"),
+                "points_earned": answer.get("points_earned"),
+                "auto_graded": False if _answer_question_type(answer) in {"essay", "short_answer"} else bool(answer.get("auto_graded", answer.get("is_correct") is not None)),
+            })
 
+        _debug_dump("OCR_SUBMIT_STUDENT_ANSWERS_SAVED", saved_answer_debug)
         db.commit()
 
         ai_request_id: str | None = None
@@ -898,7 +1252,7 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
         return {
             "attempt_id": attempt_id,
             "exam_id": int(payload.exam_id),
-            "student_id": int(payload.student_id),
+            "student_id": scan_owner_user_id,
             "answer_count": len(payload.answers),
             "status": response_status,
             "ai_grading_requested": ai_request_id is not None,
@@ -912,6 +1266,553 @@ def submit_exam_scan(*, payload: Any, db: Any, current_user: dict) -> dict[str, 
         db.rollback()
         raise HTTPException(status_code=500, detail="Failed to submit scan correction") from exc
 
+
+
+def _get_or_create_ocr_dummy_student(*, db: Any, course_id: int, instructor_id: int) -> int:
+    """Return a hidden student user used only for instructor OCR scan attempts.
+
+    The normal grading/callback flow is built around student_exam_attempts, where
+    student_id is a NOT NULL FK to users.id. Instructor OCR scans do not use the
+    printed Student ID, so we create one deterministic dummy student per course
+    and enroll it in that course. This allows OCR scans to be saved and graded by
+    the same code path as normal student submissions without mixing them with a
+    real student account.
+    """
+    from sqlalchemy import text
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id for OCR scan student")
+
+    # Deterministic and unique enough for one DB. Keep it stable so repeated
+    # scans for the same course reuse the same hidden student.
+    email = f"ocr.scan.course.{course_id}@learnova.local"
+    student_code = f"OCR-SCAN-C{int(course_id):06d}"
+    full_name = f"OCR Scan Student C{int(course_id)}"
+
+    row = db.execute(
+        text("""
+            SELECT id
+            FROM users
+            WHERE email = :email
+               OR student_id = :student_code
+            ORDER BY id ASC
+            LIMIT 1
+        """),
+        {"email": email, "student_code": student_code},
+    ).mappings().first()
+
+    if row:
+        student_user_id = int(row["id"])
+        # Make sure an old row is still usable as the OCR scan student.
+        db.execute(
+            text("""
+                UPDATE users
+                SET system_role = CAST('student' AS system_role_enum),
+                    account_status = CAST('active' AS account_status_enum),
+                    is_email_verified = TRUE,
+                    student_id = COALESCE(student_id, :student_code),
+                    updated_at = NOW()
+                WHERE id = :user_id
+            """),
+            {"user_id": student_user_id, "student_code": student_code},
+        )
+    else:
+        inserted = db.execute(
+            text("""
+                INSERT INTO users (
+                    full_name, email, hashed_password, student_id,
+                    system_role, language_preference, account_status,
+                    is_email_verified, email_verified_at, created_at, updated_at
+                ) VALUES (
+                    :full_name, :email, NULL, :student_code,
+                    CAST('student' AS system_role_enum), 'en', CAST('active' AS account_status_enum),
+                    TRUE, NOW(), NOW(), NOW()
+                )
+                RETURNING id
+            """),
+            {
+                "full_name": full_name,
+                "email": email,
+                "student_code": student_code,
+            },
+        ).mappings().first()
+        if not inserted:
+            raise HTTPException(status_code=500, detail="Failed to create OCR dummy student")
+        student_user_id = int(inserted["id"])
+
+    # Enroll the dummy student so any course/exam joins that expect enrollment
+    # continue to behave like the normal student flow.
+    db.execute(
+        text("""
+            INSERT INTO course_enrollments (
+                student_id, course_id, status, enrollment_type, enrolled_at
+            ) VALUES (
+                :student_id, :course_id,
+                CAST('active' AS course_enrollment_status_enum),
+                CAST('invited' AS course_enrollment_type_enum),
+                NOW()
+            )
+            ON CONFLICT (student_id, course_id)
+            DO UPDATE SET
+                status = CAST('active' AS course_enrollment_status_enum),
+                enrollment_type = CAST('invited' AS course_enrollment_type_enum)
+        """),
+        {"student_id": student_user_id, "course_id": int(course_id)},
+    )
+
+    print(
+        f"[OCR_SUBMIT] using dummy student user_id={student_user_id} "
+        f"student_code={student_code} course_id={course_id} instructor_id={instructor_id}",
+        flush=True,
+    )
+    return student_user_id
+
+
+def _create_scan_attempt_like_student_submit(
+    *,
+    db: Any,
+    scan_id: str,
+    exam_id: int,
+    course_id: int,
+    answers: list[dict[str, Any]],
+    questions: list[dict[str, Any]],
+    exam_payload: dict[str, Any],
+    current_user: dict,
+) -> dict[str, Any]:
+    """Persist OCR answers in the same tables used by normal student submit.
+
+    The existing AI callback stores grading results by attempt_id, so OCR grading
+    must create an attempt before sending essay/short-answer answers to AI. We do
+    not read or require the printed Student ID; instead we create/reuse a hidden
+    dummy student for the scanned course and save the attempt against that user.
+    The attempt is clearly marked in session_data as source=learnova_ocr_scan.
+    """
+    from sqlalchemy import text
+
+    instructor_id = _safe_int(current_user.get("id"))
+    if instructor_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    exam_row = db.execute(
+        text("""
+            SELECT e.id, e.course_id, e.passing_score, e.total_score, c.created_by
+            FROM exams e
+            JOIN courses c ON c.id = e.course_id
+            WHERE e.id = :exam_id AND e.course_id = :course_id
+            LIMIT 1
+        """),
+        {"exam_id": exam_id, "course_id": course_id},
+    ).mappings().first()
+    if not exam_row:
+        raise HTTPException(status_code=404, detail="Exam not found")
+    if int(exam_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only scan exams for your own courses")
+
+    owner_user_id = _get_or_create_ocr_dummy_student(
+        db=db,
+        course_id=course_id,
+        instructor_id=instructor_id,
+    )
+
+    _debug_dump("OCR_SUBMIT_CONTEXT", {
+        "scan_id": scan_id,
+        "course_id": course_id,
+        "exam_id": exam_id,
+        "instructor_id": instructor_id,
+        "dummy_student_user_id": owner_user_id,
+        "exam_row": dict(exam_row),
+        "env": {
+            "OCR_AUTO_SUBMIT_SCAN": os.getenv("OCR_AUTO_SUBMIT_SCAN"),
+            "OCR_ANALYZE_AI_GRADING": os.getenv("OCR_ANALYZE_AI_GRADING"),
+            "OCR_SUBMIT_VERBOSE_LOGS": os.getenv("OCR_SUBMIT_VERBOSE_LOGS"),
+            "OCR_HANDWRITING_ENGINE": os.getenv("OCR_HANDWRITING_ENGINE"),
+            "OCR_TROCR_MODEL": os.getenv("OCR_TROCR_MODEL"),
+        },
+    })
+
+    answer_rows = [answer for answer in answers if _safe_int(answer.get("exam_question_id")) is not None]
+
+    question_type_by_exam_question_id = {
+        _safe_int(question.get("exam_question_id")): str(question.get("type") or "").strip().lower()
+        for question in questions
+        if _safe_int(question.get("exam_question_id")) is not None
+    }
+
+    def _answer_question_type(answer: dict[str, Any]) -> str:
+        explicit_type = str(answer.get("type") or "").strip().lower()
+        if explicit_type:
+            return explicit_type
+        exam_question_id = _safe_int(answer.get("exam_question_id"))
+        return question_type_by_exam_question_id.get(exam_question_id, "")
+
+    def _scan_answer_needs_ai(answer: dict[str, Any]) -> bool:
+        qtype = _answer_question_type(answer)
+        if qtype in {"essay", "short_answer"}:
+            return bool(str(answer.get("answer_text") or "").strip())
+        return False
+
+    written_with_text = [answer for answer in answer_rows if _scan_answer_needs_ai(answer)]
+    has_ai_grading = bool(written_with_text)
+    attempt_status = "submitted" if has_ai_grading else "graded"
+
+    print(
+        f"[OCR_SUBMIT] answers={len(answer_rows)} written_with_text={len(written_with_text)} "
+        f"has_ai_grading={has_ai_grading} qtypes={[ _answer_question_type(a) for a in answer_rows ]}",
+        flush=True,
+    )
+    _debug_dump("OCR_SUBMIT_ANSWER_ROWS_BEFORE_SAVE", [
+        {
+            "exam_question_id": a.get("exam_question_id"),
+            "question_number": a.get("question_number"),
+            "type_from_answer": a.get("type"),
+            "resolved_type": _answer_question_type(a),
+            "answer_text": a.get("answer_text"),
+            "selected_option_index": a.get("selected_option_index"),
+            "selected_option_indices": a.get("selected_option_indices"),
+            "detected_answer": a.get("detected_answer"),
+            "is_correct": a.get("is_correct"),
+            "points_earned": a.get("points_earned"),
+            "auto_graded": a.get("auto_graded"),
+            "status": a.get("status"),
+        }
+        for a in answer_rows
+    ])
+
+    total_score = 0.0
+    correct_count = 0
+    incorrect_count = 0
+    unanswered_count = 0
+    for answer in answer_rows:
+        qtype = _answer_question_type(answer)
+        answer["type"] = qtype or answer.get("type")
+        if qtype in {"essay", "short_answer"}:
+            if not str(answer.get("answer_text") or "").strip():
+                unanswered_count += 1
+            # normal submit does not count written questions until AI callback
+            answer["is_correct"] = None
+            answer["points_earned"] = None
+            answer["auto_graded"] = False
+            answer["status"] = "ai_pending" if str(answer.get("answer_text") or "").strip() else "needs_review"
+            answer["ai_status"] = "pending" if str(answer.get("answer_text") or "").strip() else "needs_review"
+            continue
+
+        if answer.get("is_correct") is True:
+            correct_count += 1
+            total_score += float(answer.get("points_earned") or 0)
+        elif answer.get("is_correct") is False:
+            incorrect_count += 1
+        else:
+            unanswered_count += 1
+
+    exam_total_score = float(exam_row["total_score"] or exam_payload.get("total_score") or 0)
+    percentage_score = round((total_score / exam_total_score) * 100, 2) if exam_total_score else None
+    is_passed = None
+    if not has_ai_grading and percentage_score is not None and exam_row.get("passing_score") is not None:
+        is_passed = percentage_score >= float(exam_row["passing_score"])
+
+    _debug_dump("OCR_SUBMIT_SCORE_PREVIEW", {
+        "has_ai_grading": has_ai_grading,
+        "attempt_status": attempt_status,
+        "total_score_before_ai": total_score,
+        "exam_total_score": exam_total_score,
+        "percentage_score_before_ai": percentage_score,
+        "is_passed_before_ai": is_passed,
+        "correct_count_before_ai": correct_count,
+        "incorrect_count_before_ai": incorrect_count,
+        "unanswered_count_before_ai": unanswered_count,
+    })
+
+    try:
+        next_attempt = db.execute(
+            text("""
+                SELECT COALESCE(MAX(attempt_number), 0) + 1 AS attempt_number
+                FROM student_exam_attempts
+                WHERE student_id = :student_id AND exam_id = :exam_id
+            """),
+            {"student_id": owner_user_id, "exam_id": exam_id},
+        ).mappings().first()
+        attempt_number = int(next_attempt["attempt_number"] if next_attempt else 1)
+
+        attempt = db.execute(
+            text("""
+                INSERT INTO student_exam_attempts (
+                    student_id, exam_id, attempt_number, status,
+                    started_at, submitted_at, graded_at, time_spent_seconds,
+                    total_score, percentage_score, is_passed,
+                    correct_count, incorrect_count, unanswered_count,
+                    session_data
+                ) VALUES (
+                    :student_id, :exam_id, :attempt_number, CAST(:status AS exam_attempt_status_enum),
+                    NOW(), NOW(), CASE WHEN :is_graded THEN NOW() ELSE NULL END, 0,
+                    :total_score, :percentage_score, :is_passed,
+                    :correct_count, :incorrect_count, :unanswered_count,
+                    CAST(:session_data AS JSONB)
+                ) RETURNING id
+            """),
+            {
+                "student_id": owner_user_id,
+                "exam_id": exam_id,
+                "attempt_number": attempt_number,
+                "status": attempt_status,
+                "is_graded": attempt_status == "graded",
+                "total_score": total_score,
+                "percentage_score": percentage_score,
+                "is_passed": is_passed,
+                "correct_count": correct_count,
+                "incorrect_count": incorrect_count,
+                "unanswered_count": unanswered_count,
+                "session_data": json.dumps({
+                    "source": "learnova_ocr_scan",
+                    "scan_id": scan_id,
+                    "uploaded_by_instructor_id": instructor_id,
+                    "student_id_from_paper_used": False,
+                    "ocr_dummy_student_id": owner_user_id,
+                    "ai_grading_required": has_ai_grading,
+                }),
+            },
+        ).mappings().first()
+        attempt_id = int(attempt["id"])
+        print(f"[OCR_SUBMIT] attempt_created attempt_id={attempt_id} attempt_number={attempt_number} status={attempt_status}", flush=True)
+        _debug_dump("OCR_SUBMIT_ATTEMPT_INSERTED", {
+            "attempt_id": attempt_id,
+            "student_id": owner_user_id,
+            "exam_id": exam_id,
+            "attempt_number": attempt_number,
+            "status": attempt_status,
+            "session_source": "learnova_ocr_scan",
+        })
+
+        saved_answer_debug: list[dict[str, Any]] = []
+        for answer in answer_rows:
+            selected_many = answer.get("selected_option_indices")
+            db.execute(
+                text("""
+                    INSERT INTO student_answers (
+                        attempt_id, exam_question_id,
+                        selected_option_index, selected_option_indices,
+                        answer_text, time_taken_seconds,
+                        is_correct, points_earned, auto_graded,
+                        created_at, updated_at
+                    ) VALUES (
+                        :attempt_id, :exam_question_id,
+                        :selected_option_index, CAST(:selected_option_indices AS JSON),
+                        :answer_text, NULL,
+                        :is_correct, :points_earned, :auto_graded,
+                        NOW(), NOW()
+                    )
+                    ON CONFLICT (attempt_id, exam_question_id)
+                    DO UPDATE SET
+                        selected_option_index   = EXCLUDED.selected_option_index,
+                        selected_option_indices = EXCLUDED.selected_option_indices,
+                        answer_text             = EXCLUDED.answer_text,
+                        is_correct              = EXCLUDED.is_correct,
+                        points_earned           = EXCLUDED.points_earned,
+                        auto_graded             = EXCLUDED.auto_graded,
+                        updated_at              = NOW()
+                """),
+                {
+                    "attempt_id": attempt_id,
+                    "exam_question_id": int(answer["exam_question_id"]),
+                    "selected_option_index": answer.get("selected_option_index"),
+                    "selected_option_indices": json.dumps(selected_many) if selected_many is not None else None,
+                    "answer_text": answer.get("answer_text") or answer.get("detected_answer"),
+                    "is_correct": answer.get("is_correct"),
+                    "points_earned": answer.get("points_earned"),
+                    "auto_graded": False if _answer_question_type(answer) in {"essay", "short_answer"} else bool(answer.get("auto_graded", answer.get("is_correct") is not None)),
+                },
+            )
+
+        db.commit()
+
+        ai_request_id: str | None = None
+        ai_error: str | None = None
+        ai_enabled = _env_bool("OCR_ANALYZE_AI_GRADING", True)
+        print(
+            f"[OCR_SUBMIT][AI_DECISION] has_ai_grading={has_ai_grading} "
+            f"ai_enabled={ai_enabled} written_with_text={len(written_with_text)}",
+            flush=True,
+        )
+        _debug_dump("OCR_SUBMIT_AI_DECISION", {
+            "has_ai_grading": has_ai_grading,
+            "ai_enabled_from_env": ai_enabled,
+            "written_exam_question_ids": [a.get("exam_question_id") for a in written_with_text],
+            "written_answers": [
+                {
+                    "exam_question_id": a.get("exam_question_id"),
+                    "type": _answer_question_type(a),
+                    "answer_text": a.get("answer_text"),
+                    "status": a.get("status"),
+                }
+                for a in written_with_text
+            ],
+        })
+        if has_ai_grading and ai_enabled:
+            try:
+                ai_request_id = _send_ocr_submit_ai_grading_request(
+                    db=db,
+                    attempt_id=attempt_id,
+                    exam_id=exam_id,
+                    course_id=course_id,
+                )
+                for answer in written_with_text:
+                    answer["ai_request_id"] = ai_request_id
+                    answer["ai_status"] = "pending"
+                    answer["status"] = "ai_pending"
+                db.commit()
+            except Exception as exc:
+                db.rollback()
+                ai_error = str(exc)
+                print(f"[OCR_SUBMIT][AI_ERROR] Failed to send normal exam grading request: {exc!r}", flush=True)
+                for answer in written_with_text:
+                    answer["ai_status"] = "failed"
+                    answer["status"] = "needs_review"
+                    answer["ai_feedback"] = "AI grading request failed; review manually."
+        elif has_ai_grading and not ai_enabled:
+            ai_error = "OCR_ANALYZE_AI_GRADING=false; AI grading request was intentionally skipped."
+            print(f"[OCR_SUBMIT][AI_SKIP] {ai_error}", flush=True)
+            for answer in written_with_text:
+                answer["ai_status"] = "skipped"
+                answer["status"] = "needs_review"
+                answer["ai_feedback"] = ai_error
+
+        return {
+            "attempt_id": attempt_id,
+            "attempt_status": "submitted" if has_ai_grading else "graded",
+            "ai_grading_requested": bool(ai_request_id),
+            "ai_request_id": ai_request_id,
+            "ai_error": ai_error,
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        print(f"[OCR_SUBMIT][ERROR] Failed to create OCR grading attempt: {exc!r}", flush=True)
+        print("[OCR_SUBMIT][ERROR_TRACEBACK]", flush=True)
+        print(traceback.format_exc(), flush=True)
+        raise HTTPException(status_code=500, detail=f"Failed to create OCR grading attempt: {exc}") from exc
+
+
+def get_exam_scan_attempt_result(*, attempt_id: int, db: Any, current_user: dict) -> dict[str, Any]:
+    """Instructor-safe OCR result reader for attempts created from exam scans."""
+    from sqlalchemy import text
+
+    ensure_instructor(current_user)
+    instructor_id = _safe_int(current_user.get("id"))
+    if instructor_id is None:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    attempt_row = db.execute(
+        text("""
+            SELECT
+                sea.id, sea.exam_id, sea.status, sea.total_score,
+                sea.percentage_score, sea.correct_count, sea.incorrect_count,
+                sea.unanswered_count, sea.session_data,
+                e.course_id, e.title, e.exam_type, e.total_score AS exam_total_score,
+                c.created_by
+            FROM student_exam_attempts sea
+            JOIN exams e ON e.id = sea.exam_id
+            JOIN courses c ON c.id = e.course_id
+            WHERE sea.id = :attempt_id
+            LIMIT 1
+        """),
+        {"attempt_id": attempt_id},
+    ).mappings().first()
+    if not attempt_row:
+        raise HTTPException(status_code=404, detail="OCR grading attempt not found")
+    if int(attempt_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only view OCR results for your own courses")
+
+    session_data = attempt_row.get("session_data") or {}
+    if isinstance(session_data, str):
+        try:
+            session_data = json.loads(session_data)
+        except Exception:
+            session_data = {}
+    if session_data.get("source") != "learnova_ocr_scan":
+        raise HTTPException(status_code=404, detail="Attempt is not an OCR scan attempt")
+
+    exam_id = int(attempt_row["exam_id"])
+    course_id = int(attempt_row["course_id"])
+    exam_payload = {
+        "exam_id": exam_id,
+        "course_id": course_id,
+        "title": attempt_row.get("title"),
+        "exam_type": attempt_row.get("exam_type"),
+        "total_score": attempt_row.get("exam_total_score"),
+    }
+    questions = _load_exam_questions_for_scan(db=db, exam_id=exam_id, course_id=course_id)
+
+    answer_rows = db.execute(
+        text("""
+            SELECT
+                exam_question_id, selected_option_index, selected_option_indices,
+                answer_text, is_correct, points_earned, auto_graded, teacher_feedback
+            FROM student_answers
+            WHERE attempt_id = :attempt_id
+        """),
+        {"attempt_id": attempt_id},
+    ).mappings().all()
+    answers_by_qid = {int(row["exam_question_id"]): dict(row) for row in answer_rows}
+
+    answers: list[dict[str, Any]] = []
+    for question in questions:
+        qid = int(question["exam_question_id"])
+        qtype = str(question.get("type") or "").strip().lower()
+        row = answers_by_qid.get(qid, {})
+        selected_many = row.get("selected_option_indices")
+        if isinstance(selected_many, str):
+            try:
+                selected_many = json.loads(selected_many)
+            except Exception:
+                selected_many = None
+        answer = {
+            "exam_question_id": qid,
+            "question_number": int(question.get("question_number") or len(answers) + 1),
+            "type": qtype,
+            "detected_answer": row.get("answer_text") if qtype in {"multiple_choice", "true_false"} else None,
+            "detected_answers": selected_many if isinstance(selected_many, list) else [],
+            "selected_option_index": row.get("selected_option_index"),
+            "selected_option_indices": selected_many if isinstance(selected_many, list) else None,
+            "answer_text": row.get("answer_text"),
+            "confidence": 0,
+            "status": "graded" if row and row.get("points_earned") is not None else ("ai_pending" if qtype in {"essay", "short_answer"} else "needs_review"),
+            "is_correct": row.get("is_correct"),
+            "points_earned": float(row["points_earned"]) if row.get("points_earned") is not None else None,
+            "max_score": _question_points(qid, questions),
+            "regions": [],
+            "answer_region": None,
+            "ai_grading_payload": None,
+            "ai_score": float(row["points_earned"]) if row.get("points_earned") is not None and qtype in {"essay", "short_answer"} else None,
+            "ai_status": "completed" if row.get("points_earned") is not None and qtype in {"essay", "short_answer"} else ("pending" if qtype in {"essay", "short_answer"} else None),
+            "ai_feedback": row.get("teacher_feedback"),
+        }
+        answers.append(answer)
+
+    _attach_question_context(answers=answers, questions=questions)
+    grade_preview = _build_scan_grade_preview(answers=answers, questions=questions, exam_payload=exam_payload)
+    return {
+        "scan_id": str(session_data.get("scan_id") or f"attempt_{attempt_id}"),
+        "status": str(attempt_row["status"]),
+        "language": "eng",
+        "exam": {
+            "exam_id": exam_id,
+            "course_id": course_id,
+            "title": attempt_row.get("title"),
+            "exam_type": attempt_row.get("exam_type"),
+            "template_version": "v1",
+        },
+        "student": {"student_id": None, "user_id": None, "name": None, "source": "not_used", "confidence": 0, "digits": []},
+        "pages": [],
+        "answers": answers,
+        "grade_preview": grade_preview,
+        "processing_time_seconds": None,
+        "attempt_id": attempt_id,
+        "attempt_status": str(attempt_row["status"]),
+        "ai_grading_requested": str(attempt_row["status"]) == "submitted",
+        "ai_request_id": None,
+        "warnings": [],
+    }
 
 
 
@@ -928,58 +1829,125 @@ def _send_ocr_submit_ai_grading_request(*, db: Any, attempt_id: int, exam_id: in
     from sqlalchemy import text
     from app.core.ai_service_integration.ai_transport import send_ai_request
 
+    print(
+        f"[OCR_SUBMIT][AI] preparing normal exam_grading request "
+        f"attempt_id={attempt_id} exam_id={exam_id} course_id={course_id}",
+        flush=True,
+    )
+
+    diagnostic_rows = db.execute(
+        text("""
+            SELECT
+                eq.id AS exam_question_id,
+                eq.exam_id,
+                eq.order_index,
+                eq.points,
+                eq.snapshot_type,
+                eq.snapshot_auto_gradable,
+                NULLIF(BTRIM(COALESCE(sa.answer_text, '')), '') IS NOT NULL AS has_answer_text,
+                LENGTH(COALESCE(sa.answer_text, '')) AS answer_text_length,
+                sa.answer_text,
+                eq.snapshot_question_text,
+                eq.snapshot_expected_answer,
+                eq.snapshot_grading_rubric
+            FROM exam_questions eq
+            LEFT JOIN student_answers sa
+              ON sa.exam_question_id = eq.id
+             AND sa.attempt_id = :attempt_id
+            WHERE eq.exam_id = :exam_id
+            ORDER BY eq.order_index ASC, eq.id ASC
+        """),
+        {"attempt_id": attempt_id, "exam_id": exam_id},
+    ).mappings().all()
+    _debug_dump("OCR_SUBMIT_AI_DIAGNOSTIC_ALL_EXAM_QUESTIONS", [dict(row) for row in diagnostic_rows])
+
+    # Keep this query and request shape intentionally aligned with the normal
+    # student submit flow in domains/exams/service.py. OCR only supplies the
+    # answer_text; grading/callback storage remains the normal attempt flow.
     rows = db.execute(
         text("""
             SELECT
                 eq.id AS exam_question_id,
-                COALESCE(eq.snapshot_question_text, q.question_text) AS question_text,
-                COALESCE(eq.snapshot_type, q.type::text) AS question_type,
-                COALESCE(eq.snapshot_expected_answer, q.expected_answer) AS expected_answer,
-                COALESCE(eq.snapshot_grading_rubric, q.grading_rubric) AS grading_rubric,
-                COALESCE(eq.points, eq.snapshot_max_score, q.max_score, 0) AS max_score,
+                eq.snapshot_question_text,
+                eq.snapshot_type,
+                eq.snapshot_expected_answer,
+                eq.snapshot_grading_rubric,
+                eq.points AS max_score,
                 sa.answer_text
-            FROM student_answers sa
-            JOIN exam_questions eq ON eq.id = sa.exam_question_id
-            LEFT JOIN questions q ON q.id = eq.question_id
-            WHERE sa.attempt_id = :attempt_id
-              AND eq.exam_id = :exam_id
-              AND COALESCE(eq.snapshot_type, q.type::text) IN ('essay', 'short_answer')
+            FROM exam_questions eq
+            JOIN student_answers sa
+              ON sa.exam_question_id = eq.id
+             AND sa.attempt_id = :attempt_id
+            WHERE eq.exam_id = :exam_id
+              AND eq.snapshot_type IN ('essay', 'short_answer')
+              AND COALESCE(eq.snapshot_auto_gradable, FALSE) = FALSE
               AND NULLIF(BTRIM(COALESCE(sa.answer_text, '')), '') IS NOT NULL
+            ORDER BY eq.order_index ASC, eq.id ASC
         """),
         {"attempt_id": attempt_id, "exam_id": exam_id},
     ).mappings().all()
 
+    _debug_dump("OCR_SUBMIT_AI_SELECTED_ROWS", [dict(row) for row in rows])
+
     if not rows:
+        print(
+            f"[OCR_SUBMIT][AI] no essay/short_answer rows found for attempt_id={attempt_id} exam_id={exam_id}",
+            flush=True,
+        )
         return None
 
     questions = [
         {
             "exam_question_id": int(row["exam_question_id"]),
-            "question_text": row["question_text"],
-            "type": row["question_type"],
-            "expected_answer": row["expected_answer"],
-            "grading_rubric": row["grading_rubric"],
+            "question_text": row["snapshot_question_text"],
+            "type": row["snapshot_type"],
+            "expected_answer": row["snapshot_expected_answer"],
+            "grading_rubric": row["snapshot_grading_rubric"],
             "max_score": float(row["max_score"] or 0),
             "student_answer": row["answer_text"],
         }
         for row in rows
     ]
 
-    return send_ai_request(
-        db,
-        operation_type="exam_grading",
-        endpoint_path=getattr(settings, "ocr_ai_grading_endpoint_path", "/api/v1/courses/grading/evaluate"),
-        course_id=course_id,
-        primary_entity_type="attempt",
-        primary_entity_id=attempt_id,
-        body={
-            "attempt_id": attempt_id,
-            "exam_id": exam_id,
-            "questions": questions,
-            "source": "learnova_ocr_scan",
-        },
+    body = {
+        "attempt_id": attempt_id,
+        "exam_id": exam_id,
+        "questions": questions,
+    }
+
+    _debug_dump("OCR_SUBMIT_AI_PAYLOAD_TO_NORMAL_GRADING", {
+        "operation_type": "exam_grading",
+        "endpoint_path": "/api/v1/courses/grading/evaluate",
+        "course_id": course_id,
+        "primary_entity_type": "attempt",
+        "primary_entity_id": attempt_id,
+        "body": body,
+    }, always=True)
+
+    print(
+        f"[OCR_SUBMIT][AI] sending normal exam_grading request attempt_id={attempt_id} "
+        f"exam_id={exam_id} questions={len(questions)}",
+        flush=True,
     )
 
+    try:
+        request_id = send_ai_request(
+            db,
+            operation_type="exam_grading",
+            endpoint_path="/api/v1/courses/grading/evaluate",
+            course_id=course_id,
+            primary_entity_type="attempt",
+            primary_entity_id=attempt_id,
+            body=body,
+        )
+    except Exception as exc:
+        print(f"[OCR_SUBMIT][AI_ERROR] send_ai_request raised: {exc!r}", flush=True)
+        print("[OCR_SUBMIT][AI_ERROR_TRACEBACK]", flush=True)
+        print(traceback.format_exc(), flush=True)
+        raise
+
+    print(f"[OCR_SUBMIT][AI] request_created request_id={request_id}", flush=True)
+    return request_id
 
 
 def _assert_instructor_owns_course(*, db: Any, course_id: int, current_user: dict) -> None:
@@ -1182,17 +2150,225 @@ def _dedupe_answers(answers: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return sorted(best.values(), key=lambda item: (_safe_int(item.get("exam_question_id")) or 10**9, _safe_int(item.get("question_number")) or 10**9, str(item.get("type") or "")))
 
 
+def _ensure_answers_for_all_questions(*, answers: list[dict[str, Any]], questions: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Return exactly one review row for every exam question.
+
+    OCR/OMR can legitimately miss a bubble or a written box. The instructor UI
+    still needs a row for that question so it can show "not detected" together
+    with the correct answer from the exam bank.
+    """
+    if not questions:
+        return answers
+
+    by_exam_question_id = {
+        int(answer["exam_question_id"]): answer
+        for answer in answers
+        if _safe_int(answer.get("exam_question_id")) is not None
+    }
+    by_question_number = {
+        int(answer["question_number"]): answer
+        for answer in answers
+        if _safe_int(answer.get("question_number")) is not None
+    }
+
+    merged: list[dict[str, Any]] = []
+    used_ids: set[int] = set()
+    for question in questions:
+        exam_question_id = _safe_int(question.get("exam_question_id"))
+        question_number = _safe_int(question.get("question_number")) or (len(merged) + 1)
+        answer = by_exam_question_id.get(exam_question_id) if exam_question_id is not None else None
+        if answer is None:
+            answer = by_question_number.get(question_number)
+        if answer is None:
+            qtype = str(question.get("type") or "").strip().lower() or "question"
+            max_score = _question_points(exam_question_id, questions)
+            is_objective = qtype in {"multiple_choice", "multi_select", "true_false"}
+            answer = {
+                "exam_question_id": exam_question_id,
+                "question_number": question_number,
+                "type": qtype,
+                "detected_answer": None,
+                "detected_answers": [],
+                "selected_option_index": None,
+                "selected_option_indices": None,
+                "answer_text": None,
+                "confidence": 0.0,
+                "status": "needs_review",
+                "is_correct": False if is_objective else None,
+                "points_earned": 0.0 if is_objective else None,
+                "max_score": max_score,
+                "regions": [],
+                "answer_region": None,
+                "ai_grading_payload": None,
+                "ai_score": None,
+                "ai_status": "needs_review" if not is_objective else None,
+                "ai_feedback": "No written answer was detected." if not is_objective else None,
+                "ai_request_id": None,
+            }
+        if exam_question_id is not None:
+            used_ids.add(exam_question_id)
+        merged.append(answer)
+
+    # Keep any extra detections that were not mapped to a known question.
+    for answer in answers:
+        exam_question_id = _safe_int(answer.get("exam_question_id"))
+        if exam_question_id is not None and exam_question_id in used_ids:
+            continue
+        if exam_question_id is None and answer not in merged:
+            merged.append(answer)
+    return merged
+
+
+def _attach_question_context(*, answers: list[dict[str, Any]], questions: list[dict[str, Any]]) -> None:
+    for answer in answers:
+        question = _find_question(answer.get("exam_question_id"), answer.get("question_number"), questions)
+        if not question:
+            answer.setdefault("question_text", None)
+            answer.setdefault("options", [])
+            answer.setdefault("correct_answer", None)
+            answer.setdefault("expected_answer", None)
+            continue
+        qtype = str(question.get("type") or answer.get("type") or "").strip().lower()
+        answer["question_text"] = question.get("question_text")
+        answer["options"] = _options_payload(question.get("options"))
+        answer["expected_answer"] = question.get("expected_answer")
+        answer["correct_answer"] = _expected_answer_display(question.get("expected_answer"), qtype, question.get("options"))
+        if answer.get("max_score") is None:
+            answer["max_score"] = _question_points(question.get("exam_question_id"), questions)
+        if qtype in {"multiple_choice", "multi_select", "true_false"}:
+            _apply_objective_grade(answer, questions)
+
+
+def _options_payload(options: Any) -> list[dict[str, Any]]:
+    if not isinstance(options, list):
+        return []
+    payload: list[dict[str, Any]] = []
+    for index, option in enumerate(options):
+        label = chr(ord("A") + index) if index < 26 else str(index + 1)
+        if isinstance(option, dict):
+            text_value = option.get("text") or option.get("label") or option.get("value") or ""
+        else:
+            text_value = option
+        payload.append({"label": label, "text": str(text_value or "")})
+    return payload
+
+
+def _expected_answer_display(raw: Any, question_type: Any, options: Any = None) -> str | None:
+    if raw is None:
+        return None
+    qtype = str(question_type or "").strip().lower()
+    option_payload = _options_payload(options)
+
+    def one(value: Any) -> str | None:
+        if value is None:
+            return None
+        if isinstance(value, dict):
+            value = value.get("answer") or value.get("correct_answer") or value.get("expected_answer") or value.get("value")
+        if isinstance(value, int):
+            if 0 <= value < 26:
+                return chr(ord("A") + value)
+            return str(value)
+        text = str(value).strip()
+        if not text:
+            return None
+        lower = text.lower()
+        if lower in {"true", "t"}:
+            return "True"
+        if lower in {"false", "f"}:
+            return "False"
+        if text.isdigit():
+            index = int(text)
+            if 0 <= index < 26:
+                return chr(ord("A") + index)
+        if len(text) == 1 and text.upper() in "ABCDEFGHIJKLMNOPQRSTUVWXYZ":
+            return text.upper()
+        # Match the stored option text back to a label when possible.
+        for option in option_payload:
+            if text.strip().lower() == str(option.get("text") or "").strip().lower():
+                return str(option.get("label"))
+        return text
+
+    if isinstance(raw, dict):
+        values = raw.get("answers") or raw.get("correct_answers") or raw.get("correct_option_indices") or raw.get("correct_option_ids")
+        value = raw.get("answer") or raw.get("correct_answer") or raw.get("expected_answer")
+        raw = values if values is not None else value
+
+    if qtype == "multi_select" or isinstance(raw, list):
+        values = raw if isinstance(raw, list) else [raw]
+        labels = [label for label in (one(value) for value in values) if label]
+        return ", ".join(labels) if labels else None
+    return one(raw)
+
+
 def _build_scan_grade_preview(*, answers: list[dict[str, Any]], questions: list[dict[str, Any]], exam_payload: dict[str, Any]) -> dict[str, Any]:
-    score = sum(float(answer.get("points_earned") or 0) for answer in answers)
+    """Build instructor-facing score summary from the already graded answers.
+
+    This mirrors the normal exam result idea: objective questions have local
+    points, while essay/short-answer points come from the AI grader when it
+    returns an immediate result.  Anything without a score is counted as needing
+    review so the instructor never sees a fake zero as a finished grade.
+    """
     total_score = float(exam_payload.get("total_score") or sum(float(q.get("points") or q.get("max_score") or 0) for q in questions))
+    score = 0.0
+    correct_count = 0
+    incorrect_count = 0
+    unanswered_count = 0
+    needs_review = 0
+    graded_questions = 0
+
+    for answer in answers:
+        answer_type = str(answer.get("type") or "").strip().lower()
+        text_answer = str(answer.get("answer_text") or answer.get("detected_answer") or "").strip()
+        selected_many = answer.get("detected_answers") or answer.get("selected_option_indices") or []
+        has_answer = bool(text_answer) or bool(selected_many)
+        is_written = answer_type in {"short_answer", "essay"}
+        points = answer.get("points_earned")
+        is_correct = answer.get("is_correct")
+        status = str(answer.get("status") or "").strip().lower()
+
+        if not has_answer:
+            unanswered_count += 1
+            needs_review += 1
+            continue
+
+        if points is None:
+            # Written questions are not fully graded until AI/teacher provides points.
+            needs_review += 1
+            continue
+
+        try:
+            earned = float(points or 0)
+        except (TypeError, ValueError):
+            earned = 0.0
+        score += earned
+        graded_questions += 1
+
+        if is_correct is True:
+            correct_count += 1
+        elif is_correct is False or (not is_written and status in {"wrong", "incorrect"}):
+            incorrect_count += 1
+        elif earned > 0:
+            # AI-graded essay/short-answer can be partially correct.  Count it as
+            # correct in the top summary when it earned credit, while the exact
+            # score remains visible on the question row.
+            correct_count += 1
+        else:
+            incorrect_count += 1
+
+    percentage_score = round((score / total_score) * 100, 2) if total_score else None
     objective_types = {"multiple_choice", "multi_select", "true_false"}
     return {
         "score_so_far": round(score, 2),
         "total_score": round(total_score, 2),
+        "percentage_score": percentage_score,
+        "graded_questions": graded_questions,
+        "correct_count": correct_count,
+        "incorrect_count": incorrect_count,
+        "unanswered_count": unanswered_count,
         "auto_gradable_questions": sum(1 for q in questions if str(q.get("type") or "").lower() in objective_types),
-        "detected_questions": sum(1 for answer in answers if answer.get("status") == "detected"),
+        "detected_questions": sum(1 for answer in answers if str(answer.get("answer_text") or answer.get("detected_answer") or "").strip() or answer.get("detected_answers")),
         "written_questions": sum(1 for answer in answers if str(answer.get("type") or "").lower() in {"short_answer", "essay"}),
-        "needs_review": sum(1 for answer in answers if answer.get("status") == "needs_review"),
+        "needs_review": needs_review,
         "ai_ready": sum(1 for answer in answers if answer.get("status") == "ai_ready" or answer.get("ai_status") == "ai_ready"),
         "ai_graded": sum(1 for answer in answers if answer.get("status") == "ai_graded" or answer.get("ai_status") == "completed"),
         "ai_pending": sum(1 for answer in answers if answer.get("ai_status") in {"pending", "sent"}),

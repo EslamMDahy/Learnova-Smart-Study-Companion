@@ -20,6 +20,7 @@ from app.domains.organizations.router           import router as organizations_r
 from app.domains.settings.router                import router as settings_router
 from app.domains.ai.router                      import router as ai_router
 from app.domains.ocr.router                     import router as ocr_router
+from fastapi.middleware.cors import CORSMiddleware
 
 
 @asynccontextmanager
@@ -30,14 +31,17 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(lifespan=lifespan)
 
-origins = [
+allow_origins = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
+    "https://www.learnova-edu.com",
+    "https://learnova-edu.com",
 ]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=allow_origins,
+    allow_origin_regex=r"https://.*\.ngrok-free\.dev",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

@@ -37,7 +37,6 @@ async def analyze_exam_scan(
     lang: str = Form(default="eng", description="OCR language for written answers: eng, ara, or ara+eng"),
     exam_id: int | None = Form(default=None, description="Optional fallback when QR cannot be read"),
     course_id: int | None = Form(default=None, description="Optional fallback when QR cannot be read"),
-    student_id_digits: int = Form(default=6, description="Number of Student ID bubble rows printed on the sheet"),
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),
 ):
@@ -54,7 +53,6 @@ async def analyze_exam_scan(
         current_user=current_user,
         fallback_exam_id=exam_id,
         fallback_course_id=course_id,
-        student_id_digits=student_id_digits,
     )
 
 
@@ -69,6 +67,23 @@ def submit_exam_scan(
     current_user: dict = Depends(get_current_user),
 ):
     return service.submit_exam_scan(payload=payload, db=db, current_user=current_user)
+
+
+@router.get(
+    "/exam-scan/attempts/{attempt_id}/result",
+    response_model=ExamScanAnalyzeResponse,
+    status_code=status.HTTP_200_OK,
+)
+def get_exam_scan_attempt_result(
+    attempt_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    return service.get_exam_scan_attempt_result(
+        attempt_id=attempt_id,
+        db=db,
+        current_user=current_user,
+    )
 
 
 @router.post(

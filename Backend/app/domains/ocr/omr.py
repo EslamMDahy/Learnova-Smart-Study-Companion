@@ -39,24 +39,45 @@ _OPTION_LABELS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
 
 
 def detect_bubbles(image: Any) -> list[Bubble]:
+    """Detect printed OCR bubbles quickly.
+
+    The old implementation ran HoughCircles on full-resolution aligned pages.
+    On 300-DPI photographed PDFs this could take 90+ seconds per page. This
+    version caps the working image size, then rescales coordinates back to the
+    original page so downstream Student-ID and objective OMR keep working.
+    """
     try:
         import cv2
         import numpy as np
     except Exception:
         return []
 
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    if image is None:
+        return []
+
+    gray_full = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+    height, width = gray_full.shape[:2]
+
+    longest = max(height, width)
+    max_work_longest = 1800
+    scale = 1.0
+    if longest > max_work_longest:
+        scale = max_work_longest / float(longest)
+        gray = cv2.resize(gray_full, None, fx=scale, fy=scale, interpolation=cv2.INTER_AREA)
+    else:
+        gray = gray_full
+
     gray = cv2.medianBlur(gray, 5)
-    height, width = gray.shape[:2]
-    min_radius = max(7, int(min(width, height) * 0.003))
-    max_radius = max(18, int(min(width, height) * 0.012))
+    work_h, work_w = gray.shape[:2]
+    min_radius = max(5, int(min(work_w, work_h) * 0.003))
+    max_radius = max(12, int(min(work_w, work_h) * 0.012))
 
     circles = cv2.HoughCircles(
         gray,
         cv2.HOUGH_GRADIENT,
-        dp=1.25,
-        minDist=max(18, min_radius * 3),
-        param1=70,
+        dp=1.35,
+        minDist=max(14, min_radius * 3),
+        param1=75,
         param2=18,
         minRadius=min_radius,
         maxRadius=max_radius,
@@ -65,8 +86,8 @@ def detect_bubbles(image: Any) -> list[Bubble]:
     if circles is None:
         return []
 
-    binary = cv2.adaptiveThreshold(
-        gray,
+    binary_full = cv2.adaptiveThreshold(
+        gray_full,
         255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
         cv2.THRESH_BINARY_INV,
@@ -75,23 +96,23 @@ def detect_bubbles(image: Any) -> list[Bubble]:
     )
 
     bubbles: list[Bubble] = []
+    inv_scale = 1.0 / scale
     for raw in np.round(circles[0, :]).astype("int"):
-        x, y, r = int(raw[0]), int(raw[1]), int(raw[2])
+        x = int(round(float(raw[0]) * inv_scale))
+        y = int(round(float(raw[1]) * inv_scale))
+        r = max(3, int(round(float(raw[2]) * inv_scale)))
         if x - r < 0 or y - r < 0 or x + r >= width or y + r >= height:
             continue
-        mask = np.zeros(binary.shape, dtype="uint8")
+
+        mask = np.zeros(binary_full.shape, dtype="uint8")
         inner = max(2, int(r * 0.62))
         cv2.circle(mask, (x, y), inner, 255, -1)
-        dark_pixels = cv2.countNonZero(cv2.bitwise_and(binary, binary, mask=mask))
+        dark_pixels = cv2.countNonZero(cv2.bitwise_and(binary_full, binary_full, mask=mask))
         area = max(1, cv2.countNonZero(mask))
         fill_ratio = float(dark_pixels) / float(area)
-        # Empty printed rings usually land below 0.18; filled pencil/pen bubbles
-        # typically exceed 0.28 after thresholding. Confidence rewards distance
-        # from the ambiguous band.
         confidence = min(99.0, abs(fill_ratio - 0.21) * 420.0)
         bubbles.append(Bubble(x=x, y=y, r=r, fill_ratio=fill_ratio, confidence=round(confidence, 2)))
 
-    # Deduplicate Hough duplicates.
     bubbles.sort(key=lambda b: (b.y, b.x))
     deduped: list[Bubble] = []
     for bubble in bubbles:
@@ -106,7 +127,6 @@ def detect_bubbles(image: Any) -> list[Bubble]:
         if not duplicate:
             deduped.append(bubble)
     return deduped
-
 
 def read_student_id(image: Any, bubbles: list[Bubble], digits: int = 6) -> StudentIdResult:
     height, width = image.shape[:2]
@@ -317,3 +337,101 @@ def _region(bubble: Bubble) -> dict[str, int | float]:
         "h": int(size),
         "fill_ratio": round(bubble.fill_ratio, 4),
     }
+
+
+def extract_objective_answers_from_pages(
+    *,
+    pages: list[dict[str, Any]],
+    questions: list[dict[str, Any]],
+) -> list[ObjectiveAnswerResult]:
+    """Read objective answers once across all pages in print order.
+
+    The old call-site ran extraction per page with the full question list. That
+    can remap page-3 bubbles to Q1/Q2. This function builds one global row stream
+    from all pages, then consumes it according to the objective questions order.
+    """
+    row_stream: list[tuple[int, list[Bubble]]] = []
+    for page in sorted(pages, key=lambda p: int(p.get("page_number") or 0)):
+        image = page.get("image")
+        bubbles = page.get("bubbles") or []
+        if image is None or not bubbles:
+            continue
+        height, width = image.shape[:2]
+        answer_bubbles = [
+            b for b in bubbles
+            if not (b.x > width * 0.42 and b.y < height * 0.34)
+            and b.y > height * 0.12
+        ]
+        rows = _group_rows(answer_bubbles, tolerance=max(14, int(height * 0.006)))
+        rows = [sorted(row, key=lambda b: b.x) for row in rows]
+        rows = sorted(rows, key=lambda row: sum(b.y for b in row) / len(row))
+        for row in rows:
+            row_stream.append((int(page.get("page_number") or 0), row))
+
+    results: list[ObjectiveAnswerResult] = []
+    cursor = 0
+    objective_questions = [q for q in questions if _normal_type(q.get("type")) in {"multiple_choice", "multi_select", "true_false"}]
+
+    for question_index, question in enumerate(objective_questions, start=1):
+        qtype = _normal_type(question.get("type"))
+        option_count = _option_count(question)
+        exam_question_id = _safe_int(question.get("exam_question_id"))
+        question_number = _safe_int(question.get("question_number")) or question_index
+        needed_rows = 1 if qtype == "true_false" else option_count
+        needed_bubbles = 2 if qtype == "true_false" else 1
+
+        consumed: list[tuple[int, list[Bubble]]] = []
+        while cursor < len(row_stream) and len(consumed) < needed_rows:
+            page_number, row = row_stream[cursor]
+            cursor += 1
+            if qtype == "true_false":
+                if len(row) >= 2:
+                    consumed.append((page_number, row[:2]))
+            else:
+                if len(row) >= 1:
+                    consumed.append((page_number, [row[0]]))
+
+        if len(consumed) < needed_rows:
+            results.append(ObjectiveAnswerResult(
+                exam_question_id=exam_question_id,
+                question_number=question_number,
+                type=qtype,
+                detected_answer=None,
+                detected_answers=[],
+                selected_option_index=None,
+                selected_option_indices=None,
+                confidence=0.0,
+                status="needs_review",
+                regions=[],
+            ))
+            continue
+
+        flat = [bubble for _, row in consumed for bubble in row[:needed_bubbles]]
+        selected_pool = flat if qtype == "true_false" else [row[0] for _, row in consumed]
+        selected_indices = _select_bubbles(selected_pool, allow_multiple=qtype == "multi_select")
+        labels = [_OPTION_LABELS[i] for i in selected_indices if i < len(_OPTION_LABELS)]
+        if qtype == "true_false":
+            labels = ["true" if i == 0 else "false" for i in selected_indices]
+
+        confidence = _answer_confidence(selected_pool, selected_indices)
+        status = "detected" if labels and confidence >= 62 else "needs_review"
+        regions: list[dict[str, Any]] = []
+        for page_number, row in consumed:
+            for bubble in row:
+                region = _region(bubble)
+                region["page_number"] = page_number
+                regions.append(region)
+        results.append(ObjectiveAnswerResult(
+            exam_question_id=exam_question_id,
+            question_number=question_number,
+            type=qtype,
+            detected_answer=labels[0] if len(labels) == 1 else None,
+            detected_answers=labels,
+            selected_option_index=selected_indices[0] if len(selected_indices) == 1 and qtype != "multi_select" else None,
+            selected_option_indices=selected_indices if qtype == "multi_select" else None,
+            confidence=round(confidence, 2),
+            status=status,
+            regions=regions,
+        ))
+
+    return results

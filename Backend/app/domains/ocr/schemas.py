@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Optional
+from typing import Any, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -100,6 +100,9 @@ class ExamScanPage(BaseModel):
     alignment_confidence: float = Field(default=0, ge=0, le=100)
     qr_detected: bool = False
     bubble_count: int = Field(default=0, ge=0)
+    ocr_text: Optional[str] = None
+    ocr_confidence: Optional[float] = Field(default=None, ge=0, le=100)
+    word_count: Optional[int] = Field(default=None, ge=0)
     warnings: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="forbid")
@@ -108,7 +111,11 @@ class ExamScanPage(BaseModel):
 class ExamScanAnswer(BaseModel):
     exam_question_id: Optional[int] = None
     question_number: int = Field(..., ge=1)
+    question_text: Optional[str] = None
     type: str
+    options: list[dict[str, Any]] = Field(default_factory=list)
+    correct_answer: Optional[str] = None
+    expected_answer: Optional[Any] = None
     detected_answer: Optional[str] = None
     detected_answers: list[str] = Field(default_factory=list)
     selected_option_index: Optional[int] = None
@@ -119,6 +126,8 @@ class ExamScanAnswer(BaseModel):
     is_correct: Optional[bool] = None
     points_earned: Optional[float] = None
     max_score: Optional[float] = None
+    auto_graded: Optional[bool] = None
+    teacher_feedback: Optional[str] = None
     regions: list[dict] = Field(default_factory=list)
     answer_region: Optional[dict] = None
     ai_grading_payload: Optional[dict] = None
@@ -133,6 +142,11 @@ class ExamScanAnswer(BaseModel):
 class ExamScanGradePreview(BaseModel):
     score_so_far: float = 0
     total_score: float = 0
+    percentage_score: Optional[float] = Field(default=None, ge=0, le=100)
+    graded_questions: int = 0
+    correct_count: int = 0
+    incorrect_count: int = 0
+    unanswered_count: int = 0
     auto_gradable_questions: int = 0
     detected_questions: int = 0
     written_questions: int = 0
@@ -153,6 +167,11 @@ class ExamScanAnalyzeResponse(BaseModel):
     pages: list[ExamScanPage] = Field(default_factory=list)
     answers: list[ExamScanAnswer] = Field(default_factory=list)
     grade_preview: ExamScanGradePreview
+    processing_time_seconds: Optional[float] = Field(default=None, ge=0)
+    attempt_id: Optional[int] = None
+    attempt_status: Optional[str] = None
+    ai_grading_requested: bool = False
+    ai_request_id: Optional[str] = None
     warnings: list[str] = Field(default_factory=list)
 
     model_config = ConfigDict(extra="forbid")
@@ -175,7 +194,7 @@ class ExamScanSubmitAnswer(BaseModel):
 class ExamScanSubmitRequest(BaseModel):
     scan_id: str
     exam_id: int
-    student_id: int
+    student_id: Optional[int] = None
     answers: list[ExamScanSubmitAnswer] = Field(default_factory=list)
     total_score: Optional[float] = None
     percentage_score: Optional[float] = None
@@ -187,7 +206,7 @@ class ExamScanSubmitRequest(BaseModel):
 class ExamScanSubmitResponse(BaseModel):
     attempt_id: int
     exam_id: int
-    student_id: int
+    student_id: Optional[int] = None
     answer_count: int
     status: str
     ai_grading_requested: bool = False
