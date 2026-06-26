@@ -525,6 +525,9 @@ def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest
     payload = verified_callback.payload
     body = _extract_callback_body(payload)
 
+    print(f"[rag_chat] payload keys: {list(payload.keys())}")
+    print(f"[rag_chat] body keys: {list(body.keys())}")
+
     # =========================
     # 1) Validate callback status
     # =========================
@@ -533,6 +536,8 @@ def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest
         "status",
         "Missing status in callback payload",
     ).lower()
+
+    print(f"[rag_chat] callback_status: {callback_status}")
 
     if callback_status != "completed":
         raise HTTPException(
@@ -548,7 +553,7 @@ def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest
         "course_id",
         "Missing or invalid course_id in callback payload",
     )
-
+    
     request_log_course_id = request_log.get("course_id")
     if request_log_course_id is None or int(request_log_course_id) != course_id:
         raise HTTPException(
@@ -584,6 +589,8 @@ def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest
         "Missing or invalid message_id in callback body",
     )
 
+    print(f"[rag_chat] course_id: {course_id}, session_id: {session_id}, message_id: {message_id}")
+
     request_log_entity_id = request_log.get("primary_entity_id")
     if request_log_entity_id is None or int(request_log_entity_id) != session_id:
         raise HTTPException(
@@ -611,6 +618,8 @@ def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest
             detail="sources must be a list or null",
         )
 
+    print(f"[rag_chat] content length: {len(content)}, sources: {sources}")
+
     # =========================
     # 7) Save response and publish event
     # =========================
@@ -622,7 +631,11 @@ def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest
         sources=sources,
     )
 
+    print(f"[rag_chat] save result: {result}")
+
     publish_sync(channel=f"chat_{message_id}", payload="ready")
+
+    print(f"[rag_chat] published to chat_{message_id}")
 
     return result
 
