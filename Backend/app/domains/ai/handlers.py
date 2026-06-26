@@ -173,11 +173,19 @@ def handle_content_structure_generation(*, db: Session, verified_callback: Verif
             "Each learning outcome must include a non-empty title",
         )
 
-        _extract_required_str(
-            item,
-            "level",
-            "Each learning outcome must include a non-empty level",
-        )
+        parent_temp_id = item.get("parent_temp_id")
+        if parent_temp_id is not None:
+            if not isinstance(parent_temp_id, str) or not parent_temp_id.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="learning_outcome.parent_temp_id must be null or a non-empty string",
+                )
+            level = item.get("level")
+            if not level or not isinstance(level, str) or not level.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Sub learning outcome must include a non-empty level",
+                )
 
         if temp_id in seen_lo_temp_ids:
             raise HTTPException(

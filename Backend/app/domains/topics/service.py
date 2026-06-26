@@ -141,7 +141,7 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
     if normalized_learning_outcome_ids:
         lo_rows = db.execute(
             text("""
-                SELECT id, course_id
+                SELECT id, course_id, parent_learning_outcome_id
                 FROM learning_outcomes
                 WHERE id = ANY(:learning_outcome_ids)
             """),
@@ -157,6 +157,14 @@ def create_topic(*, course_id: int, module_id: int, material_id: int, payload: T
                     status_code=400,
                     detail="All learning outcomes must belong to the same course"
                 )
+            topic_is_subtopic = parent_topic_id is not None
+            lo_is_sub = row["parent_learning_outcome_id"] is not None
+
+            if topic_is_subtopic != lo_is_sub:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Topics and learning outcomes must be of the same level (both parent or both sub)"
+                )        
 
     # =========================
     # 7) Compute order_index inside same material
@@ -775,7 +783,7 @@ def update_topic(*, course_id: int, module_id: int, material_id: int, topic_id: 
         if normalized_learning_outcome_ids:
             lo_rows = db.execute(
                 text("""
-                    SELECT id, course_id
+                    SELECT id, course_id, parent_learning_outcome_id
                     FROM learning_outcomes
                     WHERE id = ANY(:learning_outcome_ids)
                 """),
@@ -790,6 +798,14 @@ def update_topic(*, course_id: int, module_id: int, material_id: int, topic_id: 
                     raise HTTPException(
                         status_code=400,
                         detail="All learning outcomes must belong to the same course"
+                    )
+                topic_is_subtopic = (update_fields.get("parent_topic_id") or topic_row["parent_topic_id"]) is not None
+                lo_is_sub = row["parent_learning_outcome_id"] is not None
+
+                if topic_is_subtopic != lo_is_sub:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Topics and learning outcomes must be of the same level (both parent or both sub)"
                     )
 
     if not update_fields and not replace_learning_outcomes:

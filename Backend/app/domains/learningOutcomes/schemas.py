@@ -9,7 +9,13 @@ from pydantic import BaseModel, ConfigDict, Field
 class LearningOutcomeCreateRequest(BaseModel):
     title: str = Field(..., min_length=1, max_length=255, description="Learning outcome title")
     description: Optional[str] = Field(default=None, description="Optional learning outcome description")
-    level: str = Field(..., description="Learning outcome level enum value")
+
+    level: Optional[str] = Field(..., description="Learning outcome level enum value")
+    
+    parent_learning_outcome_id: Optional[int] = Field(
+        default=None,
+        description="Optional parent LO ID. If provided, the new LO becomes a sup learning outcome.")
+
     topic_ids: Optional[List[int]] = Field(
         default=None,
         description="Optional list of existing topic IDs to attach to this learning outcome"
@@ -22,8 +28,9 @@ class LearningOutcomeCreateResponse(BaseModel):
     course_id: int
     title: str
     description: Optional[str] = None
-    level: str
-    # ai_ref_key: Optional[str] = None
+
+    level: Optional[str]
+    parent_learning_outcome_id: Optional[int] = None
 
     is_ai_generated: bool
     is_reviewed: bool
@@ -67,8 +74,9 @@ class LearningOutcomeGetResponse(BaseModel):
     course_id: int
     title: str
     description: Optional[str] = None
-    level: str
-    # ai_ref_key: Optional[str] = None
+    
+    level: Optional[str] = None
+    parent_learning_outcome_id: Optional[int] = None
 
     is_ai_generated: bool
     is_reviewed: bool
@@ -85,6 +93,11 @@ class LearningOutcomeUpdateRequest(BaseModel):
     title: Optional[str] = Field(default=None, min_length=1, max_length=255, description="Updated title")
     description: Optional[str] = Field(default=None, description="Updated description")
     level: Optional[str] = Field(default=None, description="Updated learning outcome level enum value")
+    
+    parent_learning_outcome_id: Optional[int] = Field(
+        default=None,
+        description="Optional parent LO ID. If provided, the new LO becomes a sup learning outcome.")
+
     topic_ids: Optional[List[int]] = Field(
         default=None,
         description="Optional full replacement list of linked topic IDs"
@@ -98,8 +111,9 @@ class LearningOutcomeUpdateResponse(BaseModel):
     course_id: int
     title: str
     description: Optional[str] = None
-    level: str
-    # ai_ref_key: Optional[str] = None
+    
+    level: Optional[str]
+    parent_learning_outcome_id: Optional[int] = None
 
     is_ai_generated: bool
     is_reviewed: bool

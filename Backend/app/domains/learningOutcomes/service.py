@@ -59,8 +59,17 @@ def create_learning_outcome(*, course_id: int, payload: LearningOutcomeCreateReq
         description = description.strip() or None
 
     level = (payload.level or "").strip()
-    if not level:
-        raise HTTPException(status_code=422, detail="level is required")
+    parent_learning_outcome_id = payload.parent_learning_outcome_id
+
+    if parent_learning_outcome_id is not None:
+        # Sub LO — level مطلوب
+        if not level:
+            raise HTTPException(status_code=422, detail="level is required for sub learning outcomes")
+    else:
+        # Parent LO — level يكون None
+        if level:
+            raise HTTPException(status_code=422, detail="level must not be provided for parent learning outcomes")
+        level = None
 
     topic_ids = payload.topic_ids or []
 
@@ -75,13 +84,37 @@ def create_learning_outcome(*, course_id: int, payload: LearningOutcomeCreateReq
             normalized_topic_ids.append(topic_id)
 
     # =========================
-    # 4) Validate topics belong to same course
+    # 4) Validate parent_learning_outcome_id (if provided)
+    # =========================
+    if parent_learning_outcome_id is not None:
+        parent_lo_row = db.execute(
+            text("""
+                SELECT id, course_id, parent_learning_outcome_id
+                FROM learning_outcomes
+                WHERE id = :parent_lo_id
+                LIMIT 1
+            """),
+            {"parent_lo_id": parent_learning_outcome_id},
+        ).mappings().first()
+
+        if not parent_lo_row:
+            raise HTTPException(status_code=404, detail="Parent learning outcome not found")
+
+        if int(parent_lo_row["course_id"]) != int(course_id):
+            raise HTTPException(status_code=400, detail="Parent learning outcome must belong to the same course")
+
+        if parent_lo_row["parent_learning_outcome_id"] is not None:
+            raise HTTPException(status_code=400, detail="Cannot create a sub learning outcome under another sub learning outcome")
+
+    # =========================
+    # 5) Validate topics belong to same course
     # =========================
     if normalized_topic_ids:
         topic_rows = db.execute(
             text("""
                 SELECT
                     t.id,
+                    t.parent_topic_id,
                     m.module_id,
                     mo.course_id
                 FROM topics t
@@ -96,16 +129,23 @@ def create_learning_outcome(*, course_id: int, payload: LearningOutcomeCreateReq
 
         if len(topic_rows) != len(normalized_topic_ids):
             raise HTTPException(status_code=404, detail="One or more topics were not found")
-
+            
         for row in topic_rows:
             if int(row["course_id"]) != int(course_id):
+                raise HTTPException(status_code=400, detail="All topics must belong to the same course")
+            
+            # validation جديد
+            topic_is_subtopic = row["parent_topic_id"] is not None
+            lo_is_sub = parent_learning_outcome_id is not None
+            
+            if topic_is_subtopic != lo_is_sub:
                 raise HTTPException(
                     status_code=400,
-                    detail="All topics must belong to the same course"
+                    detail="Topics and learning outcomes must be of the same level (both parent or both sub)"
                 )
 
     # =========================
-    # 5) Insert learning outcome
+    # 6) Insert learning outcome
     # =========================
     try:
         learning_outcome_row = db.execute(
@@ -115,6 +155,7 @@ def create_learning_outcome(*, course_id: int, payload: LearningOutcomeCreateReq
                     title,
                     description,
                     level,
+                    parent_learning_outcome_id,
                     is_ai_generated,
                     is_reviewed,
                     created_at,
@@ -125,6 +166,7 @@ def create_learning_outcome(*, course_id: int, payload: LearningOutcomeCreateReq
                     :title,
                     :description,
                     :level,
+                    :parent_learning_outcome_id,
                     :is_ai_generated,
                     :is_reviewed,
                     NOW(),
@@ -136,6 +178,7 @@ def create_learning_outcome(*, course_id: int, payload: LearningOutcomeCreateReq
                     title,
                     description,
                     level,
+                    parent_learning_outcome_id,
                     is_ai_generated,
                     is_reviewed,
                     created_at,
@@ -146,6 +189,7 @@ def create_learning_outcome(*, course_id: int, payload: LearningOutcomeCreateReq
                 "title": title,
                 "description": description,
                 "level": level,
+                "parent_learning_outcome_id": parent_learning_outcome_id,
                 "is_ai_generated": False,
                 "is_reviewed": True,
             },
@@ -158,7 +202,7 @@ def create_learning_outcome(*, course_id: int, payload: LearningOutcomeCreateReq
         learning_outcome_id = int(learning_outcome_row["id"])
 
         # =========================
-        # 6) Insert topic relations (optional)
+        # 7) Insert topic relations (optional)
         # =========================
         if normalized_topic_ids:
             for topic_id in normalized_topic_ids:
@@ -340,6 +384,7 @@ def get_learning_outcome(*, course_id: int, learning_outcome_id: int, db: Sessio
                     title,
                     description,
                     level,
+                    parent_learning_outcome_id,
                     is_ai_generated,
                     is_reviewed,
                     created_at,
@@ -422,6 +467,7 @@ def update_learning_outcome(*, course_id: int, learning_outcome_id: int, payload
             SELECT
                 lo.id,
                 lo.course_id,
+                lo.parent_learning_outcome_id,
                 c.created_by
             FROM learning_outcomes lo
             JOIN courses c
@@ -444,6 +490,8 @@ def update_learning_outcome(*, course_id: int, learning_outcome_id: int, payload
             detail="You can only update learning outcomes in your own course"
         )
 
+    lo_is_sub = learning_outcome_row["parent_learning_outcome_id"] is not None
+
     # =========================
     # 3) Build dynamic update fields
     # =========================
@@ -464,6 +512,8 @@ def update_learning_outcome(*, course_id: int, learning_outcome_id: int, payload
         level = payload.level.strip()
         if level == "":
             raise HTTPException(status_code=422, detail="level cannot be empty")
+        if not lo_is_sub:
+            raise HTTPException(status_code=400, detail="Cannot set level on a parent learning outcome")
         update_fields["level"] = level
 
     # =========================
@@ -491,6 +541,7 @@ def update_learning_outcome(*, course_id: int, learning_outcome_id: int, payload
                 text("""
                     SELECT
                         t.id,
+                        t.parent_topic_id,
                         mo.course_id
                     FROM topics t
                     JOIN materials m
@@ -510,6 +561,13 @@ def update_learning_outcome(*, course_id: int, learning_outcome_id: int, payload
                     raise HTTPException(
                         status_code=400,
                         detail="All topics must belong to the same course"
+                    )
+
+                topic_is_subtopic = row["parent_topic_id"] is not None
+                if topic_is_subtopic != lo_is_sub:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Topics and learning outcomes must be of the same level (both parent or both sub)"
                     )
 
     if not update_fields and not replace_topics:
@@ -543,6 +601,7 @@ def update_learning_outcome(*, course_id: int, learning_outcome_id: int, payload
                         title,
                         description,
                         level,
+                        parent_learning_outcome_id,
                         is_ai_generated,
                         is_reviewed,
                         created_at,
@@ -563,6 +622,7 @@ def update_learning_outcome(*, course_id: int, learning_outcome_id: int, payload
                         title,
                         description,
                         level,
+                        parent_learning_outcome_id,
                         is_ai_generated,
                         is_reviewed,
                         created_at,
@@ -621,7 +681,7 @@ def update_learning_outcome(*, course_id: int, learning_outcome_id: int, payload
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
-    
+
 
 
 def delete_learning_outcome(*, course_id: int, learning_outcome_id: int, db: Session, current_user: dict,):

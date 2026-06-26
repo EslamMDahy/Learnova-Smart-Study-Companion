@@ -6,13 +6,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 
-def insert_topic_learning_outcome_relations(
-    *,
-    db: Session,
-    relations: list[dict],
-    topic_id_map: dict[str, int],
-    learning_outcome_id_map: dict[str, int],
-) -> int:
+def insert_topic_learning_outcome_relations(*, db: Session, relations: list[dict], topic_id_map: dict[str, int], learning_outcome_id_map: dict[str, int],) -> int:
     if not isinstance(relations, list):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
