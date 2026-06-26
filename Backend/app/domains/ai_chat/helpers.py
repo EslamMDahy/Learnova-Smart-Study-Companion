@@ -5,6 +5,8 @@ from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+import json
+
 
 def save_rag_chat_response(*, db: Session, session_id: int, user_message_id: int, content: str, sources: list | None,) -> dict:
     try:
@@ -42,7 +44,7 @@ def save_rag_chat_response(*, db: Session, session_id: int, user_message_id: int
             {
                 "session_id": session_id,
                 "content": content,
-                "sources": sources,
+                "sources": json.dumps(sources) if sources is not None else None,
                 "user_message_id": user_message_id,
             },
         ).mappings().first()
