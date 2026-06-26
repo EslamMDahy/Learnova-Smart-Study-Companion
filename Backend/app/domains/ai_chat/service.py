@@ -751,7 +751,7 @@ async def stream_message(*, course_id: int, session_id: int, message_id: int, db
                 "session_id": assistant_data["session_id"],
                 "message_type": assistant_data["message_type"],
                 "content": assistant_data["content"],
-                "sources": assistant_data["sources"],
+                "sources": assistant_data["sources"] or [],
                 "created_at": assistant_data["created_at"].isoformat(),
             })
             yield f"event: message\ndata: {data}\n\n"
@@ -824,7 +824,7 @@ async def stream_message(*, course_id: int, session_id: int, message_id: int, db
                     "session_id": assistant_row["session_id"],
                     "message_type": assistant_row["message_type"],
                     "content": assistant_row["content"],
-                    "sources": assistant_row["sources"],
+                    "sources": assistant_row["sources"] or [],
                     "created_at": assistant_row["created_at"].isoformat(),
                 })
 

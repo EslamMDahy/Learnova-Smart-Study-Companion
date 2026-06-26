@@ -56,7 +56,7 @@ class MessageResponse(BaseModel):
     session_id: int
     message_type: AIChatMessageType
     content: str
-    sources: List[SourceItem] = Field(default_factory=list)
+    sources: Optional[list] = []
     created_at: datetime
 
     model_config = ConfigDict(extra="forbid")
