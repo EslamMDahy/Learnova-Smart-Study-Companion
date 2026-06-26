@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import shutil
+import sys
 import time
 import traceback
 from dataclasses import dataclass
@@ -118,28 +120,43 @@ def parse_answer_key_text(raw: str) -> dict[int, str]:
 
 
 def ocr_health() -> dict[str, Any]:
+    diagnostics = _build_ocr_engine_diagnostics()
     try:
         pytesseract = _import_pytesseract()
+        configured_cmd = getattr(pytesseract.pytesseract, "tesseract_cmd", None)
         version = str(pytesseract.get_tesseract_version())
         try:
             langs = sorted(str(lang) for lang in pytesseract.get_languages(config=""))
-        except Exception:
+        except Exception as lang_exc:
             langs = []
-        return {
+            diagnostics["language_probe_error"] = repr(lang_exc)
+        health = {
             "available": True,
             "engine": "tesseract",
             "version": version,
             "languages": langs,
             "detail": None,
+            "tesseract_cmd": configured_cmd,
+            "diagnostics": diagnostics,
         }
+        if _ocr_engine_verbose_enabled():
+            _debug_dump("OCR_ENGINE_HEALTH_OK", health, always=True, max_chars=60000)
+        return health
     except Exception as exc:
-        return {
+        health = {
             "available": False,
             "engine": "tesseract",
             "version": None,
             "languages": [],
-            "detail": str(exc),
+            "detail": str(getattr(exc, "detail", None) or exc),
+            "exception_type": type(exc).__name__,
+            "exception_repr": repr(exc),
+            "traceback": traceback.format_exc(),
+            "tesseract_cmd": _resolve_tesseract_cmd(),
+            "diagnostics": diagnostics,
         }
+        _debug_dump("OCR_ENGINE_HEALTH_FAILED", health, always=True, max_chars=60000)
+        return health
 
 
 def _ocr_perf_enabled() -> bool:
@@ -595,29 +612,112 @@ def _grade_answers(
 def _assert_engine_ready(lang: str) -> None:
     health = ocr_health()
     if not health["available"]:
+        _debug_dump("OCR_ENGINE_UNAVAILABLE_RAISE_503", health, always=True, max_chars=60000)
         raise HTTPException(status_code=503, detail=f"OCR engine unavailable: {health['detail']}")
 
     installed = set(health.get("languages") or [])
     missing = [part for part in lang.split("+") if installed and part not in installed]
     if missing:
+        payload = {"requested_lang": lang, "missing": missing, "installed_languages": sorted(installed), "health": health}
+        _debug_dump("OCR_ENGINE_LANGUAGE_DATA_MISSING", payload, always=True, max_chars=60000)
         raise HTTPException(status_code=503, detail=f"Missing Tesseract language data: {', '.join(missing)}")
+
+
+def _ocr_engine_verbose_enabled() -> bool:
+    # Keep engine diagnostics ON by default while deploying OCR to a server.
+    # Set OCR_ENGINE_VERBOSE_LOGS=false to silence these logs after it works.
+    return _env_bool("OCR_ENGINE_VERBOSE_LOGS", True)
+
+
+def _tesseract_candidate_values() -> list[str | None]:
+    return [
+        getattr(settings, "tesseract_cmd", None),
+        os.getenv("TESSERACT_CMD"),
+        os.getenv("OCR_TESSERACT_CMD"),
+        os.getenv("TESSERACT_PATH"),
+        shutil.which("tesseract"),
+        "/usr/bin/tesseract",
+        "/usr/local/bin/tesseract",
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+    ]
+
+
+def _build_ocr_engine_diagnostics() -> dict[str, Any]:
+    candidates: list[dict[str, Any]] = []
+    for raw_candidate in _tesseract_candidate_values():
+        candidate = str(raw_candidate or "").strip().strip('"')
+        if not candidate:
+            continue
+        try:
+            path = Path(candidate)
+            candidates.append({
+                "candidate": candidate,
+                "exists": path.exists(),
+                "is_file": path.is_file(),
+                "suffix": path.suffix,
+            })
+        except Exception as exc:
+            candidates.append({"candidate": candidate, "probe_error": repr(exc)})
+
+    return {
+        "python_executable": sys.executable,
+        "cwd": os.getcwd(),
+        "settings_tesseract_cmd": str(getattr(settings, "tesseract_cmd", None)),
+        "env_TESSERACT_CMD": os.getenv("TESSERACT_CMD"),
+        "env_OCR_TESSERACT_CMD": os.getenv("OCR_TESSERACT_CMD"),
+        "env_TESSERACT_PATH": os.getenv("TESSERACT_PATH"),
+        "shutil_which_tesseract": shutil.which("tesseract"),
+        "PATH": os.getenv("PATH", ""),
+        "candidates": candidates,
+    }
+
+
+def _resolve_tesseract_cmd() -> str | None:
+    for raw_candidate in _tesseract_candidate_values():
+        candidate = str(raw_candidate or "").strip().strip('"')
+        if not candidate:
+            continue
+        if Path(candidate).exists():
+            return candidate
+    return None
 
 
 def _import_pytesseract():
     try:
         import pytesseract
-
-        configured_path = str(getattr(settings, "tesseract_cmd", "") or "").strip()
-        candidates = [configured_path] if configured_path else []
-        candidates.append(r"C:\Program Files\Tesseract-OCR\tesseract.exe")
-        for candidate in candidates:
-            if candidate and Path(candidate).exists():
-                pytesseract.pytesseract.tesseract_cmd = candidate
-                break
-
-        return pytesseract
+    except ModuleNotFoundError as exc:
+        payload = {
+            "message": "Python package pytesseract is missing from the backend venv",
+            "python_executable": sys.executable,
+            "fix": "python -m pip install pytesseract pillow",
+            "diagnostics": _build_ocr_engine_diagnostics(),
+            "exception": repr(exc),
+            "traceback": traceback.format_exc(),
+        }
+        _debug_dump("OCR_ENGINE_IMPORT_PYTESSERACT_FAILED", payload, always=True, max_chars=60000)
+        raise HTTPException(
+            status_code=503,
+            detail=f"OCR requires Python package pytesseract in this venv: {sys.executable}. Run: python -m pip install pytesseract pillow",
+        ) from exc
     except Exception as exc:
-        raise HTTPException(status_code=503, detail="OCR requires pytesseract and Tesseract to be installed") from exc
+        payload = {
+            "message": "Failed while importing pytesseract",
+            "python_executable": sys.executable,
+            "diagnostics": _build_ocr_engine_diagnostics(),
+            "exception": repr(exc),
+            "traceback": traceback.format_exc(),
+        }
+        _debug_dump("OCR_ENGINE_IMPORT_PYTESSERACT_FAILED", payload, always=True, max_chars=60000)
+        raise HTTPException(status_code=503, detail=f"OCR failed while importing pytesseract: {exc}") from exc
+
+    resolved_cmd = _resolve_tesseract_cmd()
+    if resolved_cmd:
+        pytesseract.pytesseract.tesseract_cmd = resolved_cmd
+    elif _ocr_engine_verbose_enabled():
+        _debug_dump("OCR_ENGINE_TESSERACT_CMD_NOT_RESOLVED", _build_ocr_engine_diagnostics(), always=True, max_chars=60000)
+
+    return pytesseract
 
 
 def _import_cv2_numpy():
