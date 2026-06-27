@@ -25,6 +25,8 @@ class ExamCorrectionApi {
   Future<ExamScanAnalyzeResponse> analyzeExamScan({
     required List<ExamCorrectionUploadFile> files,
     required String language,
+    int? courseId,
+    int? examId,
     CancelToken? cancelToken,
   }) async {
     if (files.isEmpty) {
@@ -44,6 +46,12 @@ class ExamCorrectionApi {
       );
     }
     form.fields.add(MapEntry('lang', language));
+    if (courseId != null) {
+      form.fields.add(MapEntry('course_id', courseId.toString()));
+    }
+    if (examId != null) {
+      form.fields.add(MapEntry('exam_id', examId.toString()));
+    }
 
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.examScanAnalyze,

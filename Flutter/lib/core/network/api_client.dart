@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:convert';
-
 import 'package:dio/dio.dart';
 
 import '../config/env.dart';
@@ -11,7 +10,31 @@ import 'api_exceptions.dart';
 import 'dio_adapter_config.dart';
 import 'endpoints.dart';
 import 'i_token_refresh_scheduler.dart';
+import 'jwt_access_token.dart';
 import 'refresh_client.dart';
+
+
+class SseEvent {
+  final String event;
+  final String data;
+  final Map<String, dynamic>? jsonData;
+
+  const SseEvent({
+    required this.event,
+    this.data = '',
+    this.jsonData,
+  });
+
+  bool get isReady => event == 'ready';
+  bool get isTimeout => event == 'timeout';
+  bool get isError => event == 'error';
+
+  String? get detail {
+    final raw = jsonData?['detail'] ?? jsonData?['message'] ?? jsonData?['error'];
+    final text = raw?.toString().trim();
+    return text == null || text.isEmpty ? null : text;
+  }
+}
 
 /// HTTP client built on Dio.
 /// Also implements [ITokenRefreshScheduler] so the repository layer can depend
@@ -35,14 +58,43 @@ class ApiClient implements ITokenRefreshScheduler {
 
     _dio.interceptors.add(
       InterceptorsWrapper(
-        onRequest: (options, handler) {
+        onRequest: (options, handler) async {
           GlobalLoadingBus.beginIfNeeded(options);
 
           options.headers['ngrok-skip-browser-warning'] = 'true';
 
-          final token = TokenStorage.token;
-          if (token != null && token.trim().isNotEmpty) {
-            options.headers['Authorization'] = 'Bearer ${token.trim()}';
+          var token = TokenStorage.token?.trim();
+
+          // Web timers can be throttled when the tab is inactive, so relying
+          // only on a proactive Timer is not enough. Before every protected
+          // request, silently refresh if the access JWT is already close to
+          // expiry. This prevents the app from sending an expired Bearer token
+          // and then being redirected out of the dashboard.
+          if (Env.enableRefreshToken &&
+              token != null &&
+              token.isNotEmpty &&
+              !_isAuthPath(options.path) &&
+              _shouldRefreshBeforeRequest(token)) {
+            try {
+              final fresh = await _refreshAccessTokenWithRecovery(
+                logFailure: false,
+              );
+              TokenStorage.saveSession(
+                accessToken: fresh,
+                persist: TokenStorage.isPersisted,
+              );
+              scheduleProactiveRefresh(fresh);
+              token = fresh.trim();
+            } catch (_) {
+              // Keep the current token on the request. If it really is expired,
+              // the 401 interceptor below will perform the normal reactive
+              // refresh flow and show a session-expired state only after the
+              // refresh cookie is confirmed invalid.
+            }
+          }
+
+          if (token != null && token.isNotEmpty) {
+            options.headers['Authorization'] = 'Bearer $token';
           }
 
           handler.next(options);
@@ -79,7 +131,7 @@ class ApiClient implements ITokenRefreshScheduler {
           if (shouldTryRefresh) {
             String newAccess;
             try {
-              newAccess = await _refreshAccessToken();
+              newAccess = await _refreshAccessTokenWithRecovery();
             } catch (refreshError) {
               GlobalLoadingBus.endIfNeeded(e.requestOptions);
 
@@ -182,39 +234,18 @@ class ApiClient implements ITokenRefreshScheduler {
     _proactiveTimer?.cancel();
     _proactiveTimer = null;
 
-    try {
-      final parts = accessToken.split('.');
-      if (parts.length != 3) return;
+    final expiry = JwtAccessToken.expiryOf(accessToken);
+    if (expiry == null) return;
 
-      String pad(String s) {
-        final rem = s.length % 4;
-        return rem == 0 ? s : s + '=' * (4 - rem);
-      }
+    final now = DateTime.now().toUtc();
+    if (expiry.isBefore(now)) return;
 
-      final payload = jsonDecode(
-        utf8.decode(base64Url.decode(pad(parts[1]))),
-      ) as Map<String, dynamic>;
+    final fireAt = expiry.subtract(const Duration(minutes: 2));
+    final delay = fireAt.isAfter(now)
+        ? fireAt.difference(now)
+        : const Duration(seconds: 30);
 
-      final exp = payload['exp'];
-      if (exp == null) return;
-
-      final expiry = DateTime.fromMillisecondsSinceEpoch(
-        (exp as num).toInt() * 1000,
-        isUtc: true,
-      );
-      final now = DateTime.now().toUtc();
-
-      if (expiry.isBefore(now)) return;
-
-      final fireAt = expiry.subtract(const Duration(minutes: 2));
-      final delay = fireAt.isAfter(now)
-          ? fireAt.difference(now)
-          : const Duration(seconds: 30);
-
-      _proactiveTimer = Timer(delay, _proactiveRefresh);
-    } catch (_) {
-      // Unparseable token → rely on the reactive interceptor.
-    }
+    _proactiveTimer = Timer(delay, _proactiveRefresh);
   }
 
   @override
@@ -231,7 +262,7 @@ class ApiClient implements ITokenRefreshScheduler {
     if (!TokenStorage.hasToken) return;
 
     try {
-      final newToken = await _refreshAccessToken();
+      final newToken = await _refreshAccessTokenWithRecovery();
 
       TokenStorage.saveSession(
         accessToken: newToken,
@@ -245,6 +276,92 @@ class ApiClient implements ITokenRefreshScheduler {
   }
 
   // ── Public HTTP methods ────────────────────────────────────────────────────
+
+
+  Future<SseEvent> waitForSseEvent(
+    String path, {
+    CancelToken? cancelToken,
+    Duration receiveTimeout = const Duration(minutes: 5),
+    Set<String> terminalEvents = const <String>{'ready', 'timeout', 'error'},
+  }) async {
+    final response = await _dio.get<ResponseBody>(
+      path,
+      options: Options(
+        responseType: ResponseType.stream,
+        receiveTimeout: receiveTimeout,
+        headers: const <String, dynamic>{
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        },
+        extra: const <String, dynamic>{'silent': true},
+      ),
+      cancelToken: cancelToken,
+    );
+
+    final stream = response.data?.stream;
+    if (stream == null) {
+      throw const FormatException('Invalid SSE response stream');
+    }
+
+    String eventName = 'message';
+    final dataLines = <String>[];
+
+    SseEvent dispatchEvent() {
+      final rawData = dataLines.join('\n').trim();
+      Map<String, dynamic>? jsonData;
+      if (rawData.isNotEmpty) {
+        try {
+          final decoded = jsonDecode(rawData);
+          if (decoded is Map) {
+            jsonData = Map<String, dynamic>.from(decoded);
+          }
+        } catch (_) {
+          jsonData = null;
+        }
+      }
+      final emitted = SseEvent(
+        event: eventName.trim().isEmpty ? 'message' : eventName.trim(),
+        data: rawData,
+        jsonData: jsonData,
+      );
+      eventName = 'message';
+      dataLines.clear();
+      return emitted;
+    }
+
+    final lineStream = stream
+        .map<List<int>>((chunk) => chunk)
+        .transform(utf8.decoder)
+        .transform(const LineSplitter());
+
+    await for (final line in lineStream) {
+      if (line.trim().isEmpty) {
+        if (dataLines.isEmpty && eventName == 'message') continue;
+        final emitted = dispatchEvent();
+        if (terminalEvents.contains(emitted.event)) return emitted;
+        continue;
+      }
+
+      if (line.startsWith(':')) continue;
+      if (line.startsWith('event:')) {
+        eventName = line.substring('event:'.length).trim();
+        continue;
+      }
+      if (line.startsWith('data:')) {
+        dataLines.add(line.substring('data:'.length).trimLeft());
+        continue;
+      }
+    }
+
+    if (dataLines.isNotEmpty || eventName != 'message') {
+      return dispatchEvent();
+    }
+
+    return const SseEvent(
+      event: 'closed',
+      data: 'The server closed the event stream before sending a terminal event.',
+    );
+  }
 
   Future<Response<T>> get<T>(
     String path, {
@@ -371,7 +488,21 @@ class ApiClient implements ITokenRefreshScheduler {
   }
 
   Future<String> refreshAccessToken({bool logFailure = true}) =>
-      _refreshAccessToken(logFailure: logFailure);
+      _refreshAccessTokenWithRecovery(logFailure: logFailure);
+
+  Future<String> _refreshAccessTokenWithRecovery({bool logFailure = true}) async {
+    try {
+      return await _refreshAccessToken(logFailure: logFailure);
+    } catch (error) {
+      if (!_isRefreshAuthFailure(error)) rethrow;
+
+      // A refresh cookie can be rotated by another in-flight request or tab.
+      // Give the browser a short moment to apply the newest Set-Cookie, then
+      // retry once before deciding the session is actually expired.
+      await Future<void>.delayed(const Duration(milliseconds: 450));
+      return _refreshAccessToken(logFailure: logFailure);
+    }
+  }
 
   Future<String> _callRefreshEndpoint({bool logFailure = true}) async {
     final url = '${Env.baseUrl}${Endpoints.refresh}';
@@ -491,6 +622,15 @@ class ApiClient implements ITokenRefreshScheduler {
     );
   }
 
+
+  bool _shouldRefreshBeforeRequest(String accessToken) {
+    final timeLeft = _accessTokenTimeLeft(accessToken);
+    if (timeLeft == null) return false;
+    return timeLeft <= const Duration(seconds: 90);
+  }
+
+  Duration? _accessTokenTimeLeft(String accessToken) =>
+      JwtAccessToken.timeLeft(accessToken);
 
   bool _canAttemptRefresh() {
     return TokenStorage.hasToken || TokenStorage.isPersisted;

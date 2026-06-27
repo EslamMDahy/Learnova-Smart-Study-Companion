@@ -202,44 +202,54 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
 
     return Container(
       color: AppColors.pageBg,
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
-      child: Column(
-        children: [
-          _StudentsHeader(
-            course: widget.course,
-            total: _invites.length + _requests.length,
-            accepted: _acceptedCount,
-            pending: _pendingCount + _requests.length,
-            onInvite: _openInviteDialog,
-            onRefresh: _loading ? null : _load,
-          ),
-          const SizedBox(height: 16),
-          if (_requests.isNotEmpty) ...[
-            _EnrollmentRequestsPanel(
-              requests: _requests,
-              updatingRequestIds: _updatingRequestIds,
-              onApprove: (request) => _updateEnrollmentRequest(request, 'approved'),
-              onDecline: (request) => _updateEnrollmentRequest(request, 'declined'),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1480),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _StudentsHeader(
+                  course: widget.course,
+                  loading: _loading,
+                  total: _invites.length + _requests.length,
+                  accepted: _acceptedCount,
+                  pending: _pendingCount + _requests.length,
+                  onInvite: _openInviteDialog,
+                  onRefresh: _load,
+                ),
+                const SizedBox(height: 16),
+                if (_requests.isNotEmpty) ...[
+                  _EnrollmentRequestsPanel(
+                    requests: _requests,
+                    updatingRequestIds: _updatingRequestIds,
+                    onApprove: (request) => _updateEnrollmentRequest(request, 'approved'),
+                    onDecline: (request) => _updateEnrollmentRequest(request, 'declined'),
+                  ),
+                  const SizedBox(height: 16),
+                ],
+                Expanded(
+                  child: _WorkspacePanel(
+                    searchController: _searchController,
+                    search: _search,
+                    filterLabel: _filterLabel,
+                    filterLabels: _filterLabels,
+                    loading: _loading,
+                    error: _error,
+                    total: _invites.length,
+                    shown: shown,
+                    onSearchChanged: (value) => setState(() => _search = value),
+                    onFilterChanged: (value) => setState(() => _filterLabel = value),
+                    onRetry: _load,
+                    onInvite: _openInviteDialog,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 16),
-          ],
-          Expanded(
-            child: _WorkspacePanel(
-              searchController: _searchController,
-              search: _search,
-              filterLabel: _filterLabel,
-              filterLabels: _filterLabels,
-              loading: _loading,
-              error: _error,
-              total: _invites.length,
-              shown: shown,
-              onSearchChanged: (value) => setState(() => _search = value),
-              onFilterChanged: (value) => setState(() => _filterLabel = value),
-              onRetry: _load,
-              onInvite: _openInviteDialog,
-            ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -247,14 +257,16 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
 
 class _StudentsHeader extends StatelessWidget {
   final MyCourseItem course;
+  final bool loading;
   final int total;
   final int accepted;
   final int pending;
   final VoidCallback onInvite;
-  final VoidCallback? onRefresh;
+  final VoidCallback onRefresh;
 
   const _StudentsHeader({
     required this.course,
+    required this.loading,
     required this.total,
     required this.accepted,
     required this.pending,
@@ -265,98 +277,163 @@ class _StudentsHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      constraints: const BoxConstraints(minHeight: 138),
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 20),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-          colors: [Color(0xFF0F5DCD), Color(0xFF168AE8), Color(0xFF19BCE8)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF145CCB), Color(0xFF137FEC), Color(0xFF22C1F1)],
         ),
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: AppColors.shadowBlue.withOpacity(0.28),
-            blurRadius: 24,
+            color: AppColors.primary.withOpacity(0.18),
+            blurRadius: 28,
             offset: const Offset(0, 12),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.14),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white.withOpacity(0.18)),
-                  ),
-                  child: const Text(
-                    'Private course access',
-                    style: TextStyle(
-                      fontFamily: 'Inter',
-                      fontSize: 12,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                    ),
-                  ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 820;
+
+          final actions = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: loading ? null : onRefresh,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white.withOpacity(0.5),
+                  side: BorderSide(color: Colors.white.withOpacity(0.35)),
+                  backgroundColor: Colors.white.withOpacity(0.08),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
-                const SizedBox(height: 14),
-                Text(
-                  'Student Workspace',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.h3.copyWith(
+                icon: loading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Refresh'),
+              ),
+              FilledButton.icon(
+                onPressed: onInvite,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.group_add_rounded, size: 18),
+                label: const Text('Invite students'),
+              ),
+            ],
+          );
+
+          final stats = Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _HeaderMetric(value: total, label: 'Invites'),
+              _HeaderMetric(value: accepted, label: 'Accepted'),
+              _HeaderMetric(value: pending, label: 'Pending'),
+            ],
+          );
+
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: Colors.white.withOpacity(0.18)),
+                ),
+                child: const Text(
+                  'Students',
+                  style: TextStyle(
+                    fontFamily: 'Inter',
                     color: Colors.white,
-                    fontSize: 26,
-                    height: 1.05,
-                    letterSpacing: -0.4,
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.4,
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  '${course.safeTitle} • invite-only enrollment management',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppTextStyles.muted.copyWith(
-                    color: Colors.white.withOpacity(0.86),
-                    fontWeight: FontWeight.w600,
-                  ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Student Workspace',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 30,
+                  height: 1.05,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: -0.7,
                 ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${course.safeTitle} • invite-only enrollment management',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontFamily: 'Inter',
+                  fontSize: 13.5,
+                  height: 1.55,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withOpacity(0.84),
+                ),
+              ),
+            ],
+          );
+
+          if (compact) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                copy,
+                const SizedBox(height: 18),
+                stats,
+                const SizedBox(height: 10),
+                actions,
               ],
-            ),
-          ),
-          const SizedBox(width: 24),
-          _HeaderMetric(value: '$total', label: 'Invites'),
-          const SizedBox(width: 10),
-          _HeaderMetric(value: '$accepted', label: 'Accepted'),
-          const SizedBox(width: 10),
-          _HeaderMetric(value: '$pending', label: 'Pending'),
-          const SizedBox(width: 16),
-          _HeaderButton(
-            icon: Icons.refresh_rounded,
-            label: 'Refresh',
-            onPressed: onRefresh,
-            outlined: true,
-          ),
-          const SizedBox(width: 10),
-          _HeaderButton(
-            icon: Icons.group_add_rounded,
-            label: 'Invite students',
-            onPressed: onInvite,
-            outlined: false,
-          ),
-        ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(child: copy),
+              const SizedBox(width: 24),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  stats,
+                  const SizedBox(height: 10),
+                  actions,
+                ],
+              ),
+            ],
+          );
+        },
       ),
     );
   }
 }
 
 class _HeaderMetric extends StatelessWidget {
-  final String value;
+  final int value;
   final String label;
 
   const _HeaderMetric({required this.value, required this.label});
@@ -364,82 +441,37 @@ class _HeaderMetric extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 96,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.14),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.18)),
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.22)),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Text(
-            value,
+            '$value',
             style: const TextStyle(
               fontFamily: 'Inter',
-              fontSize: 20,
-              fontWeight: FontWeight.w900,
               color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
               height: 1,
             ),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(width: 7),
           Text(
             label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               fontFamily: 'Inter',
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
               color: Colors.white.withOpacity(0.78),
+              fontSize: 11.2,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _HeaderButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
-  final bool outlined;
-
-  const _HeaderButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    required this.outlined,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final bg = outlined ? Colors.white.withOpacity(0.10) : Colors.white;
-    final fg = outlined ? Colors.white : AppColors.primary;
-    return SizedBox(
-      height: 40,
-      child: TextButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 17),
-        label: Text(label),
-        style: TextButton.styleFrom(
-          backgroundColor: onPressed == null ? Colors.white.withOpacity(0.08) : bg,
-          foregroundColor: onPressed == null ? Colors.white.withOpacity(0.45) : fg,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(9),
-            side: BorderSide(color: Colors.white.withOpacity(outlined ? 0.22 : 0)),
-          ),
-          textStyle: const TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 13,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
       ),
     );
   }
@@ -972,29 +1004,38 @@ class _PublicCourseMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       color: AppColors.pageBg,
-      alignment: Alignment.center,
-      padding: const EdgeInsets.all(32),
-      child: Container(
-        constraints: const BoxConstraints(maxWidth: 520),
-        padding: const EdgeInsets.all(28),
-        decoration: BoxDecoration(
-          color: AppColors.cardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.public_rounded, color: AppColors.primary, size: 34),
-            const SizedBox(height: 14),
-            Text('No pending enrollment requests', style: AppTextStyles.sectionTitle),
-            const SizedBox(height: 8),
-            Text(
-              '${course.safeTitle} has no pending enrollment requests right now.',
-              style: AppTextStyles.muted.copyWith(height: 1.45),
-              textAlign: TextAlign.center,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1480),
+            child: Center(
+              child: Container(
+                constraints: const BoxConstraints(maxWidth: 520),
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  color: AppColors.cardBg,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.public_rounded, color: AppColors.primary, size: 34),
+                    const SizedBox(height: 14),
+                    Text('No pending enrollment requests', style: AppTextStyles.sectionTitle),
+                    const SizedBox(height: 8),
+                    Text(
+                      '${course.safeTitle} has no pending enrollment requests right now.',
+                      style: AppTextStyles.muted.copyWith(height: 1.45),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ],
+          ),
         ),
       ),
     );

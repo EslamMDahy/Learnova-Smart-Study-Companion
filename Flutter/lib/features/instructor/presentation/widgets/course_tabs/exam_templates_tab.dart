@@ -94,47 +94,87 @@ class _CourseExamTemplatesTabState extends ConsumerState<CourseExamTemplatesTab>
 
   @override
   Widget build(BuildContext context) {
+    final totalQuestions = _templates.fold<int>(
+      0,
+      (sum, template) => sum + template.questionCount,
+    );
+    final customTemplates = _templates.where((template) => !template.isDefault).length;
+
     return Container(
       color: AppColors.pageBg,
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
-      child: Column(
-        children: [
-          _TemplatesHeader(onCreate: () => _openEditor()),
-          const SizedBox(height: 16),
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: AppColors.cardBg,
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: AppColors.border),
-                boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 24, offset: const Offset(0, 10))],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(18),
-                child: _loading
-                    ? const Center(child: CircularProgressIndicator())
-                    : _error != null
-                        ? _TemplatesError(message: _error!, onRetry: _load)
-                        : _templates.isEmpty
-                            ? _TemplatesEmpty(onCreate: () => _openEditor())
-                            : _TemplatesList(
-                                templates: _templates,
-                                onEdit: _openEditor,
-                                onDelete: _delete,
-                              ),
-              ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1480),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _TemplatesHeader(
+                  loading: _loading,
+                  totalTemplates: _templates.length,
+                  customTemplates: customTemplates,
+                  totalQuestions: totalQuestions,
+                  onRefresh: _load,
+                  onCreate: () => _openEditor(),
+                ),
+                const SizedBox(height: 16),
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: AppColors.cardBg,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: AppColors.border),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.shadowThin,
+                          blurRadius: 24,
+                          offset: const Offset(0, 10),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(18),
+                      child: _loading
+                          ? const Center(child: CircularProgressIndicator())
+                          : _error != null
+                              ? _TemplatesError(message: _error!, onRetry: _load)
+                              : _templates.isEmpty
+                                  ? _TemplatesEmpty(onCreate: () => _openEditor())
+                                  : _TemplatesList(
+                                      templates: _templates,
+                                      onEdit: _openEditor,
+                                      onDelete: _delete,
+                                    ),
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
 }
 
 class _TemplatesHeader extends StatelessWidget {
+  final bool loading;
+  final int totalTemplates;
+  final int customTemplates;
+  final int totalQuestions;
+  final VoidCallback onRefresh;
   final VoidCallback onCreate;
 
-  const _TemplatesHeader({required this.onCreate});
+  const _TemplatesHeader({
+    required this.loading,
+    required this.totalTemplates,
+    required this.customTemplates,
+    required this.totalQuestions,
+    required this.onRefresh,
+    required this.onCreate,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -146,57 +186,183 @@ class _TemplatesHeader extends StatelessWidget {
           end: Alignment.bottomRight,
           colors: [Color(0xFF145CCB), Color(0xFF137FEC), Color(0xFF22C1F1)],
         ),
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.18), blurRadius: 28, offset: const Offset(0, 12))],
+        borderRadius: BorderRadius.circular(14),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.18),
+            blurRadius: 28,
+            offset: const Offset(0, 12),
+          ),
+        ],
       ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Expanded(
-            child: Column(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 820;
+
+          final actions = Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              OutlinedButton.icon(
+                onPressed: loading ? null : onRefresh,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white.withOpacity(0.5),
+                  side: BorderSide(color: Colors.white.withOpacity(0.35)),
+                  backgroundColor: Colors.white.withOpacity(0.08),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: loading
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : const Icon(Icons.refresh_rounded, size: 18),
+                label: const Text('Refresh'),
+              ),
+              FilledButton.icon(
+                onPressed: onCreate,
+                style: FilledButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: AppColors.primary,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: const Icon(Icons.add_rounded, size: 18),
+                label: const Text('New Template'),
+              ),
+            ],
+          );
+
+          final stats = Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.end,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              _TemplateHeaderCounter(label: 'Templates', value: totalTemplates),
+              _TemplateHeaderCounter(label: 'Custom', value: customTemplates),
+              _TemplateHeaderCounter(label: 'Questions', value: totalQuestions),
+            ],
+          );
+
+          final copy = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.14),
+                  borderRadius: BorderRadius.circular(9),
+                  border: Border.all(color: Colors.white.withOpacity(0.18)),
+                ),
+                child: Text(
+                  'Templates',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 0.4,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 14),
+              const Text(
+                'Assessment Templates',
+                style: TextStyle(
+                  fontSize: 30,
+                  height: 1.05,
+                  fontWeight: FontWeight.w900,
+                  color: Colors.white,
+                  letterSpacing: -0.7,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Define reusable exam structures before selecting topics, outcomes, and questions.',
+                style: TextStyle(
+                  fontSize: 13.5,
+                  height: 1.55,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withOpacity(0.84),
+                ),
+              ),
+            ],
+          );
+
+          if (compact) {
+            return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.14),
-                    borderRadius: BorderRadius.circular(999),
-                    border: Border.all(color: Colors.white.withOpacity(0.18)),
-                  ),
-                  child: Text(
-                    'Exam templates',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 0.4,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                const Text(
-                  'Assessment Templates',
-                  style: TextStyle(fontSize: 30, height: 1.05, fontWeight: FontWeight.w900, color: Colors.white, letterSpacing: -0.7),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'Define reusable exam structures before selecting topics, outcomes, and questions.',
-                  style: TextStyle(fontSize: 13.5, height: 1.55, fontWeight: FontWeight.w600, color: Colors.white.withOpacity(0.84)),
-                ),
+                copy,
+                const SizedBox(height: 18),
+                stats,
+                const SizedBox(height: 10),
+                actions,
               ],
+            );
+          }
+
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(child: copy),
+              const SizedBox(width: 24),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  stats,
+                  const SizedBox(height: 10),
+                  actions,
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _TemplateHeaderCounter extends StatelessWidget {
+  final String label;
+  final int value;
+
+  const _TemplateHeaderCounter({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 42,
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.12),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.white.withOpacity(0.22)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            '$value',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 15,
+              fontWeight: FontWeight.w900,
+              height: 1,
             ),
           ),
-          const SizedBox(width: 18),
-          FilledButton.icon(
-            onPressed: onCreate,
-            style: FilledButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          const SizedBox(width: 7),
+          Text(
+            label,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.78),
+              fontSize: 11.2,
+              fontWeight: FontWeight.w800,
             ),
-            icon: const Icon(Icons.add_rounded, size: 18),
-            label: const Text('New Template'),
           ),
         ],
       ),

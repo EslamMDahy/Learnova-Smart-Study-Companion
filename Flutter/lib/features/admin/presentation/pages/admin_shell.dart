@@ -122,9 +122,11 @@ class _AdminShellState extends ConsumerState<AdminShell> {
       valueListenable: UserStorage.listenable as ValueNotifier<int>,
       builder: (context, _, __) {
         return BaseDashboardShell(
-          sidebar: AdminSidebarWidget(
+          sidebarBuilder: (isCollapsed, toggleSidebar) => AdminSidebarWidget(
             selectedIndex: _selectedIndexFromPath(path),
             onItemSelected: _goByIndex,
+            isCollapsed: isCollapsed,
+            onToggle: toggleSidebar,
           ),
 
           header: TopHeaderWidget(

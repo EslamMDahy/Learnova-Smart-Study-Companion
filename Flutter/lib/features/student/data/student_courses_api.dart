@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/network/endpoints.dart';
+import '../../../core/utils/json_utils.dart';
 import 'student_courses_models.dart';
 
 class StudentCoursesApi {
@@ -10,17 +11,14 @@ class StudentCoursesApi {
   const StudentCoursesApi(this._client);
 
   Future<StudentMyCoursesResponse> myCourses({CancelToken? cancelToken}) async {
-    final res = await _client.get<Map<String, dynamic>>(
+    final res = await _client.get<Object?>(
       Endpoints.myCourses,
       cancelToken: cancelToken,
     );
 
-    final data = res.data;
-    if (data is Map<String, dynamic>) {
-      return StudentMyCoursesResponse.fromJson(data);
-    }
-
-    throw const FormatException('Invalid response from /courses/my');
+    return StudentMyCoursesResponse.fromJson(
+      requireJsonMap(res.data, 'Invalid response from /courses/my'),
+    );
   }
 
   Future<StudentCourseSearchResponse> searchPublicCourses({
@@ -53,23 +51,19 @@ class StudentCoursesApi {
       },
     ).toString();
 
-    final res = await _client.get<dynamic>(
+    final res = await _client.get<Object?>(
       path,
       cancelToken: cancelToken,
     );
 
     final data = res.data;
-    if (data is Map<String, dynamic>) {
-      return StudentCourseSearchResponse.fromJson(data);
-    }
-    if (data is Map) {
-      return StudentCourseSearchResponse.fromJson(
-        Map<String, dynamic>.from(data),
-      );
-    }
-    if (data is List) {
+    final map = asJsonMap(data);
+    if (map != null) return StudentCourseSearchResponse.fromJson(map);
+
+    final list = asJsonList(data);
+    if (list != null) {
       return StudentCourseSearchResponse.fromList(
-        data,
+        list,
         limit: safeLimit,
         offset: safeOffset,
       );
@@ -92,23 +86,17 @@ class StudentCoursesApi {
       queryParameters: {'q': normalizedQuery},
     ).toString();
 
-    final res = await _client.get<dynamic>(
+    final res = await _client.get<Object?>(
       path,
       cancelToken: cancelToken,
     );
 
     final data = res.data;
-    if (data is Map<String, dynamic>) {
-      return StudentCourseAutocompleteResponse.fromJson(data);
-    }
-    if (data is Map) {
-      return StudentCourseAutocompleteResponse.fromJson(
-        Map<String, dynamic>.from(data),
-      );
-    }
-    if (data is List) {
-      return StudentCourseAutocompleteResponse.fromList(data);
-    }
+    final map = asJsonMap(data);
+    if (map != null) return StudentCourseAutocompleteResponse.fromJson(map);
+
+    final list = asJsonList(data);
+    if (list != null) return StudentCourseAutocompleteResponse.fromList(list);
 
     throw const FormatException(
       'Invalid response from /courses/search/autocomplete',
@@ -124,27 +112,19 @@ class StudentCoursesApi {
       throw const FormatException('Invitation token is required');
     }
 
-    final res = await _client.post<dynamic>(
+    final res = await _client.post<Object?>(
       Endpoints.acceptCourseInvitation,
       data: {'token': normalizedToken},
       cancelToken: cancelToken,
     );
 
-    final data = res.data;
-    if (data is Map<String, dynamic>) {
-      return StudentCourseInviteAcceptResult.fromJson(data);
-    }
-    if (data is Map) {
-      return StudentCourseInviteAcceptResult.fromJson(
-        Map<String, dynamic>.from(data),
-      );
-    }
-
-    throw const FormatException(
-      'Invalid response from /courses/invitations/accept',
+    return StudentCourseInviteAcceptResult.fromJson(
+      requireJsonMap(
+        res.data,
+        'Invalid response from /courses/invitations/accept',
+      ),
     );
   }
-
 
   Future<StudentCourseContent> courseContent({
     required int courseId,
@@ -163,24 +143,22 @@ class StudentCoursesApi {
       }
     }
 
-    final modulesResponse = await _client.get<Map<String, dynamic>>(
+    final modulesResponse = await _client.get<Object?>(
       Endpoints.courseModules(courseId),
       cancelToken: cancelToken,
     );
 
-    final modulesPayload = modulesResponse.data;
-    if (modulesPayload is! Map<String, dynamic>) {
-      throw const FormatException('Invalid response from /courses/{id}/modules');
-    }
+    final modulesPayload = requireJsonMap(
+      modulesResponse.data,
+      'Invalid response from /courses/{id}/modules',
+    );
+    final rawModules = requireJsonList(
+      modulesPayload['modules'],
+      'Invalid modules payload',
+    );
 
-    final rawModules = modulesPayload['modules'];
-    if (rawModules is! List) {
-      throw const FormatException('Invalid modules payload');
-    }
-
-    final modules = rawModules
-        .whereType<Map>()
-        .map((item) => StudentCourseModule.fromJson(Map<String, dynamic>.from(item)))
+    final modules = jsonMapList(rawModules)
+        .map(StudentCourseModule.fromJson)
         .where((module) => module.id > 0)
         .toList(growable: false);
 
@@ -218,24 +196,22 @@ class StudentCoursesApi {
     required int moduleId,
     CancelToken? cancelToken,
   }) async {
-    final res = await _client.get<Map<String, dynamic>>(
+    final res = await _client.get<Object?>(
       Endpoints.moduleMaterials(courseId, moduleId),
       cancelToken: cancelToken,
     );
 
-    final data = res.data;
-    if (data is! Map<String, dynamic>) {
-      throw const FormatException('Invalid response from module materials');
-    }
+    final data = requireJsonMap(
+      res.data,
+      'Invalid response from module materials',
+    );
+    final rawMaterials = requireJsonList(
+      data['materials'],
+      'Invalid module materials payload',
+    );
 
-    final rawMaterials = data['materials'];
-    if (rawMaterials is! List) {
-      throw const FormatException('Invalid module materials payload');
-    }
-
-    final materials = rawMaterials
-        .whereType<Map>()
-        .map((item) => StudentCourseMaterial.fromJson(Map<String, dynamic>.from(item)))
+    final materials = jsonMapList(rawMaterials)
+        .map(StudentCourseMaterial.fromJson)
         .where((material) => material.id > 0)
         .toList(growable: false);
 
@@ -251,24 +227,22 @@ class StudentCoursesApi {
     required int materialId,
     CancelToken? cancelToken,
   }) async {
-    final res = await _client.get<Map<String, dynamic>>(
+    final res = await _client.get<Object?>(
       Endpoints.materialTopics(courseId, moduleId, materialId),
       cancelToken: cancelToken,
     );
 
-    final data = res.data;
-    if (data is! Map<String, dynamic>) {
-      throw const FormatException('Invalid response from material topics');
-    }
+    final data = requireJsonMap(
+      res.data,
+      'Invalid response from material topics',
+    );
+    final rawTopics = requireJsonList(
+      data['topics'],
+      'Invalid material topics payload',
+    );
 
-    final rawTopics = data['topics'];
-    if (rawTopics is! List) {
-      throw const FormatException('Invalid material topics payload');
-    }
-
-    return rawTopics
-        .whereType<Map>()
-        .map((item) => StudentCourseTopic.fromJson(Map<String, dynamic>.from(item)))
+    return jsonMapList(rawTopics)
+        .map(StudentCourseTopic.fromJson)
         .where((topic) => topic.id > 0)
         .toList(growable: false);
   }
@@ -277,17 +251,17 @@ class StudentCoursesApi {
     required int courseId,
     CancelToken? cancelToken,
   }) async {
-    final res = await _client.get<Map<String, dynamic>>(
+    final res = await _client.get<Object?>(
       Endpoints.studentExams(courseId),
       cancelToken: cancelToken,
     );
 
-    final data = res.data;
-    if (data is Map<String, dynamic>) {
-      return StudentCourseExamListResponse.fromJson(data).exams;
-    }
-
-    throw const FormatException('Invalid response from student exams endpoint');
+    return StudentCourseExamListResponse.fromJson(
+      requireJsonMap(
+        res.data,
+        'Invalid response from student exams endpoint',
+      ),
+    ).exams;
   }
 
   Future<StudentExamAttempt> startStudentExamAttempt({
@@ -295,36 +269,29 @@ class StudentCoursesApi {
     required int examId,
     CancelToken? cancelToken,
   }) async {
-    final res = await _client.post<Map<String, dynamic>>(
+    final res = await _client.post<Object?>(
       Endpoints.startStudentExamAttempt(courseId, examId),
       cancelToken: cancelToken,
     );
 
-    final data = res.data;
-    if (data is Map<String, dynamic>) {
-      return StudentExamAttempt.fromJson(data);
-    }
-
-    throw const FormatException('Invalid response from student exam attempt');
+    return StudentExamAttempt.fromJson(
+      requireJsonMap(res.data, 'Invalid response from student exam attempt'),
+    );
   }
-
 
   Future<StudentExamAttemptsList> listStudentExamAttempts({
     required int courseId,
     required int examId,
     CancelToken? cancelToken,
   }) async {
-    final res = await _client.get<Map<String, dynamic>>(
+    final res = await _client.get<Object?>(
       Endpoints.studentExamAttempts(courseId, examId),
       cancelToken: cancelToken,
     );
 
-    final data = res.data;
-    if (data is Map<String, dynamic>) {
-      return StudentExamAttemptsList.fromJson(data);
-    }
-
-    throw const FormatException('Invalid response from student exam attempts');
+    return StudentExamAttemptsList.fromJson(
+      requireJsonMap(res.data, 'Invalid response from student exam attempts'),
+    );
   }
 
   Future<StudentExamLatestResult> studentExamAttemptResult({
@@ -335,22 +302,17 @@ class StudentCoursesApi {
     int attemptsUsed = 0,
     CancelToken? cancelToken,
   }) async {
-    final res = await _client.get<Map<String, dynamic>>(
+    final res = await _client.get<Object?>(
       Endpoints.studentExamAttemptResult(courseId, examId, attemptId),
       cancelToken: cancelToken,
     );
 
-    final data = res.data;
-    if (data is Map<String, dynamic>) {
-      return StudentExamLatestResult.fromAttemptResult(
-        Map<String, dynamic>.from(data),
-        courseId: courseId,
-        summary: summary,
-        attemptsUsed: attemptsUsed,
-      );
-    }
-
-    throw const FormatException('Invalid response from student exam result');
+    return StudentExamLatestResult.fromAttemptResult(
+      requireJsonMap(res.data, 'Invalid response from student exam result'),
+      courseId: courseId,
+      summary: summary,
+      attemptsUsed: attemptsUsed,
+    );
   }
 
   Future<StudentExamLatestResult> latestStudentExamResult({
@@ -403,7 +365,7 @@ class StudentCoursesApi {
     required StudentExamAnswerDraft answer,
     CancelToken? cancelToken,
   }) async {
-    await _client.put<Map<String, dynamic>>(
+    await _client.put<Object?>(
       Endpoints.submitStudentExamAnswer(courseId, examId, attemptId),
       data: answer.toJson(),
       options: Options(
@@ -421,7 +383,7 @@ class StudentCoursesApi {
     int? timeSpentSeconds,
     CancelToken? cancelToken,
   }) async {
-    final res = await _client.post<Map<String, dynamic>>(
+    final res = await _client.post<Object?>(
       Endpoints.submitStudentExam(courseId, examId, attemptId),
       data: {
         'answers': answers.map((answer) => answer.toJson()).toList(growable: false),
@@ -430,12 +392,9 @@ class StudentCoursesApi {
       cancelToken: cancelToken,
     );
 
-    final data = res.data;
-    if (data is Map<String, dynamic>) {
-      return StudentExamSubmitResult.fromJson(data);
-    }
-
-    throw const FormatException('Invalid response from student exam submit');
+    return StudentExamSubmitResult.fromJson(
+      requireJsonMap(res.data, 'Invalid response from student exam submit'),
+    );
   }
 
   Future<String?> materialDownloadUrl({
@@ -444,34 +403,30 @@ class StudentCoursesApi {
     required int materialId,
     CancelToken? cancelToken,
   }) async {
-    final res = await _client.get<Map<String, dynamic>>(
+    final res = await _client.get<Object?>(
       Endpoints.materialDownloadUrl(courseId, moduleId, materialId),
       cancelToken: cancelToken,
     );
 
-    final data = res.data;
-    if (data is Map<String, dynamic>) {
-      final url = (data['download_url'] ?? data['url'] ?? '').toString().trim();
-      return url.isEmpty ? null : url;
-    }
-
-    throw const FormatException('Invalid response from material download URL');
+    final data = requireJsonMap(
+      res.data,
+      'Invalid response from material download URL',
+    );
+    final url = (data['download_url'] ?? data['url'] ?? '').toString().trim();
+    return url.isEmpty ? null : url;
   }
 
   Future<StudentCourseEnrollmentResult> enroll({
     required int courseId,
     CancelToken? cancelToken,
   }) async {
-    final res = await _client.post<Map<String, dynamic>>(
+    final res = await _client.post<Object?>(
       Endpoints.enrollCourse(courseId),
       cancelToken: cancelToken,
     );
 
-    final data = res.data;
-    if (data is Map<String, dynamic>) {
-      return StudentCourseEnrollmentResult.fromJson(data);
-    }
-
-    throw const FormatException('Invalid response from /courses/{id}/enroll');
+    return StudentCourseEnrollmentResult.fromJson(
+      requireJsonMap(res.data, 'Invalid response from /courses/{id}/enroll'),
+    );
   }
 }

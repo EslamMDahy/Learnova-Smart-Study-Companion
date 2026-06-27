@@ -98,6 +98,35 @@ QuestionType parseQuestionType(String raw) {
   }
 }
 
+
+extension QuestionSourceVocabulary on QuestionSource {
+  String get backendValue {
+    switch (this) {
+      case QuestionSource.manual:
+        return 'manual';
+      case QuestionSource.aiGenerated:
+        return 'ai_generated';
+      case QuestionSource.nativeExtraction:
+        return 'native_extraction';
+      case QuestionSource.imported:
+        return 'imported';
+    }
+  }
+
+  String get label {
+    switch (this) {
+      case QuestionSource.manual:
+        return 'Manual';
+      case QuestionSource.aiGenerated:
+        return 'AI';
+      case QuestionSource.nativeExtraction:
+        return 'Material';
+      case QuestionSource.imported:
+        return 'Imported';
+    }
+  }
+}
+
 QuestionDifficulty parseQuestionDifficulty(String raw) {
   switch (raw.trim().toLowerCase()) {
     case 'easy':
@@ -108,3 +137,23 @@ QuestionDifficulty parseQuestionDifficulty(String raw) {
       return QuestionDifficulty.medium;
   }
 }
+
+
+QuestionSource parseQuestionSource(String raw) {
+  switch (raw.trim().toLowerCase()) {
+    case 'ai_generated':
+    case 'ai':
+      return QuestionSource.aiGenerated;
+    case 'native_extraction':
+    case 'native':
+    case 'material':
+    case 'material_extraction':
+      return QuestionSource.nativeExtraction;
+    case 'imported':
+      return QuestionSource.imported;
+    case 'manual':
+    default:
+      return QuestionSource.manual;
+  }
+}
+

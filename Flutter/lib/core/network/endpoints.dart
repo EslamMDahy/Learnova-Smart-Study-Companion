@@ -83,6 +83,8 @@ class Endpoints {
       '/materials/$materialId/confirm-upload';
   static String materialDownloadUrl(int courseId, int moduleId, int materialId) =>
       '$_courses/$courseId/modules/$moduleId/materials/$materialId/download-url';
+  static String contentStructureGenerationStream(int courseId, int materialId) =>
+      '$_courses/$courseId/materials/$materialId/content-structure/stream';
   static String deleteMaterial(int courseId, int moduleId, int materialId) =>
       '$_courses/$courseId/modules/$moduleId/materials/$materialId';
   static String reassignMaterial(int materialId) =>
@@ -128,6 +130,12 @@ class Endpoints {
       '$_courses/$courseId/modules/$moduleId/materials/$materialId/topics/$topicId/questions';
   static String aiGenerateQuestions(int courseId) =>
       '$_courses/$courseId/questions/ai-generate';
+  static String aiQuestionGenerationStream(int courseId) =>
+      '$_courses/$courseId/questions/generation/stream';
+  static String extractNativeMaterialQuestions(int courseId, int materialId) =>
+      '$_courses/$courseId/materials/$materialId/questions/extract-native';
+  static String extractNativeMaterialQuestionsStream(int courseId, int materialId) =>
+      '$_courses/$courseId/materials/$materialId/questions/extract-native/stream';
 
   // ─── EXAMS ───────────────────────────────────────────────────────────────
   static String courseExams(int courseId) =>

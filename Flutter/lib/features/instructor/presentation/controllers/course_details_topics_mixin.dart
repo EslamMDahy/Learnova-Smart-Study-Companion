@@ -14,7 +14,11 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
 
   /// Eager loader kept for flows that truly need the whole module tree.
   /// Materials page interactions should prefer [loadTopicsForMaterial].
-  Future<void> loadTopics(int moduleId, {bool force = false}) async {
+  Future<void> loadTopics(
+    int moduleId, {
+    bool force = false,
+    bool hydrateDetails = true,
+  }) async {
     if (state.topicsLoading[moduleId] ?? false) return;
 
     if ((state.materials[moduleId] ?? const <MaterialItem>[]).isEmpty) {
@@ -38,6 +42,7 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
         moduleId: moduleId,
         materialId: material.id,
         force: force,
+        hydrateDetails: hydrateDetails,
       );
     }
   }
@@ -52,6 +57,7 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
     required int moduleId,
     required int materialId,
     bool force = false,
+    bool hydrateDetails = true,
   }) async {
     if (state.topicsLoading[moduleId] ?? false) return;
     if (!force && state.topicsLoadedMaterialIds.contains(materialId)) return;
@@ -66,11 +72,33 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
             moduleId: moduleId,
             materialId: materialId,
           );
+      final previousById = <int, TopicItem>{
+        for (final TopicItem topic in state.topics[moduleId] ?? const <TopicItem>[])
+          if (topic.materialId == materialId) topic.id: topic,
+      };
+
+      final listedTopics = res.topics
+          .map(
+            (topic) => _mergeTopicDetails(
+              moduleId: moduleId,
+              materialId: materialId,
+              base: topic,
+              previous: previousById[topic.id],
+            ),
+          )
+          .toList(growable: false);
+      final detailedTopics = hydrateDetails
+          ? await _hydrateListedTopicDetails(
+              moduleId: moduleId,
+              materialId: materialId,
+              topics: listedTopics,
+            )
+          : listedTopics;
 
       final mergedTopics = <TopicItem>[
         for (final TopicItem topic in state.topics[moduleId] ?? const <TopicItem>[])
           if (topic.materialId != materialId) topic,
-        ...res.topics,
+        ...detailedTopics,
       ]..sort((a, b) {
           final materialCmp = a.materialId.compareTo(b.materialId);
           if (materialCmp != 0) return materialCmp;
@@ -98,6 +126,130 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
     }
   }
 
+
+  Future<List<TopicItem>> _hydrateListedTopicDetails({
+    required int moduleId,
+    required int materialId,
+    required List<TopicItem> topics,
+  }) async {
+    if (topics.isEmpty) return const <TopicItem>[];
+
+    final previousById = <int, TopicItem>{
+      for (final TopicItem topic in state.topics[moduleId] ?? const <TopicItem>[])
+        if (topic.materialId == materialId) topic.id: topic,
+    };
+    final api = ref.read(topicsApiProvider);
+
+    final hydrated = await Future.wait(topics.map((topic) async {
+      final previous = previousById[topic.id];
+      final normalized = _mergeTopicDetails(
+        moduleId: moduleId,
+        materialId: materialId,
+        base: topic,
+        previous: previous,
+      );
+
+      // The backend list endpoint is intentionally light and can omit
+      // page_start/page_end and learning_outcomes. Hydrate every topic once
+      // when a material opens so Sub LO mappings are visible without refresh.
+      try {
+        final detail = await api.getTopic(
+          courseId: courseId,
+          moduleId: moduleId,
+          materialId: materialId,
+          topicId: topic.id,
+        );
+        return _mergeTopicDetails(
+          moduleId: moduleId,
+          materialId: materialId,
+          base: detail.topic,
+          previous: normalized,
+        );
+      } catch (_) {
+        return normalized;
+      }
+    }));
+
+    return hydrated;
+  }
+
+  TopicItem _mergeTopicDetails({
+    required int moduleId,
+    required int materialId,
+    required TopicItem base,
+    TopicItem? previous,
+  }) {
+    final outcomeIds = base.learningOutcomeIds.isNotEmpty
+        ? base.learningOutcomeIds
+        : (previous?.learningOutcomeIds ?? const <int>[]);
+    final outcomeStringIds = base.linkedOutcomeIds.isNotEmpty
+        ? base.linkedOutcomeIds
+        : (previous?.linkedOutcomeIds ?? outcomeIds.map((id) => id.toString()).toList());
+
+    return base.copyWith(
+      moduleId: moduleId,
+      materialId: materialId,
+      pageStart: base.pageStart ?? previous?.pageStart,
+      pageEnd: base.pageEnd ?? previous?.pageEnd,
+      source: previous?.source ?? base.source,
+      difficulty: previous?.difficulty ?? base.difficulty,
+      readiness: base.isReviewed
+          ? TopicReadiness.ready
+          : (previous?.readiness ?? base.readiness),
+      linkedOutcomeId: base.linkedOutcomeId ?? previous?.linkedOutcomeId,
+      linkedOutcomeIds: outcomeStringIds,
+      learningOutcomeIds: outcomeIds,
+      instructorNotes: previous?.instructorNotes,
+      estimatedDurationMinutes: previous?.estimatedDurationMinutes,
+      isRequired: previous?.isRequired ?? base.isRequired,
+    );
+  }
+
+  Future<TopicItem?> loadTopicDetails({
+    required int moduleId,
+    required int materialId,
+    required int topicId,
+  }) async {
+    try {
+      final res = await ref.read(topicsApiProvider).getTopic(
+            courseId: courseId,
+            moduleId: moduleId,
+            materialId: materialId,
+            topicId: topicId,
+          );
+
+      final existing = List<TopicItem>.from(state.topics[moduleId] ?? const []);
+      final idx = existing.indexWhere((topic) => topic.id == topicId);
+      final previous = idx >= 0 ? existing[idx] : null;
+      final loaded = _mergeTopicDetails(
+        moduleId: moduleId,
+        materialId: materialId,
+        base: res.topic,
+        previous: previous,
+      );
+
+      if (idx >= 0) {
+        existing[idx] = loaded;
+      } else {
+        existing.add(loaded);
+      }
+      existing.sort((a, b) {
+        final materialCmp = a.materialId.compareTo(b.materialId);
+        if (materialCmp != 0) return materialCmp;
+        return a.orderIndex.compareTo(b.orderIndex);
+      });
+
+      final newTopics = Map<int, List<TopicItem>>.from(state.topics)
+        ..[moduleId] = existing;
+      state = state.copyWith(topics: newTopics);
+      return loaded;
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      AppErrorReporter.report(ref, failure);
+      return null;
+    }
+  }
+
   Future<TopicItem?> createTopic({
     required int moduleId,
     required int materialId,
@@ -116,9 +268,7 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
               .map((s) => int.tryParse(s))
               .whereType<int>()
               .toList();
-      final normalizedOutcomeIds = requestedOutcomeIds.isEmpty
-          ? const <int>[]
-          : <int>[requestedOutcomeIds.first];
+      final normalizedOutcomeIds = requestedOutcomeIds.toSet().toList()..sort();
       final topic = created.copyWith(
         moduleId: moduleId,
         materialId: materialId,

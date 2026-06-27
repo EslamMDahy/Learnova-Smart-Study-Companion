@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_theme.dart';
+import '../../data/courses_models.dart';
 import '../../data/exam_correction_models.dart';
+import '../../data/exam_models.dart';
 import '../controllers/exam_correction_controller.dart';
 
 class ExamCorrectionPage extends ConsumerWidget {
@@ -115,11 +117,22 @@ class _HeroIcon extends StatelessWidget {
   }
 }
 
-class _UploadPdfPanel extends ConsumerWidget {
+class _UploadPdfPanel extends ConsumerStatefulWidget {
   const _UploadPdfPanel();
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<_UploadPdfPanel> createState() => _UploadPdfPanelState();
+}
+
+class _UploadPdfPanelState extends ConsumerState<_UploadPdfPanel> {
+  @override
+  void initState() {
+    super.initState();
+    Future.microtask(() => ref.read(examCorrectionControllerProvider.notifier).loadExamContext());
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(examCorrectionControllerProvider);
     final controller = ref.read(examCorrectionControllerProvider.notifier);
 
@@ -131,8 +144,25 @@ class _UploadPdfPanel extends ConsumerWidget {
           const _CardTitle(
             icon: Icons.upload_file_rounded,
             title: 'Upload exam PDF',
-            subtitle: 'Choose the solved exam PDF.',
+            subtitle: 'Select the exact course and exam, then upload the solved PDF.',
           ),
+          const SizedBox(height: 18),
+          _ExamTargetPicker(
+            courses: state.courses,
+            exams: state.exams,
+            selectedCourseId: state.selectedCourseId,
+            selectedExamId: state.selectedExamId,
+            loadingCourses: state.loadingCourses,
+            loadingExams: state.loadingExams,
+            disabled: state.loading,
+            onRefresh: () => controller.loadExamContext(force: true),
+            onCourseChanged: controller.selectCourse,
+            onExamChanged: controller.selectExam,
+          ),
+          if (state.contextError != null && state.contextError!.trim().isNotEmpty) ...[
+            const SizedBox(height: 12),
+            _Notice(message: state.contextError!, tone: _NoticeTone.warning),
+          ],
           const SizedBox(height: 18),
           _UploadDropZone(
             hasFile: state.files.isNotEmpty,
@@ -152,6 +182,13 @@ class _UploadPdfPanel extends ConsumerWidget {
               ),
             ),
           ],
+          if (state.files.isNotEmpty && !state.hasExamTarget) ...[
+            const SizedBox(height: 12),
+            const _Notice(
+              message: 'Choose the matching course and exam so the backend can bind every MCQ, true/false, multi-select, and written question even when the QR scan is weak.',
+              tone: _NoticeTone.warning,
+            ),
+          ],
           const SizedBox(height: 18),
           SizedBox(
             width: double.infinity,
@@ -161,7 +198,7 @@ class _UploadPdfPanel extends ConsumerWidget {
               icon: state.loading
                   ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
                   : const Icon(Icons.document_scanner_outlined),
-              label: Text(state.loading ? 'Analyzing PDF...' : 'Analyze PDF'),
+              label: Text(state.loading ? 'Analyzing PDF...' : 'Analyze selected exam'),
             ),
           ),
           if (state.error != null && state.error!.trim().isNotEmpty) ...[
@@ -170,6 +207,139 @@ class _UploadPdfPanel extends ConsumerWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+class _ExamTargetPicker extends StatelessWidget {
+  final List<MyCourseItem> courses;
+  final List<ExamModel> exams;
+  final int? selectedCourseId;
+  final int? selectedExamId;
+  final bool loadingCourses;
+  final bool loadingExams;
+  final bool disabled;
+  final VoidCallback onRefresh;
+  final ValueChanged<int?> onCourseChanged;
+  final ValueChanged<int?> onExamChanged;
+
+  const _ExamTargetPicker({
+    required this.courses,
+    required this.exams,
+    required this.selectedCourseId,
+    required this.selectedExamId,
+    required this.loadingCourses,
+    required this.loadingExams,
+    required this.disabled,
+    required this.onRefresh,
+    required this.onCourseChanged,
+    required this.onExamChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final courseValue = courses.any((course) => course.id == selectedCourseId) ? selectedCourseId : null;
+    final examValue = exams.any((exam) => exam.id == selectedExamId) ? selectedExamId : null;
+    final canChangeCourse = !disabled && !loadingCourses;
+    final canChangeExam = !disabled && !loadingExams && courseValue != null;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Expanded(child: Text('Correction target', style: AppText.label)),
+              TextButton.icon(
+                onPressed: disabled || loadingCourses ? null : onRefresh,
+                icon: loadingCourses
+                    ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Icon(Icons.refresh_rounded, size: 17),
+                label: const Text('Refresh'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          _PickerField<int>(
+            value: courseValue,
+            hint: loadingCourses ? 'Loading courses...' : 'Select course',
+            enabled: canChangeCourse,
+            items: courses
+                .map((course) => DropdownMenuItem<int>(
+                      value: course.id,
+                      child: Text('${course.safeTitle} • ${course.safeCourseCode}', overflow: TextOverflow.ellipsis),
+                    ))
+                .toList(growable: false),
+            onChanged: canChangeCourse ? onCourseChanged : null,
+          ),
+          const SizedBox(height: 10),
+          _PickerField<int>(
+            value: examValue,
+            hint: courseValue == null
+                ? 'Select a course first'
+                : loadingExams
+                    ? 'Loading exams...'
+                    : exams.isEmpty
+                        ? 'No exams found in this course'
+                        : 'Select exam',
+            enabled: canChangeExam && exams.isNotEmpty,
+            items: exams
+                .map((exam) => DropdownMenuItem<int>(
+                      value: exam.id,
+                      child: Text(
+                        '${exam.title.trim().isEmpty ? 'Untitled exam' : exam.title} • ${exam.totalQuestions} questions • ${exam.isPublished ? 'Published' : 'Draft'}',
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ))
+                .toList(growable: false),
+            onChanged: canChangeExam ? onExamChanged : null,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PickerField<T> extends StatelessWidget {
+  final T? value;
+  final String hint;
+  final bool enabled;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?>? onChanged;
+
+  const _PickerField({
+    required this.value,
+    required this.hint,
+    required this.enabled,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return DropdownButtonFormField<T>(
+      value: value,
+      isExpanded: true,
+      items: items,
+      onChanged: enabled ? onChanged : null,
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: enabled ? AppColors.cardBg : AppColors.fieldDisabledBg,
+        hintText: hint,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.borderSoft)),
+        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.borderSoft)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.45))),
+        disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.borderSoft)),
+      ),
+      style: AppText.input.copyWith(color: AppColors.textTitle, fontWeight: FontWeight.w700),
     );
   }
 }
@@ -402,7 +572,7 @@ class _GradingSummaryPanel extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _Notice(
-            message: 'Instructor preview: the exam is graded from the uploaded PDF and displayed here. No student attempt is saved from this page.',
+            message: 'Instructor preview: the exam is graded from the uploaded PDF. Objective answers are shown immediately, while written answers can continue through the AI grading attempt until the backend returns the final result.',
             tone: _NoticeTone.info,
           ),
         ],
@@ -515,7 +685,7 @@ class _QuestionResultTile extends StatelessWidget {
           ),
           if (answer.options.isNotEmpty) ...[
             const SizedBox(height: 12),
-            _OptionsPreview(options: answer.options),
+            _OptionsPreview(answer: answer),
           ],
           if (answer.shouldShowAiFeedback) ...[
             const SizedBox(height: 12),
@@ -552,23 +722,90 @@ class _AnswerValueCard extends StatelessWidget {
 }
 
 class _OptionsPreview extends StatelessWidget {
-  final List<Map<String, dynamic>> options;
+  final ExamScanAnswer answer;
 
-  const _OptionsPreview({required this.options});
+  const _OptionsPreview({required this.answer});
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    final options = answer.options;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        for (final option in options.take(8))
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(999), border: Border.all(color: AppColors.borderSoft)),
-            child: Text('${option['label'] ?? ''}. ${option['text'] ?? ''}', style: AppText.mutedSmall.copyWith(fontWeight: FontWeight.w700)),
-          ),
+        Text('Options', style: AppText.mutedSmall.copyWith(fontWeight: FontWeight.w900)),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: [
+            for (var i = 0; i < options.length && i < 8; i++) _OptionChip(answer: answer, index: i, option: options[i]),
+          ],
+        ),
       ],
+    );
+  }
+}
+
+class _OptionChip extends StatelessWidget {
+  final ExamScanAnswer answer;
+  final int index;
+  final Map<String, dynamic> option;
+
+  const _OptionChip({required this.answer, required this.index, required this.option});
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = answer.isOptionSelected(index);
+    final correct = answer.isOptionCorrect(index);
+    final selectedWrong = selected && !correct && answer.normalizedCorrectOptionIndices.isNotEmpty;
+    final label = option['label']?.toString().trim().isNotEmpty == true ? option['label'].toString().trim() : String.fromCharCode(65 + index);
+    final text = option['text']?.toString().trim() ?? '';
+    final color = correct
+        ? AppColors.greenText
+        : selectedWrong
+            ? AppColors.dangerText
+            : selected
+                ? AppColors.primary
+                : AppColors.textMuted;
+    final bg = correct
+        ? AppColors.greenBg
+        : selectedWrong
+            ? AppColors.dangerBg
+            : selected
+                ? AppColors.primarySoft
+                : AppColors.cardBg;
+    final border = correct
+        ? AppColors.greenBorder
+        : selectedWrong
+            ? AppColors.dangerBorder
+            : selected
+                ? AppColors.primary.withOpacity(0.30)
+                : AppColors.borderSoft;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999), border: Border.all(color: border)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            correct
+                ? Icons.check_circle_rounded
+                : selectedWrong
+                    ? Icons.cancel_rounded
+                    : selected
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_unchecked_rounded,
+            size: 15,
+            color: color,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text.isEmpty ? label : '$label. $text',
+            style: AppText.mutedSmall.copyWith(color: color, fontWeight: FontWeight.w800),
+          ),
+        ],
+      ),
     );
   }
 }

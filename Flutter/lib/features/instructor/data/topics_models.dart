@@ -72,8 +72,8 @@ extension TopicReadinessX on TopicReadiness {
 // TopicItem — mirrors backend TopicListItem / TopicCreateResponse exactly,
 // plus UI-only helpers kept for the presentation layer (not sent to backend).
 //
-// Backend fields: id, material_id, title, description, order_index,
-//                 parent_topic_id, is_ai_generated, is_reviewed,
+// Backend fields: id, material_id, title, description, page_start, page_end,
+//                 order_index, parent_topic_id, is_ai_generated, is_reviewed,
 //                 created_at, updated_at
 //
 // UI-only fields (never serialised to the backend):
@@ -87,6 +87,8 @@ class TopicItem {
   final int materialId;
   final String title;
   final String? description;
+  final int? pageStart;
+  final int? pageEnd;
   final int orderIndex;
   final int? parentTopicId;
   final DateTime createdAt;
@@ -124,6 +126,8 @@ class TopicItem {
     required this.materialId,
     required this.title,
     this.description,
+    this.pageStart,
+    this.pageEnd,
     required this.orderIndex,
     this.parentTopicId,
     required this.createdAt,
@@ -148,6 +152,8 @@ class TopicItem {
     int? materialId,
     String? title,
     String? description,
+    int? pageStart,
+    int? pageEnd,
     int? orderIndex,
     int? parentTopicId,
     DateTime? createdAt,
@@ -170,6 +176,8 @@ class TopicItem {
       materialId: materialId ?? this.materialId,
       title: title ?? this.title,
       description: description ?? this.description,
+      pageStart: pageStart ?? this.pageStart,
+      pageEnd: pageEnd ?? this.pageEnd,
       orderIndex: orderIndex ?? this.orderIndex,
       parentTopicId: parentTopicId ?? this.parentTopicId,
       createdAt: createdAt ?? this.createdAt,
@@ -194,6 +202,17 @@ class TopicItem {
         DateTime.tryParse((v ?? '').toString()) ??
         DateTime.fromMillisecondsSinceEpoch(0);
 
+    int? intField(List<String> keys) {
+      for (final key in keys) {
+        final value = json[key];
+        if (value == null) continue;
+        if (value is num) return value.toInt();
+        final parsed = int.tryParse(value.toString().trim());
+        if (parsed != null) return parsed;
+      }
+      return null;
+    }
+
     // Backend may send either learning_outcome_ids or learning_outcomes.
     final explicitOutcomeIds = ((json['learning_outcome_ids'] as List?) ?? const [])
         .map((e) => (e as num).toInt())
@@ -217,6 +236,8 @@ class TopicItem {
       materialId: (json['material_id'] as num).toInt(),
       title: (json['title'] ?? '').toString(),
       description: json['description']?.toString(),
+      pageStart: intField(const ['page_start', 'start_page', 'startPage', 'start']),
+      pageEnd: intField(const ['page_end', 'end_page', 'endPage', 'end']),
       orderIndex: (json['order_index'] as num?)?.toInt() ?? 0,
       parentTopicId: json['parent_topic_id'] == null
           ? null
@@ -242,6 +263,8 @@ class TopicItem {
         'material_id': materialId,
         'title': title,
         if (description != null) 'description': description,
+        if (pageStart != null) 'page_start': pageStart,
+        if (pageEnd != null) 'page_end': pageEnd,
         'order_index': orderIndex,
         if (parentTopicId != null) 'parent_topic_id': parentTopicId,
         'is_ai_generated': isAiGenerated,
@@ -326,6 +349,8 @@ class TopicCreateRequest {
   final String title;
   final String? description;
   final int? parentTopicId;
+  final int? pageStart;
+  final int? pageEnd;
 
   // UI-only (not sent to backend directly — learningOutcomeIds is sent instead)
   final TopicSource source;
@@ -340,6 +365,8 @@ class TopicCreateRequest {
     required this.title,
     this.description,
     this.parentTopicId,
+    this.pageStart,
+    this.pageEnd,
     this.source = TopicSource.manual,
     this.difficulty = TopicDifficulty.beginner,
     this.linkedOutcomeId,
@@ -353,6 +380,8 @@ class TopicCreateRequest {
       m['description'] = description;
     }
     if (parentTopicId != null) m['parent_topic_id'] = parentTopicId;
+    if (pageStart != null) m['page_start'] = pageStart;
+    if (pageEnd != null) m['page_end'] = pageEnd;
     // Send int outcome ids to backend (prefer explicit learningOutcomeIds,
     // fall back to parsing linkedOutcomeIds strings if int list is empty)
     final ids = learningOutcomeIds.isNotEmpty
@@ -361,7 +390,7 @@ class TopicCreateRequest {
             .map((s) => int.tryParse(s))
             .whereType<int>()
             .toList();
-    final normalizedIds = ids.isEmpty ? const <int>[] : <int>[ids.first];
+    final normalizedIds = ids.toSet().toList()..sort();
     if (normalizedIds.isNotEmpty) m['learning_outcome_ids'] = normalizedIds;
     return m;
   }
@@ -373,12 +402,16 @@ class TopicUpdateRequest {
   final String? title;
   final String? description;
   final int? parentTopicId;
+  final int? pageStart;
+  final int? pageEnd;
   final List<int>? learningOutcomeIds;
 
   const TopicUpdateRequest({
     this.title,
     this.description,
     this.parentTopicId,
+    this.pageStart,
+    this.pageEnd,
     this.learningOutcomeIds,
   });
 
@@ -387,10 +420,11 @@ class TopicUpdateRequest {
     if (title != null) m['title'] = title;
     if (description != null) m['description'] = description;
     if (parentTopicId != null) m['parent_topic_id'] = parentTopicId;
+    if (pageStart != null) m['page_start'] = pageStart;
+    if (pageEnd != null) m['page_end'] = pageEnd;
     if (learningOutcomeIds != null) {
-      m['learning_outcome_ids'] = learningOutcomeIds!.isEmpty
-          ? const <int>[]
-          : <int>[learningOutcomeIds!.first];
+      final normalizedIds = learningOutcomeIds!.toSet().toList()..sort();
+      m['learning_outcome_ids'] = normalizedIds;
     }
     return m;
   }

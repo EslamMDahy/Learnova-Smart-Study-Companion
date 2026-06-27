@@ -158,6 +158,7 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
     required List<int> bytes,
     required String? contentType,
     required String filename,
+    bool recoverExistingObjectOnDuplicate = false,
   }) async {
     _cancel?.cancel();
     _cancel = CancelToken();
@@ -171,6 +172,7 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
             bytes: Uint8List.fromList(bytes),
             contentType: contentType,
             filename: filename,
+            recoverExistingObjectOnDuplicate: recoverExistingObjectOnDuplicate,
             cancelToken: _cancel,
           );
 
@@ -205,6 +207,7 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
     required List<int> bytes,
     required String? contentType,
     required String filename,
+    bool recoverExistingObjectOnDuplicate = false,
   }) async {
     _cancel?.cancel();
     _cancel = CancelToken();
@@ -215,6 +218,7 @@ class InstructorCoursesController extends StateNotifier<InstructorCoursesState> 
             bytes: Uint8List.fromList(bytes),
             contentType: contentType,
             filename: filename,
+            recoverExistingObjectOnDuplicate: recoverExistingObjectOnDuplicate,
             cancelToken: _cancel,
           );
     } catch (e) {

@@ -128,6 +128,8 @@ class AppColors {
   static Color get greenBg => successBg;
   static Color get greenBorder => _dark ? const Color(0xFF166534) : const Color(0xFFBBF7D0);
   static Color get greenText => successText;
+
+  static get primaryDark => null;
 }
 
 class AppTextStyles {

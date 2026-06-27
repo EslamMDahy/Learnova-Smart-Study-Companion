@@ -5,11 +5,15 @@ import '../instructor_tabs.dart';
 class InstructorSidebarWidget extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onItemSelected;
+  final bool isCollapsed;
+  final VoidCallback? onToggle;
 
   const InstructorSidebarWidget({
     super.key,
     required this.selectedIndex,
     required this.onItemSelected,
+    this.isCollapsed = false,
+    this.onToggle,
   });
 
   @override
@@ -17,6 +21,8 @@ class InstructorSidebarWidget extends StatelessWidget {
     return AppSidebar(
       selectedIndex: selectedIndex,
       onItemSelected: onItemSelected,
+      isCollapsed: isCollapsed,
+      onToggle: onToggle,
       portalSubtitle: 'INSTRUCTOR Portal',
       mainItems: const [
         AppSidebarItem(icon: Icons.grid_view_rounded, title: 'Dashboard', index: InstructorTabs.dashboard),

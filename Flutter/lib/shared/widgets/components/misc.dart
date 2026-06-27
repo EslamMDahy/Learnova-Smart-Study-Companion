@@ -6,6 +6,8 @@ import 'buttons.dart';
 import 'inputs.dart';
 import 'dropdowns.dart';
 
+part 'misc_table_components.dart';
+
 /// Misc widgets (layout, table bits, sidebar, uploaders, empty states, etc.).
 
 class AppSectionHeader extends StatelessWidget {
@@ -174,6 +176,9 @@ class AppSidebar extends StatelessWidget {
   final List<AppSidebarItem> mainItems;
   final List<AppSidebarItem> bottomItems;
 
+  final bool isCollapsed;
+  final VoidCallback? onToggle;
+
   const AppSidebar({
     super.key,
     required this.selectedIndex,
@@ -184,18 +189,23 @@ class AppSidebar extends StatelessWidget {
     this.brandTitle = 'Learnova',
     this.logoAssetPath = 'assets/logo.webp',
     this.onBrandTap,
+    this.isCollapsed = false,
+    this.onToggle,
   });
 
-  static const double _w              = 260;
-  static Color get _rightBorder => AppColors.sidebarBorder; // subtle right separator
+  static const double expandedWidth = 288;
+  static const double collapsedWidth = 72;
+
+  static Color get _rightBorder => AppColors.sidebarBorder;
   static Color get _sectionLabel => AppColors.sidebarLabel;
   static Color get _divider => AppColors.divider;
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    return SizedBox(
-      width: _w,
+    final horizontalPadding = isCollapsed ? 8.0 : 10.0;
+
+    return ClipRect(
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: AppColors.cardBg,
@@ -206,42 +216,53 @@ class AppSidebar extends StatelessWidget {
         child: SafeArea(
           child: Column(
             children: [
-              // ── Brand ────────────────────────────────────────────────
               Padding(
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 0),
+                padding: EdgeInsets.fromLTRB(
+                  isCollapsed ? 8 : 16,
+                  18,
+                  isCollapsed ? 8 : 12,
+                  0,
+                ),
                 child: _AppSidebarBrandHeader(
                   title: brandTitle,
                   subtitle: portalSubtitle,
                   logoAssetPath: logoAssetPath,
+                  isCollapsed: isCollapsed,
+                  onToggle: onToggle,
                   onTap: onBrandTap ??
                       () => onItemSelected(
                             mainItems.isNotEmpty ? mainItems.first.index : 0,
                           ),
                 ),
               ),
-
-              // ── Section label + main nav ──────────────────────────────
               Expanded(
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10),
+                  padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: isCollapsed
+                        ? CrossAxisAlignment.center
+                        : CrossAxisAlignment.start,
                     children: [
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(6, 20, 6, 4),
-                        child: Text(
-                          'NAVIGATION',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 1.2,
-                            color: _sectionLabel,
+                      if (isCollapsed)
+                        const SizedBox(height: 12)
+                      else
+                        Padding(
+                          padding: const EdgeInsets.fromLTRB(6, 20, 6, 4),
+                          child: Text(
+                            'NAVIGATION',
+                            maxLines: 1,
+                            overflow: TextOverflow.clip,
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.2,
+                              color: _sectionLabel,
+                            ),
                           ),
                         ),
-                      ),
                       Expanded(
                         child: Scrollbar(
-                          thumbVisibility: !kIsWeb,
+                          thumbVisibility: !kIsWeb && !isCollapsed,
                           child: ListView.builder(
                             padding: EdgeInsets.zero,
                             physics: const ClampingScrollPhysics(),
@@ -254,6 +275,7 @@ class AppSidebar extends StatelessWidget {
                                 index: mainItems[i].index,
                                 selectedIndex: selectedIndex,
                                 onTap: onItemSelected,
+                                isCollapsed: isCollapsed,
                               ),
                             ),
                           ),
@@ -263,10 +285,13 @@ class AppSidebar extends StatelessWidget {
                   ),
                 ),
               ),
-
-              // ── Bottom items ──────────────────────────────────────────
               Container(
-                padding: const EdgeInsets.fromLTRB(10, 10, 10, 14),
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  10,
+                  horizontalPadding,
+                  14,
+                ),
                 decoration: BoxDecoration(
                   border: Border(top: BorderSide(color: _divider)),
                 ),
@@ -279,6 +304,7 @@ class AppSidebar extends StatelessWidget {
                         index: bottomItems[i].index,
                         selectedIndex: selectedIndex,
                         onTap: onItemSelected,
+                        isCollapsed: isCollapsed,
                       ),
                       if (i != bottomItems.length - 1)
                         const SizedBox(height: 2),
@@ -298,15 +324,19 @@ class AppSidebar extends StatelessWidget {
 
 class _AppSidebarBrandHeader extends StatelessWidget {
   final VoidCallback onTap;
+  final VoidCallback? onToggle;
   final String title;
   final String subtitle;
   final String? logoAssetPath;
+  final bool isCollapsed;
 
   const _AppSidebarBrandHeader({
     required this.onTap,
     required this.title,
     required this.subtitle,
     required this.logoAssetPath,
+    required this.isCollapsed,
+    this.onToggle,
   });
 
   static Color get _text => AppColors.textTitle;
@@ -317,38 +347,45 @@ class _AppSidebarBrandHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(10),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: _logoBg,
-                borderRadius: BorderRadius.circular(9),
-                border: Border.all(color: _logoBorder),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(5),
-                child: logoAssetPath == null
-                    ? const Icon(Icons.auto_awesome, size: 18,
-                        color: AppColors.primary,)
-                    : Image.asset(
-                        logoAssetPath!,
-                        fit: BoxFit.contain,
-                        errorBuilder: (_, __, ___) => const Icon(
-                          Icons.auto_awesome, size: 18,
-                          color: AppColors.primary,
-                        ),
-                      ),
-              ),
+
+    if (isCollapsed) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Tooltip(
+            message: title,
+            waitDuration: const Duration(milliseconds: 350),
+            child: _SidebarLogoButton(
+              logoAssetPath: logoAssetPath,
+              onTap: onTap,
             ),
-            const SizedBox(width: 10),
-            Expanded(
+          ),
+          const SizedBox(height: 8),
+          _SidebarToggleButton(
+            isCollapsed: isCollapsed,
+            onToggle: onToggle,
+          ),
+        ],
+      );
+    }
+
+    return Row(
+      children: [
+        _SidebarLogoButton(
+          logoAssetPath: logoAssetPath,
+          onTap: onTap,
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: InkWell(
+            hoverColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(10),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 8),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
@@ -379,10 +416,168 @@ class _AppSidebarBrandHeader extends StatelessWidget {
                 ],
               ),
             ),
-          ],
+          ),
+        ),
+        const SizedBox(width: 6),
+        _SidebarToggleButton(
+          isCollapsed: isCollapsed,
+          onToggle: onToggle,
+        ),
+      ],
+    );
+  }
+}
+
+class _SidebarLogoButton extends StatelessWidget {
+  final String? logoAssetPath;
+  final VoidCallback onTap;
+
+  const _SidebarLogoButton({
+    required this.logoAssetPath,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return InkWell(
+      hoverColor: Colors.transparent,
+      splashColor: Colors.transparent,
+      highlightColor: Colors.transparent,
+      overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: _AppSidebarBrandHeader._logoBg,
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(color: _AppSidebarBrandHeader._logoBorder),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(5),
+          child: logoAssetPath == null
+              ? const Icon(
+                  Icons.auto_awesome,
+                  size: 18,
+                  color: AppColors.primary,
+                )
+              : Image.asset(
+                  logoAssetPath!,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => const Icon(
+                    Icons.auto_awesome,
+                    size: 18,
+                    color: AppColors.primary,
+                  ),
+                ),
         ),
       ),
     );
+  }
+}
+
+class _SidebarToggleButton extends StatelessWidget {
+  final bool isCollapsed;
+  final VoidCallback? onToggle;
+
+  const _SidebarToggleButton({
+    required this.isCollapsed,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    return Tooltip(
+      message: isCollapsed ? 'Open sidebar' : 'Close sidebar',
+      waitDuration: const Duration(milliseconds: 350),
+      child: Semantics(
+        button: true,
+        label: isCollapsed ? 'Open sidebar' : 'Close sidebar',
+        child: IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints.tightFor(width: 34, height: 34),
+          splashRadius: 18,
+          onPressed: onToggle,
+          icon: _ChatGptSidebarToggleIcon(
+            isCollapsed: isCollapsed,
+            color: AppColors.textMuted,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ChatGptSidebarToggleIcon extends StatelessWidget {
+  final bool isCollapsed;
+  final Color color;
+
+  const _ChatGptSidebarToggleIcon({
+    required this.isCollapsed,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      size: const Size.square(20),
+      painter: _ChatGptSidebarToggleIconPainter(
+        isCollapsed: isCollapsed,
+        color: color,
+      ),
+    );
+  }
+}
+
+class _ChatGptSidebarToggleIconPainter extends CustomPainter {
+  final bool isCollapsed;
+  final Color color;
+
+  const _ChatGptSidebarToggleIconPainter({
+    required this.isCollapsed,
+    required this.color,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final stroke = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.65
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    final rect = Rect.fromLTWH(
+      size.width * 0.14,
+      size.height * 0.18,
+      size.width * 0.72,
+      size.height * 0.64,
+    );
+
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, const Radius.circular(3.2)),
+      stroke,
+    );
+
+    // ChatGPT-style sidebar glyph: a rounded window with a slim side rail.
+    final railX = isCollapsed
+        ? rect.right - size.width * 0.25
+        : rect.left + size.width * 0.25;
+    canvas.drawLine(
+      Offset(railX, rect.top + size.height * 0.08),
+      Offset(railX, rect.bottom - size.height * 0.08),
+      stroke,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant _ChatGptSidebarToggleIconPainter oldDelegate) {
+    return oldDelegate.isCollapsed != isCollapsed ||
+        oldDelegate.color != color;
   }
 }
 
@@ -394,6 +589,7 @@ class _AppSidebarNavLink extends StatefulWidget {
   final int index;
   final int selectedIndex;
   final ValueChanged<int> onTap;
+  final bool isCollapsed;
 
   const _AppSidebarNavLink({
     required this.icon,
@@ -401,6 +597,7 @@ class _AppSidebarNavLink extends StatefulWidget {
     required this.index,
     required this.selectedIndex,
     required this.onTap,
+    required this.isCollapsed,
   });
 
   @override
@@ -427,7 +624,7 @@ class _AppSidebarNavLinkState extends State<_AppSidebarNavLink> {
     final bg = sel ? _selectedBg : _hovered ? _hoverBg : Colors.transparent;
     final fg = sel ? _selectedFg : _hovered ? _hoverFg : _idleFg;
 
-    return Semantics(
+    final link = Semantics(
       button: true,
       selected: sel,
       label: widget.title,
@@ -435,12 +632,13 @@ class _AppSidebarNavLinkState extends State<_AppSidebarNavLink> {
         onFocusChange: (v) => setState(() => _focused = v),
         child: MouseRegion(
           onEnter: (_) => setState(() => _hovered = true),
-          onExit:  (_) => setState(() => _hovered = false),
+          onExit: (_) => setState(() => _hovered = false),
           cursor: SystemMouseCursors.click,
           child: GestureDetector(
             onTap: () => widget.onTap(widget.index),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 120),
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
               height: 42,
               decoration: BoxDecoration(
                 color: bg,
@@ -455,10 +653,11 @@ class _AppSidebarNavLinkState extends State<_AppSidebarNavLink> {
               child: Stack(
                 alignment: Alignment.centerLeft,
                 children: [
-                  // Active indicator bar (left edge)
                   if (sel)
                     Positioned(
-                      left: 0, top: 10, bottom: 10,
+                      left: 0,
+                      top: 10,
+                      bottom: 10,
                       child: Container(
                         width: 3,
                         decoration: BoxDecoration(
@@ -467,27 +666,33 @@ class _AppSidebarNavLinkState extends State<_AppSidebarNavLink> {
                         ),
                       ),
                     ),
-                  // Row content
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: widget.isCollapsed ? 0 : 12,
+                    ),
                     child: Row(
+                      mainAxisAlignment: widget.isCollapsed
+                          ? MainAxisAlignment.center
+                          : MainAxisAlignment.start,
                       children: [
                         Icon(widget.icon, size: 19, color: fg),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            widget.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 13.5,
-                              fontWeight:
-                                  sel ? FontWeight.w700 : FontWeight.w500,
-                              color: fg,
-                              letterSpacing: -0.1,
+                        if (!widget.isCollapsed) ...[
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              widget.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 13.5,
+                                fontWeight:
+                                    sel ? FontWeight.w700 : FontWeight.w500,
+                                color: fg,
+                                letterSpacing: -0.1,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -497,6 +702,14 @@ class _AppSidebarNavLinkState extends State<_AppSidebarNavLink> {
           ),
         ),
       ),
+    );
+
+    if (!widget.isCollapsed) return link;
+
+    return Tooltip(
+      message: widget.title,
+      waitDuration: const Duration(milliseconds: 350),
+      child: link,
     );
   }
 }
@@ -1716,547 +1929,3 @@ class AppEmptyState extends StatelessWidget {
     );
   }
 }
-
-
-
-
-@Deprecated('Use AppCardShell')
-
-class FigmaUmPageHeader extends StatelessWidget {
-  final String title;
-  final String subtitle;
-
-  const FigmaUmPageHeader({
-    super.key,
-    required this.title,
-    required this.subtitle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          title,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 30,
-            fontWeight: FontWeight.w800,
-            height: 36 / 30,
-            letterSpacing: -0.75,
-            color: AppColors.cText,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          subtitle,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 16,
-            fontWeight: FontWeight.w400,
-            height: 24 / 16,
-            color: AppColors.cMuted,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class FigmaUmSquareIconBtn40 extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final String tooltip;
-
-  const FigmaUmSquareIconBtn40({
-    super.key,
-    required this.icon,
-    required this.onTap,
-    required this.tooltip,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Tooltip(
-      message: tooltip,
-      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppColors.cSurface,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          alignment: Alignment.center,
-          child: Icon(icon, size: 20, color: AppColors.cGray500),
-        ),
-      ),
-    );
-  }
-}
-
-class FigmaUmFiltersBar extends StatelessWidget {
-  final TextEditingController controller;
-  final String selectedRole;
-  final String selectedStatus;
-  final bool isNarrow;
-
-  final ValueChanged<String> onSearchChanged;
-  final ValueChanged<String> onRoleChanged;
-  final ValueChanged<String> onStatusChanged;
-
-  final VoidCallback onMoreFilters;
-  final VoidCallback onRefresh;
-
-const FigmaUmFiltersBar({
-    super.key,
-    required this.controller,
-    required this.selectedRole,
-    required this.selectedStatus,
-    required this.isNarrow,
-    required this.onSearchChanged,
-    required this.onRoleChanged,
-    required this.onStatusChanged,
-    required this.onMoreFilters,
-    required this.onRefresh,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    final roleDrop = FigmaUmDropdown40(
-      width: isNarrow ? 150 : 140,
-      value: selectedRole,
-      items: ['All Roles', 'owner', 'teacher', 'student', 'assistant'],
-      onChanged: onRoleChanged,
-    );
-
-    final statusDrop = FigmaUmDropdown40(
-      width: isNarrow ? 150 : 140,
-      value: selectedStatus,
-      items: ['All Status', 'pending', 'accepted', 'suspended', 'declined'],
-      onChanged: onStatusChanged,
-    );
-
-    final search = FigmaUmSearch40(
-      controller: controller,
-      onChanged: onSearchChanged,
-    );
-
-    final moreFilters = FigmaUmSquareIconBtn40(
-      icon: Icons.tune_rounded,
-      onTap: onMoreFilters,
-      tooltip: 'More filters',
-    );
-
-    final refresh = FigmaUmSquareIconBtn40(
-      icon: Icons.refresh,
-      onTap: onRefresh,
-      tooltip: 'Refresh',
-    );
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.cBorder),
-        boxShadow: [
-          const BoxShadow(
-              color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1),),
-        ],
-      ),
-      child: isNarrow
-          ? Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                search,
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  crossAxisAlignment: WrapCrossAlignment.center,
-                  children: [
-                    roleDrop,
-                    statusDrop,
-                    moreFilters,
-                    refresh,
-                  ],
-                ),
-              ],
-            )
-          : Row(
-              children: [
-                Expanded(child: search),
-                const SizedBox(width: 16),
-                roleDrop,
-                const SizedBox(width: 12),
-                statusDrop,
-                const Spacer(),
-                moreFilters,
-                const SizedBox(width: 8),
-                refresh,
-              ],
-            ),
-    );
-  }
-}
-
-class FigmaUmTableHeader extends StatelessWidget {
-  final bool isNarrow;
-  final double actionsColWidth;
-  final double cellLeftPad;
-  final double rowHPad;
-
-  const FigmaUmTableHeader({
-    super.key,
-    required this.isNarrow,
-    required this.actionsColWidth,
-    required this.cellLeftPad,
-    required this.rowHPad,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      height: 49,
-      color: AppColors.cSurface,
-      padding: EdgeInsets.symmetric(horizontal: rowHPad),
-      child: Row(
-        children: [
-          const SizedBox(width: 16, height: 16),
-          const SizedBox(width: 16),
-
-          FigmaUmHeaderCellFlex(flex: 5, text: 'USER INFO', leftPad: cellLeftPad),
-          FigmaUmHeaderCellFlex(flex: 2, text: 'ROLE', leftPad: cellLeftPad),
-
-          if (!isNarrow)
-            FigmaUmHeaderCellFlex(
-                flex: 3, text: 'DEPARTMENT', leftPad: cellLeftPad,),
-          if (!isNarrow)
-            FigmaUmHeaderCellFlex(
-                flex: 2, text: 'JOINED DATE', leftPad: cellLeftPad,),
-
-          FigmaUmHeaderCellFlex(flex: 2, text: 'STATUS', leftPad: cellLeftPad),
-
-          SizedBox(
-            width: actionsColWidth,
-            child: Align(
-              alignment: Alignment.centerRight,
-              child: Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: Text(
-                  'ACTIONS',
-                  style: TextStyle(
-                    fontFamily: 'Inter',
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                    height: 16 / 12,
-                    color: AppColors.cGray500,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class FigmaUmHeaderCellFlex extends StatelessWidget {
-  final int flex;
-  final String text;
-  final double leftPad;
-
-  const FigmaUmHeaderCellFlex({
-    super.key,
-    required this.flex,
-    required this.text,
-    this.leftPad = 0,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Expanded(
-      flex: flex,
-      child: Padding(
-        padding: EdgeInsets.only(left: leftPad),
-        child: Text(
-          text,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            height: 16 / 12,
-            color: AppColors.cGray500,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class FigmaUmEmptyTableState extends StatelessWidget {
-  final String message;
-  const FigmaUmEmptyTableState({
-    super.key,
-    this.message = 'No users match your filters right now.',
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Row(
-      children: [
-        Icon(Icons.inbox_outlined, color: AppColors.cGray500),
-        const SizedBox(width: 10),
-        Expanded(
-          child: Text(
-            message,
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              height: 20 / 14,
-              color: AppColors.cGray500,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class FigmaUmTableFooter extends StatelessWidget {
-  final String showingText;
-  final VoidCallback? onPrev;
-  final VoidCallback? onNext;
-
-  const FigmaUmTableFooter({
-    super.key,
-    required this.showingText,
-    required this.onPrev,
-    required this.onNext,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      height: 71,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.cSurface,
-        border: Border(top: BorderSide(color: AppColors.cBorder)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(
-              showingText,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontFamily: 'Inter',
-                fontSize: 14,
-                fontWeight: FontWeight.w400,
-                height: 20 / 14,
-                color: AppColors.cGray500,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Row(
-            children: [
-              FigmaUmPageBtn(
-                label: 'Previous',
-                icon: Icons.chevron_left,
-                enabled: onPrev != null,
-                onTap: onPrev,
-                width: 105,
-                trailingIcon: false,
-              ),
-              const SizedBox(width: 8),
-              FigmaUmPageBtn(
-                label: 'Next',
-                icon: Icons.chevron_right,
-                enabled: onNext != null,
-                onTap: onNext,
-                width: 79,
-                trailingIcon: true,
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class FigmaUmPageBtn extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final bool enabled;
-  final VoidCallback? onTap;
-  final double width;
-  final bool trailingIcon;
-
-  const FigmaUmPageBtn({
-    super.key,
-    required this.label,
-    required this.icon,
-    required this.enabled,
-    required this.onTap,
-    required this.width,
-    required this.trailingIcon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Opacity(
-      opacity: enabled ? 1 : 0.5,
-      child: SizedBox(
-        width: width,
-        height: 38,
-        child: OutlinedButton(
-          onPressed: enabled ? onTap : null,
-          style: OutlinedButton.styleFrom(
-            side: BorderSide(color: AppColors.borderSoft),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-            backgroundColor: AppColors.cBg,
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-          ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: trailingIcon
-                ? [
-                    Flexible(
-                      child: Text(
-                        label,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          height: 20 / 14,
-                          color: AppColors.cGray500,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                    Icon(icon, size: 18, color: AppColors.cGray500),
-                  ]
-                : [
-                    Icon(icon, size: 18, color: AppColors.cGray500),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        label,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontFamily: 'Inter',
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
-                          height: 20 / 14,
-                          color: AppColors.cGray500,
-                        ),
-                      ),
-                    ),
-                  ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/* ============================================================
-   Join Requests - Figma Reusables (NO UI CHANGE)
-============================================================ */
-
-@Deprecated('Use AppCardShell(maxWidth: ...)')
-
-class JrHScroll extends StatelessWidget {
-  final Widget child;
-  const JrHScroll({super.key, required this.child});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return SingleChildScrollView(
-      scrollDirection: Axis.horizontal,
-      child: child,
-    );
-  }
-}
-
-class JrHeaderTxt extends StatelessWidget {
-  final String text;
-  const JrHeaderTxt(this.text, {super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Text(
-      text,
-      overflow: TextOverflow.ellipsis,
-      style: TextStyle(
-        fontFamily: 'Inter',
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-        color: AppColors.textGray500,
-      ),
-    );
-  }
-}
-
-@Deprecated('Use FigmaUmEmptyTableState(message: ...)')
-
-class JrEmptyTableState extends StatelessWidget {
-  const JrEmptyTableState({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return const FigmaUmEmptyTableState(
-      message: 'No pending join requests right now.',
-    );
-  }
-}
-
-class JrRefreshIconBtnFigma extends StatelessWidget {
-  final VoidCallback? onPressed;
-  const JrRefreshIconBtnFigma({super.key, required this.onPressed});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return SizedBox(
-      height: 40,
-      width: 40,
-      child: OutlinedButton(
-        onPressed: onPressed,
-        style: OutlinedButton.styleFrom(
-          padding: EdgeInsets.zero,
-          side: BorderSide(color: AppColors.borderGray),
-          backgroundColor: AppColors.surfaceBg,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        child: Icon(Icons.refresh, size: 18, color: AppColors.textGray500),
-      ),
-    );
-  }
-}
-
-/* =========================
-   Role + Status
-========================= */

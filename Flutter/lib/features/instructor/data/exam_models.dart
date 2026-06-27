@@ -83,23 +83,22 @@ class ExamSectionCreatePayload {
 
 class GenerateExamFromTemplatePayload {
   final String title;
-  final List<int> topicIds;
-  final Map<String, dynamic>? sectionDifficultyDistribution;
+  final List<int>? topicIds;
+  final Map<String, dynamic> sectionDifficultyDistribution;
 
   const GenerateExamFromTemplatePayload({
     required this.title,
-    this.topicIds = const <int>[],
-    this.sectionDifficultyDistribution,
+    this.topicIds,
+    required this.sectionDifficultyDistribution,
   });
 
   Map<String, dynamic> toJson() {
     final cleanedTitle = title.trim();
-    final uniqueTopicIds = topicIds.where((id) => id > 0).toSet().toList()..sort();
+    final uniqueTopicIds = (topicIds ?? const <int>[]).where((id) => id > 0).toSet().toList()..sort();
     return {
       'title': cleanedTitle,
-      if (uniqueTopicIds.isNotEmpty) 'topic_ids': uniqueTopicIds,
-      if (sectionDifficultyDistribution != null && sectionDifficultyDistribution!.isNotEmpty)
-        'difficulty_config': sectionDifficultyDistribution,
+      'topic_ids': uniqueTopicIds.isEmpty ? null : uniqueTopicIds,
+      'section_difficulty_distribution': sectionDifficultyDistribution,
     };
   }
 }

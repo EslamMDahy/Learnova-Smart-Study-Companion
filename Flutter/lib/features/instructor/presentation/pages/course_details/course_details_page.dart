@@ -7,6 +7,7 @@ import '../../../../../core/network/error_mapper.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../data/courses_models.dart';
 import '../../../data/courses_providers.dart';
+import '../../../../student/data/student_course_assistant_providers.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../widgets/course_tabs/overview_tab.dart';
 import '../../widgets/course_tabs/materials_tab.dart';
@@ -14,6 +15,7 @@ import '../../widgets/course_tabs/outcomes_tab.dart';
 import '../../widgets/course_tabs/question_bank_tab.dart';
 import '../../widgets/course_tabs/exam_templates_tab.dart';
 import '../../widgets/course_tabs/students_tab.dart';
+import '../../widgets/instructor_course_assistant_panel.dart';
 import '../../controllers/selected_course_provider.dart';
 import '../../course_route_identity.dart';
 
@@ -50,6 +52,8 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
   int? _activeCourseId;
   final Set<int> _visitedTabIndexes = <int>{};
   final Set<String> _loadedTabKeys = <String>{};
+  late final TextEditingController _assistantController;
+  bool _assistantOpen = false;
 
   void _syncVisitedTabs(MyCourseItem? course) {
     final int? courseId = course?.id ?? widget.cachedCourseId;
@@ -74,6 +78,14 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
         return CourseMaterialsTab(
           key: PageStorageKey('course-${course.id}-materials-tab'),
           course: course,
+          courseAssistantBusy: ref.watch(
+            studentCourseAssistantControllerProvider(course.id),
+          ).isBusy,
+          onOpenCourseAssistant: () {
+            if (!_assistantOpen) {
+              setState(() => _assistantOpen = true);
+            }
+          },
         );
       case CourseDetailsTab.outcomes:
         return CourseOutcomesTab(
@@ -127,10 +139,17 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
   @override
   void initState() {
     super.initState();
+    _assistantController = TextEditingController();
     _currentIndex = widget.initialTab.index;
     _syncVisitedTabs(widget.cachedCourse);
     final course = widget.cachedCourse;
     if (course != null) _loadActiveTabData(course);
+  }
+
+  @override
+  void dispose() {
+    _assistantController.dispose();
+    super.dispose();
   }
 
   @override
@@ -303,6 +322,10 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
     _syncVisitedTabs(course);
     _loadActiveTabData(course);
     final visibleTabs = course.isPrivate ? _privateTabs : _publicTabs;
+    final assistantState = ref.watch(
+      studentCourseAssistantControllerProvider(course.id),
+    );
+
     return Column(children: [
       _CourseDetailsTabHeader(
         tabs: visibleTabs,
@@ -315,9 +338,45 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
         },
       ),
       Expanded(
-        child: IndexedStack(
-          index: _currentIndex,
-          children: _buildVisitedTabPages(course),
+        child: Stack(
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: IndexedStack(
+                    index: _currentIndex,
+                    children: _buildVisitedTabPages(course),
+                  ),
+                ),
+                if (_assistantOpen)
+                  InstructorCourseAssistantPanel(
+                    courseTitle: course.safeTitle,
+                    controller: _assistantController,
+                    assistantState: assistantState,
+                    onSend: (String message) {
+                      ref
+                          .read(
+                            studentCourseAssistantControllerProvider(course.id)
+                                .notifier,
+                          )
+                          .send(message: message);
+                    },
+                    onClear: () {
+                      ref
+                          .read(
+                            studentCourseAssistantControllerProvider(course.id)
+                                .notifier,
+                          )
+                          .clear();
+                    },
+                    onClose: () => setState(() => _assistantOpen = false),
+                  ),
+              ],
+            ),
+            // The Course AI entry point is shown inside the Materials footer
+            // when a module/material/topic is selected, so it does not overlap
+            // persistent bottom actions such as Generate Questions.
+          ],
         ),
       ),
     ],);

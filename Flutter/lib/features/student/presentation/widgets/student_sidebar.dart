@@ -5,11 +5,15 @@ import '../../../../shared/widgets/app_sidebar.dart';
 class StudentSidebarWidget extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onItemSelected;
+  final bool isCollapsed;
+  final VoidCallback? onToggle;
 
   const StudentSidebarWidget({
     super.key,
     required this.selectedIndex,
     required this.onItemSelected,
+    this.isCollapsed = false,
+    this.onToggle,
   });
 
   @override
@@ -17,6 +21,8 @@ class StudentSidebarWidget extends StatelessWidget {
     return AppSidebar(
       selectedIndex: selectedIndex,
       onItemSelected: onItemSelected,
+      isCollapsed: isCollapsed,
+      onToggle: onToggle,
       portalSubtitle: 'STUDENT PORTAL',
       mainItems: const [
         AppSidebarItem(

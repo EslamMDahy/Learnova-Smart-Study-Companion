@@ -110,6 +110,7 @@ class CoursesRepository {
     required Uint8List bytes,
     required String? contentType,
     required String filename,
+    bool recoverExistingObjectOnDuplicate = false,
     CancelToken? cancelToken,
   }) =>
       _api.uploadCourseCover(
@@ -117,6 +118,7 @@ class CoursesRepository {
         bytes: bytes,
         contentType: contentType,
         filename: filename,
+        recoverExistingObjectOnDuplicate: recoverExistingObjectOnDuplicate,
         cancelToken: cancelToken,
       );
 

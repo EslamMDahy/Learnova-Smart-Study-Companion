@@ -7,7 +7,7 @@ import 'question_vocabulary.dart';
 
 enum QuestionType { multipleChoice, trueFalse, shortAnswer, essay, multiSelect, fillInTheBlank, numeric, code }
 enum QuestionDifficulty { easy, medium, hard }
-enum QuestionSource { manual, aiGenerated, imported }
+enum QuestionSource { manual, aiGenerated, nativeExtraction, imported }
 enum QuestionApprovalStatus { pending, approved, rejected }
 
 class QuestionOption {
@@ -145,19 +145,11 @@ class QuestionModel {
   }
 
   /// Parse a backend Question row into a QuestionModel.
-  factory QuestionModel.fromJson(Map<String, dynamic> json) {
+  factory QuestionModel.fromJson(Map<String, dynamic> json, {bool includeDetails = true}) {
     DateTime dt(dynamic v) =>
         DateTime.tryParse((v ?? '').toString()) ??
         DateTime.fromMillisecondsSinceEpoch(0);
 
-
-    QuestionSource parseSource(String raw) {
-      switch (raw) {
-        case 'ai_generated': return QuestionSource.aiGenerated;
-        case 'imported':     return QuestionSource.imported;
-        default:             return QuestionSource.manual;
-      }
-    }
 
     QuestionApprovalStatus parseApproval(String raw) {
       switch (raw) {
@@ -167,20 +159,23 @@ class QuestionModel {
       }
     }
 
-    final rawExpectedAnswer = json['expected_answer'];
+    final rawExpectedAnswer = includeDetails ? json['expected_answer'] : null;
     final expectedAnswerText = rawExpectedAnswer is List
         ? rawExpectedAnswer.map((e) => e.toString()).join(', ')
         : rawExpectedAnswer?.toString();
 
     final rawType = (json['type'] ?? 'multiple_choice').toString();
     final parsedType = parseQuestionType(rawType);
-    final rawOptions = (json['options'] as List?) ?? const [];
+    final rawOptions = includeDetails ? ((json['options'] as List?) ?? const []) : const [];
+    final expectedAnswerIds = rawExpectedAnswer is List
+        ? rawExpectedAnswer.map((v) => v.toString()).toSet()
+        : null;
     final options = rawOptions
         .whereType<Map>()
         .map((e) {
           final option = QuestionOption.fromJson(Map<String, dynamic>.from(e));
-          final isCorrect = rawExpectedAnswer is List
-              ? rawExpectedAnswer.map((v) => v.toString()).contains(option.id)
+          final isCorrect = expectedAnswerIds != null
+              ? expectedAnswerIds.contains(option.id)
               : rawExpectedAnswer?.toString() == option.id;
           return QuestionOption(
             id: option.id,
@@ -205,12 +200,12 @@ class QuestionModel {
       text: (json['question_text'] ?? '').toString(),
       type: parsedType,
       difficulty: parseQuestionDifficulty((json['difficulty'] ?? 'medium').toString()),
-      source: parseSource((json['source'] ?? 'manual').toString()),
+      source: parseQuestionSource((json['source'] ?? 'manual').toString()),
       approvalStatus: parseApproval((json['approval_status'] ?? 'approved').toString()),
       options: options,
-      explanation: json['explanation']?.toString(),
+      explanation: includeDetails ? json['explanation']?.toString() : null,
       expectedAnswer: expectedAnswerText,
-      gradingRubric: json['grading_rubric'],
+      gradingRubric: includeDetails ? json['grading_rubric'] : null,
       correctOptionId: parsedType == QuestionType.multipleChoice ? expectedAnswerText : null,
       correctBool: parsedType == QuestionType.trueFalse ? expectedAnswerText?.toLowerCase() == 'true' : null,
       sampleAnswer: parsedType == QuestionType.shortAnswer || parsedType == QuestionType.essay ? expectedAnswerText : null,

@@ -6,8 +6,8 @@ mixin _CourseDetailsModulesMixin on StateNotifier<CourseDetailsState> {
   Ref get ref;
   int get courseId;
   Future<void> loadMaterials(int moduleId, {bool force = false});
-  Future<void> loadTopics(int moduleId, {bool force = false});
-  Future<void> loadTopicsForMaterial({required int moduleId, required int materialId, bool force = false});
+  Future<void> loadTopics(int moduleId, {bool force = false, bool hydrateDetails = true});
+  Future<void> loadTopicsForMaterial({required int moduleId, required int materialId, bool force = false, bool hydrateDetails = true});
   CancelToken? get cancelToken;
   set cancelToken(CancelToken? value);
 // ── Modules ──────────────────────────────────────────────────────────────
@@ -38,16 +38,30 @@ mixin _CourseDetailsModulesMixin on StateNotifier<CourseDetailsState> {
   ///
   /// Do not call this from route entry. Course tabs should lazy-load their own
   /// data so opening a course does not trigger every tab endpoint at once.
-  Future<void> loadModulesAndAllMaterials({bool force = false}) async {
+  Future<void> loadModulesAndAllMaterials({
+    bool force = false,
+    bool hydrateTopicDetails = true,
+  }) async {
     await loadModules(force: force);
     final modulesToLoad = state.modules
         .where((m) => force || !state.materials.containsKey(m.id) || !state.topics.containsKey(m.id))
-        .toList();
+        .toList(growable: false);
 
-    for (final module in modulesToLoad) {
-      await loadMaterials(module.id, force: force);
-      await loadTopics(module.id, force: force);
-    }
+    if (modulesToLoad.isEmpty) return;
+
+    await Future.wait<void>(
+      modulesToLoad.map((module) => loadMaterials(module.id, force: force)),
+    );
+
+    await Future.wait<void>(
+      modulesToLoad.map(
+        (module) => loadTopics(
+          module.id,
+          force: force,
+          hydrateDetails: hydrateTopicDetails,
+        ),
+      ),
+    );
   }
 
   Future<ModuleItem?> createModule(String title, {String? description}) async {

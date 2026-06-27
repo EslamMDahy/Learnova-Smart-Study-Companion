@@ -5,8 +5,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/network/error_mapper.dart';
 import '../../../../core/utils/browser_file_picker.dart';
+import '../../data/courses_providers.dart';
 import '../../data/exam_correction_models.dart';
 import '../../data/exam_correction_providers.dart';
+import '../../data/modules_materials_providers.dart';
 import 'exam_correction_state.dart';
 
 final examCorrectionControllerProvider = StateNotifierProvider.autoDispose<
@@ -22,6 +24,71 @@ class ExamCorrectionController extends StateNotifier<ExamCorrectionState> {
   final Ref _ref;
   CancelToken? _cancel;
   Timer? _pollTimer;
+
+  Future<void> loadExamContext({bool force = false}) async {
+    if (state.loadingCourses && !force) return;
+    if (state.courses.isNotEmpty && !force) return;
+
+    state = state.copyWith(loadingCourses: true, clearContextError: true);
+    try {
+      final response = await _ref.read(coursesRepositoryProvider).myCourses();
+      state = state.copyWith(
+        loadingCourses: false,
+        courses: response.items,
+        clearContextError: true,
+      );
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      state = state.copyWith(
+        loadingCourses: false,
+        contextError: failure.message,
+      );
+    }
+  }
+
+  Future<void> selectCourse(int? courseId) async {
+    if (courseId == state.selectedCourseId) return;
+    _cancel?.cancel();
+    state = state.copyWith(
+      selectedCourseId: courseId,
+      exams: const [],
+      loadingExams: false,
+      clearSelectedExam: true,
+      clearError: true,
+      clearResponse: true,
+      clearContextError: true,
+    );
+    if (courseId != null) {
+      await _loadExamsForCourse(courseId);
+    }
+  }
+
+  void selectExam(int? examId) {
+    state = state.copyWith(
+      selectedExamId: examId,
+      clearError: true,
+      clearResponse: true,
+    );
+  }
+
+  Future<void> _loadExamsForCourse(int courseId) async {
+    state = state.copyWith(loadingExams: true, clearContextError: true);
+    try {
+      final response = await _ref.read(examsApiProvider).listExams(courseId: courseId);
+      state = state.copyWith(
+        loadingExams: false,
+        exams: response.exams,
+        clearContextError: true,
+      );
+    } catch (e) {
+      final failure = mapApiFailure(e);
+      state = state.copyWith(
+        loadingExams: false,
+        exams: const [],
+        contextError: failure.message,
+      );
+    }
+  }
 
   Future<void> pickFiles() async {
     final picked = await pickBrowserFiles(
@@ -74,6 +141,11 @@ class ExamCorrectionController extends StateNotifier<ExamCorrectionState> {
   }
 
   Future<void> analyzeScan() async {
+    if (state.files.isEmpty) return;
+    if (!state.hasExamTarget) {
+      state = state.copyWith(error: 'Select the course and exam before analyzing the solved PDF.');
+      return;
+    }
     if (!state.canAnalyze) return;
 
     _cancel?.cancel();
@@ -88,6 +160,8 @@ class ExamCorrectionController extends StateNotifier<ExamCorrectionState> {
       final response = await _ref.read(examCorrectionApiProvider).analyzeExamScan(
             files: state.files,
             language: state.language,
+            courseId: state.selectedCourseId,
+            examId: state.selectedExamId,
             cancelToken: _cancel,
           );
       state = state.copyWith(loading: false, response: response, clearError: true);

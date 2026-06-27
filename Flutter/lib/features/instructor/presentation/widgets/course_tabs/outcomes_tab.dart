@@ -13,7 +13,16 @@ class CourseOutcomesTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return ColoredBox(
       color: AppColors.pageBg,
-      child: CourseOutcomesManager(courseId: course.id, embedded: true),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1480),
+            child: CourseOutcomesManager(courseId: course.id, embedded: true),
+          ),
+        ),
+      ),
     );
   }
 }

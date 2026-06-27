@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:learnova/core/storage/user_storage.dart';
 import 'package:learnova/core/ui/toast.dart';
+import 'package:learnova/core/network/error_mapper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:learnova/features/instructor/presentation/widgets/create_course_dialog.dart';
 import 'package:learnova/features/instructor/presentation/widgets/invite_students_dialog.dart';
 import 'package:learnova/features/instructor/data/courses_models.dart';
+import 'package:learnova/features/instructor/data/learning_outcomes_cache.dart';
+import 'package:learnova/features/instructor/data/learning_outcomes_models.dart';
 import 'package:learnova/features/instructor/data/modules_materials_providers.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_course_widgets.dart';
 import 'package:learnova/features/instructor/presentation/widgets/instructor_dashboard_content.dart';
@@ -86,13 +89,14 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
               bytes: result.coverBytes!,
               contentType: result.coverContentType,
               filename: result.coverFilename ?? 'course-cover.jpg',
+              recoverExistingObjectOnDuplicate: true,
             );
-      } catch (_) {
+      } catch (error) {
         if (mounted) {
           AppToast.error(
             context,
             title: 'Cover upload failed',
-            message: 'Course created, but the cover image could not be uploaded.',
+            message: 'Course created, but the cover image could not be uploaded. ${mapApiFailure(error).message}',
           );
         }
       }
@@ -102,17 +106,23 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
     // dedicated Outcomes tab stays consistent after refresh/navigation.
     if (result.learningOutcomes.isNotEmpty) {
       var failedOutcomes = 0;
+      final savedOutcomes = <LearningOutcome>[];
       final api = ref.read(learningOutcomesApiProvider);
 
       for (final outcome in result.learningOutcomes) {
         try {
-          await api.createOutcome(
+          final saved = await api.createOutcome(
             courseId: courseId,
             outcome: outcome.copyWith(courseId: courseId),
           );
+          savedOutcomes.add(saved);
         } catch (_) {
           failedOutcomes += 1;
         }
+      }
+
+      if (savedOutcomes.isNotEmpty) {
+        LearningOutcomesCache.save(courseId: courseId, outcomes: savedOutcomes);
       }
 
       if (failedOutcomes > 0 && mounted) {

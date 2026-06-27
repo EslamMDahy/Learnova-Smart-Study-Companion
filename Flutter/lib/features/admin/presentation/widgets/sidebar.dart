@@ -5,11 +5,15 @@ import '../admin_tabs.dart';
 class AdminSidebarWidget extends StatelessWidget {
   final int selectedIndex;
   final ValueChanged<int> onItemSelected;
+  final bool isCollapsed;
+  final VoidCallback? onToggle;
 
   const AdminSidebarWidget({
     super.key,
     required this.selectedIndex,
     required this.onItemSelected,
+    this.isCollapsed = false,
+    this.onToggle,
   });
 
   @override
@@ -17,6 +21,8 @@ class AdminSidebarWidget extends StatelessWidget {
     return AppSidebar(
       selectedIndex: selectedIndex,
       onItemSelected: onItemSelected,
+      isCollapsed: isCollapsed,
+      onToggle: onToggle,
       portalSubtitle: 'ADMIN Portal',
       mainItems: const [
         AppSidebarItem(

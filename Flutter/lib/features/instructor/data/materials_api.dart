@@ -74,6 +74,18 @@ class MaterialsApi {
     throw const FormatException('Invalid response from POST confirm-upload');
   }
 
+  Future<SseEvent> waitForContentStructureGeneration({
+    required int courseId,
+    required int materialId,
+    CancelToken? cancelToken,
+  }) {
+    return _client.waitForSseEvent(
+      Endpoints.contentStructureGenerationStream(courseId, materialId),
+      cancelToken: cancelToken,
+      receiveTimeout: const Duration(minutes: 6),
+    );
+  }
+
   /// Fetches a fresh signed download URL for the given material.
   Future<String?> getDownloadUrl({
     required int courseId,

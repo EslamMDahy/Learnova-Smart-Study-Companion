@@ -77,13 +77,19 @@ class CourseQuestionsResponse {
     required this.questions,
   });
 
-  factory CourseQuestionsResponse.fromJson(Map<String, dynamic> json) {
+  factory CourseQuestionsResponse.fromJson(
+    Map<String, dynamic> json, {
+    bool includeDetails = true,
+  }) {
     final raw = (json['questions'] as List?) ?? const [];
     return CourseQuestionsResponse(
       courseId: (json['course_id'] as num?)?.toInt() ?? 0,
       questions: raw
           .whereType<Map>()
-          .map((e) => QuestionModel.fromJson(Map<String, dynamic>.from(e)))
+          .map((e) => QuestionModel.fromJson(
+                Map<String, dynamic>.from(e),
+                includeDetails: includeDetails,
+              ))
           .toList(),
     );
   }
@@ -272,6 +278,27 @@ class AiQuestionGenerationResponse {
   );
 }
 
+
+class ExtractNativeQuestionsResponse {
+  final String status;
+  final bool aiProcessingStarted;
+  final String message;
+
+  const ExtractNativeQuestionsResponse({
+    required this.status,
+    required this.aiProcessingStarted,
+    required this.message,
+  });
+
+  factory ExtractNativeQuestionsResponse.fromJson(Map<String, dynamic> json) {
+    return ExtractNativeQuestionsResponse(
+      status: (json['status'] ?? '').toString(),
+      aiProcessingStarted: json['ai_processing_started'] == true,
+      message: (json['message'] ?? '').toString(),
+    );
+  }
+}
+
 class QuestionsApi {
   final ApiClient _client;
   QuestionsApi(this._client);
@@ -293,9 +320,50 @@ class QuestionsApi {
 
 
 
+  Future<SseEvent> waitForQuestionGeneration({
+    required int courseId,
+    CancelToken? cancelToken,
+  }) {
+    return _client.waitForSseEvent(
+      Endpoints.aiQuestionGenerationStream(courseId),
+      cancelToken: cancelToken,
+      receiveTimeout: const Duration(minutes: 8),
+    );
+  }
+
+  Future<ExtractNativeQuestionsResponse> extractNativeQuestionsFromMaterial({
+    required int courseId,
+    required int materialId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.extractNativeMaterialQuestions(courseId, materialId),
+      data: const <String, dynamic>{},
+      cancelToken: cancelToken,
+    );
+    return ExtractNativeQuestionsResponse.fromJson(
+      Map<String, dynamic>.from(res.data ?? const <String, dynamic>{}),
+    );
+  }
+
+  Future<SseEvent> waitForNativeQuestionExtraction({
+    required int courseId,
+    required int materialId,
+    CancelToken? cancelToken,
+  }) {
+    return _client.waitForSseEvent(
+      Endpoints.extractNativeMaterialQuestionsStream(courseId, materialId),
+      cancelToken: cancelToken,
+      receiveTimeout: const Duration(minutes: 8),
+    );
+  }
+
+
+
   Future<CourseQuestionsResponse> getCourseQuestions({
     required int courseId,
     CancelToken? cancelToken,
+    bool summaryOnly = false,
   }) async {
     final res = await _client.get<Map<String, dynamic>>(
       Endpoints.courseQuestions(courseId),
@@ -304,7 +372,10 @@ class QuestionsApi {
 
     final data = res.data;
     if (data is Map<String, dynamic>) {
-      return CourseQuestionsResponse.fromJson(data);
+      return CourseQuestionsResponse.fromJson(
+        data,
+        includeDetails: !summaryOnly,
+      );
     }
     throw const FormatException('Invalid response from GET /courses/{id}/questions');
   }

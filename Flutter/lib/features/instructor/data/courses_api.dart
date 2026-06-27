@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 
 import '../../../core/log/app_logger.dart';
 import '../../../core/network/api_client.dart';
+import '../../../core/network/api_exceptions.dart';
 import '../../../core/network/browser_upload_client.dart';
 import '../../../core/network/endpoints.dart';
 import 'courses_models.dart';
@@ -67,6 +68,41 @@ class CoursesApi {
 
 
 
+
+  String _readErrorText(Object error) {
+    if (error is DioException) {
+      final apiError = error.error;
+      if (apiError is ApiException) return apiError.message;
+
+      final data = error.response?.data;
+      if (data is Map) {
+        final detail = data['detail'] ?? data['message'] ?? data['error'];
+        if (detail != null) return detail.toString();
+      }
+
+      final message = error.message;
+      if (message != null && message.trim().isNotEmpty) return message;
+    }
+
+    if (error is ApiException) return error.message;
+    return error.toString();
+  }
+
+  bool _isSupabaseDuplicateObjectError(Object error) {
+    final text = _readErrorText(error).toLowerCase();
+    return text.contains('duplicate') &&
+        (text.contains('resource already exists') ||
+            text.contains('already exists') ||
+            text.contains('statuscode') && text.contains('409'));
+  }
+
+  ApiException _duplicateCoverUploadException() {
+    return ApiException(
+      'This course already has a cover object in storage. The current backend creates a fixed-path signed upload URL without upsert, so the selected new image cannot replace the old one from Flutter only. Ask the backend to enable upsert for /courses/{course_id}/cover/initiate.',
+      statusCode: 409,
+      code: 'COURSE_COVER_DUPLICATE_OBJECT',
+    );
+  }
 
   String _normalizeCoverContentType(String? contentType, String filename) {
     final raw = (contentType ?? '').trim().toLowerCase();
@@ -171,17 +207,38 @@ class CoursesApi {
     required List<int> bytes,
     required String? contentType,
     required String filename,
+    bool recoverExistingObjectOnDuplicate = false,
     CancelToken? cancelToken,
   }) async {
     if (bytes.isEmpty) throw ArgumentError('Cover image is empty.');
 
     final normalizedContentType = _normalizeCoverContentType(contentType, filename);
-    final init = await initiateCourseCoverUpload(
-      courseId: courseId,
-      contentType: normalizedContentType,
-      fileSizeBytes: bytes.length,
-      cancelToken: cancelToken,
-    );
+    late final CourseCoverUploadInitResponse init;
+
+    try {
+      init = await initiateCourseCoverUpload(
+        courseId: courseId,
+        contentType: normalizedContentType,
+        fileSizeBytes: bytes.length,
+        cancelToken: cancelToken,
+      );
+    } catch (error) {
+      if (_isSupabaseDuplicateObjectError(error)) {
+        if (recoverExistingObjectOnDuplicate) {
+          // If the previous browser upload succeeded but the final confirm call
+          // failed/timed out, the fixed storage object already exists. In that
+          // specific case, confirming recovers the course cover URL without
+          // creating a second storage object.
+          return confirmCourseCoverUpload(
+            courseId: courseId,
+            cancelToken: cancelToken,
+          );
+        }
+
+        throw _duplicateCoverUploadException();
+      }
+      rethrow;
+    }
 
     await uploadBinaryToSignedUrl(
       uploadUrl: init.uploadUrl,

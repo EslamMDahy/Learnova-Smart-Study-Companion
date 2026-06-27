@@ -143,9 +143,11 @@ class _StudentShellState extends ConsumerState<StudentShell> {
           wrapChild: false,
 
           /// SIDEBAR
-          sidebar: StudentSidebarWidget(
+          sidebarBuilder: (isCollapsed, toggleSidebar) => StudentSidebarWidget(
             selectedIndex: _selectedIndexFromPath(path),
             onItemSelected: _goByIndex,
+            isCollapsed: isCollapsed,
+            onToggle: toggleSidebar,
           ),
 
           /// HEADER

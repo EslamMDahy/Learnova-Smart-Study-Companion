@@ -1,64 +1,27 @@
 import 'dart:convert';
 
-int _asInt(dynamic value, {int fallback = 0}) {
-  if (value == null) return fallback;
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  return int.tryParse(value.toString()) ?? fallback;
-}
+import '../../../core/utils/json_utils.dart';
 
-int? _asNullableInt(dynamic value) {
-  if (value == null) return null;
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  return int.tryParse(value.toString());
-}
+int _asInt(Object? value, {int fallback = 0}) =>
+    jsonInt(value, fallback: fallback);
 
-double? _asNullableDouble(dynamic value) {
-  if (value == null) return null;
-  if (value is double) return value;
-  if (value is num) return value.toDouble();
-  return double.tryParse(value.toString());
-}
+int? _asNullableInt(Object? value) => jsonNullableInt(value);
 
-bool _asBool(dynamic value, {bool fallback = false}) {
-  if (value == null) return fallback;
-  if (value is bool) return value;
-  final normalized = value.toString().trim().toLowerCase();
-  if (normalized == 'true' || normalized == '1' || normalized == 'yes') {
-    return true;
-  }
-  if (normalized == 'false' || normalized == '0' || normalized == 'no') {
-    return false;
-  }
-  return fallback;
-}
+double? _asNullableDouble(Object? value) => jsonNullableDouble(value);
 
-DateTime? _asDate(dynamic value) {
-  if (value == null) return null;
-  if (value is DateTime) return value;
-  final raw = value.toString().trim();
-  if (raw.isEmpty) return null;
-  return DateTime.tryParse(raw);
-}
+bool _asBool(Object? value, {bool fallback = false}) =>
+    jsonBool(value, fallback: fallback);
 
-String _asString(dynamic value) => (value ?? '').toString().trim();
+DateTime? _asDate(Object? value) => jsonDate(value);
 
+String _asString(Object? value) => jsonString(value);
 
-String? _asNullableString(dynamic value) {
-  final text = _asString(value);
-  return text.isEmpty ? null : text;
-}
+String? _asNullableString(Object? value) => jsonNullableString(value);
 
-String? _firstNonEmptyString(List<dynamic> values) {
-  for (final value in values) {
-    final text = _asNullableString(value);
-    if (text != null) return text;
-  }
-  return null;
-}
+String? _firstNonEmptyString(Iterable<Object?> values) =>
+    jsonFirstNonEmptyString(values);
 
-String? _extractCoverUrl(Map<String, dynamic> json) {
+String? _extractCoverUrl(JsonMap json) {
   final direct = _firstNonEmptyString([
     json['cover_url'],
     json['coverUrl'],
@@ -74,23 +37,22 @@ String? _extractCoverUrl(Map<String, dynamic> json) {
   if (direct != null) return direct;
 
   for (final key in const ['cover', 'cover_image', 'image', 'thumbnail', 'banner']) {
-    final nested = json[key];
-    if (nested is Map) {
-      final nestedUrl = _firstNonEmptyString([
-        nested['url'],
-        nested['public_url'],
-        nested['publicUrl'],
-        nested['cover_url'],
-        nested['image_url'],
-      ]);
-      if (nestedUrl != null) return nestedUrl;
-    }
+    final nested = asJsonMap(json[key]);
+    if (nested == null) continue;
+    final nestedUrl = _firstNonEmptyString([
+      nested['url'],
+      nested['public_url'],
+      nested['publicUrl'],
+      nested['cover_url'],
+      nested['image_url'],
+    ]);
+    if (nestedUrl != null) return nestedUrl;
   }
 
   return null;
 }
 
-String? _extractInstructorName(Map<String, dynamic> json) {
+String? _extractInstructorName(JsonMap json) {
   final direct = _firstNonEmptyString([
     json['instructor_name'],
     json['instructorName'],
@@ -104,24 +66,23 @@ String? _extractInstructorName(Map<String, dynamic> json) {
   if (direct != null) return direct;
 
   for (final key in const ['instructor', 'teacher', 'owner', 'creator', 'created_by_user']) {
-    final nested = json[key];
-    if (nested is Map) {
-      final nestedName = _firstNonEmptyString([
-        nested['full_name'],
-        nested['fullName'],
-        nested['name'],
-        nested['display_name'],
-        nested['displayName'],
-        nested['email'],
-      ]);
-      if (nestedName != null) return nestedName;
-    }
+    final nested = asJsonMap(json[key]);
+    if (nested == null) continue;
+    final nestedName = _firstNonEmptyString([
+      nested['full_name'],
+      nested['fullName'],
+      nested['name'],
+      nested['display_name'],
+      nested['displayName'],
+      nested['email'],
+    ]);
+    if (nestedName != null) return nestedName;
   }
 
   return null;
 }
 
-String? _extractInstructorAvatarUrl(Map<String, dynamic> json) {
+String? _extractInstructorAvatarUrl(JsonMap json) {
   final direct = _firstNonEmptyString([
     json['instructor_avatar_url'],
     json['instructorAvatarUrl'],
@@ -135,39 +96,23 @@ String? _extractInstructorAvatarUrl(Map<String, dynamic> json) {
   if (direct != null) return direct;
 
   for (final key in const ['instructor', 'teacher', 'owner', 'creator', 'created_by_user']) {
-    final nested = json[key];
-    if (nested is Map) {
-      final nestedUrl = _firstNonEmptyString([
-        nested['avatar_url'],
-        nested['avatarUrl'],
-        nested['photo_url'],
-        nested['photoUrl'],
-        nested['image_url'],
-        nested['imageUrl'],
-      ]);
-      if (nestedUrl != null) return nestedUrl;
-    }
+    final nested = asJsonMap(json[key]);
+    if (nested == null) continue;
+    final nestedUrl = _firstNonEmptyString([
+      nested['avatar_url'],
+      nested['avatarUrl'],
+      nested['photo_url'],
+      nested['photoUrl'],
+      nested['image_url'],
+      nested['imageUrl'],
+    ]);
+    if (nestedUrl != null) return nestedUrl;
   }
 
   return null;
 }
 
-List<String> _asStringList(dynamic value) {
-  if (value == null) return const [];
-  if (value is List) {
-    return value
-        .map((item) => item.toString().trim())
-        .where((item) => item.isNotEmpty)
-        .toList(growable: false);
-  }
-  final raw = value.toString().trim();
-  if (raw.isEmpty) return const [];
-  return raw
-      .split(',')
-      .map((item) => item.trim())
-      .where((item) => item.isNotEmpty)
-      .toList(growable: false);
-}
+List<String> _asStringList(Object? value) => jsonStringList(value);
 
 enum StudentCourseSource { enrolled, publicSearch }
 
@@ -302,7 +247,7 @@ class StudentCourse {
     );
   }
 
-  factory StudentCourse.fromMyJson(Map<String, dynamic> json) {
+  factory StudentCourse.fromMyJson(JsonMap json) {
     return StudentCourse(
       id: _asInt(json['id']),
       title: _asString(json['title']),
@@ -345,7 +290,7 @@ class StudentCourse {
     );
   }
 
-  factory StudentCourse.fromSearchJson(Map<String, dynamic> json) {
+  factory StudentCourse.fromSearchJson(JsonMap json) {
     return StudentCourse(
       id: _asInt(json['id']),
       title: _asString(json['title']),
@@ -393,15 +338,14 @@ class StudentMyCoursesResponse {
 
   const StudentMyCoursesResponse({required this.items, required this.total});
 
-  factory StudentMyCoursesResponse.fromJson(Map<String, dynamic> json) {
+  factory StudentMyCoursesResponse.fromJson(JsonMap json) {
     final rawItems = json['items'];
     if (rawItems is! List) {
       throw const FormatException('Invalid /courses/my payload');
     }
 
-    final items = rawItems
-        .whereType<Map>()
-        .map((item) => StudentCourse.fromMyJson(Map<String, dynamic>.from(item)))
+    final items = jsonMapList(rawItems)
+        .map(StudentCourse.fromMyJson)
         .where((course) => course.id > 0)
         .toList(growable: false);
 
@@ -425,7 +369,7 @@ class StudentCourseSearchResponse {
     required this.results,
   });
 
-  factory StudentCourseSearchResponse.fromJson(Map<String, dynamic> json) {
+  factory StudentCourseSearchResponse.fromJson(JsonMap json) {
     final rawResults = json['results'] ?? json['items'] ?? json['courses'];
     if (rawResults is! List) {
       throw const FormatException('Invalid /courses/search payload');
@@ -442,7 +386,7 @@ class StudentCourseSearchResponse {
   }
 
   factory StudentCourseSearchResponse.fromList(
-    List<dynamic> rawResults, {
+    Iterable<Object?> rawResults, {
     required int limit,
     required int offset,
   }) {
@@ -455,10 +399,9 @@ class StudentCourseSearchResponse {
     );
   }
 
-  static List<StudentCourse> _parseSearchResults(List<dynamic> rawResults) {
-    return rawResults
-        .whereType<Map>()
-        .map((item) => StudentCourse.fromSearchJson(Map<String, dynamic>.from(item)))
+  static List<StudentCourse> _parseSearchResults(Iterable<Object?> rawResults) {
+    return jsonMapList(rawResults)
+        .map(StudentCourse.fromSearchJson)
         .where((course) => course.id > 0)
         .toList(growable: false);
   }
@@ -470,7 +413,7 @@ class StudentCourseAutocompleteResponse {
   const StudentCourseAutocompleteResponse({required this.suggestions});
 
   factory StudentCourseAutocompleteResponse.fromJson(
-    Map<String, dynamic> json,
+    JsonMap json,
   ) {
     final rawSuggestions =
         json['suggestions'] ?? json['items'] ?? json['results'];
@@ -482,7 +425,7 @@ class StudentCourseAutocompleteResponse {
     return const StudentCourseAutocompleteResponse(suggestions: []);
   }
 
-  factory StudentCourseAutocompleteResponse.fromList(List<dynamic> raw) {
+  factory StudentCourseAutocompleteResponse.fromList(Iterable<Object?> raw) {
     final seen = <String>{};
     final suggestions = <String>[];
 
@@ -519,7 +462,7 @@ class StudentCourseEnrollmentResult {
 
   bool get isPending => status.trim().toLowerCase() == 'pending';
 
-  factory StudentCourseEnrollmentResult.fromJson(Map<String, dynamic> json) {
+  factory StudentCourseEnrollmentResult.fromJson(JsonMap json) {
     return StudentCourseEnrollmentResult(
       enrollmentId: _asInt(json['enrollment_id']),
       courseId: _asInt(json['course_id']),
@@ -547,7 +490,7 @@ class StudentCourseInviteAcceptResult {
     required this.acceptedAt,
   });
 
-  factory StudentCourseInviteAcceptResult.fromJson(Map<String, dynamic> json) {
+  factory StudentCourseInviteAcceptResult.fromJson(JsonMap json) {
     return StudentCourseInviteAcceptResult(
       message: _asString(json['message']).isEmpty
           ? 'Invitation accepted. You are now enrolled in the course.'
@@ -637,7 +580,7 @@ class StudentCourseModule {
     );
   }
 
-  factory StudentCourseModule.fromJson(Map<String, dynamic> json) {
+  factory StudentCourseModule.fromJson(JsonMap json) {
     return StudentCourseModule(
       id: _asInt(json['id']),
       courseId: _asInt(json['course_id']),
@@ -690,7 +633,7 @@ class StudentCourseTopic {
     return value.isEmpty ? 'No topic description has been added yet.' : value;
   }
 
-  factory StudentCourseTopic.fromJson(Map<String, dynamic> json) {
+  factory StudentCourseTopic.fromJson(JsonMap json) {
     return StudentCourseTopic(
       id: _asInt(json['id']),
       materialId: _asInt(json['material_id']),
@@ -720,7 +663,7 @@ class StudentCourseTranscriptSegment {
 
   bool get isValid => marker.trim().isNotEmpty && text.trim().isNotEmpty;
 
-  factory StudentCourseTranscriptSegment.fromJson(Map<String, dynamic> json) {
+  factory StudentCourseTranscriptSegment.fromJson(JsonMap json) {
     final rawMarker = _asString(
       json['timestamp'] ??
           json['time'] ??
@@ -739,15 +682,12 @@ class StudentCourseTranscriptSegment {
   }
 }
 
-List<StudentCourseTranscriptSegment> _asTranscriptSegments(dynamic value) {
+List<StudentCourseTranscriptSegment> _asTranscriptSegments(Object? value) {
   if (value == null) return const [];
 
   if (value is List) {
-    return value
-        .whereType<Map>()
-        .map((item) => StudentCourseTranscriptSegment.fromJson(
-              Map<String, dynamic>.from(item),
-            ))
+    return jsonMapList(value)
+        .map(StudentCourseTranscriptSegment.fromJson)
         .where((segment) => segment.isValid)
         .toList(growable: false);
   }
@@ -760,11 +700,10 @@ List<StudentCourseTranscriptSegment> _asTranscriptSegments(dynamic value) {
   ];
 }
 
-List<StudentCourseTopic> _asTopics(dynamic value) {
+List<StudentCourseTopic> _asTopics(Object? value) {
   if (value == null || value is! List) return const [];
-  return value
-      .whereType<Map>()
-      .map((item) => StudentCourseTopic.fromJson(Map<String, dynamic>.from(item)))
+  return jsonMapList(value)
+      .map(StudentCourseTopic.fromJson)
       .where((topic) => topic.id > 0)
       .toList(growable: false);
 }
@@ -863,7 +802,7 @@ class StudentCourseMaterial {
     );
   }
 
-  factory StudentCourseMaterial.fromJson(Map<String, dynamic> json) {
+  factory StudentCourseMaterial.fromJson(JsonMap json) {
     return StudentCourseMaterial(
       id: _asInt(json['id']),
       moduleId: _asInt(json['module_id']),
@@ -917,15 +856,14 @@ class StudentCourseExamListResponse {
     required this.exams,
   });
 
-  factory StudentCourseExamListResponse.fromJson(Map<String, dynamic> json) {
+  factory StudentCourseExamListResponse.fromJson(JsonMap json) {
     final rawExams = json['exams'] ?? json['items'] ?? json['results'];
     if (rawExams is! List) {
       throw const FormatException('Invalid student exams payload');
     }
 
-    final exams = rawExams
-        .whereType<Map>()
-        .map((item) => StudentCourseExam.fromJson(Map<String, dynamic>.from(item)))
+    final exams = jsonMapList(rawExams)
+        .map(StudentCourseExam.fromJson)
         .where((exam) => exam.id > 0)
         .toList(growable: false);
 
@@ -982,7 +920,7 @@ class StudentCourseExam {
 
   bool get hasAvailabilityWindow => availableFrom != null || availableTo != null;
 
-  factory StudentCourseExam.fromJson(Map<String, dynamic> json) {
+  factory StudentCourseExam.fromJson(JsonMap json) {
     return StudentCourseExam(
       id: _asInt(json['id']),
       courseId: _asInt(json['course_id']),
@@ -1060,14 +998,11 @@ class StudentExamAttempt {
       .expand((section) => section.questions)
       .toList(growable: false);
 
-  factory StudentExamAttempt.fromJson(Map<String, dynamic> json) {
+  factory StudentExamAttempt.fromJson(JsonMap json) {
     final rawSections = json['sections'];
     final sections = rawSections is List
-        ? rawSections
-            .whereType<Map>()
-            .map((item) => StudentExamSection.fromJson(
-                  Map<String, dynamic>.from(item),
-                ))
+        ? jsonMapList(rawSections)
+            .map(StudentExamSection.fromJson)
             .toList(growable: false)
         : const <StudentExamSection>[];
 
@@ -1132,14 +1067,11 @@ class StudentExamSection {
 
   String get safeTitle => title.trim().isEmpty ? 'Questions' : title.trim();
 
-  factory StudentExamSection.fromJson(Map<String, dynamic> json) {
+  factory StudentExamSection.fromJson(JsonMap json) {
     final rawQuestions = json['questions'];
     final questions = rawQuestions is List
-        ? rawQuestions
-            .whereType<Map>()
-            .map((item) => StudentExamQuestion.fromJson(
-                  Map<String, dynamic>.from(item),
-                ))
+        ? jsonMapList(rawQuestions)
+            .map(StudentExamQuestion.fromJson)
             .where((question) => question.examQuestionId > 0)
             .toList(growable: false)
         : const <StudentExamQuestion>[];
@@ -1201,7 +1133,7 @@ class StudentExamQuestion {
         normalized.contains('checkbox');
   }
 
-  factory StudentExamQuestion.fromJson(Map<String, dynamic> json) {
+  factory StudentExamQuestion.fromJson(JsonMap json) {
     return StudentExamQuestion(
       examQuestionId: _asInt(json['exam_question_id']),
       questionId: _asInt(json['question_id']),
@@ -1229,7 +1161,7 @@ class StudentExamQuestionOption {
 
   bool get isValid => text.trim().isNotEmpty;
 
-  factory StudentExamQuestionOption.fromJson(Map<String, dynamic> json, int index) {
+  factory StudentExamQuestionOption.fromJson(JsonMap json, int index) {
     final rawId = _asString(json['id'] ?? json['key'] ?? json['value']);
     final rawText = _asString(
       json['text'] ?? json['label'] ?? json['answer'] ?? json['content'],
@@ -1242,17 +1174,16 @@ class StudentExamQuestionOption {
   }
 }
 
-List<StudentExamQuestionOption> _asExamOptions(dynamic value) {
+List<StudentExamQuestionOption> _asExamOptions(Object? value) {
   if (value == null) return const [];
   if (value is List) {
     final options = <StudentExamQuestionOption>[];
     for (var i = 0; i < value.length; i++) {
       final item = value[i];
       if (item is Map) {
-        final option = StudentExamQuestionOption.fromJson(
-          Map<String, dynamic>.from(item),
-          i,
-        );
+        final optionMap = asJsonMap(item);
+        if (optionMap == null) continue;
+        final option = StudentExamQuestionOption.fromJson(optionMap, i);
         if (option.isValid) options.add(option);
       } else {
         final text = _asString(item);
@@ -1285,10 +1216,12 @@ class StudentExamAnswerDraft {
     final normalizedAnswerText = (answerText ?? '').trim();
     return {
       'exam_question_id': examQuestionId,
-      // Keep the database-facing field numeric. The real option id (A/B/C/D)
-      // is carried in answer_text for grading/result display.
-      if (selectedOptionIndex != null) 'selected_option_index': selectedOptionIndex,
-      if (selectedOptionIndices != null) 'selected_option_indices': selectedOptionIndices,
+      // Backend submit-answer / submit-exam now accepts objective option
+      // positions as strings. answer_text still carries the real option id
+      // (A/B/C/D or true/false) for result review/display.
+      if (selectedOptionIndex != null) 'selected_option_index': selectedOptionIndex.toString(),
+      if (selectedOptionIndices != null)
+        'selected_option_indices': selectedOptionIndices!.map((index) => index.toString()).toList(growable: false),
       if (normalizedAnswerText.isNotEmpty) 'answer_text': normalizedAnswerText,
       if (timeTakenSeconds != null) 'time_taken_seconds': timeTakenSeconds,
     };
@@ -1321,7 +1254,7 @@ class StudentExamSubmitResult {
     required this.submittedAt,
   });
 
-  factory StudentExamSubmitResult.fromJson(Map<String, dynamic> json) {
+  factory StudentExamSubmitResult.fromJson(JsonMap json) {
     return StudentExamSubmitResult(
       attemptId: _asInt(json['attempt_id']),
       examId: _asInt(json['exam_id']),
@@ -1373,7 +1306,7 @@ class StudentExamAttemptSummary {
         normalized == 'completed';
   }
 
-  factory StudentExamAttemptSummary.fromJson(Map<String, dynamic> json) {
+  factory StudentExamAttemptSummary.fromJson(JsonMap json) {
     return StudentExamAttemptSummary(
       attemptId: _asInt(json['attempt_id']),
       attemptNumber: _asInt(json['attempt_number'], fallback: 1),
@@ -1397,12 +1330,13 @@ class StudentExamAttemptsList {
 
   const StudentExamAttemptsList({required this.examId, required this.attempts});
 
-  factory StudentExamAttemptsList.fromJson(Map<String, dynamic> json) {
+  factory StudentExamAttemptsList.fromJson(JsonMap json) {
     final rawAttempts = json['attempts'];
     final attempts = rawAttempts is List
         ? rawAttempts
-            .whereType<Map>()
-            .map((item) => StudentExamAttemptSummary.fromJson(Map<String, dynamic>.from(item)))
+            .map(asJsonMap)
+            .whereType<JsonMap>()
+            .map(StudentExamAttemptSummary.fromJson)
             .where((attempt) => attempt.attemptId > 0)
             .toList(growable: false)
         : const <StudentExamAttemptSummary>[];
@@ -1525,7 +1459,7 @@ class StudentExamLatestResult {
   }
 
   factory StudentExamLatestResult.fromAttemptResult(
-    Map<String, dynamic> json, {
+    JsonMap json, {
     required int courseId,
     StudentExamAttemptSummary? summary,
     int attemptsUsed = 0,
@@ -1592,7 +1526,7 @@ class StudentExamLatestResult {
     );
   }
 
-  factory StudentExamLatestResult.fromJson(Map<String, dynamic> json) {
+  factory StudentExamLatestResult.fromJson(JsonMap json) {
     // Backward-compatible path for any old/custom latest-result shape.
     if (json['sections'] is List) {
       return StudentExamLatestResult.fromAttemptResult(json, courseId: _asInt(json['course_id']));
@@ -1600,9 +1534,8 @@ class StudentExamLatestResult {
 
     final rawQuestions = json['questions'];
     final questions = rawQuestions is List
-        ? rawQuestions
-            .whereType<Map>()
-            .map((item) => StudentExamResultQuestion.fromJson(Map<String, dynamic>.from(item)))
+        ? jsonMapList(rawQuestions)
+            .map(StudentExamResultQuestion.fromJson)
             .toList(growable: false)
         : const <StudentExamResultQuestion>[];
 
@@ -1666,12 +1599,11 @@ class StudentExamResultSection {
     required this.questions,
   });
 
-  factory StudentExamResultSection.fromJson(Map<String, dynamic> json) {
+  factory StudentExamResultSection.fromJson(JsonMap json) {
     final rawQuestions = json['questions'];
     final questions = rawQuestions is List
-        ? rawQuestions
-            .whereType<Map>()
-            .map((item) => StudentExamResultQuestion.fromJson(Map<String, dynamic>.from(item)))
+        ? jsonMapList(rawQuestions)
+            .map(StudentExamResultQuestion.fromJson)
             .toList(growable: false)
         : const <StudentExamResultQuestion>[];
 
@@ -1685,11 +1617,12 @@ class StudentExamResultSection {
   }
 }
 
-List<StudentExamResultSection> _asResultSections(dynamic value) {
+List<StudentExamResultSection> _asResultSections(Object? value) {
   if (value is! List) return const <StudentExamResultSection>[];
   return value
-      .whereType<Map>()
-      .map((item) => StudentExamResultSection.fromJson(Map<String, dynamic>.from(item)))
+      .map(asJsonMap)
+      .whereType<JsonMap>()
+      .map(StudentExamResultSection.fromJson)
       .toList(growable: false);
 }
 
@@ -1710,7 +1643,7 @@ class StudentExamAnswerDetail {
         (answerText ?? '').trim().isEmpty;
   }
 
-  factory StudentExamAnswerDetail.fromJson(dynamic value) {
+  factory StudentExamAnswerDetail.fromJson(Object? value) {
     if (value is! Map) {
       return const StudentExamAnswerDetail(
         selectedOptionIndex: null,
@@ -1718,7 +1651,14 @@ class StudentExamAnswerDetail {
         answerText: null,
       );
     }
-    final json = Map<String, dynamic>.from(value);
+    final json = asJsonMap(value);
+    if (json == null) {
+      return const StudentExamAnswerDetail(
+        selectedOptionIndex: null,
+        selectedOptionIndices: null,
+        answerText: null,
+      );
+    }
     return StudentExamAnswerDetail(
       selectedOptionIndex: _asNullableInt(json['selected_option_index']),
       selectedOptionIndices: _asIntList(json['selected_option_indices']),
@@ -1738,7 +1678,7 @@ class StudentExamResultQuestion {
   final String difficulty;
   final List<StudentExamQuestionOption> options;
   final StudentExamAnswerDetail studentAnswer;
-  final dynamic rawCorrectAnswer;
+  final Object? rawCorrectAnswer;
   final bool? _backendIsCorrect;
   final String? explanation;
   final String? teacherFeedback;
@@ -1880,7 +1820,7 @@ class StudentExamResultQuestion {
     return id;
   }
 
-  factory StudentExamResultQuestion.fromJson(Map<String, dynamic> json) {
+  factory StudentExamResultQuestion.fromJson(JsonMap json) {
     final backendIsCorrect = json.containsKey('is_correct') && json['is_correct'] != null
         ? _asBool(json['is_correct'])
         : null;
@@ -1904,7 +1844,7 @@ class StudentExamResultQuestion {
   }
 }
 
-List<int>? _asIntList(dynamic value) {
+List<int>? _asIntList(Object? value) {
   if (value == null) return null;
   if (value is List) {
     return value.map(_asNullableInt).whereType<int>().toList(growable: false);
@@ -1929,7 +1869,7 @@ List<int>? _asIntList(dynamic value) {
   return null;
 }
 
-List<String> _answerIdsFromDynamic(dynamic value) {
+List<String> _answerIdsFromDynamic(Object? value) {
   if (value == null) return const <String>[];
   if (value is List) {
     return value.map(_asString).map(_cleanAnswerId).where((item) => item.isNotEmpty).toList(growable: false);

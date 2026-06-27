@@ -114,9 +114,11 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
         return BaseDashboardShell(
           wrapChild: false,
 
-          sidebar: InstructorSidebarWidget(
+          sidebarBuilder: (isCollapsed, toggleSidebar) => InstructorSidebarWidget(
             selectedIndex: _selectedIndexFromPath(path),
             onItemSelected: _goByIndex,
+            isCollapsed: isCollapsed,
+            onToggle: toggleSidebar,
           ),
 
           header: TopHeaderWidget(
