@@ -13,7 +13,8 @@ from .schemas import (TopicCreateRequest,
                       TopicGetResponse, 
                       TopicReorderRequest, 
                       TopicReorderResponse,
-                      ConfirmTopicsRequest)
+                      ConfirmTopicsRequest,
+                      ConfirmTopicsResponse)
 
 router = APIRouter(prefix="/courses/{course_id}/modules/{module_id}/materials/{material_id}/topics", tags=["Topics"],)
 
