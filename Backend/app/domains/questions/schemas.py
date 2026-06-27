@@ -173,6 +173,7 @@ class QuestionGenerationResponse(BaseModel):
     status: str
     ai_processing_started: bool
     message: Optional[str] = None
+    questions: Optional[List[QuestionListItem]] = None
 
     model_config = ConfigDict(extra="forbid")
 
@@ -182,3 +183,15 @@ class ExtractNativeQuestionsResponse(BaseModel):
     status: str
     ai_processing_started: bool
     message: str
+
+
+class ApproveQuestionsRequest(BaseModel):
+    question_ids: List[int] = Field(..., min_length=1)
+    
+    model_config = ConfigDict(extra="forbid")
+
+class ApproveQuestionsResponse(BaseModel):
+    approved_count: int
+    
+    model_config = ConfigDict(extra="forbid")
+

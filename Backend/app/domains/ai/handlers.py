@@ -8,7 +8,7 @@ from app.core.event_bus.publish import publish_sync
 
 from app.domains.topics.helpers import bulk_insert_ai_topics
 from app.domains.learningOutcomes.helpers import bulk_insert_ai_learning_outcomes
-from app.domains.questions.helpers import validate_and_prepare_ai_generated_questions, insert_ai_generated_questions
+from app.domains.questions.helpers import validate_and_prepare_ai_generated_questions, insert_ai_generated_questions, bulk_insert_pool_questions 
 from app.domains.exams.helpers import save_ai_exam_grading_results
 from app.domains.ai_chat.helpers import save_rag_chat_response
 from app.domains.ai.helpers import (
@@ -327,6 +327,8 @@ def handle_question_generation(*, db: Session, verified_callback: VerifiedAICall
     print(f"REQUEST LOG = {request_log}")
     print("========================================================\n")
 
+    destination = body.get("destination", "question_bank")
+
     # =========================
     # 1) Verify request_log context
     # =========================
@@ -357,12 +359,19 @@ def handle_question_generation(*, db: Session, verified_callback: VerifiedAICall
     # =========================
     # 3) Insert questions into DB
     # =========================
-    insert_result = insert_ai_generated_questions(
-        course_id=course_id,
-        prepared_questions=prepared_questions,
-        db=db,
-        created_by=request_log.get("created_by"),
-    )
+    if destination == "pool":
+        insert_result = bulk_insert_pool_questions(
+            course_id=course_id,
+            prepared_questions=prepared_questions,
+            db=db,
+        )
+    else:
+        insert_result = insert_ai_generated_questions(
+            course_id=course_id,
+            prepared_questions=prepared_questions,
+            db=db,
+            created_by=request_log.get("created_by"),
+        )
 
     print(f"\nINSERT RESULT = {insert_result}\n")
 

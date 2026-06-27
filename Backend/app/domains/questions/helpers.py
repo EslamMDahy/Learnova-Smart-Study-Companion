@@ -237,3 +237,108 @@ def insert_ai_generated_questions(*, course_id: int, prepared_questions: list[di
 
     except SQLAlchemyError as e:
         raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def bulk_insert_pool_questions(*, course_id: int, prepared_questions: list[dict[str, Any]], db: Session,) -> dict:
+    # =========================
+    # 1) Validate inputs
+    # =========================
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not isinstance(prepared_questions, list) or not prepared_questions:
+        raise HTTPException(status_code=422, detail="prepared_questions is required")
+
+    inserted_ids = []
+
+    try:
+        # =========================
+        # 2) Insert into questions_pool
+        # =========================
+        for prepared_question in prepared_questions:
+            topic_id = prepared_question.get("topic_id")
+            normalized_data = prepared_question.get("data")
+
+            if not topic_id or int(topic_id) <= 0:
+                raise HTTPException(status_code=422, detail="Invalid topic_id")
+
+            if not isinstance(normalized_data, dict):
+                raise HTTPException(status_code=422, detail="Invalid normalized question data")
+
+            row = db.execute(
+                text("""
+                    INSERT INTO questions_pool (
+                        course_id,
+                        topic_id,
+                        question_text,
+                        explanation,
+                        options,
+                        type,
+                        difficulty,
+                        source,
+                        expected_answer,
+                        grading_rubric,
+                        max_score,
+                        auto_gradable,
+                        is_used,
+                        created_at,
+                        updated_at
+                    )
+                    VALUES (
+                        :course_id,
+                        :topic_id,
+                        :question_text,
+                        :explanation,
+                        CAST(:options AS JSONB),
+                        :type,
+                        :difficulty,
+                        :source,
+                        CAST(:expected_answer AS JSONB),
+                        CAST(:grading_rubric AS JSONB),
+                        :max_score,
+                        :auto_gradable,
+                        FALSE,
+                        NOW(),
+                        NOW()
+                    )
+                    RETURNING id
+                """),
+                {
+                    "course_id": course_id,
+                    "topic_id": int(topic_id),
+                    "question_text": normalized_data["question_text"],
+                    "explanation": normalized_data["explanation"],
+                    "options": json.dumps(normalized_data["options"]),
+                    "type": normalized_data["type"],
+                    "difficulty": normalized_data["difficulty"],
+                    "source": normalized_data["source"],
+                    "expected_answer": json.dumps(normalized_data["expected_answer"]),
+                    "grading_rubric": (
+                        json.dumps(normalized_data["grading_rubric"])
+                        if normalized_data["grading_rubric"] is not None else None
+                    ),
+                    "max_score": normalized_data["max_score"],
+                    "auto_gradable": normalized_data["auto_gradable"],
+                },
+            ).mappings().first()
+
+            if not row:
+                raise HTTPException(status_code=503, detail="Failed to insert question into pool")
+
+            inserted_ids.append(row["id"])
+
+        # =========================
+        # 3) Return summary
+        # =========================
+        return {
+            "inserted_count": len(inserted_ids),
+            "question_ids": inserted_ids,
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+

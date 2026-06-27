@@ -324,6 +324,99 @@ def list_topic_questions(*, course_id: int, module_id: int, material_id: int, to
 
 
 
+def list_pending_questions(*, course_id: int, module_id: int, material_id: int, topic_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can view pending questions")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # =========================
+    # 2) Validate hierarchy + ownership
+    # =========================
+    topic_row = db.execute(
+        text("""
+            SELECT
+                t.id,
+                t.material_id,
+                m.module_id,
+                mo.course_id,
+                c.created_by
+            FROM topics t
+            JOIN materials m ON m.id = t.material_id
+            JOIN modules mo ON mo.id = m.module_id
+            JOIN courses c ON c.id = mo.course_id
+            WHERE t.id = :topic_id
+            LIMIT 1
+        """),
+        {"topic_id": topic_id},
+    ).mappings().first()
+
+    if not topic_row:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    if int(topic_row["material_id"]) != int(material_id):
+        raise HTTPException(status_code=400, detail="Topic does not belong to this material")
+
+    if int(topic_row["module_id"]) != int(module_id):
+        raise HTTPException(status_code=400, detail="Topic does not belong to this module")
+
+    if int(topic_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Topic does not belong to this course")
+
+    if int(topic_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only view questions for your own course")
+
+    # =========================
+    # 3) Fetch pending questions
+    # =========================
+    try:
+        question_rows = db.execute(
+            text("""
+                SELECT
+                    id,
+                    course_id,
+                    topic_id,
+                    question_text,
+                    options,
+                    type,
+                    difficulty,
+                    source,
+                    approval_status,
+                    auto_gradable,
+                    created_at,
+                    updated_at
+                FROM questions
+                WHERE course_id = :course_id
+                  AND topic_id = :topic_id
+                  AND approval_status = 'pending'
+                ORDER BY created_at ASC, id ASC
+            """),
+            {
+                "course_id": course_id,
+                "topic_id": topic_id,
+            },
+        ).mappings().all()
+
+        return {
+            "course_id": course_id,
+            "topic_id": topic_id,
+            "questions": [dict(row) for row in question_rows],
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
 def list_material_questions(*, course_id: int, module_id: int, material_id: int, db: Session, current_user: dict,):
     # =========================
     # 1) Authorization
@@ -1182,7 +1275,195 @@ def generate_questions_for_topics(*, course_id: int, payload: QuestionGeneration
         topic_titles[int(topic_row["id"])] = topic_row["title"]
 
     # =========================
-    # 5) Build AI request body
+    # 5) Check question pool
+    # =========================
+    pool_results = {}
+    pool_sufficient = True
+
+    for topic_payload in payload.topics:
+        topic_id = int(topic_payload.topic_id)
+        configs = normalized_topic_configs[topic_id]
+
+        for config in configs:
+            pool_rows = db.execute(
+                text("""
+                    SELECT id, question_text, explanation, options, type, difficulty,
+                           source, expected_answer, grading_rubric, max_score, auto_gradable
+                    FROM questions_pool
+                    WHERE topic_id = :topic_id
+                      AND type = :type
+                      AND difficulty = :difficulty
+                      AND is_used = FALSE
+                    LIMIT :count
+                """),
+                {
+                    "topic_id": topic_id,
+                    "type": config["type"],
+                    "difficulty": config["difficulty"],
+                    "count": config["count"],
+                },
+            ).mappings().all()
+
+            if len(pool_rows) < config["count"]:
+                pool_sufficient = False
+                break
+
+            pool_results.setdefault(topic_id, []).extend([dict(row) for row in pool_rows])
+
+        if not pool_sufficient:
+            break
+
+    if pool_sufficient and pool_results:
+        # =========================
+        # 5.1) Mark pool questions as used
+        # =========================
+        all_pool_ids = [row["id"] for rows in pool_results.values() for row in rows]
+
+        db.execute(
+            text("""
+                UPDATE questions_pool
+                SET is_used = TRUE,
+                    updated_at = NOW()
+                WHERE id = ANY(:ids)
+            """),
+            {"ids": all_pool_ids},
+        )
+
+        # =========================
+        # 5.2) Insert into questions table
+        # =========================
+        inserted_questions = []
+
+        for topic_id, rows in pool_results.items():
+            for row in rows:
+                question_row = db.execute(
+                    text("""
+                        INSERT INTO questions (
+                            course_id,
+                            topic_id,
+                            question_text,
+                            explanation,
+                            options,
+                            type,
+                            difficulty,
+                            source,
+                            approval_status,
+                            expected_answer,
+                            grading_rubric,
+                            max_score,
+                            auto_gradable,
+                            usage_count,
+                            success_rate,
+                            average_time_seconds,
+                            tags,
+                            created_by,
+                            created_at,
+                            updated_at
+                        )
+                        VALUES (
+                            :course_id,
+                            :topic_id,
+                            :question_text,
+                            :explanation,
+                            CAST(:options AS JSONB),
+                            :type,
+                            :difficulty,
+                            :source,
+                            'pending',
+                            CAST(:expected_answer AS JSONB),
+                            CAST(:grading_rubric AS JSONB),
+                            :max_score,
+                            :auto_gradable,
+                            0,
+                            NULL,
+                            NULL,
+                            NULL,
+                            NULL,
+                            NOW(),
+                            NOW()
+                        )
+                        RETURNING id, question_text, options, type, difficulty,
+                                  source, auto_gradable, created_at, updated_at
+                    """),
+                    {
+                        "course_id": course_id,
+                        "topic_id": topic_id,
+                        "question_text": row["question_text"],
+                        "explanation": row["explanation"],
+                        "options": json.dumps(row["options"]) if row["options"] is not None else None,
+                        "type": row["type"],
+                        "difficulty": row["difficulty"],
+                        "source": row["source"],
+                        "expected_answer": json.dumps(row["expected_answer"]) if row["expected_answer"] is not None else None,
+                        "grading_rubric": json.dumps(row["grading_rubric"]) if row["grading_rubric"] is not None else None,
+                        "max_score": row["max_score"],
+                        "auto_gradable": row["auto_gradable"],
+                    },
+                ).mappings().first()
+
+                if not question_row:
+                    raise HTTPException(status_code=503, detail="Failed to insert question from pool")
+
+                inserted_questions.append({
+                    "id": question_row["id"],
+                    "course_id": course_id,
+                    "topic_id": topic_id,
+                    "question_text": question_row["question_text"],
+                    "options": question_row["options"],
+                    "type": question_row["type"],
+                    "difficulty": question_row["difficulty"],
+                    "source": question_row["source"],
+                    "approval_status": "pending",
+                    "auto_gradable": question_row["auto_gradable"],
+                    "created_at": question_row["created_at"],
+                    "updated_at": question_row["updated_at"],
+                })
+
+        # =========================
+        # 5.3) Send replenishment request
+        # =========================
+        replenishment_topics = []
+        for topic_payload in payload.topics:
+            topic_id = int(topic_payload.topic_id)
+            replenishment_topics.append({
+                "topic_id": topic_id,
+                "topic_title": topic_titles[topic_id],
+                "question_configs": normalized_topic_configs[topic_id],
+            })
+
+        try:
+            send_ai_request(
+                db,
+                operation_type="question_generation",
+                endpoint_path="api/v1/courses/questions/generate",
+                course_id=course_id,
+                primary_entity_type="course",
+                primary_entity_id=course_id,
+                body={
+                    "destination": "pool",
+                    "topics": replenishment_topics,
+                },
+            )
+        except Exception:
+            pass
+
+        # =========================
+        # 5.4) Commit
+        # =========================
+        try:
+            db.commit()
+        except SQLAlchemyError as e:
+            db.rollback()
+            raise HTTPException(status_code=500, detail=f"Database error, {e}") from e
+
+        return {
+            "status": "completed",
+            "ai_processing_started": False,
+            "message": "Questions served from pool",
+            "questions": inserted_questions,
+        }
+    # =========================
+    # 6) Build AI request body
     # =========================
     ai_topics = []
 
@@ -1196,17 +1477,18 @@ def generate_questions_for_topics(*, course_id: int, payload: QuestionGeneration
         })
 
     ai_request_body = {
+        "destination": "question_bank",
         "topics": ai_topics,
     }
 
     # =========================
-    # 6) Send AI request
+    # 7) Send AI request
     # =========================
     try:
         send_ai_request(
             db,
             operation_type="question_generation",
-            endpoint_path="api/v1/courses/questions/generate", # !!!!!!UPDATE THIS AFTER GETING THE REAL ENDPOINT!!!!!!
+            endpoint_path="api/v1/courses/questions/generate",
             course_id=course_id,
             primary_entity_type="course",
             primary_entity_id=course_id,
@@ -1505,6 +1787,120 @@ async def stream_question_generation(*, course_id: int, db: Session, current_use
             "X-Accel-Buffering": "no",
         },
     )
+
+
+
+def approve_questions(*, course_id: int, module_id: int, material_id: int, topic_id: int, payload, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can approve questions")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # =========================
+    # 2) Validate hierarchy + ownership
+    # =========================
+    topic_row = db.execute(
+        text("""
+            SELECT
+                t.id,
+                t.material_id,
+                m.module_id,
+                mo.course_id,
+                c.created_by
+            FROM topics t
+            JOIN materials m ON m.id = t.material_id
+            JOIN modules mo ON mo.id = m.module_id
+            JOIN courses c ON c.id = mo.course_id
+            WHERE t.id = :topic_id
+            LIMIT 1
+        """),
+        {"topic_id": topic_id},
+    ).mappings().first()
+
+    if not topic_row:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    if int(topic_row["material_id"]) != int(material_id):
+        raise HTTPException(status_code=400, detail="Topic does not belong to this material")
+
+    if int(topic_row["module_id"]) != int(module_id):
+        raise HTTPException(status_code=400, detail="Topic does not belong to this module")
+
+    if int(topic_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Topic does not belong to this course")
+
+    if int(topic_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only approve questions for your own course")
+
+    # =========================
+    # 3) Validate question_ids
+    # =========================
+    try:
+        question_ids = payload.question_ids
+
+        if len(question_ids) != len(set(question_ids)):
+            raise HTTPException(status_code=400, detail="question_ids must not contain duplicates")
+
+        question_rows = db.execute(
+            text("""
+                SELECT id
+                FROM questions
+                WHERE id = ANY(:question_ids)
+                AND course_id = :course_id
+                AND topic_id = :topic_id
+                AND approval_status = 'pending'
+            """),
+            {
+                "question_ids": question_ids,
+                "course_id": course_id,
+                "topic_id": topic_id,
+            },
+        ).mappings().all()
+
+        if len(question_rows) != len(question_ids):
+            raise HTTPException(
+                status_code=400,
+                detail="One or more question_ids are invalid, do not belong to this topic, or are not pending"
+            )
+
+    # =========================
+    # 4) Approve questions
+    # =========================
+        db.execute(
+            text("""
+                UPDATE questions
+                SET approval_status = 'approved',
+                    updated_at = NOW()
+                WHERE id = ANY(:question_ids)
+                  AND course_id = :course_id
+                  AND topic_id = :topic_id
+            """),
+            {
+                "question_ids": question_ids,
+                "course_id": course_id,
+                "topic_id": topic_id,
+            },
+        )
+
+        db.commit()
+
+        return {"approved_count": len(question_ids)}
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
 
 
     

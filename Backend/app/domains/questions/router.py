@@ -15,7 +15,9 @@ from .schemas import (QuestionCreateRequest,
                       QuestionUpdateRequest,
                       QuestionGenerationRequest,
                       QuestionGenerationResponse,
-                      ExtractNativeQuestionsResponse)
+                      ExtractNativeQuestionsResponse,
+                      ApproveQuestionsRequest,
+                      ApproveQuestionsResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}", tags=["Questions"],)
@@ -42,6 +44,22 @@ def list_topic_questions(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user),):
     return service.list_topic_questions(
+        course_id=course_id,
+        module_id=module_id,
+        material_id=material_id,
+        topic_id=topic_id,
+        db=db,
+        current_user=current_user,)
+
+@router.get("/modules/{module_id}/materials/{material_id}/topics/{topic_id}/questions/pending", response_model=TopicQuestionListResponse, status_code=status.HTTP_200_OK,)
+def list_pending_questions(
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    topic_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.list_pending_questions(
         course_id=course_id,
         module_id=module_id,
         material_id=material_id,
@@ -155,6 +173,24 @@ async def stream_question_generation_endpoint(
     current_user: dict = Depends(get_current_user),):
     return await service.stream_question_generation(
         course_id=course_id,
+        db=db,
+        current_user=current_user,)
+
+@router.patch("/modules/{module_id}/materials/{material_id}/topics/{topic_id}/questions/approve", response_model=ApproveQuestionsResponse, status_code=status.HTTP_200_OK,)
+def approve_questions(
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    topic_id: int,
+    payload: ApproveQuestionsRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.approve_questions(
+        course_id=course_id,
+        module_id=module_id,
+        material_id=material_id,
+        topic_id=topic_id,
+        payload=payload,
         db=db,
         current_user=current_user,)
 
