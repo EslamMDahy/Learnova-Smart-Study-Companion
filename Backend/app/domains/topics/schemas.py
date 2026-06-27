@@ -165,3 +165,17 @@ class TopicReorderResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+
+class ConfirmTopicsRequest(BaseModel):
+    topic_ids: List[int] = Field(..., min_length=1)
+    
+    model_config = ConfigDict(extra="forbid")
+
+class ConfirmTopicsResponse(BaseModel):
+    material_id: int
+    confirmed_count: int
+    ai_pregeneration_started: bool
+    
+    model_config = ConfigDict(extra="forbid")
+
+

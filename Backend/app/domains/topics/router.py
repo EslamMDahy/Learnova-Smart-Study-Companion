@@ -5,20 +5,17 @@ from app.db.session import get_db
 from app.core.deps import get_current_user
 
 from . import service
-from .schemas import (
-    TopicCreateRequest,
-    TopicCreateResponse,
-    TopicUpdateRequest,
-    TopicUpdateResponse,
-    TopicListResponse,
-    TopicGetResponse, 
-    TopicReorderRequest, 
-    TopicReorderResponse)
+from .schemas import (TopicCreateRequest,
+                      TopicCreateResponse,
+                      TopicUpdateRequest,
+                      TopicUpdateResponse,
+                      TopicListResponse,
+                      TopicGetResponse, 
+                      TopicReorderRequest, 
+                      TopicReorderResponse,
+                      ConfirmTopicsRequest)
 
-router = APIRouter(
-    prefix="/courses/{course_id}/modules/{module_id}/materials/{material_id}/topics",
-    tags=["Topics"],
-)
+router = APIRouter(prefix="/courses/{course_id}/modules/{module_id}/materials/{material_id}/topics", tags=["Topics"],)
 
 
 @router.post("", response_model=TopicCreateResponse, status_code=status.HTTP_201_CREATED)
@@ -116,5 +113,20 @@ def delete_topic(
         topic_id=topic_id,
         db=db,
         current_user=current_user,)
-    
+
+@router.post("/confirm", response_model=ConfirmTopicsResponse, status_code=status.HTTP_200_OK)
+def confirm_topics(
+    course_id: int,
+    module_id: int,
+    material_id: int,
+    payload: ConfirmTopicsRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.confirm_topics(
+        course_id=course_id,
+        module_id=module_id,
+        material_id=material_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
 

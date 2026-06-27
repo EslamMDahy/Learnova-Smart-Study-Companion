@@ -5,6 +5,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
+from app.core.ai_service_integration.ai_transport import send_ai_request
+
 from .schemas import (TopicCreateRequest
                      ,TopicUpdateRequest)
 
@@ -1178,5 +1180,149 @@ def delete_topic(*, course_id: int, module_id: int, material_id: int, topic_id: 
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
-    
+
+
+
+def confirm_topics(*, course_id: int, module_id: int, material_id: int, payload, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can confirm topics")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # =========================
+    # 2) Validate hierarchy + ownership
+    # =========================
+    material_row = db.execute(
+        text("""
+            SELECT
+                m.id AS material_id,
+                m.module_id,
+                mo.course_id,
+                c.created_by
+            FROM materials m
+            JOIN modules mo ON mo.id = m.module_id
+            JOIN courses c ON c.id = mo.course_id
+            WHERE m.id = :material_id
+            LIMIT 1
+        """),
+        {"material_id": material_id},
+    ).mappings().first()
+
+    if not material_row:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    if int(material_row["module_id"]) != int(module_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this module")
+
+    if int(material_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this course")
+
+    if int(material_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only confirm topics for your own course")
+
+    # =========================
+    # 3) Validate topic_ids
+    # =========================
+    topic_ids = payload.topic_ids
+
+    if len(topic_ids) != len(set(topic_ids)):
+        raise HTTPException(status_code=400, detail="topic_ids must not contain duplicates")
+
+    topic_rows = db.execute(
+        text("""
+            SELECT id, title
+            FROM topics
+            WHERE id = ANY(:topic_ids)
+              AND material_id = :material_id
+        """),
+        {"topic_ids": topic_ids, "material_id": material_id},
+    ).mappings().all()
+
+    if len(topic_rows) != len(topic_ids):
+        raise HTTPException(status_code=400, detail="One or more topic_ids are invalid or do not belong to this material")
+
+    # =========================
+    # 4) Mark topics as reviewed
+    # =========================
+    db.execute(
+        text("""
+            UPDATE topics
+            SET is_reviewed = TRUE,
+                updated_at = NOW()
+            WHERE id = ANY(:topic_ids)
+              AND material_id = :material_id
+        """),
+        {"topic_ids": topic_ids, "material_id": material_id},
+    )
+
+    # =========================
+    # 5) Build AI request body
+    # =========================
+    QUESTIONS_PER_TYPE_PER_DIFFICULTY = 5
+
+    QUESTION_TYPES = ["multiple_choice", "multi_select", "true_false", "short_answer"]
+    QUESTION_DIFFICULTIES = ["easy", "medium", "hard"]
+
+    question_configs = [
+        {"type": qtype, "difficulty": difficulty, "count": QUESTIONS_PER_TYPE_PER_DIFFICULTY}
+        for qtype in QUESTION_TYPES
+        for difficulty in QUESTION_DIFFICULTIES
+    ]
+
+    topic_titles = {int(row["id"]): row["title"] for row in topic_rows}
+
+    ai_topics = [
+        {
+            "topic_id": tid,
+            "topic_title": topic_titles[tid],
+            "question_configs": question_configs,
+        }
+        for tid in topic_ids
+    ]
+
+    ai_request_body = {
+        "destination": "pool",
+        "topics": ai_topics,
+    }
+
+    # =========================
+    # 6) Send AI request
+    # =========================
+    ai_pregeneration_started = False
+    try:
+        send_ai_request(
+            db,
+            operation_type="question_generation",
+            endpoint_path="api/v1/courses/questions/generate",
+            course_id=course_id,
+            primary_entity_type="material",
+            primary_entity_id=material_id,
+            body=ai_request_body,
+        )
+        ai_pregeneration_started = True
+
+    except Exception:
+        pass
+
+    # =========================
+    # 7) Commit
+    # =========================
+    try:
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+    return {
+        "material_id": material_id,
+        "confirmed_count": len(topic_ids),
+        "ai_pregeneration_started": ai_pregeneration_started,
+    }
+
 
