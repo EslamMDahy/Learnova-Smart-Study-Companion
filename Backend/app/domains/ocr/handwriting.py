@@ -362,8 +362,7 @@ def _segment_handwriting_lines(gray: Any) -> list[Any]:
 
         if line_images:
             _debug(f"line_seg component_clusters={len(clusters)} returned_lines={len(line_images[:10])}")
-            _debug(f"line_seg projection_returned_lines={len(line_images[:10])}")
-    return line_images[:10]
+            return line_images[:10]
 
     # Projection fallback for unusually connected handwriting.
     projection = np.count_nonzero(binary, axis=1)
