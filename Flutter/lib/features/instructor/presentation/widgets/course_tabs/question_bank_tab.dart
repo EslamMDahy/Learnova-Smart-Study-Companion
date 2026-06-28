@@ -246,9 +246,10 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
         summaryOnly: true,
       );
       if (!mounted || requestSerial != _questionsRequestSerial) return;
-      _rebuildQuestionSearchIndex(resp.questions);
+      final sortedQuestions = _sortQuestionsNewestFirst(resp.questions);
+      _rebuildQuestionSearchIndex(sortedQuestions);
       setState(() {
-        _questions = resp.questions;
+        _questions = sortedQuestions;
         _loading = false;
         _pageIndex = 0;
         if (_selectedQuestionId != null &&
@@ -381,10 +382,10 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
 
     _upsertQuestionSearchIndex(updated);
     setState(() {
-      _questions = _questions.map((item) {
+      _questions = _sortQuestionsNewestFirst(_questions.map((item) {
         if (item.id == question.id || item.remoteId == question.remoteId) return updated;
         return item;
-      }).toList();
+      }).toList());
       _selectedQuestionId = updated.id;
     });
   }
@@ -711,7 +712,7 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
         _filterOutcomeId != null;
 
     if (!hasSearch && !hasTopicFilters && !hasQuestionFilters) {
-      return input;
+      return _sortQuestionsNewestFirst(input);
     }
 
     final result = <QuestionModel>[];
@@ -740,7 +741,7 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
       }
       result.add(q);
     }
-    return result;
+    return _sortQuestionsNewestFirst(result);
   }
 
   List<_TopicTarget> _topicTargetsFromState(CourseDetailsState courseState) {
@@ -772,6 +773,21 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
       return a.topic.orderIndex.compareTo(b.topic.orderIndex);
     });
     return result;
+  }
+
+
+  List<QuestionModel> _sortQuestionsNewestFirst(List<QuestionModel> questions) {
+    final sorted = List<QuestionModel>.of(questions);
+    sorted.sort((a, b) {
+      final createdCmp = b.createdAt.compareTo(a.createdAt);
+      if (createdCmp != 0) return createdCmp;
+      final updatedCmp = b.updatedAt.compareTo(a.updatedAt);
+      if (updatedCmp != 0) return updatedCmp;
+      final bId = b.remoteId ?? int.tryParse(b.id) ?? 0;
+      final aId = a.remoteId ?? int.tryParse(a.id) ?? 0;
+      return bId.compareTo(aId);
+    });
+    return sorted;
   }
 
   String _friendlyError(String raw) {

@@ -76,8 +76,8 @@ class _AssistantMessage extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final availableWidth = constraints.hasBoundedWidth ? constraints.maxWidth : 420.0;
-        final bubbleMaxWidth = isUser ? math.min(360.0, availableWidth * 0.84) : availableWidth;
+        final availableWidth = constraints.hasBoundedWidth ? constraints.maxWidth : 520.0;
+        final bubbleMaxWidth = isUser ? math.min(420.0, availableWidth * 0.84) : availableWidth;
 
         return Align(
           alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -85,16 +85,26 @@ class _AssistantMessage extends StatelessWidget {
             constraints: BoxConstraints(maxWidth: bubbleMaxWidth),
             child: Container(
               width: isUser ? null : double.infinity,
-              padding: const EdgeInsets.all(12),
+              padding: EdgeInsets.symmetric(
+                horizontal: isUser ? 14 : 15,
+                vertical: isUser ? 10 : 13,
+              ),
               decoration: BoxDecoration(
                 color: isUser ? AppColors.primary : AppColors.cardBg,
                 borderRadius: BorderRadius.only(
-                  topLeft: const Radius.circular(12),
-                  topRight: const Radius.circular(12),
-                  bottomLeft: isUser ? const Radius.circular(12) : Radius.zero,
-                  bottomRight: isUser ? Radius.zero : const Radius.circular(12),
+                  topLeft: const Radius.circular(18),
+                  topRight: const Radius.circular(18),
+                  bottomLeft: Radius.circular(isUser ? 18 : 6),
+                  bottomRight: Radius.circular(isUser ? 6 : 18),
                 ),
                 border: isUser ? null : Border.all(color: AppColors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.shadowThin,
+                    blurRadius: 14,
+                    offset: const Offset(0, 7),
+                  ),
+                ],
               ),
               child: child,
             ),
@@ -148,13 +158,27 @@ class _AssistantBotIcon extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: AppColors.infoBg,
         shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: <Color>[
+            AppColors.primary,
+            AppColors.badgeIndigoFg,
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withOpacity(0.18),
+            blurRadius: 12,
+            offset: const Offset(0, 6),
+          ),
+        ],
       ),
       child: Icon(
-        Icons.smart_toy_outlined,
-        color: AppColors.primary,
-        size: size * 0.55,
+        Icons.auto_awesome_rounded,
+        color: Colors.white,
+        size: size * 0.52,
       ),
     );
   }

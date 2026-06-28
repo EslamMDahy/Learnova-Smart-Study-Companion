@@ -884,8 +884,15 @@ class _RightPanel extends StatelessWidget {
               child: ElevatedButton.icon(
                 onPressed: onPrimary,
                 icon: processing
-                    ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.save_alt_rounded, size: 18),
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Icon(
+                        queuedCount > 0 ? Icons.file_upload_outlined : Icons.save_alt_rounded,
+                        size: 18,
+                      ),
                 label: Text(primaryLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,

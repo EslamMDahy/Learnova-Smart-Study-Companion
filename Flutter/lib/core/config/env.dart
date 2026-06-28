@@ -10,7 +10,7 @@ class Env {
   ///
   ///   flutter run/build --dart-define=API_BASE_URL=https://your-api-domain
   static const String _defaultApiBaseUrl =
-      'https://paddle-washbowl-enjoying.ngrok-free.dev';
+      'https://www.learnova-edu.com/api';
 
   static const String _overrideBaseUrl =
       String.fromEnvironment('API_BASE_URL');

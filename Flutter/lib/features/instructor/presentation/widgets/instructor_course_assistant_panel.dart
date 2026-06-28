@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/chat/rich_message_renderer.dart';
@@ -32,11 +33,58 @@ class InstructorCourseAssistantPanel extends StatefulWidget {
 
 class _InstructorCourseAssistantPanelState
     extends State<InstructorCourseAssistantPanel> {
-  static const double _minPanelWidth = 320;
-  static const double _defaultPanelWidth = 430;
-  static const double _maxPanelWidth = 760;
+  static const double _minPanelWidth = 360;
+  static const double _defaultPanelWidth = 520;
+  static const double _maxPanelWidth = 960;
 
+  final ScrollController _scrollController = ScrollController();
   double _panelWidth = _defaultPanelWidth;
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollToBottom(jump: true);
+    Future<void>.delayed(const Duration(milliseconds: 120), () {
+      if (mounted) _scrollToBottom(jump: true);
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant InstructorCourseAssistantPanel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    final messageCountChanged =
+        oldWidget.assistantState.messages.length != widget.assistantState.messages.length;
+    final sendingChanged =
+        oldWidget.assistantState.sending != widget.assistantState.sending;
+    final historyChanged =
+        oldWidget.assistantState.loadingHistory != widget.assistantState.loadingHistory;
+
+    if (messageCountChanged || sendingChanged || historyChanged) {
+      _scrollToBottom();
+    }
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _scrollToBottom({bool jump = false}) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      final target = _scrollController.position.maxScrollExtent;
+      if (jump) {
+        _scrollController.jumpTo(target);
+        return;
+      }
+      _scrollController.animateTo(
+        target,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,7 +92,7 @@ class _InstructorCourseAssistantPanelState
     final screenWidth = MediaQuery.sizeOf(context).width;
     final maxAllowedWidth = math.max(
       _minPanelWidth,
-      math.min(_maxPanelWidth, screenWidth * 0.58),
+      math.min(_maxPanelWidth, screenWidth * 0.68),
     );
     final width = _panelWidth.clamp(_minPanelWidth, maxAllowedWidth).toDouble();
 
@@ -135,6 +183,7 @@ class _InstructorCourseAssistantPanelState
                 ),
                 Expanded(
                   child: ListView(
+                    controller: _scrollController,
                     padding: const EdgeInsets.fromLTRB(16, 16, 16, 20),
                     children: [
                       Center(
@@ -350,7 +399,7 @@ class _AssistantContextCard extends StatelessWidget {
   }
 }
 
-class _AssistantInputBar extends StatelessWidget {
+class _AssistantInputBar extends StatefulWidget {
   final TextEditingController controller;
   final bool sending;
   final bool enabled;
@@ -364,105 +413,183 @@ class _AssistantInputBar extends StatelessWidget {
   });
 
   @override
+  State<_AssistantInputBar> createState() => _AssistantInputBarState();
+}
+
+class _AssistantInputBarState extends State<_AssistantInputBar> {
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(14, 13, 14, 22),
+    return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
-      child: Container(
-        constraints: const BoxConstraints(minHeight: 52),
-        decoration: BoxDecoration(
-          color: AppColors.headerBg,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.shadowThin,
-              blurRadius: 12,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        padding: const EdgeInsets.fromLTRB(14, 5, 7, 5),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            Expanded(
-              child: TextField(
-                controller: controller,
-                enabled: enabled && !sending,
-                minLines: 1,
-                maxLines: 3,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _submit(),
-                style: TextStyle(
-                  color: AppColors.textTitle,
-                  fontSize: 13,
-                  height: 1.35,
-                  fontWeight: FontWeight.w600,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                constraints: const BoxConstraints(minHeight: 56, maxHeight: 184),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(30),
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.07),
+                      blurRadius: 22,
+                      offset: const Offset(0, 10),
+                    ),
+                  ],
                 ),
-                decoration: InputDecoration(
-                  hintText: enabled
-                      ? 'Ask a question about this course...'
-                      : 'Loading chat...',
-                  hintStyle: TextStyle(
-                    color: AppColors.textHint,
-                    fontSize: 12.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: const EdgeInsets.symmetric(vertical: 11),
+                padding: const EdgeInsets.fromLTRB(18, 10, 8, 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Expanded(
+                      child: MouseRegion(
+                        cursor: SystemMouseCursors.text,
+                        child: CallbackShortcuts(
+                          bindings: <ShortcutActivator, VoidCallback>{
+                            const SingleActivator(LogicalKeyboardKey.enter): _submit,
+                          },
+                          child: Stack(
+                            alignment: Alignment.centerLeft,
+                            children: [
+                              ValueListenableBuilder<TextEditingValue>(
+                                valueListenable: widget.controller,
+                                builder: (context, value, _) {
+                                  if (value.text.isNotEmpty) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return IgnorePointer(
+                                    child: Text(
+                                      widget.enabled
+                                          ? 'Message Learnova AI...'
+                                          : 'Loading chat...',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        color: AppColors.textHint,
+                                        fontSize: 13.2,
+                                        height: 1.35,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                              EditableText(
+                                controller: widget.controller,
+                                focusNode: _focusNode,
+                                readOnly: !widget.enabled || widget.sending,
+                                minLines: 1,
+                                maxLines: 7,
+                                keyboardType: TextInputType.multiline,
+                                textInputAction: TextInputAction.newline,
+                                cursorColor: AppColors.primary,
+                                backgroundCursorColor: AppColors.border,
+                                cursorWidth: 2,
+                                style: TextStyle(
+                                  color: AppColors.textTitle,
+                                  fontSize: 13.2,
+                                  height: 1.35,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                                selectionColor: AppColors.primary.withOpacity(0.18),
+                                enableSuggestions: true,
+                                autocorrect: true,
+                                scrollPadding: EdgeInsets.zero,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: widget.controller,
+                      builder: (context, value, _) {
+                        final canSend = widget.enabled &&
+                            !widget.sending &&
+                            value.text.trim().isNotEmpty;
+                        return Tooltip(
+                          message: canSend ? 'Send message' : 'Type a message first',
+                          waitDuration: const Duration(milliseconds: 500),
+                          child: Material(
+                            color: canSend ? AppColors.primary : const Color(0xFFE9EFF7),
+                            shape: const CircleBorder(),
+                            child: InkWell(
+                              customBorder: const CircleBorder(),
+                              onTap: canSend ? _submit : null,
+                              child: SizedBox(
+                                width: 40,
+                                height: 40,
+                                child: widget.sending
+                                    ? Padding(
+                                        padding: const EdgeInsets.all(11),
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2.3,
+                                          color: canSend
+                                              ? Colors.white
+                                              : AppColors.textHint,
+                                        ),
+                                      )
+                                    : Icon(
+                                        Icons.arrow_upward_rounded,
+                                        color: canSend ? Colors.white : AppColors.textHint,
+                                        size: 22,
+                                      ),
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(width: 8),
-            ValueListenableBuilder<TextEditingValue>(
-              valueListenable: controller,
-              builder: (context, value, _) {
-                final canSend = enabled &&
-                    !sending &&
-                    value.text.trim().isNotEmpty;
-                return Material(
-                  color: canSend ? AppColors.primary : AppColors.border,
-                  borderRadius: BorderRadius.circular(9),
-                  child: InkWell(
-                    onTap: canSend ? _submit : null,
-                    borderRadius: BorderRadius.circular(9),
-                    child: SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: sending
-                          ? const Padding(
-                              padding: EdgeInsets.all(10),
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2.3,
-                                color: Colors.white,
-                              ),
-                            )
-                          : Icon(
-                              Icons.send_rounded,
-                              color: canSend ? Colors.white : AppColors.textHint,
-                              size: 18,
-                            ),
+              const SizedBox(height: 6),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.keyboard_return_rounded,
+                      size: 13, color: AppColors.textHint),
+                  const SizedBox(width: 5),
+                  Text(
+                    'Enter to send · Shift + Enter for a new line',
+                    style: TextStyle(
+                      color: AppColors.textHint,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
-                );
-              },
-            ),
-          ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
   }
 
   void _submit() {
-    final text = controller.text.trim();
-    if (text.isEmpty || sending || !enabled) return;
-    controller.clear();
-    onSend(text);
+    final text = widget.controller.text.trim();
+    if (text.isEmpty || widget.sending || !widget.enabled) return;
+    widget.controller.clear();
+    widget.onSend(text);
+    _focusNode.requestFocus();
   }
 }
 
@@ -603,23 +730,29 @@ class _AssistantMessage extends StatelessWidget {
     return Align(
       alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 330),
+        constraints: BoxConstraints(
+          maxWidth: isUser ? 420 : double.infinity,
+        ),
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+          width: isUser ? null : double.infinity,
+          padding: EdgeInsets.symmetric(
+            horizontal: isUser ? 14 : 15,
+            vertical: isUser ? 10 : 13,
+          ),
           decoration: BoxDecoration(
-            color: isUser ? AppColors.primary : AppColors.headerBg,
+            color: isUser ? AppColors.primary : AppColors.cardBg,
             borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(16),
-              topRight: const Radius.circular(16),
-              bottomLeft: Radius.circular(isUser ? 16 : 4),
-              bottomRight: Radius.circular(isUser ? 4 : 16),
+              topLeft: const Radius.circular(18),
+              topRight: const Radius.circular(18),
+              bottomLeft: Radius.circular(isUser ? 18 : 6),
+              bottomRight: Radius.circular(isUser ? 6 : 18),
             ),
             border: isUser ? null : Border.all(color: AppColors.border),
             boxShadow: [
               BoxShadow(
                 color: AppColors.shadowThin,
-                blurRadius: 12,
-                offset: const Offset(0, 6),
+                blurRadius: 14,
+                offset: const Offset(0, 7),
               ),
             ],
           ),
@@ -645,7 +778,7 @@ class _AssistantBotIcon extends StatelessWidget {
         gradient: LinearGradient(
           colors: <Color>[
             AppColors.primary,
-            
+            AppColors.badgeIndigoFg,
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,

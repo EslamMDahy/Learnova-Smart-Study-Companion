@@ -715,8 +715,10 @@ class _QuestionTableHeader extends StatelessWidget {
           SizedBox(width: 96, child: _HeaderCell('#')),
           Expanded(flex: 50, child: _HeaderCell('Question')),
           SizedBox(width: 24),
-          Expanded(flex: 34, child: _HeaderCell('Topic')),
-          SizedBox(width: 22),
+          Expanded(flex: 30, child: _HeaderCell('Topic')),
+          SizedBox(width: 18),
+          SizedBox(width: 124, child: _HeaderCell('Added')),
+          SizedBox(width: 18),
           SizedBox(width: 150, child: _HeaderCell('Type')),
           SizedBox(width: 16),
           SizedBox(width: 88, child: _HeaderCell('Actions')),
@@ -878,7 +880,7 @@ class _QuestionRow extends StatelessWidget {
               ),
               const SizedBox(width: 24),
               Expanded(
-                flex: 34,
+                flex: 30,
                 child: Text(
                   topic,
                   maxLines: 2,
@@ -891,7 +893,12 @@ class _QuestionRow extends StatelessWidget {
                   ),
                 ),
               ),
-              const SizedBox(width: 22),
+              const SizedBox(width: 18),
+              SizedBox(
+                width: 124,
+                child: _QuestionDateCell(createdAt: q.createdAt),
+              ),
+              const SizedBox(width: 18),
               SizedBox(
                 width: 150,
                 child: _SoftStatusPill(label: q.typeLabel, icon: Icons.quiz_outlined),
@@ -944,6 +951,66 @@ class _QuestionMiniPill extends StatelessWidget {
       ),
     );
   }
+}
+
+
+class _QuestionDateCell extends StatelessWidget {
+  final DateTime createdAt;
+
+  const _QuestionDateCell({required this.createdAt});
+
+  @override
+  Widget build(BuildContext context) {
+    final label = _formatQuestionCreatedDate(createdAt);
+    final timeLabel = _formatQuestionCreatedTime(createdAt);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: AppColors.textTitle,
+            fontSize: 11.8,
+            fontWeight: FontWeight.w900,
+            height: 1.2,
+          ),
+        ),
+        const SizedBox(height: 3),
+        Text(
+          timeLabel,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: TextStyle(
+            color: AppColors.textHint,
+            fontSize: 10.3,
+            fontWeight: FontWeight.w700,
+            height: 1.15,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+String _formatQuestionCreatedDate(DateTime value) {
+  if (value.millisecondsSinceEpoch <= 0) return '—';
+  final local = value.toLocal();
+  final day = local.day.toString().padLeft(2, '0');
+  final month = local.month.toString().padLeft(2, '0');
+  return '$day/$month/${local.year}';
+}
+
+String _formatQuestionCreatedTime(DateTime value) {
+  if (value.millisecondsSinceEpoch <= 0) return 'Unknown';
+  final local = value.toLocal();
+  final hour24 = local.hour;
+  final minute = local.minute.toString().padLeft(2, '0');
+  final period = hour24 >= 12 ? 'PM' : 'AM';
+  final hour12 = hour24 % 12 == 0 ? 12 : hour24 % 12;
+  return '$hour12:$minute $period';
 }
 
 class _SoftStatusPill extends StatelessWidget {
