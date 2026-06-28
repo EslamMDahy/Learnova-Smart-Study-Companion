@@ -49,12 +49,14 @@ class TopHeaderWidget extends StatelessWidget {
 
     final isDrawerMode = w < _drawerBp;
     final collapseSearch = w < _searchCollapseBp;
+    final veryCompact = w < 430;
+    final hideProfileText = w < 520;
 
     return Container(
-      height: 73,
+      height: veryCompact ? 64 : 73,
       padding: EdgeInsets.symmetric(
-        horizontal: w < 900 ? 16 : 32,
-        vertical: 16,
+        horizontal: w < 380 ? 10 : (w < 900 ? 14 : 32),
+        vertical: veryCompact ? 10 : 16,
       ),
       decoration: BoxDecoration(
         color: _bg,
@@ -71,12 +73,12 @@ class TopHeaderWidget extends StatelessWidget {
                     Scaffold.of(context).openDrawer();
                   },
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: veryCompact ? 6 : 12),
           ],
 
           if (!collapseSearch)
             SizedBox(
-              width: w < 900 ? 240 : 320,
+              width: w < 820 ? 220 : 320,
               height: 40,
               child: FigmaUmSearch40(
                 controller: searchController,
@@ -100,14 +102,18 @@ class TopHeaderWidget extends StatelessWidget {
                 hasBadge: notificationsCount > 0,
                 onTap: onNotificationsTap,
               ),
-              const SizedBox(width: 16),
-              Container(width: 1, height: 24, color: _divider),
-              const SizedBox(width: 16),
+              if (!veryCompact) ...[
+                const SizedBox(width: 10),
+                Container(width: 1, height: 24, color: _divider),
+                const SizedBox(width: 10),
+              ] else
+                const SizedBox(width: 4),
 
               _ModernHeaderProfileMenu(
                 name: userName,
                 subtitle: userSubtitle,
                 avatarUrl: avatarUrl,
+                showText: !hideProfileText,
                 onLogout: onLogout,
                 onProfile: onProfile,
                 onSettings: onSettings,
@@ -231,11 +237,13 @@ class _ModernHeaderProfileMenu extends StatefulWidget {
   final VoidCallback? onLogout;
   final VoidCallback? onProfile;
   final VoidCallback? onSettings;
+  final bool showText;
 
   const _ModernHeaderProfileMenu({
     required this.name,
     required this.subtitle,
     this.avatarUrl,
+    this.showText = true,
     this.onLogout,
     this.onProfile,
     this.onSettings,
@@ -326,10 +334,11 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
                     )
                   : const Icon(Icons.person, size: 16, color: Colors.white),
             ),
-            const SizedBox(width: 10),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
-              child: Column(
+            if (widget.showText) ...[
+              const SizedBox(width: 10),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 180),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -357,9 +366,10 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
                     ),
                   ),
                 ],
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
+              const SizedBox(width: 10),
+            ],
             Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 18,

@@ -176,7 +176,12 @@ class _HeroSection extends StatelessWidget {
 
     return Container(
       color: AppColors.cardBg,
-      padding: EdgeInsets.fromLTRB(isMobile ? 24 : 80, 60, isMobile ? 24 : 80, 80),
+      padding: EdgeInsets.fromLTRB(
+        w < 380 ? 16 : (isMobile ? 24 : 80),
+        isMobile ? 42 : 60,
+        w < 380 ? 16 : (isMobile ? 24 : 80),
+        isMobile ? 56 : 80,
+      ),
       child: isMobile
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -207,6 +212,10 @@ class _HeroText extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final w = MediaQuery.sizeOf(context).width;
+    final isMobile = w < 700;
+    final titleSize = w < 380 ? 31.0 : (isMobile ? 34.0 : 42.0);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -214,7 +223,7 @@ class _HeroText extends StatelessWidget {
         RichText(
           text: TextSpan(
             style: TextStyle(
-              fontSize: 42,
+              fontSize: titleSize,
               fontWeight: FontWeight.w900,
               color: AppColors.textTitle,
               height: 1.15,
@@ -246,7 +255,9 @@ class _HeroText extends StatelessWidget {
         const SizedBox(height: 32),
 
         // Buttons
-        Row(
+        Wrap(
+          spacing: 12,
+          runSpacing: 10,
           children: [
             ElevatedButton(
               onPressed: onGetStarted,
@@ -261,7 +272,6 @@ class _HeroText extends StatelessWidget {
               child: const Text('Get Started',
                   style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15),),
             ),
-            const SizedBox(width: 16),
             TextButton(
               onPressed: onLogin,
               style: TextButton.styleFrom(
@@ -282,8 +292,9 @@ class _HeroMockup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final w = MediaQuery.sizeOf(context).width;
     return Container(
-      height: 320,
+      height: w < 420 ? 250 : 320,
       decoration: BoxDecoration(
         color: const Color(0xFF0E7490),
         borderRadius: BorderRadius.circular(16),
@@ -320,8 +331,8 @@ class _HeroMockup extends StatelessWidget {
           // Mock UI card
           Center(
             child: Container(
-              margin: const EdgeInsets.all(28),
-              padding: const EdgeInsets.all(20),
+              margin: EdgeInsets.all(w < 420 ? 16 : 28),
+              padding: EdgeInsets.all(w < 420 ? 16 : 20),
               decoration: BoxDecoration(
                 color: Colors.white.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),

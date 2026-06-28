@@ -333,12 +333,16 @@ class _GenerateQuestionsDialogState
     final allTopics = _buildTopicList(state);
     final filtered = _filtered(allTopics);
 
+    final viewport = MediaQuery.sizeOf(context);
+    final dialogWidth = viewport.width < 840 ? viewport.width - 36 : 780.0;
+    final dialogHeight = viewport.height < 720 ? viewport.height - 36 : 660.0;
+
     return Dialog(
       insetPadding: const EdgeInsets.all(18),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: SizedBox(
-        width: 780,
-        height: 660,
+        width: dialogWidth,
+        height: dialogHeight,
         child: Column(
           children: [
             _DialogHeader(

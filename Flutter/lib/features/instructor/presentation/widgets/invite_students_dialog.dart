@@ -101,11 +101,14 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final viewportWidth = MediaQuery.sizeOf(context).width;
+    final dialogWidth = viewportWidth < 610 ? viewportWidth - 40 : 550.0;
+
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
       child: Container(
-        width: 550,
+        width: dialogWidth,
         decoration: BoxDecoration(
           color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(24),

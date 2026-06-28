@@ -89,11 +89,16 @@ class _InstructorCourseAssistantPanelState
   Widget build(BuildContext context) {
     final isAssistantBusy = widget.assistantState.isBusy;
     final screenWidth = MediaQuery.sizeOf(context).width;
-    final maxAllowedWidth = math.max(
-      _minPanelWidth,
-      math.min(_maxPanelWidth, screenWidth * 0.68),
-    );
-    final width = _panelWidth.clamp(_minPanelWidth, maxAllowedWidth).toDouble();
+    final minAllowedWidth = math.min(_minPanelWidth, math.max(280.0, screenWidth - 24));
+    final maxAllowedWidth = screenWidth < 700
+        ? math.max(minAllowedWidth, screenWidth)
+        : math.max(
+            minAllowedWidth,
+            math.min(_maxPanelWidth, screenWidth * 0.68),
+          );
+    final width = screenWidth < 700
+        ? screenWidth
+        : _panelWidth.clamp(minAllowedWidth, maxAllowedWidth).toDouble();
 
     return SizedBox(
       width: width,

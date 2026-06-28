@@ -28,7 +28,11 @@ class _AddTopicDialogWidgetState extends State<_AddTopicDialogWidget> {
       SizedBox(height: 4),
       Text('in "${widget.moduleTitle}"', style: TextStyle(fontSize: 13, color: AppColors.textMuted, fontWeight: FontWeight.w400)),
     ]),
-    content: SizedBox(width: 440, child: Column(mainAxisSize: MainAxisSize.min, children: [
+    content: SizedBox(
+      width: MediaQuery.sizeOf(context).width < 500
+          ? MediaQuery.sizeOf(context).width - 48
+          : 440,
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
       TextField(controller: widget.titleCtrl, autofocus: true, decoration: InputDecoration(
           hintText: 'e.g. Introduction to Cryptography', labelText: 'Topic Title *',
           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
@@ -137,6 +141,213 @@ class _ConfirmDialogWidget extends StatelessWidget {
 // ─────────────────────────────────────────────────────────────────────────────
 //  Module Actions Grid — replaces the vertical list with a 2-col card grid
 // ─────────────────────────────────────────────────────────────────────────────
+class _ActionCardData {
+  final IconData icon;
+  final Color iconColor;
+  final Color iconBg;
+  final String label;
+  final VoidCallback? onTap;
+  final bool danger;
+
+  const _ActionCardData({
+    required this.icon,
+    required this.iconColor,
+    required this.iconBg,
+    required this.label,
+    this.onTap,
+    this.danger = false,  
+  });
+}
+
+class _ActionCard extends StatefulWidget {
+  final _ActionCardData data;
+  const _ActionCard({required this.data});
+
+  @override
+  State<_ActionCard> createState() => _ActionCardState();
+}
+
+class _ActionCardState extends State<_ActionCard> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final d = widget.data;
+    final disabled = d.onTap == null;
+    final hoverBorderColor = d.danger
+        ? Color(0xFFFCA5A5)
+        : d.iconColor.withValues(alpha: 0.3);
+    final hoverBg = d.danger
+        ? AppColors.dangerBg
+        : d.iconColor.withValues(alpha: 0.04);
+
+    return MouseRegion(
+      cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) { if (!disabled) setState(() => _hovered = true); },
+      onExit:  (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: d.onTap,
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 140),
+          padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 14),
+          decoration: BoxDecoration(
+            color: _hovered ? hoverBg : AppColors.cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: _hovered ? hoverBorderColor : _K.div,
+              width: _hovered ? 1.5 : 1.0,
+            ),
+            boxShadow: _hovered
+                ? [BoxShadow(color: d.iconColor.withValues(alpha: 0.08), blurRadius: 12, offset: Offset(0, 3))]
+                : [BoxShadow(color: Color(0x07000000), blurRadius: 4, offset: Offset(0, 1))],
+          ),
+          child: Opacity(
+            opacity: disabled ? 0.4 : 1.0,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                AnimatedContainer(
+                  duration: Duration(milliseconds: 140),
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: _hovered
+                        ? d.iconColor.withValues(alpha: 0.15)
+                        : d.iconBg,
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  alignment: Alignment.center,
+                  child: Icon(d.icon, size: 17, color: d.iconColor),
+                ),
+                SizedBox(height: 10),
+                Text(
+                  d.label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: d.danger
+                        ? AppColors.dangerText
+                        : (_hovered ? d.iconColor : AppColors.textTitle),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CardWidget extends StatelessWidget {
+  final Widget child; final _HdrWidget? header; final bool noPadding;
+  const _CardWidget({required this.child, this.header, this.noPadding = false});
+  @override
+  Widget build(BuildContext context) => Container(
+    decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(16), border: Border.all(color: _K.div), boxShadow: [BoxShadow(color: Color(0x07000000), blurRadius: 12, offset: Offset(0, 4))]),
+    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (header != null) ...[header!, Divider(height: 1, color: _K.div)],
+      child,
+    ]));
+}
+
+class _HdrWidget extends StatelessWidget {
+  final IconData icon; final Color iconColor; final String title;
+  final String? badge; final Widget? trailing;
+  const _HdrWidget({required this.icon, required this.iconColor, required this.title,
+      this.badge, this.trailing});
+  @override
+  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.fromLTRB(18, 15, 18, 15),
+    child: Row(children: [
+      Icon(icon, size: 15, color: iconColor), SizedBox(width: 10),
+      Text(title, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+      if (badge != null) ...[SizedBox(width: 7),
+        Container(padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+            decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(10)),
+            child: Text(badge!, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)))],
+      Spacer(), if (trailing != null) trailing!,
+    ]));
+}
+
+class _PRow extends StatefulWidget {
+  final IconData icon; final Color iconBg, iconFg;
+  final String label, sub; final VoidCallback? onTap; final bool danger;
+  const _PRow({required this.icon, required this.iconBg, required this.iconFg,
+      required this.label, required this.sub, this.onTap, this.danger = false});
+  @override
+  State<_PRow> createState() => _PRowState();
+}
+
+class _PRowState extends State<_PRow> {
+  bool _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    Theme.of(context);
+    final disabled = widget.onTap == null;
+    final textColor = widget.danger ? AppColors.dangerText : AppColors.textTitle;
+    final iconColor = disabled ? AppColors.textHint : widget.iconFg;
+
+    return MouseRegion(
+      cursor: disabled ? SystemMouseCursors.basic : SystemMouseCursors.click,
+      onEnter: (_) { if (!disabled) setState(() => _hovered = true); },
+      onExit:  (_) => setState(() => _hovered = false),
+      child: GestureDetector(
+        onTap: widget.onTap,
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 120),
+          color: Colors.transparent,
+          padding: const EdgeInsets.fromLTRB(18, 15, 18, 15),
+          child: Opacity(
+            opacity: disabled ? 0.4 : 1.0,
+            child: Row(children: [
+              // Small icon — not a big chunky box
+              Container(
+                width: 36, height: 36,
+                decoration: BoxDecoration(
+                  color: _hovered && !disabled
+                      ? widget.iconFg.withValues(alpha: 0.12)
+                      : widget.iconBg.withValues(alpha: 0.7),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: Icon(widget.icon, size: 16, color: iconColor),
+              ),
+              SizedBox(width: 12),
+              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(widget.label, style: TextStyle(
+                  fontSize: 13.8,
+                  fontWeight: FontWeight.w700,
+                  color: _hovered && !disabled && !widget.danger
+                      ? AppColors.primary
+                      : textColor,
+                )),
+                SizedBox(height: 4),
+                Text(widget.sub, maxLines: 2, overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontSize: 11.8, color: AppColors.textMuted, height: 1.45)),
+              ])),
+              // Arrow only visible on hover
+              AnimatedOpacity(
+                duration: Duration(milliseconds: 120),
+                opacity: disabled ? 0.0 : (_hovered ? 1.0 : 0.18),
+                child: Icon(
+                  Icons.arrow_forward_rounded,
+                  size: 14,
+                  color: widget.danger
+                      ? AppColors.dangerText
+                      : AppColors.primary,
+                ),
+              ),
+            ]),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _Dot extends StatelessWidget {
   final String status; const _Dot({required this.status});
   @override

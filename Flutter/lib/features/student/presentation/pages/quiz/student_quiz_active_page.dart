@@ -111,62 +111,79 @@ class _StudentQuizActivePageState extends ConsumerState<StudentQuizActivePage> {
                     onFinish: () => _confirmSubmit(courseId, attempt),
                   ),
                   Expanded(
-                    child: Row(
-                      children: [
-                        _QuestionRail(
+                    child: LayoutBuilder(
+                      builder: (context, bodyConstraints) {
+                        final compactExamLayout = bodyConstraints.maxWidth < 760;
+                        final questionContent = question == null
+                            ? _NoQuestions(
+                                onBack: () => context.go('${Routes.studentCourseDetails}?courseId=$courseId'),
+                              )
+                            : _QuestionPanel(
+                                attempt: attempt,
+                                question: question,
+                                index: clampedIndex,
+                                total: questions.length,
+                                answeredCount: answeredCount,
+                                remaining: _remainingLabel(attempt),
+                                submitting: _submitting,
+                                flagged: _flaggedQuestionIds.contains(question.examQuestionId),
+                                selectedSingleIndex: _singleAnswers[question.examQuestionId],
+                                selectedMultiIndices: _multiAnswers[question.examQuestionId] ?? const <int>{},
+                                textController: _controllerFor(question),
+                                onFlagToggled: () {
+                                  setState(() {
+                                    if (!_flaggedQuestionIds.add(question.examQuestionId)) {
+                                      _flaggedQuestionIds.remove(question.examQuestionId);
+                                    }
+                                  });
+                                },
+                                onSingleSelected: (optionIndex) {
+                                  setState(() => _singleAnswers[question.examQuestionId] = optionIndex);
+                                  _scheduleAnswerAutosave(courseId, attempt, question);
+                                },
+                                onMultiChanged: (optionIndex, selected) {
+                                  setState(() {
+                                    final values = {...?_multiAnswers[question.examQuestionId]};
+                                    selected ? values.add(optionIndex) : values.remove(optionIndex);
+                                    _multiAnswers[question.examQuestionId] = values;
+                                  });
+                                  _scheduleAnswerAutosave(courseId, attempt, question);
+                                },
+                                onTextChanged: () {
+                                  setState(() {});
+                                  _scheduleAnswerAutosave(courseId, attempt, question);
+                                },
+                                onPrevious: clampedIndex > 0 ? () => setState(() => _currentIndex--) : null,
+                                onNext: clampedIndex < questions.length - 1 ? () => setState(() => _currentIndex++) : null,
+                                onFinish: _submitting ? null : () => _confirmSubmit(courseId, attempt),
+                              );
+
+                        final rail = _QuestionRail(
                           questions: questions,
                           selectedIndex: clampedIndex,
                           submitting: _submitting,
                           answered: _isAnswered,
                           flaggedQuestionIds: _flaggedQuestionIds,
+                          compact: compactExamLayout,
                           onSelect: (index) => setState(() => _currentIndex = index),
-                        ),
-                        Expanded(
-                          child: question == null
-                              ? _NoQuestions(
-                                  onBack: () => context.go('${Routes.studentCourseDetails}?courseId=$courseId'),
-                                )
-                              : _QuestionPanel(
-                                  attempt: attempt,
-                                  question: question,
-                                  index: clampedIndex,
-                                  total: questions.length,
-                                  answeredCount: answeredCount,
-                                  remaining: _remainingLabel(attempt),
-                                  submitting: _submitting,
-                                  flagged: _flaggedQuestionIds.contains(question.examQuestionId),
-                                  selectedSingleIndex: _singleAnswers[question.examQuestionId],
-                                  selectedMultiIndices: _multiAnswers[question.examQuestionId] ?? const <int>{},
-                                  textController: _controllerFor(question),
-                                  onFlagToggled: () {
-                                    setState(() {
-                                      if (!_flaggedQuestionIds.add(question.examQuestionId)) {
-                                        _flaggedQuestionIds.remove(question.examQuestionId);
-                                      }
-                                    });
-                                  },
-                                  onSingleSelected: (optionIndex) {
-                                    setState(() => _singleAnswers[question.examQuestionId] = optionIndex);
-                                    _scheduleAnswerAutosave(courseId, attempt, question);
-                                  },
-                                  onMultiChanged: (optionIndex, selected) {
-                                    setState(() {
-                                      final values = {...?_multiAnswers[question.examQuestionId]};
-                                      selected ? values.add(optionIndex) : values.remove(optionIndex);
-                                      _multiAnswers[question.examQuestionId] = values;
-                                    });
-                                    _scheduleAnswerAutosave(courseId, attempt, question);
-                                  },
-                                  onTextChanged: () {
-                                    setState(() {});
-                                    _scheduleAnswerAutosave(courseId, attempt, question);
-                                  },
-                                  onPrevious: clampedIndex > 0 ? () => setState(() => _currentIndex--) : null,
-                                  onNext: clampedIndex < questions.length - 1 ? () => setState(() => _currentIndex++) : null,
-                                  onFinish: _submitting ? null : () => _confirmSubmit(courseId, attempt),
-                                ),
-                        ),
-                      ],
+                        );
+
+                        if (compactExamLayout) {
+                          return Column(
+                            children: [
+                              Expanded(child: questionContent),
+                              rail,
+                            ],
+                          );
+                        }
+
+                        return Row(
+                          children: [
+                            rail,
+                            Expanded(child: questionContent),
+                          ],
+                        );
+                      },
                     ),
                   ),
                 ],
@@ -594,71 +611,88 @@ class _ExamHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 58,
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        border: Border(bottom: BorderSide(color: AppColors.border)),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  attempt.safeTitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.textTitle,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w900,
-                    height: 1.1,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${_titleCase(attempt.safeType)} • Attempt ${attempt.attemptNumber}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ],
-            ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 520;
+        return Container(
+          height: compact ? 64 : 58,
+          padding: EdgeInsets.symmetric(horizontal: compact ? 12 : 20),
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            border: Border(bottom: BorderSide(color: AppColors.border)),
           ),
-          const SizedBox(width: 16),
-          SizedBox(
-            height: 36,
-            child: ElevatedButton.icon(
-              onPressed: submitting || !canFinish ? null : onFinish,
-              icon: submitting
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                    )
-                  : const Icon(Icons.logout_rounded, size: 16),
-              label: Text(submitting ? 'Submitting...' : 'Finish Attempt'),
-              style: ElevatedButton.styleFrom(
-                elevation: 0,
-                backgroundColor: AppColors.headerBg,
-                foregroundColor: AppColors.textTitle,
-                disabledBackgroundColor: AppColors.headerBg,
-                disabledForegroundColor: AppColors.textMuted,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      attempt.safeTitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textTitle,
+                        fontSize: compact ? 14 : 16,
+                        fontWeight: FontWeight.w900,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      '${_titleCase(attempt.safeType)} • Attempt ${attempt.attemptNumber}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+              SizedBox(width: compact ? 8 : 16),
+              SizedBox(
+                height: 36,
+                child: compact
+                    ? IconButton.filledTonal(
+                        tooltip: submitting ? 'Submitting...' : 'Finish Attempt',
+                        onPressed: submitting || !canFinish ? null : onFinish,
+                        icon: submitting
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.logout_rounded, size: 17),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: submitting || !canFinish ? null : onFinish,
+                        icon: submitting
+                            ? const SizedBox(
+                                width: 14,
+                                height: 14,
+                                child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                              )
+                            : const Icon(Icons.logout_rounded, size: 16),
+                        label: Text(submitting ? 'Submitting...' : 'Finish Attempt'),
+                        style: ElevatedButton.styleFrom(
+                          elevation: 0,
+                          backgroundColor: AppColors.headerBg,
+                          foregroundColor: AppColors.textTitle,
+                          disabledBackgroundColor: AppColors.headerBg,
+                          disabledForegroundColor: AppColors.textMuted,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
+                        ),
+                      ),
+              ),
+            ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }
@@ -669,6 +703,7 @@ class _QuestionRail extends StatelessWidget {
   final bool submitting;
   final bool Function(StudentExamQuestion question) answered;
   final Set<int> flaggedQuestionIds;
+  final bool compact;
   final ValueChanged<int> onSelect;
 
   const _QuestionRail({
@@ -677,11 +712,23 @@ class _QuestionRail extends StatelessWidget {
     required this.submitting,
     required this.answered,
     required this.flaggedQuestionIds,
+    this.compact = false,
     required this.onSelect,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (compact) {
+      return _CompactQuestionRail(
+        questions: questions,
+        selectedIndex: selectedIndex,
+        submitting: submitting,
+        answered: answered,
+        flaggedQuestionIds: flaggedQuestionIds,
+        onSelect: onSelect,
+      );
+    }
+
     return Container(
       width: 276,
       height: double.infinity,
@@ -747,6 +794,57 @@ class _QuestionRail extends StatelessWidget {
           ),
           const _PaletteLegend(),
         ],
+      ),
+    );
+  }
+}
+
+
+class _CompactQuestionRail extends StatelessWidget {
+  final List<StudentExamQuestion> questions;
+  final int selectedIndex;
+  final bool submitting;
+  final bool Function(StudentExamQuestion question) answered;
+  final Set<int> flaggedQuestionIds;
+  final ValueChanged<int> onSelect;
+
+  const _CompactQuestionRail({
+    required this.questions,
+    required this.selectedIndex,
+    required this.submitting,
+    required this.answered,
+    required this.flaggedQuestionIds,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 92,
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: ListView.separated(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        scrollDirection: Axis.horizontal,
+        itemCount: questions.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 10),
+        itemBuilder: (context, index) {
+          final question = questions[index];
+          return SizedBox(
+            width: 44,
+            height: 44,
+            child: _QuestionNumber(
+              number: index + 1,
+              selected: index == selectedIndex,
+              answered: answered(question),
+              flagged: flaggedQuestionIds.contains(question.examQuestionId),
+              onTap: submitting ? null : () => onSelect(index),
+            ),
+          );
+        },
       ),
     );
   }
@@ -930,29 +1028,38 @@ class _QuestionPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final sectionInfo = _sectionInfoForQuestion(attempt, question);
     final completed = total == 0 ? 0 : ((answeredCount / total) * 100).round();
+    final compact = MediaQuery.sizeOf(context).width < 560;
 
     return Container(
       color: AppColors.bg,
       child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(46, 26, 46, 40),
+        padding: EdgeInsets.fromLTRB(
+          compact ? 16 : 46,
+          compact ? 18 : 26,
+          compact ? 16 : 46,
+          40,
+        ),
         child: Center(
           child: ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 820),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 10,
+                  crossAxisAlignment: WrapCrossAlignment.center,
                   children: [
-                    Expanded(
+                    SizedBox(
+                      width: compact ? MediaQuery.sizeOf(context).width - 32 : 560,
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
                             sectionInfo.title,
-                            maxLines: 1,
+                            maxLines: compact ? 2 : 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: AppColors.textTitle, fontSize: 20, fontWeight: FontWeight.w900),
+                            style: TextStyle(color: AppColors.textTitle, fontSize: compact ? 18 : 20, fontWeight: FontWeight.w900),
                           ),
                           const SizedBox(height: 5),
                           Text(
@@ -962,7 +1069,6 @@ class _QuestionPanel extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 16),
                     _TimerPill(label: remaining),
                   ],
                 ),
@@ -1205,16 +1311,10 @@ class _SingleOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selected = selectedIndex == index;
-    return RadioGroup<int>(
-      groupValue: selectedIndex,
-      onChanged: (value) {
-        if (!enabled) return;
-        onChanged(value ?? index);
-      },
-      child: InkWell(
-        onTap: enabled ? () => onChanged(index) : null,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
+    return InkWell(
+      onTap: enabled ? () => onChanged(index) : null,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
         constraints: const BoxConstraints(minHeight: 50),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -1226,7 +1326,9 @@ class _SingleOption extends StatelessWidget {
           children: [
             Radio<int>(
               value: index,
+              groupValue: selectedIndex,
               activeColor: AppColors.primary,
+              onChanged: enabled ? (value) => onChanged(value ?? index) : null,
             ),
             const SizedBox(width: 4),
             Expanded(
@@ -1236,7 +1338,6 @@ class _SingleOption extends StatelessWidget {
               ),
             ),
           ],
-        ),
         ),
       ),
     );
@@ -1391,9 +1492,12 @@ class _MessageCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isCompact = MediaQuery.sizeOf(context).width < 480;
     return Container(
-      width: 460,
-      padding: const EdgeInsets.all(26),
+      width: double.infinity,
+      constraints: const BoxConstraints(maxWidth: 460),
+      margin: EdgeInsets.symmetric(horizontal: isCompact ? 16 : 0),
+      padding: EdgeInsets.all(isCompact ? 18 : 26),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(22),

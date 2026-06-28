@@ -1273,14 +1273,27 @@ class AppAuthShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final size = MediaQuery.sizeOf(context);
+    final horizontalPadding = size.width < 380
+        ? 16.0
+        : isMobile
+            ? 24.0
+            : 56.0;
+
     return Container(
       color: AppColors.pageBg,
-      padding: EdgeInsets.symmetric(horizontal: isMobile ? 24 : 56),
-      child: Center(
-        child: SingleChildScrollView(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: maxWidth),
-            child: child,
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding),
+      child: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
+            padding: EdgeInsets.symmetric(
+              vertical: isMobile ? 22 : 32,
+            ).copyWith(bottom: 22 + MediaQuery.viewInsetsOf(context).bottom),
+            child: ConstrainedBox(
+              constraints: BoxConstraints(maxWidth: maxWidth),
+              child: child,
+            ),
           ),
         ),
       ),

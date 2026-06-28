@@ -338,45 +338,62 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
         },
       ),
       Expanded(
-        child: Stack(
-          children: [
-            Row(
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compactAssistant = constraints.maxWidth < 920;
+            final tabPages = IndexedStack(
+              index: _currentIndex,
+              children: _buildVisitedTabPages(course),
+            );
+
+            final assistantPanel = InstructorCourseAssistantPanel(
+              courseTitle: course.safeTitle,
+              controller: _assistantController,
+              assistantState: assistantState,
+              onSend: (String message) {
+                ref
+                    .read(
+                      studentCourseAssistantControllerProvider(course.id)
+                          .notifier,
+                    )
+                    .send(message: message);
+              },
+              onClear: () {
+                ref
+                    .read(
+                      studentCourseAssistantControllerProvider(course.id)
+                          .notifier,
+                    )
+                    .clear();
+              },
+              onClose: () => setState(() => _assistantOpen = false),
+            );
+
+            return Stack(
               children: [
-                Expanded(
-                  child: IndexedStack(
-                    index: _currentIndex,
-                    children: _buildVisitedTabPages(course),
+                if (_assistantOpen && !compactAssistant)
+                  Row(
+                    children: [
+                      Expanded(child: tabPages),
+                      assistantPanel,
+                    ],
+                  )
+                else
+                  tabPages,
+                if (_assistantOpen && compactAssistant)
+                  Positioned.fill(
+                    child: Material(
+                      color: AppColors.cardBg,
+                      elevation: 18,
+                      child: assistantPanel,
+                    ),
                   ),
-                ),
-                if (_assistantOpen)
-                  InstructorCourseAssistantPanel(
-                    courseTitle: course.safeTitle,
-                    controller: _assistantController,
-                    assistantState: assistantState,
-                    onSend: (String message) {
-                      ref
-                          .read(
-                            studentCourseAssistantControllerProvider(course.id)
-                                .notifier,
-                          )
-                          .send(message: message);
-                    },
-                    onClear: () {
-                      ref
-                          .read(
-                            studentCourseAssistantControllerProvider(course.id)
-                                .notifier,
-                          )
-                          .clear();
-                    },
-                    onClose: () => setState(() => _assistantOpen = false),
-                  ),
+                // The Course AI entry point is shown inside the Materials footer
+                // when a module/material/topic is selected, so it does not overlap
+                // persistent bottom actions such as Generate Questions.
               ],
-            ),
-            // The Course AI entry point is shown inside the Materials footer
-            // when a module/material/topic is selected, so it does not overlap
-            // persistent bottom actions such as Generate Questions.
-          ],
+            );
+          },
         ),
       ),
     ],);

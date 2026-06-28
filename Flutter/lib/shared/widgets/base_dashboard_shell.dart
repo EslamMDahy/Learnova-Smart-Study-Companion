@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:learnova/core/storage/key_value_store_factory.dart';
+import 'package:learnova/core/ui/responsive_layout.dart';
 
 import 'design_tokens.dart';
 
@@ -212,7 +213,7 @@ class _BaseDashboardShellState extends State<BaseDashboardShell> {
     final effectivePadding = !widget.enableResponsive
         ? widget.contentPadding
         : width < widget.compactPaddingBreakpoint
-            ? widget.compactPadding
+            ? learnovaPagePaddingForWidth(width)
             : EdgeInsets.symmetric(
                 horizontal: dynamicHorizontal,
                 vertical: dynamicVertical,
@@ -229,7 +230,12 @@ class _BaseDashboardShellState extends State<BaseDashboardShell> {
               ),
             ),
           )
-        : widget.child;
+        : MediaQuery.removePadding(
+            context: context,
+            removeTop: true,
+            removeBottom: false,
+            child: widget.child,
+          );
 
     final effectiveBackground = widget.backgroundColor ?? AppColors.pageBg;
     final effectiveDivider = widget.dividerColor ?? AppColors.border;
@@ -289,6 +295,7 @@ class _BaseDashboardShellState extends State<BaseDashboardShell> {
       backgroundColor: effectiveBackground,
       drawer: useDrawer
           ? Drawer(
+              width: math.min(320.0, width * 0.88),
               child: SafeArea(
                 child: widget.sidebarBuilder(false, () {
                   Navigator.of(context).maybePop();

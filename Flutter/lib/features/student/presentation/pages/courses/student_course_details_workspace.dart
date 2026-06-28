@@ -229,14 +229,17 @@ class _CompactCourseLearningWorkspace extends StatelessWidget {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(18, 18, 18, 10),
-            child: Row(
+            child: Wrap(
+              spacing: 10,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              alignment: WrapAlignment.spaceBetween,
               children: [
                 TextButton.icon(
                   onPressed: onBackToCourses,
                   icon: const Icon(Icons.arrow_back_rounded, size: 18),
                   label: const Text('Back to My Courses'),
                 ),
-                const Spacer(),
                 _SoftBadge(label: course?.safeCode ?? 'COURSE-$courseId'),
               ],
             ),
@@ -668,22 +671,32 @@ class _LessonContentArea extends StatelessWidget {
     return Container(
       color: AppColors.bg,
       height: double.infinity,
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(34, 30, 34, 42),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: BoxConstraints(maxWidth: selectedExam != null ? 980 : 860),
-            child: _LessonBody(
-              courseId: courseId,
-              course: course,
-              selectedModule: selectedModule,
-              selectedMaterial: selectedMaterial,
-              selectedExam: selectedExam,
-              onRefresh: onRefresh,
-              onStartExam: onStartExam,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final compact = constraints.maxWidth < 640;
+          return SingleChildScrollView(
+            padding: EdgeInsets.fromLTRB(
+              compact ? 16 : 34,
+              compact ? 20 : 30,
+              compact ? 16 : 34,
+              42,
             ),
-          ),
-        ),
+            child: Center(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: selectedExam != null ? 980 : 860),
+                child: _LessonBody(
+                  courseId: courseId,
+                  course: course,
+                  selectedModule: selectedModule,
+                  selectedMaterial: selectedMaterial,
+                  selectedExam: selectedExam,
+                  onRefresh: onRefresh,
+                  onStartExam: onStartExam,
+                ),
+              ),
+            ),
+          );
+        },
       ),
     );
   }

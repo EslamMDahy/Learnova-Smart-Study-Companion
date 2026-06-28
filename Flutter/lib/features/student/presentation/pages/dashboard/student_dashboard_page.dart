@@ -1161,14 +1161,17 @@ class _DashboardLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final viewportWidth = MediaQuery.sizeOf(context).width;
+    final horizontalPadding = viewportWidth < 480 ? 16.0 : 32.0;
+    final maxLineWidth = viewportWidth - horizontalPadding * 2;
     return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
+      padding: EdgeInsets.symmetric(horizontal: horizontalPadding, vertical: 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SkeletonBox(width: 360, height: 38, radius: 10),
+          _SkeletonBox(width: maxLineWidth < 360 ? maxLineWidth : 360, height: 38, radius: 10),
           const SizedBox(height: 10),
-          _SkeletonBox(width: 440, height: 16, radius: 8),
+          _SkeletonBox(width: maxLineWidth < 440 ? maxLineWidth : 440, height: 16, radius: 8),
           const SizedBox(height: 26),
           LayoutBuilder(
             builder: (context, constraints) {
@@ -1212,9 +1215,10 @@ class _DashboardError extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        width: 520,
-        margin: const EdgeInsets.all(24),
-        padding: const EdgeInsets.all(24),
+        width: double.infinity,
+        constraints: const BoxConstraints(maxWidth: 520),
+        margin: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 420 ? 18 : 24),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(16),

@@ -729,12 +729,13 @@ class _StatsRow extends StatelessWidget {
         ],);
       }
 
+      final cardWidth = c.maxWidth < 560 ? c.maxWidth : (c.maxWidth - 16) / 2;
       return Wrap(
         spacing:    16,
         runSpacing: 16,
         children: cards
             .map((w) => SizedBox(
-                width:  (c.maxWidth - 16) / 2,
+                width:  cardWidth,
                 height: _CourseTokens.statCardHeight,
                 child:  w,),)
             .toList(),

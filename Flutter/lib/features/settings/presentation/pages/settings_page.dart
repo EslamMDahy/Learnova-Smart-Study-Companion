@@ -291,7 +291,7 @@ void _onNavSelect(int i) {
       accept: ['image/png', 'image/jpeg'],
     );
     if (picked == null || picked.bytes.isEmpty) return;
-    if (!mounted) return;
+    if (!context.mounted) return;
 
     final bytes = picked.bytes;
     var contentType = (picked.mimeType ?? '').trim().toLowerCase();
@@ -335,7 +335,7 @@ void _onNavSelect(int i) {
           contentType: contentType,
         );
 
-    if (!mounted) return;
+    if (!context.mounted) return;
     if (ok) {
       _toast(
         context,
@@ -509,8 +509,7 @@ return PopScope(
   onPopInvokedWithResult: (didPop, _) async {
     if (!didPop) {
       final shouldPop = await _confirmDiscardDialog(context);
-      if (!context.mounted || !shouldPop) return;
-        Navigator.of(context).pop();
+      if (shouldPop && context.mounted) Navigator.of(context).pop();
     }
   },
   child: AbsorbPointer(
@@ -528,28 +527,28 @@ return PopScope(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Header row + actions (stays visible)
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Account Settings', style: AppText.h1),
-                          const SizedBox(height: 6),
-                          Text(
-                            'Manage your personal information, security credentials, and system preferences.',
-                            style: AppText.subtitle,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(width: 16),
-                    Row(
-                      mainAxisSize: MainAxisSize.min,
+                LayoutBuilder(
+                  builder: (context, headerConstraints) {
+                    final narrowHeader = headerConstraints.maxWidth < 680;
+                    final titleBlock = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Account Settings', style: AppText.h1),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Manage your personal information, security credentials, and system preferences.',
+                          style: AppText.subtitle,
+                        ),
+                      ],
+                    );
+
+                    final actions = Wrap(
+                      spacing: 10,
+                      runSpacing: 10,
+                      alignment: narrowHeader ? WrapAlignment.start : WrapAlignment.end,
                       children: [
                         SizedBox(
-                          width: 120,
+                          width: narrowHeader ? 132 : 120,
                           child: AppPrimaryLoadingButton(
                             label: 'Cancel',
                             loading: false,
@@ -573,16 +572,14 @@ return PopScope(
                             borderColor: AppColors.borderSoft,
                           ),
                         ),
-                        const SizedBox(width: 10),
                         SizedBox(
-                          width: 160,
+                          width: narrowHeader ? 170 : 160,
                           child: AppPrimaryLoadingButton(
                             label: 'Save Changes',
                             height: btnH,
                             loading: st.savingProfile || st.savingPreferences,
                             onPressed: canSave
                                 ? () {
-                                    
                                     if (_shouldValidateProfileOnSave()) {
                                       if (!_validateProfileForm()) return;
                                     }
@@ -596,8 +593,6 @@ return PopScope(
                                           bio: bio.text.trim(),
                                           language: _language,
                                           assignmentAlerts: assignmentAlerts,
-
-                                          // prefs (user_preferences)
                                           emailNotifications: emailNotifications,
                                           courseUpdates: courseUpdates,
                                           announcementNotifications:
@@ -609,12 +604,32 @@ return PopScope(
                                           showOnlineStatus: showOnlineStatus,
                                         );
                                   }
-                                : null, 
+                                : null,
                           ),
                         ),
                       ],
-                    ),
-                  ],
+                    );
+
+                    if (narrowHeader) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          titleBlock,
+                          const SizedBox(height: 14),
+                          actions,
+                        ],
+                      );
+                    }
+
+                    return Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(child: titleBlock),
+                        const SizedBox(width: 16),
+                        actions,
+                      ],
+                    );
+                  },
                 ),
 
                 const SizedBox(height: 24),

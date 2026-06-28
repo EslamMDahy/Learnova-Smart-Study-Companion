@@ -283,7 +283,20 @@ class _StatsRow extends StatelessWidget {
     ];
 
     if (isNarrow) {
-      return Wrap(spacing: 16, runSpacing: 16, children: updated);
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final cardWidth = constraints.maxWidth < 560
+              ? constraints.maxWidth
+              : (constraints.maxWidth - 16) / 2;
+          return Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: updated
+                .map((card) => SizedBox(width: cardWidth, child: card))
+                .toList(),
+          );
+        },
+      );
     }
 
     return Row(

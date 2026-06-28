@@ -68,8 +68,8 @@ Future<void> showCourseOutcomesDialog(
 ) {
   return showDialog(
     context: context,
-    builder: (_) => UncontrolledProviderScope(
-      container: ProviderScope.containerOf(context),
+    builder: (_) => ProviderScope(
+      parent: ProviderScope.containerOf(context),
       child: CourseOutcomesManager(courseId: courseId),
     ),
   );
@@ -369,67 +369,71 @@ Future<_OutcomeDraft?> _showOutcomeEditor(
   final result = await showDialog<_OutcomeDraft>(
     context: context,
     builder: (dialogContext) => StatefulBuilder(
-      builder: (dialogContext, setDialogState) => AlertDialog(
-        title: Text(title),
-        content: SizedBox(
-          width: 520,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(subtitle, style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-              const SizedBox(height: 16),
-              TextField(
-                controller: titleCtrl,
-                autofocus: true,
-                decoration: const InputDecoration(labelText: 'Title'),
-              ),
-              const SizedBox(height: 12),
-              TextField(
-                controller: descCtrl,
-                minLines: 2,
-                maxLines: 4,
-                decoration: const InputDecoration(labelText: 'Description (optional)'),
-              ),
-              if (!parentMode && difficulty == null) ...[
+      builder: (dialogContext, setDialogState) {
+        final rawWidth = MediaQuery.sizeOf(dialogContext).width - 48;
+        final dialogWidth = rawWidth < 520 ? rawWidth : 520.0;
+        return AlertDialog(
+          title: Text(title),
+          content: SizedBox(
+            width: dialogWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(subtitle, style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
                 const SizedBox(height: 16),
-                Text('Difficulty level', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  children: OutcomeDifficulty.values.map((level) {
-                    final selected = selectedDifficulty == level;
-                    return ChoiceChip(
-                      avatar: _DifficultyDot(level: level, compact: true),
-                      label: Text(level.label),
-                      selected: selected,
-                      onSelected: (_) => setDialogState(() => selectedDifficulty = level),
-                    );
-                  }).toList(),
+                TextField(
+                  controller: titleCtrl,
+                  autofocus: true,
+                  decoration: const InputDecoration(labelText: 'Title'),
                 ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: descCtrl,
+                  minLines: 2,
+                  maxLines: 4,
+                  decoration: const InputDecoration(labelText: 'Description (optional)'),
+                ),
+                if (!parentMode && difficulty == null) ...[
+                  const SizedBox(height: 16),
+                  Text('Difficulty level', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: OutcomeDifficulty.values.map((level) {
+                      final selected = selectedDifficulty == level;
+                      return ChoiceChip(
+                        avatar: _DifficultyDot(level: level, compact: true),
+                        label: Text(level.label),
+                        selected: selected,
+                        onSelected: (_) => setDialogState(() => selectedDifficulty = level),
+                      );
+                    }).toList(),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              final cleanTitle = titleCtrl.text.trim();
-              if (cleanTitle.isEmpty) return;
-              Navigator.pop(
-                dialogContext,
-                _OutcomeDraft(
-                  title: cleanTitle,
-                  description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
-                  difficulty: parentMode ? null : selectedDifficulty,
-                ),
-              );
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                final cleanTitle = titleCtrl.text.trim();
+                if (cleanTitle.isEmpty) return;
+                Navigator.pop(
+                  dialogContext,
+                  _OutcomeDraft(
+                    title: cleanTitle,
+                    description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                    difficulty: parentMode ? null : selectedDifficulty,
+                  ),
+                );
+              },
+              child: const Text('Save'),
+            ),
+          ],
+        );
+      },
     ),
   );
 
@@ -955,7 +959,8 @@ class _EmptyOutcomes extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        width: 460,
+        width: double.infinity,
+        constraints: const BoxConstraints(maxWidth: 460),
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.border)),
         child: Column(

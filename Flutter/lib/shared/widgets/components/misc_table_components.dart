@@ -107,15 +107,18 @@ const FigmaUmFiltersBar({
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final availableWidth = MediaQuery.sizeOf(context).width;
+    final filterWidth = availableWidth < 380 ? 132.0 : (isNarrow ? 150.0 : 140.0);
+
     final roleDrop = FigmaUmDropdown40(
-      width: isNarrow ? 150 : 140,
+      width: filterWidth,
       value: selectedRole,
       items: ['All Roles', 'owner', 'teacher', 'student', 'assistant'],
       onChanged: onRoleChanged,
     );
 
     final statusDrop = FigmaUmDropdown40(
-      width: isNarrow ? 150 : 140,
+      width: filterWidth,
       value: selectedStatus,
       items: ['All Status', 'pending', 'accepted', 'suspended', 'declined'],
       onChanged: onStatusChanged,

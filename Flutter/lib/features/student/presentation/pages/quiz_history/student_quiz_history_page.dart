@@ -777,8 +777,10 @@ class _HistoryErrorState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Center(
       child: Container(
-        width: 520,
-        padding: const EdgeInsets.all(24),
+        width: double.infinity,
+        constraints: const BoxConstraints(maxWidth: 520),
+        margin: const EdgeInsets.all(16),
+        padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 420 ? 18 : 24),
         decoration: BoxDecoration(
           color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(16),

@@ -237,7 +237,7 @@ class _DashboardBody extends StatelessWidget {
       builder: (context, constraints) {
         final width = constraints.maxWidth;
         final compact = width < 920;
-        final cardsPerRow = width < 680 ? 2 : 4;
+        final cardsPerRow = width < 520 ? 1 : (width < 760 ? 2 : 4);
 
         return RefreshIndicator(
           onRefresh: onRefresh,
@@ -336,11 +336,10 @@ class _DashboardHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: Column(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final compact = constraints.maxWidth < 560;
+        final heading = Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
@@ -388,19 +387,38 @@ class _DashboardHeader extends StatelessWidget {
                 ),
               ),
             ],
-          ),
-        ),
-        const SizedBox(width: 16),
-        Wrap(
+          );
+
+        final actions = Wrap(
           spacing: 10,
           runSpacing: 10,
-          alignment: WrapAlignment.end,
+          alignment: compact ? WrapAlignment.start : WrapAlignment.end,
           children: [
             _DateBadge(label: _todayLabel()),
             _RefreshButton(onRefresh: onRefresh),
           ],
-        ),
-      ],
+        );
+
+        if (compact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              heading,
+              const SizedBox(height: 14),
+              actions,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: heading),
+            const SizedBox(width: 16),
+            actions,
+          ],
+        );
+      },
     );
   }
 }
