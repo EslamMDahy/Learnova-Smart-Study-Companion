@@ -183,8 +183,9 @@ def _env_bool(name: str, default: bool = False) -> bool:
 
 
 def _ocr_submit_verbose_enabled() -> bool:
-    # Keep this on by default while debugging the OCR submit/grading bridge.
-    return _env_bool("OCR_SUBMIT_VERBOSE_LOGS", True)
+    # Keep noisy JSON dumps off by default. Enable only while debugging with
+    # OCR_SUBMIT_VERBOSE_LOGS=true. Timing logs remain available separately.
+    return _env_bool("OCR_SUBMIT_VERBOSE_LOGS", False)
 
 
 def _jsonable(value: Any) -> Any:
@@ -624,9 +625,7 @@ def _assert_engine_ready(lang: str) -> None:
 
 
 def _ocr_engine_verbose_enabled() -> bool:
-    # Keep engine diagnostics ON by default while deploying OCR to a server.
-    # Set OCR_ENGINE_VERBOSE_LOGS=false to silence these logs after it works.
-    return _env_bool("OCR_ENGINE_VERBOSE_LOGS", True)
+    return _env_bool("OCR_ENGINE_VERBOSE_LOGS", False)
 
 
 def _tesseract_candidate_values() -> list[str | None]:
@@ -759,6 +758,7 @@ def analyze_exam_scan_files(
     from .alignment import align_exam_page
     from .omr import detect_bubbles, extract_objective_answers_from_pages
     from .qr import read_qr_from_image, verify_payload
+    from .vision_grading import grade_written_answer_image, vision_enabled, vision_inline_enabled
     from .written_ocr import extract_written_answers_from_pages
 
     total_timer = time.perf_counter()
@@ -800,25 +800,60 @@ def analyze_exam_scan_files(
             page_number += 1
             page_warnings = list(document.warnings)
             qr_payload = read_qr_from_image(raw_page)
-            alignment = align_exam_page(raw_page)
-            if alignment.warnings:
-                page_warnings.extend(alignment.warnings)
-            qr_payload = qr_payload or read_qr_from_image(alignment.image)
             qr_detected = bool(qr_payload)
+
+            fast_scan = bool(getattr(settings, "ocr_fast_scan", True))
+            skip_cover_bubbles = bool(getattr(settings, "ocr_skip_cover_page_bubbles", True))
+            is_cover_page = bool(page_number == 1 and len(document.pages) > 1 and qr_detected)
+
+            if fast_scan:
+                # Alignment on photographed pages frequently falls back to the
+                # original scan anyway, but still costs about a second per page.
+                # In fast scan mode we keep the raw page and let the template
+                # extractors work on it directly.
+                aligned_image = raw_page
+                alignment_status = "skipped_fast"
+                alignment_confidence = 100.0
+                alignment_warnings: list[str] = []
+            else:
+                alignment = align_exam_page(raw_page)
+                aligned_image = alignment.image
+                alignment_status = alignment.status
+                alignment_confidence = alignment.confidence
+                alignment_warnings = list(alignment.warnings or [])
+                qr_payload = qr_payload or read_qr_from_image(aligned_image)
+                qr_detected = bool(qr_payload)
+
+            if alignment_warnings:
+                page_warnings.extend(alignment_warnings)
+
             if qr_payload:
                 if verify_payload(qr_payload):
                     detected_metadata.update(qr_payload)
                 else:
                     page_warnings.append("QR code was detected but its signature is invalid.")
 
-            bubbles = detect_bubbles(alignment.image)
-            step_timer = _mark_ocr_step("prepare_page", step_timer, page=page_number, bubbles=len(bubbles), qr=qr_detected)
+            if skip_cover_bubbles and is_cover_page:
+                bubbles = []
+                page_warnings.append("Cover/instructions page detected; skipped bubble extraction for speed.")
+            else:
+                bubbles = detect_bubbles(aligned_image)
+
+            step_timer = _mark_ocr_step(
+                "prepare_page",
+                step_timer,
+                page=page_number,
+                bubbles=len(bubbles),
+                qr=qr_detected,
+                fast=fast_scan,
+                cover_skip=bool(skip_cover_bubbles and is_cover_page),
+            )
             page_payloads.append({
                 "page_number": page_number,
                 "filename": filename,
-                "image": alignment.image,
-                "alignment_status": alignment.status,
-                "alignment_confidence": alignment.confidence,
+                "image": aligned_image,
+                "alignment_status": alignment_status,
+                "alignment_confidence": alignment_confidence,
                 "qr_detected": qr_detected,
                 "bubbles": bubbles,
                 "warnings": page_warnings,
@@ -886,7 +921,7 @@ def analyze_exam_scan_files(
         lang=lang,
     )
     for item in written_results:
-        all_written_answers.append({
+        answer_payload = {
             "exam_question_id": item.exam_question_id,
             "question_number": item.question_number,
             "type": item.type,
@@ -904,8 +939,30 @@ def analyze_exam_scan_files(
             "answer_region": item.region,
             "ai_grading_payload": item.ai_grading_payload,
             "ai_score": None,
-        })
-    step_timer = _mark_ocr_step("written_ocr", step_timer, answers=len(all_written_answers))
+            "ai_status": item.status if item.status in {"ai_ready", "needs_review"} else None,
+            "ai_feedback": None,
+            "ai_request_id": None,
+        }
+        question = _find_question(item.exam_question_id, item.question_number, questions) or {}
+        if vision_inline_enabled() and item.crop_image is not None:
+            vision_result = grade_written_answer_image(
+                crop=item.crop_image,
+                question=question,
+                ocr_text=item.answer_text,
+                ocr_confidence=item.confidence,
+            )
+            if vision_result is not None:
+                _apply_local_vision_result_to_answer(answer=answer_payload, result=vision_result, question=question)
+                if vision_result.error:
+                    warnings.append(f"Local vision review for question {item.question_number}: {vision_result.feedback or vision_result.error}")
+        all_written_answers.append(answer_payload)
+    step_timer = _mark_ocr_step(
+        "written_extraction",
+        step_timer,
+        answers=len(all_written_answers),
+        mode=getattr(settings, "ocr_written_extraction_mode", "local"),
+        vision=bool(getattr(settings, "ocr_vision_enabled", False)),
+    )
 
     answers = _dedupe_answers(all_objective_answers + all_written_answers)
     answers = _ensure_answers_for_all_questions(answers=answers, questions=questions)
@@ -1527,15 +1584,22 @@ def _create_scan_attempt_like_student_submit(
             "OCR_SUBMIT_VERBOSE_LOGS": os.getenv("OCR_SUBMIT_VERBOSE_LOGS"),
             "OCR_HANDWRITING_ENGINE": os.getenv("OCR_HANDWRITING_ENGINE"),
             "OCR_TROCR_MODEL": os.getenv("OCR_TROCR_MODEL"),
+            "OCR_WRITTEN_EXTRACTION_MODE": os.getenv("OCR_WRITTEN_EXTRACTION_MODE"),
+            "OCR_VISION_ENABLED": os.getenv("OCR_VISION_ENABLED"),
+            "OCR_VISION_OLLAMA_MODEL": os.getenv("OCR_VISION_OLLAMA_MODEL"),
         },
     })
 
     answer_rows = [answer for answer in answers if _safe_int(answer.get("exam_question_id")) is not None]
 
-    question_type_by_exam_question_id = {
-        _safe_int(question.get("exam_question_id")): str(question.get("type") or "").strip().lower()
+    question_by_exam_question_id = {
+        _safe_int(question.get("exam_question_id")): question
         for question in questions
         if _safe_int(question.get("exam_question_id")) is not None
+    }
+    question_type_by_exam_question_id = {
+        qid: str(question.get("type") or "").strip().lower()
+        for qid, question in question_by_exam_question_id.items()
     }
 
     def _answer_question_type(answer: dict[str, Any]) -> str:
@@ -1545,15 +1609,41 @@ def _create_scan_attempt_like_student_submit(
         exam_question_id = _safe_int(answer.get("exam_question_id"))
         return question_type_by_exam_question_id.get(exam_question_id, "")
 
+    def _answer_has_ai_reference(answer: dict[str, Any]) -> bool:
+        exam_question_id = _safe_int(answer.get("exam_question_id"))
+        question = question_by_exam_question_id.get(exam_question_id) or {}
+        expected = str(question.get("expected_answer") or "").strip()
+        rubric = question.get("grading_rubric")
+        if expected:
+            return True
+        if isinstance(rubric, dict):
+            return bool(rubric)
+        if isinstance(rubric, list):
+            return bool(rubric)
+        return bool(str(rubric or "").strip())
+
     def _scan_answer_needs_ai(answer: dict[str, Any]) -> bool:
         qtype = _answer_question_type(answer)
         if qtype in {"essay", "short_answer"}:
-            return bool(str(answer.get("answer_text") or "").strip())
+            if _safe_float(answer.get("points_earned")) is not None and bool(answer.get("auto_graded")):
+                return False
+            if str(answer.get("ai_status") or "").strip().lower() == "completed":
+                return False
+            if not bool(str(answer.get("answer_text") or "").strip()):
+                return False
+            if bool(getattr(settings, "ocr_submit_ai_require_reference", True)) and not _answer_has_ai_reference(answer):
+                return False
+            return True
         return False
 
+    written_answers_with_text = [
+        answer for answer in answer_rows
+        if _answer_question_type(answer) in {"essay", "short_answer"} and str(answer.get("answer_text") or "").strip()
+    ]
     written_with_text = [answer for answer in answer_rows if _scan_answer_needs_ai(answer)]
     has_ai_grading = bool(written_with_text)
-    attempt_status = "submitted" if has_ai_grading else "graded"
+    has_manual_written_review = any(answer not in written_with_text for answer in written_answers_with_text)
+    attempt_status = "submitted" if has_ai_grading or has_manual_written_review else "graded"
 
     print(
         f"[OCR_SUBMIT] answers={len(answer_rows)} written_with_text={len(written_with_text)} "
@@ -1586,14 +1676,50 @@ def _create_scan_attempt_like_student_submit(
         qtype = _answer_question_type(answer)
         answer["type"] = qtype or answer.get("type")
         if qtype in {"essay", "short_answer"}:
-            if not str(answer.get("answer_text") or "").strip():
+            has_text = bool(str(answer.get("answer_text") or "").strip())
+            written_points = _safe_float(answer.get("points_earned"))
+            already_local_graded = bool(answer.get("auto_graded")) and written_points is not None
+            if not has_text:
                 unanswered_count += 1
+                answer["is_correct"] = None
+                answer["points_earned"] = None
+                answer["auto_graded"] = False
+                answer["status"] = "needs_review"
+                answer["ai_status"] = "needs_review"
+                continue
+
+            if already_local_graded:
+                earned = max(0.0, float(written_points or 0))
+                answer["points_earned"] = earned
+                answer["is_correct"] = earned > 0
+                answer["auto_graded"] = True
+                answer["status"] = "ai_graded"
+                answer["ai_status"] = "completed"
+                total_score += earned
+                if earned > 0:
+                    correct_count += 1
+                else:
+                    incorrect_count += 1
+                continue
+
+            if bool(getattr(settings, "ocr_submit_ai_require_reference", True)) and not _answer_has_ai_reference(answer):
+                # Do not send an invalid grading request with expected_answer=null
+                # and grading_rubric=null. The external AI grading endpoint rejects
+                # that payload with 422; keep the extracted answer for manual review.
+                answer["is_correct"] = None
+                answer["points_earned"] = None
+                answer["auto_graded"] = False
+                answer["status"] = "needs_review"
+                answer["ai_status"] = "needs_review"
+                answer["ai_feedback"] = "No expected answer or grading rubric is saved for this written question; review manually."
+                continue
+
             # normal submit does not count written questions until AI callback
             answer["is_correct"] = None
             answer["points_earned"] = None
             answer["auto_graded"] = False
-            answer["status"] = "ai_pending" if str(answer.get("answer_text") or "").strip() else "needs_review"
-            answer["ai_status"] = "pending" if str(answer.get("answer_text") or "").strip() else "needs_review"
+            answer["status"] = "ai_pending"
+            answer["ai_status"] = "pending"
             continue
 
         if answer.get("is_correct") is True:
@@ -1718,7 +1844,7 @@ def _create_scan_attempt_like_student_submit(
                     "answer_text": answer.get("answer_text") or answer.get("detected_answer"),
                     "is_correct": answer.get("is_correct"),
                     "points_earned": answer.get("points_earned"),
-                    "auto_graded": False if _answer_question_type(answer) in {"essay", "short_answer"} else bool(answer.get("auto_graded", answer.get("is_correct") is not None)),
+                    "auto_graded": bool(answer.get("auto_graded")) if _answer_question_type(answer) in {"essay", "short_answer"} else bool(answer.get("auto_graded", answer.get("is_correct") is not None)),
                 },
             )
 
@@ -1736,6 +1862,8 @@ def _create_scan_attempt_like_student_submit(
             "has_ai_grading": has_ai_grading,
             "ai_enabled_from_env": ai_enabled,
             "written_exam_question_ids": [a.get("exam_question_id") for a in written_with_text],
+            "manual_review_written_exam_question_ids": [a.get("exam_question_id") for a in written_answers_with_text if a not in written_with_text],
+            "require_reference": bool(getattr(settings, "ocr_submit_ai_require_reference", True)),
             "written_answers": [
                 {
                     "exam_question_id": a.get("exam_question_id"),
@@ -1982,9 +2110,14 @@ def _send_ocr_submit_ai_grading_request(*, db: Any, attempt_id: int, exam_id: in
               AND eq.snapshot_type IN ('essay', 'short_answer')
               AND COALESCE(eq.snapshot_auto_gradable, FALSE) = FALSE
               AND NULLIF(BTRIM(COALESCE(sa.answer_text, '')), '') IS NOT NULL
+              AND (
+                    :require_reference = FALSE
+                 OR NULLIF(BTRIM(COALESCE(eq.snapshot_expected_answer, '')), '') IS NOT NULL
+                 OR eq.snapshot_grading_rubric IS NOT NULL
+              )
             ORDER BY eq.order_index ASC, eq.id ASC
         """),
-        {"attempt_id": attempt_id, "exam_id": exam_id},
+        {"attempt_id": attempt_id, "exam_id": exam_id, "require_reference": bool(getattr(settings, "ocr_submit_ai_require_reference", True))},
     ).mappings().all()
 
     _debug_dump("OCR_SUBMIT_AI_SELECTED_ROWS", [dict(row) for row in rows])
@@ -2022,7 +2155,7 @@ def _send_ocr_submit_ai_grading_request(*, db: Any, attempt_id: int, exam_id: in
         "primary_entity_type": "attempt",
         "primary_entity_id": attempt_id,
         "body": body,
-    }, always=True)
+    })
 
     print(
         f"[OCR_SUBMIT][AI] sending normal exam_grading request attempt_id={attempt_id} "
@@ -2238,6 +2371,52 @@ def _normalise_one_answer(value: Any) -> Any:
         return int(text_value)
     except ValueError:
         return text_value.upper()
+
+
+def _apply_local_vision_result_to_answer(*, answer: dict[str, Any], result: Any, question: dict[str, Any]) -> None:
+    """Merge a free/local vision result into the scan answer payload."""
+    extracted = str(getattr(result, "extracted_answer", "") or "").strip()
+    if extracted:
+        answer["answer_text"] = extracted
+
+    original_conf = float(answer.get("confidence") or 0)
+    result_conf = float(getattr(result, "confidence", 0) or 0)
+    answer["confidence"] = round(max(original_conf, result_conf), 2)
+
+    feedback = getattr(result, "feedback", None)
+    points = getattr(result, "points_earned", None)
+    needs_review = bool(getattr(result, "needs_review", True))
+    max_score = _question_points(answer.get("exam_question_id"), [question]) if question else answer.get("max_score")
+    if max_score is not None:
+        answer["max_score"] = max_score
+
+    payload = answer.get("ai_grading_payload")
+    if isinstance(payload, dict):
+        payload["vision_engine"] = getattr(result, "engine", None)
+        payload["vision_confidence"] = round(result_conf, 2)
+        payload["vision_extracted_answer"] = extracted
+        payload["vision_needs_review"] = needs_review
+        payload["vision_feedback"] = feedback
+
+    if points is not None and not needs_review:
+        answer["points_earned"] = round(float(points), 2)
+        answer["ai_score"] = round(float(points), 2)
+        answer["is_correct"] = float(points) > 0
+        answer["status"] = "ai_graded"
+        answer["ai_status"] = "completed"
+        answer["auto_graded"] = True
+        answer["teacher_feedback"] = feedback
+        answer["ai_feedback"] = feedback or "Graded locally from the answer image."
+        return
+
+    # Vision can still be useful as a better extractor even when grading remains manual.
+    answer["points_earned"] = None
+    answer["ai_score"] = None
+    answer["is_correct"] = None
+    answer["auto_graded"] = False
+    answer["status"] = "needs_review" if needs_review else "detected"
+    answer["ai_status"] = "needs_review" if needs_review else "ai_ready"
+    answer["ai_feedback"] = feedback or "Local vision extracted the answer; review manually before grading."
 
 
 def _dedupe_answers(answers: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -2496,6 +2675,14 @@ def _question_points(exam_question_id: Any, questions: list[dict[str, Any]]) -> 
     except (TypeError, ValueError):
         return None
 
+
+def _safe_float(value: Any) -> float | None:
+    try:
+        if value is None or value == "":
+            return None
+        return float(str(value).strip())
+    except (TypeError, ValueError):
+        return None
 
 def _safe_int(value: Any) -> int | None:
     try:

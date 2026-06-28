@@ -57,11 +57,17 @@ def read_handwritten_answer(*, crop: Any, question: dict[str, Any], lang: str = 
     extracted" to the instructor.
     """
     engine = str(getattr(settings, "ocr_handwriting_engine", os.getenv("OCR_HANDWRITING_ENGINE", "auto")) or "auto").strip().lower()
-    if engine not in {"auto", "trocr", "tesseract"}:
+    if engine not in {"auto", "fast", "trocr", "tesseract"}:
         engine = "auto"
-    _debug(f"read_answer start engine={engine} lang={lang} crop_shape={getattr(crop, 'shape', None)} qn={question.get('question_number')} type={question.get('type')}")
+    fast_scan = bool(getattr(settings, "ocr_fast_scan", os.getenv("OCR_FAST_SCAN", "true")).__str__().strip().lower() in {"1", "true", "yes", "on"})
+    trocr_inline = bool(getattr(settings, "ocr_trocr_inline", os.getenv("OCR_TROCR_INLINE", "false")).__str__().strip().lower() in {"1", "true", "yes", "on"})
+    _debug(f"read_answer start engine={engine} fast_scan={fast_scan} trocr_inline={trocr_inline} lang={lang} crop_shape={getattr(crop, 'shape', None)} qn={question.get('question_number')} type={question.get('type')}")
 
-    if engine == "tesseract":
+    # Fast exam correction must not load/run TrOCR by default on CPU. A single
+    # TrOCR/Ollama pass can take longer than the whole exam scan budget.
+    # Use OCR_TROCR_INLINE=true or OCR_HANDWRITING_ENGINE=trocr only for slow
+    # accuracy checks, not the normal instructor correction request.
+    if engine in {"tesseract", "fast"} or (engine == "auto" and fast_scan and not trocr_inline):
         return _read_with_tesseract(crop=crop, question=question, lang=lang)
 
     trocr_result: HandwritingOcrResult | None = None
@@ -196,7 +202,8 @@ def _read_with_tesseract(*, crop: Any, question: dict[str, Any], lang: str) -> H
     if not variants:
         return HandwritingOcrResult(text="", raw_text="", confidence=0.0, engine="tesseract", word_count=0)
 
-    configs = [
+    fast_scan = bool(getattr(settings, "ocr_fast_scan", os.getenv("OCR_FAST_SCAN", "true")).__str__().strip().lower() in {"1", "true", "yes", "on"})
+    configs = ["--oem 1 --psm 6 -c preserve_interword_spaces=1"] if fast_scan else [
         "--oem 1 --psm 6 -c preserve_interword_spaces=1",
         "--oem 1 --psm 11 -c preserve_interword_spaces=1",
     ]
@@ -204,7 +211,7 @@ def _read_with_tesseract(*, crop: Any, question: dict[str, Any], lang: str) -> H
     if user_words_path:
         configs = [f'{config} --user-words "{user_words_path}"' for config in configs]
 
-    timeout_seconds = int(getattr(settings, "ocr_tesseract_timeout_seconds", 45))
+    timeout_seconds = int(getattr(settings, "ocr_tesseract_timeout_seconds", 6 if fast_scan else 45))
     best_text = ""
     best_conf = 0.0
     best_score = -1.0
@@ -263,7 +270,9 @@ def _tesseract_preprocess_variants(crop: Any) -> list[Any]:
     ink = 255 - adaptive
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 1))
     connected = 255 - cv2.dilate(ink, kernel, iterations=1)
-    return [cv2.copyMakeBorder(v, 28, 28, 28, 28, cv2.BORDER_CONSTANT, value=255) for v in [sharpened, otsu, adaptive, connected]]
+    fast_scan = bool(getattr(settings, "ocr_fast_scan", os.getenv("OCR_FAST_SCAN", "true")).__str__().strip().lower() in {"1", "true", "yes", "on"})
+    variants = [adaptive] if fast_scan else [sharpened, otsu, adaptive, connected]
+    return [cv2.copyMakeBorder(v, 24, 24, 24, 24, cv2.BORDER_CONSTANT, value=255) for v in variants]
 
 
 def _prepare_trocr_image(gray: Any) -> Any:
@@ -362,7 +371,8 @@ def _segment_handwriting_lines(gray: Any) -> list[Any]:
 
         if line_images:
             _debug(f"line_seg component_clusters={len(clusters)} returned_lines={len(line_images[:10])}")
-            return line_images[:10]
+            _debug(f"line_seg projection_returned_lines={len(line_images[:10])}")
+    return line_images[:10]
 
     # Projection fallback for unusually connected handwriting.
     projection = np.count_nonzero(binary, axis=1)

@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from app.core.config import settings
+
 from .handwriting import read_handwritten_answer
 from .service import normalise_lang
 
@@ -19,6 +21,7 @@ class WrittenAnswerResult:
     status: str
     region: dict[str, int] | None
     ai_grading_payload: dict[str, Any]
+    crop_image: Any | None = None
 
 
 def _debug_enabled() -> bool:
@@ -141,6 +144,7 @@ def extract_written_answers(
             status=status,
             region=region,
             ai_grading_payload=payload,
+            crop_image=crop if region is not None else None,
         ))
 
     return results
@@ -369,15 +373,18 @@ def _is_footer_region(region: dict[str, int], image: Any) -> bool:
     # Learnova pages have a long footer line + page number near the bottom. The edge
     # detector can falsely detect it as a large rectangle. These regions should never
     # be used as written answers.
-    if y > height * 0.68:
+    # Do not reject real lower-page essay boxes.  The second essay answer in
+    # Learnova legacy sheets often starts around 65-70% of the page height and is
+    # tall.  Reject only thin footer/page-number strips.
+    if y > height * 0.82 and h < height * 0.16:
         return True
-    if (y + h) > height * 0.94 and h < height * 0.24:
+    if (y + h) > height * 0.965 and h < height * 0.16:
         return True
     # Bottom-wide strips are almost always footer borders, not answer boxes.
-    if y > height * 0.58 and w > width * 0.60 and h < height * 0.18:
+    if y > height * 0.76 and w > width * 0.60 and h < height * 0.14:
         return True
-    # Right-lower blocks are commonly page number/footer crops.
-    if y > height * 0.62 and x > width * 0.30:
+    # Right-lower blocks are commonly page number/footer crops when they are thin.
+    if y > height * 0.78 and x > width * 0.30 and h < height * 0.18:
         return True
     return False
 
@@ -492,6 +499,111 @@ def _crop_answer_content(region_crop: Any, *, debug_prefix: str = "answer") -> A
     return answer_crop
 
 
+
+def _try_extract_written_answers_with_page_vision(
+    *,
+    pages: list[dict[str, Any]],
+    written_questions: list[dict[str, Any]],
+) -> list[WrittenAnswerResult] | None:
+    """Use one local vision request to extract all written answers.
+
+    This mode is activated with OCR_WRITTEN_EXTRACTION_MODE=vision_page and
+    OCR_VISION_ENABLED=true.  It deliberately bypasses Tesseract/TrOCR for the
+    written answers so scanned handwriting is not converted into garbage text.
+    """
+    mode = str(getattr(settings, "ocr_written_extraction_mode", "local") or "local").strip().lower()
+    if mode not in {"vision", "vision_page", "ai_vision", "ollama_vision", "page_vision"}:
+        return None
+    if not written_questions:
+        return []
+
+    try:
+        from .vision_grading import extract_written_answers_from_pages_with_vision, written_page_vision_enabled
+    except Exception as exc:
+        _debug(f"page_vision_import_failed error={exc!r}")
+        return None if bool(getattr(settings, "ocr_vision_page_fallback_to_local_ocr", True)) else []
+
+    if not written_page_vision_enabled():
+        _debug("page_vision_requested_but_disabled; set OCR_VISION_ENABLED=true")
+        return None if bool(getattr(settings, "ocr_vision_page_fallback_to_local_ocr", True)) else _empty_written_results(written_questions, engine="page_vision_disabled")
+
+    vision_by_qn = extract_written_answers_from_pages_with_vision(pages=pages, questions=written_questions)
+    if not vision_by_qn:
+        _debug("page_vision_no_results")
+        return None if bool(getattr(settings, "ocr_vision_page_fallback_to_local_ocr", True)) else _empty_written_results(written_questions, engine="page_vision_no_results")
+
+    results: list[WrittenAnswerResult] = []
+    for index, question in enumerate(written_questions):
+        qn = _safe_int(question.get("question_number")) or (index + 1)
+        item = vision_by_qn.get(qn)
+        if item is None:
+            text = ""
+            confidence = 0.0
+            status = "needs_review"
+            engine = "page_vision_missing_question"
+            raw_text = ""
+        else:
+            text = str(getattr(item, "extracted_answer", "") or "").strip()
+            raw_text = text
+            confidence = float(getattr(item, "confidence", 0.0) or 0.0)
+            engine = str(getattr(item, "engine", "page_vision") or "page_vision")
+            status = "ai_ready" if text and confidence >= 35 else "needs_review"
+            if bool(getattr(item, "needs_review", False)) and not text:
+                status = "needs_review"
+
+        payload = build_ai_grading_payload(
+            question=question,
+            answer_text=text,
+            raw_ocr_text=raw_text,
+            ocr_engine=engine,
+            region=None,
+            confidence=confidence,
+        )
+        if item is not None:
+            payload["vision_feedback"] = getattr(item, "feedback", None)
+            payload["vision_raw_response"] = getattr(item, "raw_response", None)
+
+        results.append(WrittenAnswerResult(
+            exam_question_id=_safe_int(question.get("exam_question_id")),
+            question_number=qn,
+            type=str(question.get("type") or "written"),
+            answer_text=text,
+            confidence=round(confidence, 2),
+            status=status,
+            region=None,
+            ai_grading_payload=payload,
+            crop_image=None,
+        ))
+
+    _debug(f"page_vision_results={[{'qn': r.question_number, 'text': r.answer_text, 'conf': r.confidence} for r in results]}")
+    return results
+
+
+def _empty_written_results(written_questions: list[dict[str, Any]], *, engine: str) -> list[WrittenAnswerResult]:
+    results: list[WrittenAnswerResult] = []
+    for index, question in enumerate(written_questions):
+        qn = _safe_int(question.get("question_number")) or (index + 1)
+        payload = build_ai_grading_payload(
+            question=question,
+            answer_text="",
+            raw_ocr_text="",
+            ocr_engine=engine,
+            region=None,
+            confidence=0.0,
+        )
+        results.append(WrittenAnswerResult(
+            exam_question_id=_safe_int(question.get("exam_question_id")),
+            question_number=qn,
+            type=str(question.get("type") or "written"),
+            answer_text="",
+            confidence=0.0,
+            status="needs_review",
+            region=None,
+            ai_grading_payload=payload,
+            crop_image=None,
+        ))
+    return results
+
 def _safe_int(value: Any) -> int | None:
     try:
         return int(value)
@@ -522,6 +634,13 @@ def extract_written_answers_from_pages(
         if str(q.get("type") or "").strip().lower() in {"short_answer", "essay"}
     ]
     _debug(f"start: pages={len(pages)} written_questions={len(written_questions)} question_numbers={[q.get('question_number') for q in written_questions]}")
+
+    vision_results = _try_extract_written_answers_with_page_vision(
+        pages=pages,
+        written_questions=written_questions,
+    )
+    if vision_results is not None:
+        return vision_results
 
     # Store candidate answer regions with their page image. We intentionally skip footer
     # detections because the edge detector can see the Learnova footer/page-number strip
@@ -664,5 +783,6 @@ def extract_written_answers_from_pages(
             status=status,
             region=region,
             ai_grading_payload=payload,
+            crop_image=crop if region is not None else None,
         ))
     return results

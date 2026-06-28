@@ -36,6 +36,7 @@ allow_origins = [
     "http://127.0.0.1:5173",
     "https://www.learnova-edu.com",
     "http://www.learnova-edu.com",
+    "https://www.learnova-edu.com/api",
     "https://learnova-edu.com",
 ]
 
