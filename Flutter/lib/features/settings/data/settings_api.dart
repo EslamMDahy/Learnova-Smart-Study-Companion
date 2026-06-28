@@ -1,8 +1,4 @@
-import 'dart:async';
 import 'dart:typed_data';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-
 import 'package:dio/dio.dart';
 
 import '../../../core/network/api_client.dart';
@@ -67,7 +63,12 @@ class SettingsApi {
     return (res.data ?? {}).cast<String, dynamic>();
   }
 
-  /// Step 2: Upload the file bytes directly to Supabase using the signed URL
+  /// Step 2: Upload the file bytes directly to Supabase using the signed URL.
+  ///
+  /// Keep this request outside [ApiClient]. Signed storage URLs should not inherit
+  /// the app API base URL, auth interceptor, JSON content-type, or global loading
+  /// behavior. This keeps the upload path compatible with both the normal JS
+  /// web build and the wasm web build.
   Future<void> uploadAvatarToSupabase({
     required String uploadUrl,
     required List<int> bytes,
@@ -75,30 +76,28 @@ class SettingsApi {
     CancelToken? cancelToken,
   }) async {
     final bodyBytes = Uint8List.fromList(bytes);
-    final completer = Completer<void>();
 
-    final xhr = html.HttpRequest()
-      ..open('PUT', uploadUrl)
-      ..setRequestHeader('Content-Type', contentType)
-      ..setRequestHeader('x-upsert', 'true');
+    final response = await Dio().put<void>(
+      uploadUrl,
+      data: bodyBytes,
+      cancelToken: cancelToken,
+      options: Options(
+        contentType: contentType,
+        responseType: ResponseType.plain,
+        sendTimeout: const Duration(minutes: 2),
+        receiveTimeout: const Duration(minutes: 2),
+        headers: const <String, dynamic>{
+          'x-upsert': 'true',
+        },
+        validateStatus: (status) =>
+            status != null && status >= 200 && status < 400,
+      ),
+    );
 
-    xhr.onLoad.listen((_) {
-      final status = xhr.status ?? 0;
-      if (status >= 200 && status < 400) {
-        completer.complete();
-      } else {
-        completer.completeError(
-          Exception('Supabase upload failed: HTTP $status - ${xhr.responseText}'),
-        );
-      }
-    });
-
-    xhr.onError.listen((_) {
-      completer.completeError(Exception('Supabase upload network error'));
-    });
-
-    xhr.send(bodyBytes.buffer);
-    return completer.future;
+    final status = response.statusCode ?? 0;
+    if (status < 200 || status >= 400) {
+      throw Exception('Supabase upload failed: HTTP $status');
+    }
   }
 
   /// Step 3: Confirm the upload to the backend so it bumps updated_at

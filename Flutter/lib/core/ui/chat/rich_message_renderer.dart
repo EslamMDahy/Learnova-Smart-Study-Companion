@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:html' as html;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -1447,15 +1446,15 @@ String _diagramFileName(String prefix, String source) {
 }
 
 Future<void> _downloadRemoteImage(String imageUrl, String fileName) async {
-  try {
-    final anchor = html.AnchorElement(href: imageUrl)
-      ..download = fileName
-      ..target = '_blank'
-      ..rel = 'noopener noreferrer';
-    html.document.body?.append(anchor);
-    anchor.click();
-    anchor.remove();
-  } catch (_) {
+  final uri = Uri.tryParse(imageUrl.trim());
+  if (uri == null) return;
+
+  final opened = await launchUrl(
+    uri,
+    webOnlyWindowName: '_blank',
+  );
+
+  if (!opened) {
     await _openLink(imageUrl);
   }
 }
