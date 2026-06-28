@@ -401,8 +401,8 @@ class AppTheme {
         ).copyWith(
           mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
           overlayColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.hovered)) return overlay.withOpacity(0.08);
-            if (states.contains(WidgetState.pressed)) return overlay.withOpacity(0.14);
+            if (states.contains(WidgetState.hovered)) return overlay.withValues(alpha: 0.08);
+            if (states.contains(WidgetState.pressed)) return overlay.withValues(alpha: 0.14);
             return Colors.transparent;
           }),
         ),
@@ -421,7 +421,7 @@ class AppTheme {
         ).copyWith(
           mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
           overlayColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.hovered)) return overlay.withOpacity(0.05);
+            if (states.contains(WidgetState.hovered)) return overlay.withValues(alpha: 0.05);
             return Colors.transparent;
           }),
         ),
@@ -435,7 +435,7 @@ class AppTheme {
         ).copyWith(
           mouseCursor: WidgetStateProperty.all(SystemMouseCursors.click),
           overlayColor: WidgetStateProperty.resolveWith((states) {
-            if (states.contains(WidgetState.hovered)) return AppColors.primary.withOpacity(0.08);
+            if (states.contains(WidgetState.hovered)) return AppColors.primary.withValues(alpha: 0.08);
             return Colors.transparent;
           }),
         ),
@@ -445,7 +445,7 @@ class AppTheme {
 
       textSelectionTheme: TextSelectionThemeData(
         cursorColor: AppColors.primary,
-        selectionColor: AppColors.primary.withOpacity(0.28),
+        selectionColor: AppColors.primary.withValues(alpha: 0.28),
         selectionHandleColor: AppColors.primary,
       ),
 

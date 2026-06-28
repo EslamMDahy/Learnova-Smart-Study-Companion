@@ -105,7 +105,7 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
             border: Border.all(color: AppColors.borderGray),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: Colors.black.withOpacity(0.14),
+                color: Colors.black.withValues(alpha: 0.14),
                 blurRadius: 28,
                 offset: const Offset(0, 16),
               ),
@@ -534,7 +534,7 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
     }
 
     return DropdownButtonFormField<int>(
-      value: _selectedTargetTopicId,
+      initialValue: _selectedTargetTopicId,
       isExpanded: true,
       decoration: InputDecoration(
         labelText: 'Selected topic',
@@ -606,10 +606,10 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: selected ? AppColors.primary.withOpacity(0.06) : AppColors.surfaceBg,
+        color: selected ? AppColors.primary.withValues(alpha: 0.06) : AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: selected ? AppColors.primary.withOpacity(0.35) : AppColors.borderGray,
+          color: selected ? AppColors.primary.withValues(alpha: 0.35) : AppColors.borderGray,
         ),
       ),
       child: Row(
@@ -618,7 +618,7 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(9),
             ),
             child: Icon(
@@ -701,7 +701,7 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
           width: 34,
           height: 34,
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.08),
+            color: AppColors.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(9),
           ),
           child: Icon(icon, color: AppColors.primary, size: 18),
@@ -753,7 +753,7 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
             height: 28,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.08),
+              color: AppColors.primary.withValues(alpha: 0.08),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Text(
@@ -953,8 +953,8 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
           color: danger
-              ? AppColors.dangerText.withOpacity(0.22)
-              : AppColors.primary.withOpacity(0.16),
+              ? AppColors.dangerText.withValues(alpha: 0.22)
+              : AppColors.primary.withValues(alpha: 0.16),
         ),
       ),
       child: Row(

@@ -1140,31 +1140,3 @@ class _SkeletonCardState extends State<_SkeletonCard>
     );
   }
 }
-
-// ==================== API Course Card ====================
-
-enum _CourseStatus { active, draft, archived }
-
-class _CourseModel {
-  final String code;
-  final _CourseStatus status;
-  final String title;
-  final String meta;
-  final int students;
-  final int modules;
-  final String memberCountText;
-  final String? note;
-  final String coverUrl;
-
-  const _CourseModel({
-    required this.code,
-    required this.status,
-    required this.title,
-    required this.meta,
-    required this.students,
-    required this.modules,
-    required this.coverUrl,
-    this.memberCountText = '',
-    this.note,
-  });
-}

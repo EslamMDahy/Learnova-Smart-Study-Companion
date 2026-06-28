@@ -1096,7 +1096,7 @@ class _StudentQuizResultPageState extends State<StudentQuizResultPage> {
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Text(label,
           style: const TextStyle(

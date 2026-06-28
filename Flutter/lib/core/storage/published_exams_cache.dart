@@ -204,7 +204,7 @@ class PublishedExamsCache {
 
       final allExams = rawExams
           .whereType<Map>()
-          .map((item) => Map<String, dynamic>.from(item))
+          .map(Map<String, dynamic>.from)
           .where((item) => _asInt(item['id']) > 0)
           .toList(growable: false);
 

@@ -174,7 +174,7 @@ class _ExamDetailsHero extends StatelessWidget {
                 style: OutlinedButton.styleFrom(
                   foregroundColor: AppColors.primary,
                   backgroundColor: AppColors.primarySoft,
-                  side: BorderSide(color: AppColors.primary.withOpacity(0.22)),
+                  side: BorderSide(color: AppColors.primary.withValues(alpha: 0.22)),
                 ),
               ),
               const Spacer(),
@@ -645,9 +645,9 @@ class _IconBox extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(size * 0.30),
-        border: Border.all(color: color.withOpacity(0.14)),
+        border: Border.all(color: color.withValues(alpha: 0.14)),
       ),
       child: Icon(icon, color: color, size: size * 0.50),
     );
@@ -665,9 +665,9 @@ class _MiniBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.16)),
+        border: Border.all(color: color.withValues(alpha: 0.16)),
       ),
       child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: _textStyle(color: color, size: 11, weight: FontWeight.w900)),
     );

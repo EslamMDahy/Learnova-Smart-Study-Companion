@@ -81,42 +81,6 @@ class _TemplateRequirementGap {
   });
 }
 
-class _TemplateDistributionStatus extends StatelessWidget {
-  final ExamTemplateModel template;
-  final List<_TemplateRequirementGap> gaps;
-
-  const _TemplateDistributionStatus({required this.template, required this.gaps});
-
-  @override
-  Widget build(BuildContext context) {
-    final distribution = _templateDistributionText(template);
-    if (distribution.isEmpty) {
-      return Text(
-        'Template uses total question count only.',
-        style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w700),
-      );
-    }
-    final ok = gaps.isEmpty;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: ok ? AppColors.successBg : AppColors.dangerBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: ok ? AppColors.successText.withOpacity(0.24) : AppColors.dangerBorder),
-      ),
-      child: Text(
-        ok ? 'Section plan ready: $distribution' : 'Section shortage: ${gaps.map((gap) => '${gap.label} ${gap.availableCount}/${gap.requiredCount}').join(' • ')}',
-        style: TextStyle(
-          color: ok ? AppColors.successText : AppColors.dangerText,
-          fontSize: 11.5,
-          fontWeight: FontWeight.w800,
-        ),
-      ),
-    );
-  }
-}
-
 String _difficultyLabelFromKey(String key) {
   switch (key.trim().toLowerCase()) {
     case 'easy':
@@ -126,15 +90,6 @@ String _difficultyLabelFromKey(String key) {
     default:
       return 'Medium';
   }
-}
-
-String _templateDistributionText(ExamTemplateModel template) {
-  final sections = template.sections.where((section) => section.questionCount > 0).toList()
-    ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
-  if (sections.isEmpty) return '';
-  return sections.map((section) {
-    return '${section.questionCount} ${_shortTemplateQuestionTypeLabel(section.questionType)}';
-  }).join(' / ');
 }
 
 String _templateQuestionTypeLabel(String questionType) {
@@ -158,26 +113,3 @@ String _templateQuestionTypeLabel(String questionType) {
       return 'Multiple Choice';
   }
 }
-
-String _shortTemplateQuestionTypeLabel(String questionType) {
-  switch (questionType) {
-    case 'true_false':
-      return 'TF';
-    case 'short_answer':
-      return 'SA';
-    case 'essay':
-      return 'Essay';
-    case 'multi_select':
-      return 'MS';
-    case 'fill_in_the_blank':
-    case 'fill_in_blank':
-      return 'Blank';
-    case 'numeric':
-      return 'Num';
-    case 'code':
-      return 'Code';
-    default:
-      return 'MCQ';
-  }
-}
-

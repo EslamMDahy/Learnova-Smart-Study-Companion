@@ -138,9 +138,9 @@ class _QuestionInspector extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.15),
+                  color: Colors.white.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: Colors.white.withOpacity(0.22)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
                 ),
                 child: const Icon(Icons.fact_check_outlined, color: Colors.white, size: 20),
               ),
@@ -164,7 +164,7 @@ class _QuestionInspector extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.82),
+                        color: Colors.white.withValues(alpha: 0.82),
                         fontSize: 12.5,
                         fontWeight: FontWeight.w700,
                       ),
@@ -253,7 +253,7 @@ class _QuestionInspector extends StatelessWidget {
                     child: Wrap(
                       spacing: 8,
                       runSpacing: 8,
-                      children: q.tags.map((tag) => _TagChip(tag)).toList(),
+                      children: q.tags.map(_TagChip.new).toList(),
                     ),
                   ),
                 ],
@@ -286,7 +286,7 @@ class _InspectorNotice extends StatelessWidget {
     final warning = tone == _InspectorNoticeTone.warning;
     final fg = warning ? AppColors.warningText : AppColors.primary;
     final bg = warning ? AppColors.warningSoftBg : AppColors.primarySoft;
-    final border = warning ? AppColors.warningBorder : AppColors.primary.withOpacity(0.22);
+    final border = warning ? AppColors.warningBorder : AppColors.primary.withValues(alpha: 0.22);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -317,126 +317,6 @@ class _InspectorNotice extends StatelessWidget {
   }
 }
 
-class _QuestionMetadataGrid extends StatelessWidget {
-  final QuestionModel question;
-  final _TopicTarget? target;
-  final String topicPath;
-
-  const _QuestionMetadataGrid({
-    required this.question,
-    required this.target,
-    required this.topicPath,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final q = question;
-    final items = <_QuestionMetadataItem>[
-      _QuestionMetadataItem(icon: Icons.tag_rounded, label: 'Question ID', value: q.remoteId?.toString() ?? q.id),
-      _QuestionMetadataItem(icon: Icons.book_outlined, label: 'Course ID', value: _optionalInt(q.courseId)),
-      _QuestionMetadataItem(icon: Icons.view_module_outlined, label: 'Module', value: _firstText([target?.module.title, q.moduleName])),
-      _QuestionMetadataItem(icon: Icons.description_outlined, label: 'Material', value: _firstText([target?.material.displayTitle, q.materialName])),
-      _QuestionMetadataItem(icon: Icons.account_tree_outlined, label: 'Topic', value: topicPath),
-      _QuestionMetadataItem(icon: Icons.category_outlined, label: 'Type', value: q.typeLabel),
-      _QuestionMetadataItem(icon: Icons.speed_rounded, label: 'Difficulty', value: q.difficultyLabel),
-      _QuestionMetadataItem(icon: Icons.bolt_rounded, label: 'Source', value: _sourceLabel(q.source)),
-      _QuestionMetadataItem(icon: Icons.verified_outlined, label: 'Approval', value: _approvalLabel(q.approvalStatus)),
-      _QuestionMetadataItem(icon: Icons.score_outlined, label: 'Max score', value: '${q.maxScore}'),
-      _QuestionMetadataItem(icon: Icons.auto_awesome_outlined, label: 'Auto gradable', value: q.autoGradable ? 'Yes' : 'No'),
-      _QuestionMetadataItem(icon: Icons.insights_rounded, label: 'Usage', value: _usageLabel(q.usageCount)),
-      _QuestionMetadataItem(icon: Icons.trending_up_rounded, label: 'Success rate', value: _successRate(q.successRate)),
-      _QuestionMetadataItem(icon: Icons.timer_outlined, label: 'Avg time', value: _seconds(q.averageTimeSeconds)),
-      _QuestionMetadataItem(icon: Icons.person_outline_rounded, label: 'Created by', value: _optionalInt(q.createdBy)),
-      _QuestionMetadataItem(icon: Icons.event_outlined, label: 'Created', value: _shortDate(q.createdAt)),
-      _QuestionMetadataItem(icon: Icons.update_rounded, label: 'Updated', value: _shortDate(q.updatedAt)),
-    ];
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final tight = constraints.maxWidth < 620;
-        final width = tight ? constraints.maxWidth : (constraints.maxWidth - 10) / 2;
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: items
-              .map((item) => SizedBox(
-                    width: width,
-                    child: _QuestionMetadataTile(item: item),
-                  ))
-              .toList(),
-        );
-      },
-    );
-  }
-}
-
-class _QuestionMetadataItem {
-  final IconData icon;
-  final String label;
-  final String value;
-
-  const _QuestionMetadataItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-  });
-}
-
-class _QuestionMetadataTile extends StatelessWidget {
-  final _QuestionMetadataItem item;
-
-  const _QuestionMetadataTile({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(item.icon, size: 16, color: AppColors.textHint),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  item.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontSize: 10.6,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.35,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.value,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.textTitle,
-                    fontSize: 12.4,
-                    height: 1.25,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 class _InspectorSection extends StatelessWidget {
   final String title;
   final Widget child;
@@ -603,7 +483,7 @@ class _AnswerOptionCard extends StatelessWidget {
                   margin: const EdgeInsets.only(left: 8),
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.62),
+                    color: Colors.white.withValues(alpha: 0.62),
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(color: AppColors.greenBorder),
                   ),
@@ -669,48 +549,6 @@ class _BooleanAnswerPreview extends StatelessWidget {
               color: selected ? AppColors.successText : AppColors.textTitle,
               fontSize: 13,
               fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _InspectorKv extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InspectorKv({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 9),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 78,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              value,
-              style: TextStyle(
-                color: AppColors.textTitle,
-                fontSize: 12.5,
-                fontWeight: FontWeight.w800,
-                height: 1.35,
-              ),
             ),
           ),
         ],

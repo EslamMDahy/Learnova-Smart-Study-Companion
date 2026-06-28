@@ -1,71 +1,5 @@
 part of 'student_course_details_page.dart';
 
-class _TranscriptLineData {
-  final String marker;
-  final String text;
-  final bool selected;
-
-  const _TranscriptLineData({
-    required this.marker,
-    required this.text,
-    this.selected = false,
-  });
-}
-
-class _TranscriptLine extends StatelessWidget {
-  final String marker;
-  final String text;
-  final bool selected;
-
-  const _TranscriptLine({
-    required this.marker,
-    required this.text,
-    this.selected = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
-      decoration: BoxDecoration(
-        color: selected ? AppColors.infoBg.withOpacity(0.74) : Colors.transparent,
-        borderRadius: BorderRadius.circular(8),
-        border: selected
-            ? Border(left: BorderSide(color: AppColors.primary, width: 2))
-            : null,
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 70,
-            child: Text(
-              marker,
-              style: const TextStyle(
-                color: AppColors.primary,
-                fontSize: 12,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              text,
-              style: TextStyle(
-                color: AppColors.textGray,
-                fontSize: 12.5,
-                height: 1.45,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _AssistantMessage extends StatelessWidget {
   final bool isUser;
   final Widget child;
@@ -169,7 +103,7 @@ class _AssistantBotIcon extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.18),
+            color: AppColors.primary.withValues(alpha: 0.18),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -179,40 +113,6 @@ class _AssistantBotIcon extends StatelessWidget {
         Icons.auto_awesome_rounded,
         color: Colors.white,
         size: size * 0.52,
-      ),
-    );
-  }
-}
-
-class _GlassLabel extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _GlassLabel({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.16)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: Colors.white, size: 15),
-          const SizedBox(width: 7),
-          Text(
-            label,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ],
       ),
     );
   }
@@ -244,64 +144,6 @@ class _SoftBadge extends StatelessWidget {
       ),
     );
   }
-}
-
-class _LearningVisualPainter extends CustomPainter {
-  const _LearningVisualPainter();
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width * 0.5, size.height * 0.58);
-    final linePaint = Paint()
-      ..color = const Color(0xFF2DD4BF).withOpacity(0.32)
-      ..strokeWidth = 1.6
-      ..style = PaintingStyle.stroke;
-    final dotPaint = Paint()
-      ..color = const Color(0xFF67E8F9).withOpacity(0.65)
-      ..style = PaintingStyle.fill;
-    final formulaPaint = Paint()
-      ..color = const Color(0xFF2DD4BF).withOpacity(0.16)
-      ..strokeWidth = 2
-      ..style = PaintingStyle.stroke;
-
-    for (var i = 0; i < 22; i++) {
-      final angle = -math.pi + i * math.pi / 11;
-      final radius = i.isEven ? 168.0 : 132.0;
-      final end = Offset(
-        center.dx + math.cos(angle) * radius,
-        center.dy + math.sin(angle) * radius * 0.58,
-      );
-      canvas.drawLine(center, end, linePaint);
-      canvas.drawCircle(end, 4.2, dotPaint);
-    }
-
-    canvas.drawCircle(center, 9, Paint()..color = Colors.white.withOpacity(0.55));
-
-    final path = Path()
-      ..moveTo(size.width * 0.16, size.height * 0.30)
-      ..quadraticBezierTo(
-        size.width * 0.24,
-        size.height * 0.18,
-        size.width * 0.34,
-        size.height * 0.28,
-      )
-      ..moveTo(size.width * 0.65, size.height * 0.24)
-      ..quadraticBezierTo(
-        size.width * 0.75,
-        size.height * 0.12,
-        size.width * 0.86,
-        size.height * 0.26,
-      )
-      ..moveTo(size.width * 0.10, size.height * 0.75)
-      ..lineTo(size.width * 0.28, size.height * 0.75)
-      ..moveTo(size.width * 0.72, size.height * 0.78)
-      ..lineTo(size.width * 0.90, size.height * 0.78);
-
-    canvas.drawPath(path, formulaPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
 }
 
 class _CourseWorkspaceLoading extends StatelessWidget {
@@ -534,78 +376,6 @@ class _EmptySidebarState extends StatelessWidget {
   }
 }
 
-
-List<_TranscriptLineData> _lessonTranscriptLines(
-  StudentCourseModule module,
-  StudentCourseMaterial? material,
-) {
-  if (material != null && material.transcriptSegments.isNotEmpty) {
-    return material.transcriptSegments
-        .map(
-          (segment) => _TranscriptLineData(
-            marker: segment.marker,
-            text: segment.text,
-            selected: segment == material.transcriptSegments.first,
-          ),
-        )
-        .toList(growable: false);
-  }
-
-  if (material == null) {
-    return [
-      _TranscriptLineData(
-        marker: 'Module',
-        text: module.safeDescription,
-        selected: true,
-      ),
-      _TranscriptLineData(
-        marker: 'Status',
-        text: module.isPublished ? 'Published' : 'Draft',
-      ),
-    ];
-  }
-
-  final lines = <_TranscriptLineData>[
-    _TranscriptLineData(
-      marker: _titleCase(material.safeType),
-      text: (material.summary ?? '').trim().isNotEmpty
-          ? material.summary!.trim()
-          : material.safeDescription,
-      selected: true,
-    ),
-    _TranscriptLineData(
-      marker: 'Status',
-      text: _titleCase(material.safeStatus),
-    ),
-  ];
-
-  if (material.fileName != null) {
-    lines.add(
-      _TranscriptLineData(marker: 'File', text: material.fileName!),
-    );
-  }
-  if (material.fileSize != null) {
-    lines.add(
-      _TranscriptLineData(marker: 'Size', text: _formatBytes(material.fileSize!)),
-    );
-  }
-  if (material.durationSeconds != null) {
-    lines.add(
-      _TranscriptLineData(
-        marker: 'Duration',
-        text: _formatDuration(material.durationSeconds!),
-      ),
-    );
-  }
-  if (material.pageCount != null) {
-    lines.add(
-      _TranscriptLineData(marker: 'Pages', text: material.pageCount.toString()),
-    );
-  }
-
-  return lines;
-}
-
 IconData _materialIcon(StudentCourseMaterial? material) {
   if (material == null) return Icons.play_circle_outline_rounded;
 
@@ -679,40 +449,6 @@ String _shortText(String value, int maxLength) {
   return '${normalized.substring(0, maxLength - 1).trimRight()}…';
 }
 
-String _formatDateTime(DateTime? value) {
-  if (value == null) return 'Not set';
-  final local = value.toLocal();
-  final day = local.day.toString().padLeft(2, '0');
-  final month = local.month.toString().padLeft(2, '0');
-  final year = local.year.toString();
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
-  return '$day/$month/$year $hour:$minute';
-}
-
-String _examAvailabilityLabel(StudentCourseExam exam) {
-  if (!exam.hasAvailabilityWindow) {
-    return exam.isAvailable
-        ? 'This exam is published and available now.'
-        : 'This exam is currently unavailable.';
-  }
-
-  final from = _formatDateTime(exam.availableFrom);
-  final to = _formatDateTime(exam.availableTo);
-  if (exam.availableFrom != null && exam.availableTo != null) {
-    return exam.isAvailable
-        ? 'Available now until $to.'
-        : 'Availability window: $from → $to.';
-  }
-  if (exam.availableFrom != null) {
-    return exam.isAvailable
-        ? 'Available since $from.'
-        : 'Available from $from.';
-  }
-  return exam.isAvailable
-      ? 'Available until $to.'
-      : 'Availability ended at $to.';
-}
 
 String _lessonTitle(
   StudentCourseModule module,
@@ -742,20 +478,6 @@ String _formatBytes(int bytes) {
   return '$fixed ${units[unitIndex]}';
 }
 
-String _formatDuration(int seconds) {
-  if (seconds <= 0) return '0m';
-  final minutes = seconds ~/ 60;
-  final remainingSeconds = seconds % 60;
-
-  if (minutes >= 60) {
-    final hours = minutes ~/ 60;
-    final remainingMinutes = minutes % 60;
-    return '${hours}h ${remainingMinutes}m';
-  }
-
-  if (remainingSeconds == 0) return '${minutes}m';
-  return '${minutes}m ${remainingSeconds}s';
-}
 
 String _titleCase(String value) {
   final normalized = value.replaceAll('_', ' ').trim();

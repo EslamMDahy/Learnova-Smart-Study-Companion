@@ -113,9 +113,9 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
             width: _isFocused ? 1.5 : 1,
           ),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 1)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 1)),
             if (_isFocused)
-              BoxShadow(color: AppColors.primary.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 2)),
+              BoxShadow(color: AppColors.primary.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 2)),
           ],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -138,7 +138,7 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
                     duration: const Duration(milliseconds: 120),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                     decoration: BoxDecoration(
-                      color: sel ? color.withOpacity(0.1) : AppColors.cardBg,
+                      color: sel ? color.withValues(alpha: 0.1) : AppColors.cardBg,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                           color: sel ? color : AppColors.border,
@@ -294,7 +294,7 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
                     duration: const Duration(milliseconds: 120),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
-                      color: sel ? color.withOpacity(0.08) : AppColors.pageBg,
+                      color: sel ? color.withValues(alpha: 0.08) : AppColors.pageBg,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: sel ? color : AppColors.border, width: sel ? 1.5 : 1),
                     ),
@@ -392,7 +392,7 @@ class _OutcomeTile extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
           decoration: BoxDecoration(
-            color: diffColor.withOpacity(0.09),
+            color: diffColor.withValues(alpha: 0.09),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(outcome.difficulty.label, style: TextStyle(

@@ -288,7 +288,7 @@ class _DocumentStage extends StatelessWidget {
                   decoration: BoxDecoration(
                     color: AppColors.primarySoft,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.14)),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.14)),
                   ),
                   child: Icon(_materialTypeIcon(material), color: AppColors.primary, size: 17),
                 ),
@@ -400,7 +400,7 @@ class _ViewerToolbarChip extends StatelessWidget {
       decoration: BoxDecoration(
         color: highlighted ? AppColors.primarySoft : AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: highlighted ? AppColors.primary.withOpacity(0.22) : AppColors.borderGray),
+        border: Border.all(color: highlighted ? AppColors.primary.withValues(alpha: 0.22) : AppColors.borderGray),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,

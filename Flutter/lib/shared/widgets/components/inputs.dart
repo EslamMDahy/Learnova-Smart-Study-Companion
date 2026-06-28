@@ -176,7 +176,6 @@ class FigmaUmSearch40 extends StatelessWidget {
     this.hint = 'Search by name, ID, or email...',
   });
 
-  static Color get _text => AppColors.textTitle;
   static Color get _muted => AppColors.textMuted;
   static Color get _bg => AppColors.headerBg;
 

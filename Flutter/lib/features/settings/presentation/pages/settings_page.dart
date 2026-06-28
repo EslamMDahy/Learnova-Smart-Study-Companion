@@ -76,6 +76,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
   SettingsFormSnapshot? _initialSnapshot;
 
+  void _runStateUpdate(VoidCallback update) {
+    if (!mounted) return;
+    setState(update);
+  }
+
   DateTime? _cachedCreatedAt;
   DateTime? _cachedLastLoginAt;
 
@@ -225,8 +230,6 @@ void _onNavSelect(int i) {
 
 
   // Legacy compatibility alias retained during page refactor.
-  TextEditingController get _nameController => firstName;
-
   void _toast(
     BuildContext context, {
     required String title,
@@ -288,6 +291,7 @@ void _onNavSelect(int i) {
       accept: ['image/png', 'image/jpeg'],
     );
     if (picked == null || picked.bytes.isEmpty) return;
+    if (!mounted) return;
 
     final bytes = picked.bytes;
     var contentType = (picked.mimeType ?? '').trim().toLowerCase();
@@ -505,7 +509,8 @@ return PopScope(
   onPopInvokedWithResult: (didPop, _) async {
     if (!didPop) {
       final shouldPop = await _confirmDiscardDialog(context);
-      if (shouldPop && context.mounted) Navigator.of(context).pop();
+      if (!context.mounted || !shouldPop) return;
+        Navigator.of(context).pop();
     }
   },
   child: AbsorbPointer(
@@ -631,12 +636,12 @@ return PopScope(
                             lastLogin: _fmtLastLoginRelative(_cachedLastLoginAt),
                             avatarUrl: st.profile?.avatarUrl,
                             uploadingAvatar: st.uploadingAvatar,
-                            onUploadAvatar: () => _pickAndUploadAvatar(),
+                            onUploadAvatar: _pickAndUploadAvatar,
                           ),
                           const SizedBox(height: 16),
                           _NavCard(
                             selectedIndex: _sectionIndex,
-                            onSelect: (i) => _onNavSelect(i),
+                            onSelect: _onNavSelect,
                           ),
                         ],
                       );

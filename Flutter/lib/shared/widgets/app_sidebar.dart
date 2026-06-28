@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import 'app_ui_components.dart' as ui;
 
 typedef AppSidebarItem = ui.AppSidebarItem;

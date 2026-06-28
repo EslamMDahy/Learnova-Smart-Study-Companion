@@ -18,12 +18,10 @@ dependencies:
   flutter:
     sdk: flutter
 
-  cupertino_icons: ^1.0.8
 
   # Routing
   go_router: ^13.2.0
 
-  path_provider: ^2.1.2
 
   # Networking
   dio: ^5.4.0
@@ -32,7 +30,6 @@ dependencies:
   flutter_riverpod: ^2.5.1
 
   # Utils
-  intl: ^0.19.0
   equatable: ^2.0.5
   file_picker: ^10.3.10
   url_launcher: ^6.3.0

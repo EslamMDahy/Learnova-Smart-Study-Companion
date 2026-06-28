@@ -5,7 +5,6 @@ class _PreferencesDialogShell extends StatelessWidget {
   final String? subtitle;
   final Widget child;
   final double maxWidth;
-  final EdgeInsetsGeometry padding;
   final Widget? leading;
 
   const _PreferencesDialogShell({
@@ -13,7 +12,6 @@ class _PreferencesDialogShell extends StatelessWidget {
     required this.child,
     this.subtitle,
     this.maxWidth = 620,
-    this.padding = const EdgeInsets.fromLTRB(20, 20, 20, 20),
     this.leading,
   });
 
@@ -27,7 +25,7 @@ class _PreferencesDialogShell extends StatelessWidget {
       child: ConstrainedBox(
         constraints: BoxConstraints(maxWidth: maxWidth),
         child: Padding(
-          padding: padding,
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -136,14 +134,12 @@ class _DialogTextField extends StatelessWidget {
 }
 
 class _DialogActions extends StatelessWidget {
-  final String cancelLabel;
   final String confirmLabel;
   final VoidCallback onCancel;
   final VoidCallback? onConfirm;
   final AppButtonVariant confirmVariant;
 
   const _DialogActions({
-    this.cancelLabel = 'Cancel',
     required this.confirmLabel,
     required this.onCancel,
     required this.onConfirm,
@@ -157,7 +153,7 @@ class _DialogActions extends StatelessWidget {
       children: [
         Expanded(
           child: AppButton(
-            label: cancelLabel,
+            label: 'Cancel',
             onTap: onCancel,
             variant: AppButtonVariant.soft,
             fullWidth: true,
@@ -195,7 +191,7 @@ final _shareTargetCoursesProvider = FutureProvider.family<List<MyCourseItem>, in
 class _ShareModuleDialog extends ConsumerStatefulWidget {
   final ModuleItem module;
   final int currentCourseId;
-  const _ShareModuleDialog({required this.module, required this.currentCourseId, super.key});
+  const _ShareModuleDialog({required this.module, required this.currentCourseId});
 
   @override
   ConsumerState<_ShareModuleDialog> createState() => _ShareModuleDialogState();

@@ -7,7 +7,6 @@ import 'package:learnova/core/utils/image_picker_bytes.dart';
 import 'package:learnova/features/instructor/data/courses_models.dart';
 import 'package:learnova/features/instructor/data/course_vocabulary.dart';
 import 'package:learnova/features/instructor/data/learning_outcomes_models.dart';
-import 'learning_outcomes_section.dart';
 
 class CreateCourseDialogResult {
   final CourseCreateRequest request;
@@ -52,7 +51,7 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
   bool _codeTouched  = false;
   bool _categoryTouched = false;
 
-  List<LearningOutcome> _outcomes = [];
+  final List<LearningOutcome> _outcomes = [];
   PickedBrowserFile? _coverFile;
 
   static final _codeRx = RegExp(r'^[A-Za-z0-9][A-Za-z0-9\-_\/ ]*$');
@@ -406,29 +405,6 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // ── Learning Outcomes card ────────────────────────────────────────────────
-  Widget _buildLearningOutcomesCard() {
-    return _SectionCard(
-      icon: Icons.flag_outlined,
-      title: 'Learning Outcomes',
-      badge: _outcomes.isEmpty ? null : '${_outcomes.length}',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Define what students will achieve. Topics will be linked to these outcomes.',
-            style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
-          ),
-          const SizedBox(height: 14),
-          LearningOutcomesSection(
-            initialOutcomes: _outcomes,
-            onChanged: (list) => setState(() => _outcomes = list),
           ),
         ],
       ),
@@ -1162,8 +1138,8 @@ class _CoverPreview extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withOpacity(0.05),
-                  Colors.black.withOpacity(0.58),
+                  Colors.black.withValues(alpha: 0.05),
+                  Colors.black.withValues(alpha: 0.58),
                 ],
               ),
             ),
@@ -1231,7 +1207,7 @@ class _TinyCoverAction extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.92),
+          color: Colors.white.withValues(alpha: 0.92),
           borderRadius: BorderRadius.circular(999),
         ),
         child: Row(

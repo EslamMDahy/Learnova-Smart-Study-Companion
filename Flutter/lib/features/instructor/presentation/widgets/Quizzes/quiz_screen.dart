@@ -15,7 +15,6 @@ import 'package:learnova/features/instructor/data/courses_models.dart';
 import 'package:learnova/features/instructor/data/courses_providers.dart';
 import 'package:learnova/features/instructor/data/exam_models.dart';
 import 'package:learnova/features/instructor/data/question_models.dart';
-import 'package:learnova/features/instructor/data/questions_api.dart';
 import 'package:learnova/features/instructor/data/modules_materials_providers.dart';
 import 'package:learnova/features/instructor/presentation/controllers/selected_course_provider.dart';
 import 'package:learnova/features/instructor/presentation/course_route_identity.dart';
@@ -494,8 +493,6 @@ class _InstructorQuizzesScreenState extends ConsumerState<InstructorQuizzesScree
               passingScore: draft.passingScore,
               shuffleQuestions: draft.shuffleQuestions,
               shuffleOptions: draft.shuffleOptions,
-              availableFrom: draft.availableFrom,
-              availableTo: draft.availableTo,
             ),
           );
       if (!mounted) return;

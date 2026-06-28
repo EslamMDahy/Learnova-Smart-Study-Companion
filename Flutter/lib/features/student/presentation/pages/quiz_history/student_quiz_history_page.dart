@@ -342,7 +342,7 @@ class _StatCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: iconColor.withOpacity(.08),
+                  color: iconColor.withValues(alpha: .08),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Icon(icon, color: iconColor, size: 18),
@@ -495,7 +495,7 @@ class _ExamHistoryRowWidget extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: statusColor.withOpacity(.1),
+                  color: statusColor.withValues(alpha: .1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(

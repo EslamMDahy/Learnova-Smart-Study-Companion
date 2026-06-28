@@ -228,7 +228,7 @@ class _DraftQuestionEditDialogState extends State<_DraftQuestionEditDialog> {
                     borderRadius: BorderRadius.circular(999),
                     border: Border.all(
                       color: correct
-                          ? AppColors.successText.withOpacity(0.32)
+                          ? AppColors.successText.withValues(alpha: 0.32)
                           : AppColors.borderSoft,
                     ),
                   ),
@@ -305,7 +305,7 @@ class _DraftQuestionEditDialogState extends State<_DraftQuestionEditDialog> {
     required ValueChanged<T?> onChanged,
   }) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       decoration: InputDecoration(
         labelText: label,

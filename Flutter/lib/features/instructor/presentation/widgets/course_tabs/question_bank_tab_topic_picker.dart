@@ -70,7 +70,7 @@ class _QuestionGenerationTopicPickerDialogState
               borderRadius: BorderRadius.circular(22),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.16),
+                  color: Colors.black.withValues(alpha: 0.16),
                   blurRadius: 42,
                   spreadRadius: 2,
                   offset: const Offset(0, 20),
@@ -164,7 +164,7 @@ class _QuestionGenerationTopicPickerDialogState
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.search_off_rounded, size: 42, color: AppColors.textMuted.withOpacity(0.65)),
+                              Icon(Icons.search_off_rounded, size: 42, color: AppColors.textMuted.withValues(alpha: 0.65)),
                               const SizedBox(height: 12),
                               Text(
                                 'No matching topics',
@@ -187,12 +187,15 @@ class _QuestionGenerationTopicPickerDialogState
                             ],
                           ),
                         )
-                      : ListView.separated(
-                          shrinkWrap: true,
-                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
-                          itemCount: filtered.length,
-                          separatorBuilder: (_, __) => const SizedBox(height: 10),
-                          itemBuilder: (context, index) {
+                      : RadioGroup<int>(
+                          groupValue: _selectedTopicId,
+                          onChanged: (value) => setState(() => _selectedTopicId = value),
+                          child: ListView.separated(
+                            shrinkWrap: true,
+                            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+                            itemCount: filtered.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 10),
+                            itemBuilder: (context, index) {
                             final target = filtered[index];
                             final selected = _selectedTopicId == target.topic.id;
                             final isSubtopic = target.topic.parentTopicId != null;
@@ -256,16 +259,13 @@ class _QuestionGenerationTopicPickerDialogState
                                       ),
                                     ),
                                     const SizedBox(width: 12),
-                                    Radio<int>(
-                                      value: target.topic.id,
-                                      groupValue: _selectedTopicId,
-                                      onChanged: (value) => setState(() => _selectedTopicId = value),
-                                    ),
+                                    Radio<int>(value: target.topic.id),
                                   ],
                                 ),
                               ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
                 ),
                 Container(

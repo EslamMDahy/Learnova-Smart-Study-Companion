@@ -387,7 +387,7 @@ class TopicCreateRequest {
     final ids = learningOutcomeIds.isNotEmpty
         ? learningOutcomeIds
         : linkedOutcomeIds
-            .map((s) => int.tryParse(s))
+            .map(int.tryParse)
             .whereType<int>()
             .toList();
     final normalizedIds = ids.toSet().toList()..sort();

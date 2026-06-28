@@ -7,7 +7,6 @@ class _K {
   static Color get green => AppColors.successText;
   static Color get greenSoft => AppColors.successBg;
   static const redSoft    = Color(0xFFFFF1F2);
-  static const blue       = Color(0xFF2563EB);
   static Color get blueSoft => AppColors.primarySoft;
   static Color get blueMid => AppColors.badgeBlueBg;
   static const div        = Color(0xFFEEEEEE);

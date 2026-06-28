@@ -52,7 +52,7 @@ class _TopicConfig {
   /// topic_id as received from the backend.
   final int topicId;
 
-  /// Map from backendType -> Map<difficulty, count>.
+  /// Map from backendType to a difficulty/count map.
   /// e.g. { 'multiple_choice': { 'easy': 2, 'medium': 3 } }
   final Map<String, Map<String, int>> configs;
 
@@ -195,7 +195,9 @@ class _GenerateQuestionsDialogState
         final material = materialById[topic.materialId];
         if (material == null) continue;
         if (widget.initialModuleId != null &&
-            module.id != widget.initialModuleId) continue;
+            module.id != widget.initialModuleId) {
+          continue;
+        }
         items.add(_TopicSelectionItem(
           module: module,
           material: material,
@@ -549,7 +551,7 @@ class _StepChip extends StatelessWidget {
             color: active
                 ? AppColors.primary
                 : done
-                    ? AppColors.primary.withOpacity(0.15)
+                    ? AppColors.primary.withValues(alpha: 0.15)
                     : AppColors.border,
             shape: BoxShape.circle,
           ),
@@ -1220,7 +1222,7 @@ class _DialogFooter extends StatelessWidget {
                           height: 14,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.white.withOpacity(0.8),
+                            color: Colors.white.withValues(alpha: 0.8),
                           ),
                         )
                       : const Icon(Icons.auto_awesome_rounded, size: 16),
@@ -1327,7 +1329,7 @@ class _EmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 40, color: AppColors.primary.withOpacity(0.5)),
+          Icon(icon, size: 40, color: AppColors.primary.withValues(alpha: 0.5)),
           const SizedBox(height: 12),
           Text(
             title,

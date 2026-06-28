@@ -97,7 +97,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
             style: TextStyle(
               fontSize: compact ? 13 : 14,
               fontWeight: FontWeight.w700,
-              color: Colors.white.withOpacity(0.82),
+              color: Colors.white.withValues(alpha: 0.82),
               height: 1.45,
             ),
           ),
@@ -139,7 +139,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
         borderRadius: BorderRadius.circular(16),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: AppColors.shadowBlue.withOpacity(0.22),
+            color: AppColors.shadowBlue.withValues(alpha: 0.22),
             blurRadius: 24,
             offset: const Offset(0, 14),
           ),
@@ -155,7 +155,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
               height: 360,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: Colors.white.withOpacity(0.09),
+                color: Colors.white.withValues(alpha: 0.09),
               ),
             ),
           ),
@@ -202,200 +202,16 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
     );
   }
 
-  Widget _buildWorkspaceActions({required bool compact}) {
-    return Container(
-      padding: EdgeInsets.all(compact ? 12 : 14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderGray),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withOpacity(0.035),
-            blurRadius: 14,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: <Widget>[
-          if (!compact) ...<Widget>[
-            Container(
-              width: 38,
-              height: 38,
-              decoration: BoxDecoration(
-                color: AppColors.infoBg,
-                borderRadius: BorderRadius.circular(11),
-              ),
-              child: Icon(Icons.tune_rounded, color: AppColors.primary, size: 19),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    'Question actions',
-                    style: TextStyle(
-                      fontSize: 13.5,
-                      fontWeight: FontWeight.w900,
-                      color: AppColors.textTitle,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    _targets.isEmpty
-                        ? 'Restoring selected topics…'
-                        : '${_targets.length} target${_targets.length == 1 ? '' : 's'} ready for authoring.',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      fontSize: 11.5,
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-          ],
-          Flexible(
-            fit: compact ? FlexFit.tight : FlexFit.loose,
-            child: Wrap(
-              alignment: compact ? WrapAlignment.start : WrapAlignment.end,
-              spacing: 10,
-              runSpacing: 10,
-              children: <Widget>[
-                _workspaceActionButton(
-                  icon: Icons.add_rounded,
-                  label: 'Add question',
-                  onPressed: _targets.isEmpty ? null : _openAddQuestion,
-                  filled: true,
-                ),
-                _workspaceActionButton(
-                  icon: Icons.auto_awesome_rounded,
-                  label: _aiPolling ? 'Generating…' : 'Generate with AI',
-                  onPressed: _targets.isEmpty || _aiPolling ? null : _handleGeneratePressed,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _workspaceActionButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback? onPressed,
-    bool filled = false,
-  }) {
-    final Color bg = filled ? AppColors.primary : AppColors.cardBg;
-    final Color fg = filled ? Colors.white : AppColors.textTitle;
-    return SizedBox(
-      height: 40,
-      child: ElevatedButton.icon(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 17),
-        label: Text(label),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: bg,
-          disabledBackgroundColor: AppColors.fieldDisabledBg,
-          foregroundColor: fg,
-          disabledForegroundColor: AppColors.textMuted,
-          shadowColor: Colors.transparent,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(11),
-            side: BorderSide(
-              color: filled ? AppColors.primary : AppColors.borderGray,
-            ),
-          ),
-          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
-        ),
-      ),
-    );
-  }
 
-  Widget _buildWorkspaceSnapshot({required bool compact, required bool tight}) {
-    final int selectedCount = _selectedDraftQuestions().length;
-    final int manualCount = _manualDrafts().length;
-    final int aiCount = _aiDrafts().length;
-    final int unsavedCount = _draftQuestions.length;
-    final List<_WorkspaceMetric> metrics = <_WorkspaceMetric>[
-      _WorkspaceMetric(Icons.edit_note_rounded, 'Manual', '$manualCount', 'handwritten questions'),
-      _WorkspaceMetric(Icons.auto_awesome_rounded, 'AI questions', '$aiCount', _aiPolling ? 'generation running' : 'ready to review'),
-      _WorkspaceMetric(Icons.fact_check_outlined, 'Selected', '$selectedCount', 'selected locally'),
-      _WorkspaceMetric(Icons.offline_pin_outlined, 'Backend', unsavedCount == 0 ? 'Ready' : 'Synced', 'question bank'),
-    ];
-
-    final Widget targetCard = _workspaceInfoCard(
-      icon: Icons.account_tree_outlined,
-      title: 'Question targets',
-      subtitle: _scopeBreakdown(),
-      body: _targets.isEmpty
-          ? 'No valid topic targets were resolved. Go back to Materials and select topics or subtopics.'
-          : _targets.take(4).map(_compactTargetLabel).join('  •  '),
-    );
-
-    final Widget safetyCard = _workspaceInfoCard(
-      icon: Icons.security_rounded,
-      title: 'Backend save',
-      subtitle: 'Questions are saved directly to the backend.',
-      body: _draftQuestions.isEmpty
-          ? 'Add manual questions or generate AI questions. The question bank remains the source of truth.'
-          : 'This workspace only keeps the selected target context locally.',
-    );
-
-    if (compact) {
-      return Column(
-        children: <Widget>[
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: metrics
-                .map((metric) => SizedBox(width: 156, child: _workspaceMetricCard(metric)))
-                .toList(),
-          ),
-          const SizedBox(height: 12),
-          targetCard,
-          const SizedBox(height: 12),
-          safetyCard,
-        ],
-      );
-    }
-
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Expanded(
-          flex: tight ? 6 : 5,
-          child: Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: metrics
-                .map((metric) => SizedBox(width: tight ? 148 : 168, child: _workspaceMetricCard(metric)))
-                .toList(),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(flex: 4, child: targetCard),
-        const SizedBox(width: 12),
-        Expanded(flex: 4, child: safetyCard),
-      ],
-    );
-  }
 
   Widget _headerChip(IconData icon, String label) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.14),
+        color: Colors.white.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.20)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.20)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -424,9 +240,9 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
       width: 96,
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.13),
+        color: Colors.white.withValues(alpha: 0.13),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white.withOpacity(0.19)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.19)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -446,7 +262,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.76),
+              color: Colors.white.withValues(alpha: 0.76),
               fontSize: 11.5,
               fontWeight: FontWeight.w800,
             ),
@@ -462,7 +278,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
     required VoidCallback? onPressed,
     bool filled = false,
   }) {
-    final Color bg = filled ? Colors.white : Colors.white.withOpacity(0.13);
+    final Color bg = filled ? Colors.white : Colors.white.withValues(alpha: 0.13);
     final Color fg = filled ? AppColors.primary : Colors.white;
     return SizedBox(
       height: 42,
@@ -472,15 +288,15 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
         label: Text(label),
         style: ElevatedButton.styleFrom(
           backgroundColor: bg,
-          disabledBackgroundColor: Colors.white.withOpacity(0.10),
+          disabledBackgroundColor: Colors.white.withValues(alpha: 0.10),
           foregroundColor: fg,
-          disabledForegroundColor: Colors.white.withOpacity(0.45),
+          disabledForegroundColor: Colors.white.withValues(alpha: 0.45),
           shadowColor: Colors.transparent,
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 16),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(11),
-            side: BorderSide(color: Colors.white.withOpacity(filled ? 0 : 0.18)),
+            side: BorderSide(color: Colors.white.withValues(alpha: filled ? 0 : 0.18)),
           ),
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
         ),
@@ -488,242 +304,9 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
     );
   }
 
-  Widget _workspaceMetricCard(_WorkspaceMetric metric) {
-    return Container(
-      height: 92,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderGray),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withOpacity(0.035),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: AppColors.infoBg,
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(metric.icon, color: AppColors.primary, size: 19),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Text(
-                  metric.value,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 19,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textTitle,
-                    height: 1,
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  metric.title,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w900,
-                    color: AppColors.textGray,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  metric.subtitle,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 10.8,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _workspaceInfoCard({
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required String body,
-  }) {
-    return Container(
-      height: 92,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderGray),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withOpacity(0.035),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: AppColors.infoBg,
-              borderRadius: BorderRadius.circular(11),
-            ),
-            child: Icon(icon, color: AppColors.primary, size: 19),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
-                const SizedBox(height: 3),
-                Text(subtitle, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800, color: AppColors.textMuted)),
-                const SizedBox(height: 7),
-                Text(body, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: AppColors.textGray)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _buildModeTabs({required bool compact}) {
-    final List<_ModeSpec> specs = <_ModeSpec>[
-      _ModeSpec(
-        mode: _WorkspaceMode.manual,
-        title: 'Manual Questions',
-        subtitle: '${_manualDrafts().length} questions',
-        icon: Icons.edit_note_rounded,
-      ),
-      _ModeSpec(
-        mode: _WorkspaceMode.ai,
-        title: 'AI',
-        subtitle: _aiPolling ? 'generating…' : '${_aiDrafts().length} questions',
-        icon: Icons.auto_awesome_rounded,
-      ),
-      _ModeSpec(
-        mode: _WorkspaceMode.review,
-        title: 'Review',
-        subtitle: '${_selectedDraftQuestions().length} ready',
-        icon: Icons.fact_check_outlined,
-      ),
-    ];
 
-    return Container(
-      height: compact ? null : 50,
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderGray),
-      ),
-      child: compact
-          ? SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: specs
-                    .map(
-                      (spec) => SizedBox(
-                        width: 190,
-                        child: _buildModeTab(spec, compact: compact),
-                      ),
-                    )
-                    .toList(),
-              ),
-            )
-          : Row(
-              children: specs
-                  .map((spec) => Expanded(child: _buildModeTab(spec, compact: compact)))
-                  .toList(),
-            ),
-    );
-  }
-
-  Widget _buildModeTab(_ModeSpec spec, {required bool compact}) {
-    final bool active = _mode == spec.mode;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      child: InkWell(
-        onTap: () => _setMode(spec.mode),
-        borderRadius: BorderRadius.circular(10),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          height: 42,
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          decoration: BoxDecoration(
-            color: active ? AppColors.primary : Colors.transparent,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: active ? AppColors.primary : AppColors.borderSoft.withOpacity(0.45),
-            ),
-          ),
-          child: Row(
-            children: <Widget>[
-              Icon(
-                spec.icon,
-                size: 17,
-                color: active ? Colors.white : AppColors.textMuted,
-              ),
-              const SizedBox(width: 9),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      spec.title,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        fontWeight: FontWeight.w900,
-                        color: active ? Colors.white : AppColors.textTitle,
-                        height: 1,
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      spec.subtitle,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 10.8,
-                        fontWeight: FontWeight.w700,
-                        color: active ? Colors.white.withOpacity(0.82) : AppColors.textMuted,
-                        height: 1,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildFiltersBar({required bool compact}) {
     final List<String> difficultyItems = <String>[
@@ -750,14 +333,14 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
     final Widget search = FigmaUmSearch40(
       controller: _searchCtrl,
       hint: 'Search by question, topic, or tag...',
-      onChanged: (_) => setState(() {}),
+      onChanged: (_) => _runStateUpdate(() {}),
     );
 
     final Widget topicFilter = _TopicTreeFilterButton(
       selectedTopicId: _selectedTopicFilterId,
       targets: _targets,
       onChanged: (int? id) {
-        setState(() => _selectedTopicFilterId = id);
+        _runStateUpdate(() => _selectedTopicFilterId = id);
       },
     );
 
@@ -765,21 +348,21 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
       width: compact ? 170 : 158,
       value: _selectedDifficultyFilter,
       items: difficultyItems,
-      onChanged: (String value) => setState(() => _selectedDifficultyFilter = value),
+      onChanged: (String value) => _runStateUpdate(() => _selectedDifficultyFilter = value),
     );
 
     final Widget typeFilter = FigmaUmDropdown40(
       width: compact ? 148 : 136,
       value: _selectedTypeFilter,
       items: typeItems,
-      onChanged: (String value) => setState(() => _selectedTypeFilter = value),
+      onChanged: (String value) => _runStateUpdate(() => _selectedTypeFilter = value),
     );
 
     final Widget sourceFilter = FigmaUmDropdown40(
       width: compact ? 150 : 136,
       value: _selectedSourceFilter,
       items: sourceItems,
-      onChanged: (String value) => setState(() => _selectedSourceFilter = value),
+      onChanged: (String value) => _runStateUpdate(() => _selectedSourceFilter = value),
     );
 
     return Container(
@@ -791,7 +374,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
         border: Border.all(color: AppColors.borderGray),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withOpacity(0.03),
+            color: Colors.black.withValues(alpha: 0.03),
             blurRadius: 8,
             offset: const Offset(0, 2),
           ),
@@ -835,98 +418,6 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
     );
   }
 
-  Widget _buildModeContent({
-    required List<QuestionModel> filteredQuestions,
-    required int totalVisible,
-  }) {
-    switch (_mode) {
-      case _WorkspaceMode.manual:
-        return _buildQuestionList(
-          title: 'Manual questions',
-          subtitle: 'Manual questions are saved to the question bank immediately.',
-          emptyTitle: 'No manual questions yet',
-          emptyBody: 'Add the first question. It will be saved to the question bank immediately.',
-          emptyActionLabel: 'Add question',
-          emptyAction: _openAddQuestion,
-          questions: filteredQuestions,
-          totalVisible: totalVisible,
-        );
-      case _WorkspaceMode.ai:
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            if (_aiPolling)
-              Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-                decoration: BoxDecoration(
-                  color: AppColors.badgeBlueBg,
-                  borderRadius: BorderRadius.circular(13),
-                  border: Border.all(color: AppColors.badgeBlueBorder),
-                ),
-                child: Row(
-                  children: <Widget>[
-                    SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        'AI generation is running. Questions appear here automatically after the backend saves them.',
-                        style: TextStyle(
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.badgeBlueFg,
-                        ),
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: _stopAiPolling,
-                      style: TextButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(horizontal: 10),
-                        visualDensity: VisualDensity.compact,
-                      ),
-                      child: Text(
-                        'Stop watching',
-                        style: TextStyle(fontSize: 12, color: AppColors.primary),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            _buildQuestionList(
-              title: 'AI questions',
-              subtitle: 'Generate, inspect answers, and edit weak items.',
-              emptyTitle: _aiPolling ? 'Waiting for AI questions' : 'No AI questions yet',
-              emptyBody: _aiPolling
-                  ? 'This page updates automatically when generated questions arrive.'
-                  : 'Use Generate with AI from the header to configure the request for the selected targets.',
-              emptyActionLabel: _aiPolling ? null : 'Generate with AI',
-              emptyAction: _aiPolling ? null : _handleGeneratePressed,
-              questions: filteredQuestions,
-              totalVisible: totalVisible,
-            ),
-          ],
-        );
-      case _WorkspaceMode.review:
-        return _buildQuestionList(
-          title: 'Review questions',
-          subtitle: 'Questions shown here are already saved in the question bank.',
-          emptyTitle: 'No selected questions',
-          emptyBody: 'Select questions to review them here.',
-          emptyActionLabel: 'Go to manual questions',
-          emptyAction: () => _setMode(_WorkspaceMode.manual),
-          questions: filteredQuestions,
-          totalVisible: totalVisible,
-          reviewMode: true,
-        );
-    }
-  }
 
   Widget _buildQuestionList({
     required String title,
@@ -946,7 +437,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
         border: Border.all(color: AppColors.borderGray),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: Colors.black.withOpacity(0.035),
+            color: Colors.black.withValues(alpha: 0.035),
             blurRadius: 22,
             offset: const Offset(0, 10),
           ),
@@ -1090,223 +581,8 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
     );
   }
 
-  Widget _buildQuestionReviewCard(
-    QuestionModel question, {
-    required bool selected,
-    required bool reviewMode,
-  }) {
-    final bool isDraft = _draftQuestions.any((QuestionModel item) => item.id == question.id);
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 160),
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: selected ? AppColors.selectedBg.withOpacity(0.46) : AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: selected ? AppColors.infoBorder : AppColors.borderGray,
-          width: selected ? 1.35 : 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Checkbox(
-                value: selected,
-                onChanged: (bool? value) => _toggleSelection(question.id, value ?? false),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(5)),
-                side: BorderSide(color: AppColors.borderSoft),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Wrap(
-                      spacing: 7,
-                      runSpacing: 7,
-                      children: <Widget>[
-                        _tablePill(question.typeLabel),
-                        _difficultyPill(question.difficultyLabel),
-                        _sourcePill(question.source),
-                        if (selected) _readyPill(),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    Text(
-                      question.text,
-                      style: TextStyle(
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
-                        height: 1.38,
-                        color: AppColors.textTitle,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 6,
-                      children: <Widget>[
-                        _inlineMeta(Icons.account_tree_outlined, _questionTargetLabel(question)),
-                        if (question.tags.isNotEmpty)
-                          _inlineMeta(Icons.sell_outlined, question.tags.take(3).join(', ')),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              if (isDraft) ...<Widget>[
-                const SizedBox(width: 10),
-                _iconAction(
-                  icon: Icons.edit_outlined,
-                  tooltip: 'Edit question',
-                  onTap: () => _openEditDraftQuestion(question),
-                ),
-                const SizedBox(width: 6),
-                _iconAction(
-                  icon: Icons.delete_outline_rounded,
-                  tooltip: 'Remove from workspace',
-                  danger: true,
-                  onTap: () => _deleteDraftQuestion(question),
-                ),
-              ],
-            ],
-          ),
-          const SizedBox(height: 12),
-          _answerPanel(question),
-          if (question.options.isNotEmpty) ...<Widget>[
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: question.options
-                  .map((QuestionOption option) => _optionChip(question, option))
-                  .toList(),
-            ),
-          ],
-          if ((question.explanation ?? '').trim().isNotEmpty) ...<Widget>[
-            const SizedBox(height: 10),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.cardBg,
-                borderRadius: BorderRadius.circular(11),
-                border: Border.all(color: AppColors.borderGray),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Icon(Icons.lightbulb_outline_rounded, size: 17, color: AppColors.warningText),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Text(
-                      question.explanation!.trim(),
-                      style: TextStyle(
-                        fontSize: 12.5,
-                        height: 1.45,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textGray,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
 
-  Widget _answerPanel(QuestionModel question) {
-    final String answer = _answerSummary(question);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: AppColors.borderGray),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: 28,
-            height: 28,
-            decoration: BoxDecoration(
-              color: AppColors.greenBg,
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(Icons.check_rounded, size: 17, color: AppColors.greenText),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  'Answer',
-                  style: TextStyle(
-                    fontSize: 11.5,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.25,
-                    color: AppColors.textMuted,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  answer,
-                  style: TextStyle(
-                    fontSize: 13,
-                    height: 1.45,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textTitle,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
-  Widget _optionChip(QuestionModel question, QuestionOption option) {
-    final bool correct = _isCorrectOption(question, option);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 8),
-      decoration: BoxDecoration(
-        color: correct ? AppColors.greenBg : AppColors.cardBg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: correct ? AppColors.successText.withOpacity(0.32) : AppColors.borderSoft),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (correct) ...<Widget>[
-            Icon(Icons.check_circle_rounded, size: 14, color: AppColors.greenText),
-            const SizedBox(width: 6),
-          ],
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 360),
-            child: Text(
-              option.text,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12.3,
-                fontWeight: FontWeight.w800,
-                color: correct ? AppColors.greenText : AppColors.textGray,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   bool _isCorrectOption(QuestionModel question, QuestionOption option) {
     if (option.isCorrect) return true;
@@ -1384,7 +660,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
                     reviewMode: reviewMode,
                   ),
                   if (index != questions.length - 1)
-                    Divider(height: 1, color: AppColors.borderGray.withOpacity(0.75)),
+                    Divider(height: 1, color: AppColors.borderGray.withValues(alpha: 0.75)),
                 ],
               );
             }),
@@ -1415,10 +691,10 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
       height: 30,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: selected ? AppColors.primary.withOpacity(0.12) : AppColors.surfaceBg,
+        color: selected ? AppColors.primary.withValues(alpha: 0.12) : AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(9),
         border: Border.all(
-          color: selected ? AppColors.primary.withOpacity(0.35) : AppColors.borderGray,
+          color: selected ? AppColors.primary.withValues(alpha: 0.35) : AppColors.borderGray,
         ),
       ),
       child: Text(
@@ -1440,7 +716,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
   }) {
     final bool isDraft = _draftQuestions.any((QuestionModel item) => item.id == question.id);
     return Material(
-      color: selected ? AppColors.selectedBg.withOpacity(0.55) : AppColors.cardBg,
+      color: selected ? AppColors.selectedBg.withValues(alpha: 0.55) : AppColors.cardBg,
       child: InkWell(
         onTap: isDraft ? () => _openEditDraftQuestion(question) : null,
         child: Container(

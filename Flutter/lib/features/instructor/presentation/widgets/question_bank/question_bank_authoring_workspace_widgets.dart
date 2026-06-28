@@ -1,5 +1,6 @@
 part of 'question_bank_authoring_flow.dart';
 
+// ignore: unused_element
 class _WorkspaceMetric {
   final IconData icon;
   final String title;
@@ -39,20 +40,6 @@ class _StoredQuestionWorkspace {
   });
 }
 
-class _ModeSpec {
-  final _WorkspaceMode mode;
-  final String title;
-  final String subtitle;
-  final IconData icon;
-
-  const _ModeSpec({
-    required this.mode,
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-  });
-}
-
 class _BackToMaterialsButton extends StatefulWidget {
   final VoidCallback onPressed;
   final bool compact;
@@ -86,12 +73,12 @@ class _BackToMaterialsButtonState extends State<_BackToMaterialsButton> {
           padding: EdgeInsets.symmetric(horizontal: widget.compact ? 12 : 14),
           decoration: BoxDecoration(
             color: widget.onDark
-                ? Colors.white.withOpacity(_hovered ? 0.22 : 0.14)
+                ? Colors.white.withValues(alpha: _hovered ? 0.22 : 0.14)
                 : (_hovered ? AppColors.primary : AppColors.cardBg),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: widget.onDark
-                  ? Colors.white.withOpacity(0.22)
+                  ? Colors.white.withValues(alpha: 0.22)
                   : (_hovered ? AppColors.primary : AppColors.infoBorder),
               width: 1.2,
             ),
@@ -99,7 +86,7 @@ class _BackToMaterialsButtonState extends State<_BackToMaterialsButton> {
                 ? const <BoxShadow>[]
                 : <BoxShadow>[
                     BoxShadow(
-                      color: AppColors.shadowBlue.withOpacity(_hovered ? 0.28 : 0.18),
+                      color: AppColors.shadowBlue.withValues(alpha: _hovered ? 0.28 : 0.18),
                       blurRadius: _hovered ? 16 : 10,
                       offset: Offset(0, _hovered ? 6 : 3),
                     ),
@@ -112,7 +99,7 @@ class _BackToMaterialsButtonState extends State<_BackToMaterialsButton> {
                 width: 24,
                 height: 24,
                 decoration: BoxDecoration(
-                  color: widget.onDark ? Colors.white.withOpacity(0.16) : (_hovered ? Colors.white.withOpacity(0.18) : AppColors.infoBg),
+                  color: widget.onDark ? Colors.white.withValues(alpha: 0.16) : (_hovered ? Colors.white.withValues(alpha: 0.18) : AppColors.infoBg),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
@@ -129,100 +116,6 @@ class _BackToMaterialsButtonState extends State<_BackToMaterialsButton> {
                   fontWeight: FontWeight.w900,
                   color: widget.onDark ? Colors.white : (_hovered ? Colors.white : AppColors.primary),
                 ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _FilterMenu extends StatelessWidget {
-  final double width;
-  final String label;
-  final List<String> items;
-  final ValueChanged<String> onSelected;
-
-  const _FilterMenu({
-    required this.width,
-    required this.label,
-    required this.items,
-    required this.onSelected,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    final List<String> normalizedItems = <String>[];
-    for (final String item in items) {
-      if (!normalizedItems.contains(item)) normalizedItems.add(item);
-    }
-
-    return SizedBox(
-      width: width,
-      height: 48,
-      child: PopupMenuButton<String>(
-        tooltip: '',
-        color: AppColors.cardBg,
-        elevation: 5,
-        surfaceTintColor: AppColors.cardBg,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(14),
-          side: BorderSide(color: AppColors.borderGray),
-        ),
-        position: PopupMenuPosition.under,
-        offset: const Offset(0, 8),
-        onSelected: onSelected,
-        itemBuilder: (BuildContext context) {
-          return normalizedItems.map((String item) {
-            final bool isSelected = item == label;
-            return PopupMenuItem<String>(
-              value: item,
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-                decoration: BoxDecoration(
-                  color: isSelected ? AppColors.selectedBg : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  item,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textGray,
-                  ),
-                ),
-              ),
-            );
-          }).toList();
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceBg,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(color: AppColors.borderGray),
-          ),
-          child: Row(
-            children: <Widget>[
-              Expanded(
-                child: Text(
-                  label,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textGray,
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Icon(
-                Icons.keyboard_arrow_down_rounded,
-                color: AppColors.textMuted,
-                size: 20,
               ),
             ],
           ),
@@ -254,7 +147,7 @@ class _TopicTreeFilterButton extends StatelessWidget {
         final int? result = await showDialog<int?>(
           context: context,
           barrierDismissible: false,
-          barrierColor: Colors.black.withOpacity(0.30),
+          barrierColor: Colors.black.withValues(alpha: 0.30),
           builder: (_) => _TopicTreeFilterDialog(
             targets: targets,
             selectedTopicId: selectedTopicId,
@@ -509,7 +402,7 @@ class _TopicTreeFilterDialogState extends State<_TopicTreeFilterDialog> {
         decoration: BoxDecoration(
           color: selected ? AppColors.selectedBg : AppColors.surfaceBg,
           borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: selected ? AppColors.primary.withOpacity(0.50) : AppColors.borderGray),
+          border: Border.all(color: selected ? AppColors.primary.withValues(alpha: 0.50) : AppColors.borderGray),
         ),
         child: Row(
           children: <Widget>[
@@ -582,7 +475,7 @@ class _WorkspaceExitDialog extends StatelessWidget {
             border: Border.all(color: AppColors.borderGray),
             boxShadow: <BoxShadow>[
               BoxShadow(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withValues(alpha: 0.12),
                 blurRadius: 28,
                 offset: const Offset(0, 18),
               ),

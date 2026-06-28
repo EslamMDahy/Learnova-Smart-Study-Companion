@@ -110,7 +110,7 @@ class _HeroIcon extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primary,
         borderRadius: BorderRadius.circular(20),
-        boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.18), blurRadius: 20, offset: const Offset(0, 10))],
+        boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.18), blurRadius: 20, offset: const Offset(0, 10))],
       ),
       child: const Icon(Icons.document_scanner_rounded, color: Colors.white, size: 30),
     );
@@ -325,7 +325,7 @@ class _PickerField<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       items: items,
       onChanged: enabled ? onChanged : null,
@@ -336,7 +336,7 @@ class _PickerField<T> extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.borderSoft)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.borderSoft)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.primary.withOpacity(0.45))),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.primary.withValues(alpha: 0.45))),
         disabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: AppColors.borderSoft)),
       ),
       style: AppText.input.copyWith(color: AppColors.textTitle, fontWeight: FontWeight.w700),
@@ -362,7 +362,7 @@ class _UploadDropZone extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.surfaceBg,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: hasFile ? AppColors.primary.withOpacity(0.30) : AppColors.borderSoft),
+          border: Border.all(color: hasFile ? AppColors.primary.withValues(alpha: 0.30) : AppColors.borderSoft),
         ),
         child: Column(
           children: [
@@ -779,7 +779,7 @@ class _OptionChip extends StatelessWidget {
         : selectedWrong
             ? AppColors.dangerBorder
             : selected
-                ? AppColors.primary.withOpacity(0.30)
+                ? AppColors.primary.withValues(alpha: 0.30)
                 : AppColors.borderSoft;
 
     return Container(

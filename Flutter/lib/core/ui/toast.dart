@@ -294,18 +294,18 @@ class _ToastCardState extends State<_ToastCard>
           color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: _hovered ? t.borderColor : t.borderColor.withOpacity(0.6),
+            color: _hovered ? t.borderColor : t.borderColor.withValues(alpha: 0.6),
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: t.glow.withOpacity(_hovered ? 0.18 : 0.10),
+              color: t.glow.withValues(alpha: _hovered ? 0.18 : 0.10),
               blurRadius: _hovered ? 40 : 24,
               spreadRadius: -4,
               offset: const Offset(0, 8),
             ),
             BoxShadow(
-              color: Colors.black.withOpacity(kIsWeb ? 0.06 : 0.09),
+              color: Colors.black.withValues(alpha: kIsWeb ? 0.06 : 0.09),
               blurRadius: 20,
               offset: const Offset(0, 4),
             ),
@@ -333,7 +333,7 @@ class _ToastCardState extends State<_ToastCard>
                     borderRadius: BorderRadius.circular(11),
                     boxShadow: [
                       BoxShadow(
-                        color: t.glow.withOpacity(0.35),
+                        color: t.glow.withValues(alpha: 0.35),
                         blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
@@ -364,7 +364,7 @@ class _ToastCardState extends State<_ToastCard>
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w400,
-                        color: t.messageColor.withOpacity(0.85),
+                        color: t.messageColor.withValues(alpha: 0.85),
                         height: 1.45,
                       ),
                     ),
@@ -400,12 +400,12 @@ class _ToastCardState extends State<_ToastCard>
                     width: 28, height: 28,
                     decoration: BoxDecoration(
                       color: _hovered
-                          ? t.glow.withOpacity(0.08)
+                          ? t.glow.withValues(alpha: 0.08)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(Icons.close_rounded, size: 15,
-                        color: t.titleColor.withOpacity(0.4),),
+                        color: t.titleColor.withValues(alpha: 0.4),),
                   ),
                 ),
               ],),
@@ -417,7 +417,7 @@ class _ToastCardState extends State<_ToastCard>
               builder: (_, __) => Stack(children: [
                 // track
                 Container(height: 2.5,
-                    color: t.borderColor.withOpacity(0.4),),
+                    color: t.borderColor.withValues(alpha: 0.4),),
                 // fill
                 FractionallySizedBox(
                   widthFactor: 1.0 - _prog.value,
@@ -425,11 +425,11 @@ class _ToastCardState extends State<_ToastCard>
                     height: 2.5,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [t.bar.withOpacity(0.5), t.bar],
+                        colors: [t.bar.withValues(alpha: 0.5), t.bar],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: t.glow.withOpacity(0.6),
+                          color: t.glow.withValues(alpha: 0.6),
                           blurRadius: 5,
                         ),
                       ],

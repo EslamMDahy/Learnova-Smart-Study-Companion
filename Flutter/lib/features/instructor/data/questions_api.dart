@@ -190,53 +190,6 @@ class UpdateQuestionPayload {
   }
 }
 
-
-class _MCQChoice {
-  final String id;   // numeric option id as string: "0", "1", "2", ...
-  final String text;
-
-  const _MCQChoice({required this.id, required this.text});
-
-  Map<String, dynamic> toJson() => {'id': id, 'text': text};
-}
-
-class _MCQOptions {
-  final List<_MCQChoice> choices;
-  const _MCQOptions({required this.choices});
-  Map<String, dynamic> toJson() => {
-        'choices': choices.map((c) => c.toJson()).toList(),
-      };
-}
-
-class _QuestionMCQCreate {
-  final String questionText;
-  final _MCQOptions options;
-  final String expectedAnswer; // numeric choice id as string, e.g. "1"
-  final String? explanation;
-  final String? difficulty; // "easy"|"medium"|"hard"|null
-
-  const _QuestionMCQCreate({
-    required this.questionText,
-    required this.options,
-    required this.expectedAnswer,
-    this.explanation,
-    this.difficulty,
-  });
-
-  Map<String, dynamic> toJson() {
-    final m = <String, dynamic>{
-      'question_text': questionText,
-      'options': options.toJson(),
-      'expected_answer': expectedAnswer,
-    };
-    if (explanation != null && explanation!.isNotEmpty) {
-      m['explanation'] = explanation;
-    }
-    if (difficulty != null) m['difficulty'] = difficulty;
-    return m;
-  }
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
 
 
@@ -633,45 +586,4 @@ class QuestionsApi {
   CreateQuestionPayload? _buildCreatePayload(QuestionModel q) =>
       buildCreatePayloadFromQuestion(q);
 
-  _QuestionMCQCreate? _buildMCQPayload(QuestionModel q) {
-    if (q.options.isEmpty) return null;
-
-    // Map options to backend numeric ids because exam grading compares
-    // selected_option_index against expected_answer as strings.
-    final choiceIds = List.generate(q.options.length, (i) => i.toString());
-
-    final choices = List.generate(q.options.length, (i) {
-      return _MCQChoice(id: choiceIds[i], text: q.options[i].text);
-    });
-
-    // Map the correct option id from app format to backend numeric id.
-    // App may store correctOptionId like "opt_0", "0", "A" etc.
-    String expectedAnswer = '0'; // fallback
-    if (q.correctOptionId != null) {
-      // Try to extract the index suffix from "opt_N"
-      final suffix = q.correctOptionId!.replaceAll(RegExp(r'[^0-9]'), '');
-      final idx = int.tryParse(suffix);
-      if (idx != null && idx >= 0 && idx < choiceIds.length) {
-        expectedAnswer = choiceIds[idx];
-      } else {
-        final normalizedId = q.correctOptionId!.trim().toUpperCase();
-        if (normalizedId.isNotEmpty) {
-          final letterIndex = normalizedId.codeUnitAt(0) - 'A'.codeUnitAt(0);
-          if (letterIndex >= 0 && letterIndex < choiceIds.length) {
-            expectedAnswer = choiceIds[letterIndex];
-          }
-        }
-      }
-    }
-
-    final difficultyStr = q.difficulty.backendValue;
-
-    return _QuestionMCQCreate(
-      questionText: q.text,
-      options: _MCQOptions(choices: choices),
-      expectedAnswer: expectedAnswer,
-      explanation: q.explanation,
-      difficulty: difficultyStr,
-    );
-  }
 }

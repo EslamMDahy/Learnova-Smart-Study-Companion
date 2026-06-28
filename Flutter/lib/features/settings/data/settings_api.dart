@@ -21,7 +21,7 @@ class SettingsApi {
     return UserProfile.fromJson(data);
   }
 
-  
+
   Future<UserProfile> updateProfile({
     required String fullName,
     String? phoneNumber,
@@ -151,7 +151,7 @@ class SettingsApi {
     return _msg(res.data);
   }
 
-  
+
   Future<UserPreferences> getPreferences({CancelToken? cancelToken}) async {
     final res = await _client.get<Map<String, dynamic>>(
       Endpoints.getPreferences,

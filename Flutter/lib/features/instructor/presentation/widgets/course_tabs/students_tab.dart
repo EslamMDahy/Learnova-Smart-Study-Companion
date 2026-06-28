@@ -92,7 +92,7 @@ class _CourseStudentsTabState extends ConsumerState<CourseStudentsTab> {
           courseId: widget.course.id,
         );
         requests = response.requests
-            .map((item) => _EnrollmentRequestRow.fromModel(item))
+            .map(_EnrollmentRequestRow.fromModel)
             .toList()
           ..sort((a, b) => a.enrolledAt.compareTo(b.enrolledAt));
       } catch (_) {
@@ -287,7 +287,7 @@ class _StudentsHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.18),
+            color: AppColors.primary.withValues(alpha: 0.18),
             blurRadius: 28,
             offset: const Offset(0, 12),
           ),
@@ -306,9 +306,9 @@ class _StudentsHeader extends StatelessWidget {
                 onPressed: loading ? null : onRefresh,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  disabledForegroundColor: Colors.white.withOpacity(0.5),
-                  side: BorderSide(color: Colors.white.withOpacity(0.35)),
-                  backgroundColor: Colors.white.withOpacity(0.08),
+                  disabledForegroundColor: Colors.white.withValues(alpha: 0.5),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -353,9 +353,9 @@ class _StudentsHeader extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.14),
+                  color: Colors.white.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(9),
-                  border: Border.all(color: Colors.white.withOpacity(0.18)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
                 ),
                 child: const Text(
                   'Students',
@@ -392,7 +392,7 @@ class _StudentsHeader extends StatelessWidget {
                   fontSize: 13.5,
                   height: 1.55,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white.withOpacity(0.84),
+                  color: Colors.white.withValues(alpha: 0.84),
                 ),
               ),
             ],
@@ -444,9 +444,9 @@ class _HeaderMetric extends StatelessWidget {
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.22)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -466,7 +466,7 @@ class _HeaderMetric extends StatelessWidget {
             label,
             style: TextStyle(
               fontFamily: 'Inter',
-              color: Colors.white.withOpacity(0.78),
+              color: Colors.white.withValues(alpha: 0.78),
               fontSize: 11.2,
               fontWeight: FontWeight.w800,
             ),
@@ -551,7 +551,7 @@ class _WorkspacePanel extends StatelessWidget {
                             itemCount: shown.length,
                             separatorBuilder: (_, __) => Divider(
                               height: 1,
-                              color: AppColors.border.withOpacity(0.72),
+                              color: AppColors.border.withValues(alpha: 0.72),
                             ),
                             itemBuilder: (context, index) {
                               return _InviteRowView(
@@ -643,7 +643,7 @@ class _TableHeader extends StatelessWidget {
     );
     return Container(
       height: 44,
-      color: AppColors.headerBg.withOpacity(0.55),
+      color: AppColors.headerBg.withValues(alpha: 0.55),
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Row(
         children: [
@@ -1169,22 +1169,6 @@ class _EnrollmentRequestRow {
     );
   }
 
-  factory _EnrollmentRequestRow.fromJson(Map<String, dynamic> json) {
-    return _EnrollmentRequestRow(
-      enrollmentId: _asIntValue(json['enrollment_id']),
-      studentId: _asIntValue(json['student_id']),
-      fullName: (json['full_name'] ?? '').toString().trim(),
-      email: (json['email'] ?? '').toString().trim(),
-      status: (json['status'] ?? 'pending').toString().trim().toLowerCase(),
-      enrolledAt: _parseDateValue(json['enrolled_at']) ?? DateTime.fromMillisecondsSinceEpoch(0),
-    );
-  }
-}
-
-int _asIntValue(Object? value) {
-  if (value is int) return value;
-  if (value is num) return value.toInt();
-  return int.tryParse(value?.toString() ?? '') ?? 0;
 }
 
 class _InviteRow {
@@ -1222,12 +1206,6 @@ class _InviteRow {
     if (value == null) return null;
     return DateTime.tryParse(value.toString());
   }
-}
-
-
-DateTime? _parseDateValue(Object? value) {
-  if (value == null) return null;
-  return DateTime.tryParse(value.toString());
 }
 
 String _formatDate(DateTime date) {

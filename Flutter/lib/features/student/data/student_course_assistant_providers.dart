@@ -19,7 +19,7 @@ final studentCourseAssistantApiProvider = Provider<StudentCourseAssistantApi>((r
 
 final studentCourseAssistantControllerProvider = StateNotifierProvider.autoDispose
     .family<StudentCourseAssistantController, StudentCourseAssistantState, int>(
-  (ref, courseId) => StudentCourseAssistantController(ref, courseId),
+  StudentCourseAssistantController.new,
 );
 
 class StudentCourseAssistantController

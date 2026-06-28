@@ -63,7 +63,6 @@ class QuestionBankAuthoringFlow extends ConsumerStatefulWidget {
 
 class _QuestionBankAuthoringFlowState
     extends ConsumerState<QuestionBankAuthoringFlow> {
-  bool _loading = false;
   late _WorkspaceMode _mode;
 
   List<add_question_sheet.QuestionAuthoringTarget> _targets =
@@ -74,6 +73,11 @@ class _QuestionBankAuthoringFlowState
   final DebouncedAction _draftPersistDebouncer =
       DebouncedAction(const Duration(milliseconds: 400));
   late final _draftStore = createLocalStore();
+
+  void _runStateUpdate(VoidCallback update) {
+    if (!mounted) return;
+    setState(update);
+  }
 
   String get _draftStateKey {
     String pack(Set<int> values) {
@@ -109,7 +113,6 @@ class _QuestionBankAuthoringFlowState
   static const Duration _kCallbackWatchDelay = Duration(seconds: 10);
   static const Duration _kNormalAiPollDelay = Duration(seconds: 10);
   static const Duration _kLateAiPollDelay = Duration(seconds: 10);
-  static const int _kMaxInitialQuestionDetailsToHydrate = 20;
   // Known question IDs before generation started (to detect new arrivals).
   // Filled from the questions already in the workspace so we do not need an
   // extra GET before calling the AI endpoint.
@@ -121,8 +124,6 @@ class _QuestionBankAuthoringFlowState
   DateTime? _pendingAiStartedAt;
   bool _aiPollInFlight = false;
   bool _aiStreamInFlight = false;
-  bool _remoteQuestionsLoadInFlight = false;
-  bool _remoteQuestionsHiddenForSession = false;
   final Set<int> _detailHydrationInFlightIds = <int>{};
   final Set<int> _hydratedRemoteDetailIds = <int>{};
 
@@ -205,7 +206,6 @@ class _QuestionBankAuthoringFlowState
       _mode = _WorkspaceMode.ai;
     }
 
-    _loading = false;
     if (_targets.isNotEmpty || _draftQuestions.isNotEmpty || _aiPolling) {
       _persistDraftState();
     }
@@ -293,106 +293,6 @@ class _QuestionBankAuthoringFlowState
     // a fresh creation workspace for the selected topic/material/module.
     // Loading old rows here made instructors think previous generated/manual
     // questions were being regenerated again.
-  }
-
-  Future<void> _loadRemoteQuestionsForTargets({bool hydrateDetails = true}) async {
-    if (_remoteQuestionsLoadInFlight || _targets.isEmpty) return;
-
-    final Set<int> targetTopicIds = _targets
-        .map((add_question_sheet.QuestionAuthoringTarget target) => target.topicId)
-        .toSet();
-    if (targetTopicIds.isEmpty) return;
-
-    _remoteQuestionsLoadInFlight = true;
-    try {
-      final QuestionsApi api = ref.read(questionsApiProvider);
-      final CourseQuestionsResponse resp = await api.getCourseQuestions(
-        courseId: widget.course.id,
-      );
-
-      if (!mounted || _remoteQuestionsHiddenForSession) return;
-
-      final List<QuestionModel> relevant = resp.questions
-          .where((QuestionModel question) =>
-              question.topicId != null && targetTopicIds.contains(question.topicId))
-          .toList()
-        ..sort((QuestionModel a, QuestionModel b) => b.createdAt.compareTo(a.createdAt));
-
-      if (relevant.isEmpty) return;
-
-      setState(() {
-        _upsertDraftQuestions(relevant);
-        _selectedQuestionIds.clear();
-      });
-      _persistDraftState();
-
-      if (hydrateDetails && !_aiPolling) {
-        unawaited(
-          _hydrateMissingQuestionDetails(
-            relevant,
-            maxCount: _kMaxInitialQuestionDetailsToHydrate,
-          ),
-        );
-      }
-    } catch (_) {
-      // Initial DB hydration is a convenience layer only. The page should still
-      // open from cached/local state if the backend is temporarily busy.
-    } finally {
-      _remoteQuestionsLoadInFlight = false;
-    }
-  }
-
-  Future<void> _hydrateMissingQuestionDetails(
-    List<QuestionModel> questions, {
-    int? maxCount,
-  }) async {
-    final QuestionsApi api = ref.read(questionsApiProvider);
-    final List<QuestionModel> candidates = questions
-        .where(_questionNeedsAnswerDetails)
-        .where((QuestionModel question) {
-          final int? id = question.remoteId ?? int.tryParse(question.id);
-          return id != null &&
-              id > 0 &&
-              !_hydratedRemoteDetailIds.contains(id) &&
-              !_detailHydrationInFlightIds.contains(id);
-        })
-        .toList();
-
-    final Iterable<QuestionModel> limited = maxCount == null
-        ? candidates
-        : candidates.take(maxCount);
-
-    final List<QuestionModel> hydrated = <QuestionModel>[];
-    for (final QuestionModel summary in limited) {
-      if (!mounted) return;
-      final int questionId = summary.remoteId ?? int.parse(summary.id);
-      _detailHydrationInFlightIds.add(questionId);
-      try {
-        final QuestionModel details = await api.getQuestion(
-          courseId: widget.course.id,
-          questionId: questionId,
-        );
-        _hydratedRemoteDetailIds.add(questionId);
-        hydrated.add(_mergeQuestionContext(details, summary));
-      } catch (_) {
-        // Keep the summary row visible even if details are temporarily busy.
-      } finally {
-        _detailHydrationInFlightIds.remove(questionId);
-      }
-    }
-
-    if (!mounted || hydrated.isEmpty) return;
-    setState(() => _upsertDraftQuestions(hydrated));
-    _persistDraftState();
-  }
-
-  bool _questionNeedsAnswerDetails(QuestionModel question) {
-    if ((question.expectedAnswer ?? '').trim().isNotEmpty) return false;
-    if ((question.sampleAnswer ?? '').trim().isNotEmpty) return false;
-    if (question.correctBool != null) return false;
-    if ((question.correctOptionId ?? '').trim().isNotEmpty) return false;
-    if (question.options.any((QuestionOption option) => option.isCorrect)) return false;
-    return true;
   }
 
   Future<void> _hydrateTargetsFromBackend() async {
@@ -764,11 +664,6 @@ class _QuestionBankAuthoringFlowState
     return resolved;
   }
 
-  void _setMode(_WorkspaceMode mode) {
-    if (_mode == mode) return;
-    setState(() => _mode = mode);
-    _persistDraftState();
-  }
 
   _StoredQuestionWorkspace? _restoreDraftState(
     List<add_question_sheet.QuestionAuthoringTarget> fallbackTargets,
@@ -865,9 +760,7 @@ class _QuestionBankAuthoringFlowState
       (_WorkspaceMode item) => item.name == rawMode,
       orElse: () => _WorkspaceMode.manual,
     );
-    final String? pendingAiRequestId = data['pendingAiRequestId'] == null
-        ? null
-        : data['pendingAiRequestId'].toString();
+    final String? pendingAiRequestId = data['pendingAiRequestId']?.toString();
     final DateTime? pendingAiStartedAt = data['pendingAiStartedAt'] == null
         ? null
         : DateTime.tryParse(data['pendingAiStartedAt'].toString());
@@ -948,7 +841,6 @@ class _QuestionBankAuthoringFlowState
     _draftStore.setString(_draftCourseKey, encoded);
   }
 
-  bool get _hasUnsavedDraftWork => _draftQuestions.isNotEmpty || _targets.isNotEmpty;
 
   void _clearDraftState() {
     _draftPersistDebouncer.cancel();
@@ -1154,7 +1046,7 @@ class _QuestionBankAuthoringFlowState
   Future<void> _requestBackToMaterials() async {
     final _WorkspaceExitAction? action = await showDialog<_WorkspaceExitAction>(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.36),
+      barrierColor: Colors.black.withValues(alpha: 0.36),
       builder: (BuildContext dialogContext) => _WorkspaceExitDialog(
         questionCount: _draftQuestions.length,
         targetCount: _targets.length,
@@ -1182,7 +1074,6 @@ class _QuestionBankAuthoringFlowState
         .toSet();
 
     setState(() {
-      _remoteQuestionsHiddenForSession = true;
       _knownRemoteIds.addAll(clearedRemoteIds);
       _selectedQuestionIds.clear();
       _draftQuestions.clear();
@@ -1247,7 +1138,7 @@ class _QuestionBankAuthoringFlowState
   Future<void> _openEditDraftQuestion(QuestionModel question) async {
     final QuestionModel? edited = await showDialog<QuestionModel>(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.34),
+      barrierColor: Colors.black.withValues(alpha: 0.34),
       builder: (_) => _DraftQuestionEditDialog(
         question: question,
         targets: _targets,
@@ -1320,16 +1211,6 @@ class _QuestionBankAuthoringFlowState
     _persistDraftState();
   }
 
-  void _toggleSelection(String id, bool selected) {
-    setState(() {
-      if (selected) {
-        _selectedQuestionIds.add(id);
-      } else {
-        _selectedQuestionIds.remove(id);
-      }
-    });
-    _persistDraftState();
-  }
 
   Future<void> _handleGeneratePressed() async {
     final List<add_question_sheet.QuestionAuthoringTarget> generationTargets =
@@ -1345,7 +1226,7 @@ class _QuestionBankAuthoringFlowState
 
     final _AiGenerationRequest? request = await showDialog<_AiGenerationRequest>(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.34),
+      barrierColor: Colors.black.withValues(alpha: 0.34),
       builder: (_) => _AiGenerationDialog(targets: generationTargets),
     );
 
@@ -1400,7 +1281,6 @@ class _QuestionBankAuthoringFlowState
         _pendingAiRequestId = responseRequestId == null || responseRequestId.isEmpty
             ? null
             : responseRequestId;
-        _remoteQuestionsHiddenForSession = false;
         AppToast.info(
           context,
           title: 'AI request sent',
@@ -1681,24 +1561,9 @@ class _QuestionBankAuthoringFlowState
   }
 
   @override
-  Widget build(BuildContext context) => this._buildAuthoringScaffold(context);
+  Widget build(BuildContext context) => _buildAuthoringScaffold(context);
 
-  List<QuestionModel> _visibleQuestionsForMode() {
-    switch (_mode) {
-      case _WorkspaceMode.manual:
-        return _manualDrafts();
-      case _WorkspaceMode.ai:
-        return _aiDrafts();
-      case _WorkspaceMode.review:
-        return _selectedDraftQuestions();
-    }
-  }
 
-  List<QuestionModel> _manualDrafts() {
-    return _draftQuestions
-        .where((QuestionModel q) => q.source == QuestionSource.manual)
-        .toList();
-  }
 
   List<QuestionModel> _aiDrafts() {
     return _draftQuestions
@@ -1820,11 +1685,6 @@ class _QuestionBankAuthoringFlowState
     return 'Selected scope';
   }
 
-  String _scopeBreakdown() {
-    final int moduleCount = _targets.map((t) => t.moduleId).whereType<int>().toSet().length;
-    final int materialCount = _targets.map((t) => t.materialId).whereType<int>().toSet().length;
-    return '$moduleCount module • $materialCount file • ${_targets.length} topics';
-  }
 
   void _upsertDraftQuestions(List<QuestionModel> questions) {
     for (final QuestionModel incoming in questions.map(_decorateQuestionWithTargetContext)) {
@@ -1932,35 +1792,6 @@ class _QuestionBankAuthoringFlowState
     return question.topicName ?? 'Unassigned topic';
   }
 
-  Widget _scopeChip({required IconData icon, required String label}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.borderSoft),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 15, color: AppColors.textMuted),
-          const SizedBox(width: 8),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 260),
-            child: Text(
-              label,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textGray,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _countPill(String label) {
     return Container(
@@ -1981,24 +1812,6 @@ class _QuestionBankAuthoringFlowState
     );
   }
 
-  Widget _inlineMeta(IconData icon, String label) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        Icon(icon, size: 14, color: AppColors.textMuted),
-        const SizedBox(width: 5),
-        Text(
-          label,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textMuted,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _difficultyPill(String label) {
     final String normalized = label.toLowerCase();
@@ -2100,42 +1913,7 @@ class _QuestionBankAuthoringFlowState
     );
   }
 
-  Widget _softPill(String label) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.borderSoft),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w800,
-          color: AppColors.textGray,
-        ),
-      ),
-    );
-  }
 
-  Widget _readyPill() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.greenBg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        'Selected for review',
-        style: TextStyle(
-          fontSize: 11.5,
-          fontWeight: FontWeight.w900,
-          color: AppColors.greenText,
-        ),
-      ),
-    );
-  }
 
   Widget _iconAction({
     required IconData icon,

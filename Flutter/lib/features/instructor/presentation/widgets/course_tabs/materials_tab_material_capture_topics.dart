@@ -198,7 +198,7 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                   decoration: BoxDecoration(
                     color: AppColors.primarySoft,
                     borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.18)),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
                   ),
                   child: Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,7 +241,7 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.primary,
                       foregroundColor: Colors.white,
-                      disabledBackgroundColor: AppColors.primary.withOpacity(0.55),
+                      disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.55),
                       elevation: 0,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                       textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900),
@@ -251,180 +251,6 @@ class _CaptureTopicPanelState extends State<_CaptureTopicPanel> {
               ],
             ),
           ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CoveragePanel extends StatelessWidget {
-  final List<TopicItem> topics;
-  final int readyTopics;
-  final List<LearningOutcome> outcomes;
-  final Set<int> mappedOutcomeIds;
-
-  const _CoveragePanel({
-    required this.topics,
-    required this.readyTopics,
-    required this.outcomes,
-    required this.mappedOutcomeIds,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    final topicProgress = topics.isEmpty ? 0.0 : readyTopics / topics.length;
-    final outcomeProgress = outcomes.isEmpty ? 0.0 : mappedOutcomeIds.length / outcomes.length;
-
-    return _PremiumPanel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _SoftIcon(icon: Icons.insights_rounded, color: AppColors.purpleText),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'Review coverage',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textTitle),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          _ProgressInsightRow(
-            label: 'Topics reviewed',
-            value: topics.isEmpty ? '0' : '$readyTopics/${topics.length}',
-            progress: topicProgress,
-            color: AppColors.primary,
-          ),
-          const SizedBox(height: 12),
-          _ProgressInsightRow(
-            label: 'Outcomes mapped',
-            value: outcomes.isEmpty ? '—' : '${mappedOutcomeIds.length}/${outcomes.length}',
-            progress: outcomeProgress,
-            color: AppColors.purpleText,
-          ),
-          const SizedBox(height: 14),
-          Container(
-            padding: const EdgeInsets.all(13),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceBg,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.borderGray),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.tips_and_updates_outlined, size: 18, color: AppColors.warningText),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    _coverageHint,
-                    style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.4),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String get _coverageHint {
-    if (topics.isEmpty) return 'Start by capturing the first topic from the PDF section you are reviewing.';
-    if (outcomes.isNotEmpty && mappedOutcomeIds.isEmpty) {
-      return 'Topics exist, but none are mapped to learning outcomes yet.';
-    }
-    return 'Use this panel as a quick quality check before generating questions.';
-  }
-}
-
-class _TopicRoadmapPanel extends StatelessWidget {
-  final List<TopicItem> topics;
-  final bool topicsLoading;
-  final void Function(TopicItem) onTopicTap;
-
-  const _TopicRoadmapPanel({
-    required this.topics,
-    required this.topicsLoading,
-    required this.onTopicTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    final parentTopics = topics.where((t) => t.parentTopicId == null).toList()
-      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
-    final childrenByParent = <int, List<TopicItem>>{};
-    for (final topic in topics.where((t) => t.parentTopicId != null)) {
-      childrenByParent.putIfAbsent(topic.parentTopicId!, () => <TopicItem>[]).add(topic);
-    }
-    for (final children in childrenByParent.values) {
-      children.sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
-    }
-
-    return _PremiumPanel(
-      padding: EdgeInsets.zero,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-            child: Row(
-              children: [
-                const _SoftIcon(icon: Icons.route_rounded, color: Color(0xFF0F766E)),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Topic map',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: AppColors.textTitle),
-                      ),
-                      const SizedBox(height: 3),
-                      Text(
-                        'Open any topic to review or generate questions.',
-                        style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
-                      ),
-                    ],
-                  ),
-                ),
-                _CountBadge(value: '${topics.length}'),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: AppColors.borderGray),
-          if (topicsLoading)
-            const SizedBox(
-              height: 190,
-              child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
-            )
-          else if (topics.isEmpty)
-            const _EmptyTopicMap()
-          else
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 420),
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
-                shrinkWrap: true,
-                itemCount: parentTopics.length,
-                itemBuilder: (context, index) {
-                  final topic = parentTopics[index];
-                  final children = childrenByParent[topic.id] ?? const <TopicItem>[];
-                  return Padding(
-                    padding: EdgeInsets.only(bottom: index == parentTopics.length - 1 ? 0 : 10),
-                    child: _RoadmapTopicTile(
-                      topic: topic,
-                      index: index,
-                      children: children,
-                      onTopicTap: onTopicTap,
-                    ),
-                  );
-                },
-              ),
-            ),
         ],
       ),
     );
@@ -558,7 +384,7 @@ class _TopicViewAction extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primarySoft,
         borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: AppColors.primary.withOpacity(0.18)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -635,115 +461,6 @@ class _CleanTextField extends StatelessWidget {
   }
 }
 
-class _OutcomeSelectTile extends StatelessWidget {
-  final LearningOutcome outcome;
-  final bool selected;
-  final bool enabled;
-  final VoidCallback onTap;
-
-  const _OutcomeSelectTile({
-    required this.outcome,
-    required this.selected,
-    required this.enabled,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Material(
-      color: selected ? AppColors.infoBg : AppColors.surfaceBg,
-      borderRadius: BorderRadius.circular(15),
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(15),
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(11, 10, 10, 10),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(15),
-            border: Border.all(color: selected ? AppColors.primary.withOpacity(0.40) : AppColors.borderGray),
-          ),
-          child: Row(
-            children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 160),
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: selected ? AppColors.primary : AppColors.cardBg,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: selected ? AppColors.primary : AppColors.borderSoft),
-                ),
-                child: selected ? const Icon(Icons.check_rounded, size: 15, color: Colors.white) : null,
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      outcome.code.isNotEmpty ? outcome.code : 'LO',
-                      style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: AppColors.primary),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      outcome.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textTitle, height: 1.25),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ProgressInsightRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final double progress;
-  final Color color;
-
-  const _ProgressInsightRow({
-    required this.label,
-    required this.value,
-    required this.progress,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Expanded(
-              child: Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textMuted)),
-            ),
-            Text(value, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
-          ],
-        ),
-        const SizedBox(height: 8),
-        ClipRRect(
-          borderRadius: BorderRadius.circular(999),
-          child: LinearProgressIndicator(
-            minHeight: 8,
-            value: progress.clamp(0.0, 1.0).toDouble(),
-            backgroundColor: AppColors.borderSoft,
-            valueColor: AlwaysStoppedAnimation<Color>(color),
-          ),
-        ),
-      ],
-    );
-  }
-}
 
 class _PremiumPanel extends StatelessWidget {
   final Widget child;
@@ -776,102 +493,6 @@ class _PremiumPanel extends StatelessWidget {
   }
 }
 
-class _ReviewerStatPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final String helper;
-
-  const _ReviewerStatPill({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.helper,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      width: 112,
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(17),
-        border: Border.all(color: AppColors.borderGray),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 18, color: AppColors.primary),
-          const SizedBox(width: 9),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, color: AppColors.textMuted)),
-                const SizedBox(height: 2),
-                Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 15, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
-                Text(helper, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 10.5, color: AppColors.textMuted)),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TinyBadge extends StatelessWidget {
-  final String label;
-  final Color color;
-  final Color background;
-
-  const _TinyBadge({
-    required this.label,
-    required this.color,
-    required this.background,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: color),
-      ),
-    );
-  }
-}
-
-class _CountBadge extends StatelessWidget {
-  final String value;
-
-  const _CountBadge({required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-      decoration: BoxDecoration(
-        color: AppColors.infoBg,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        value,
-        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: AppColors.primary),
-      ),
-    );
-  }
-}
 
 class _SoftIcon extends StatelessWidget {
   final IconData icon;
@@ -886,114 +507,10 @@ class _SoftIcon extends StatelessWidget {
       width: 38,
       height: 38,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Icon(icon, size: 19, color: color),
-    );
-  }
-}
-
-class _DarkToolbarChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _DarkToolbarChip({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.07),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.cardBg.withOpacity(0.10)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: Colors.white.withOpacity(0.76)),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: Colors.white.withOpacity(0.76))),
-        ],
-      ),
-    );
-  }
-}
-
-class _HeaderIconButton extends StatelessWidget {
-  final String tooltip;
-  final IconData? icon;
-  final bool loading;
-  final VoidCallback? onTap;
-
-  const _HeaderIconButton({
-    required this.tooltip,
-    required this.icon,
-    required this.loading,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Tooltip(
-      message: tooltip,
-      child: Material(
-        color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Container(
-            width: 46,
-            height: 46,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.borderGray),
-            ),
-            child: loading
-                ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2))
-                : Icon(icon, size: 19, color: AppColors.textMuted),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _OpenDocumentButton extends StatelessWidget {
-  final String url;
-
-  const _OpenDocumentButton({required this.url});
-
-  Future<void> _open() async {
-    final uri = Uri.tryParse(url);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return SizedBox(
-      height: 46,
-      child: ElevatedButton.icon(
-        onPressed: _open,
-        icon: const Icon(Icons.open_in_new_rounded, size: 16),
-        label: const Text('Open PDF'),
-        style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.textTitle,
-          foregroundColor: Colors.white,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 15),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
-        ),
-      ),
     );
   }
 }
@@ -1062,13 +579,6 @@ String _materialStatusLabel(MaterialItem material) {
   if (material.isProcessing) return 'Processing';
   if (material.isError) return 'Needs attention';
   return 'Draft';
-}
-
-Color _materialStatusColor(MaterialItem material) {
-  if (material.isReady || material.status == 'uploaded') return _K.green;
-  if (material.isProcessing) return _K.amber;
-  if (material.isError) return AppColors.dangerText;
-  return AppColors.textMuted;
 }
 
 String _documentMetaLine(

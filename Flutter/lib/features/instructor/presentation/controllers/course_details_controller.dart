@@ -18,7 +18,7 @@ part 'course_details_questions_mixin.dart';
 
 final courseDetailsControllerProvider = StateNotifierProvider
     .family<CourseDetailsController, CourseDetailsState, int>(
-  (ref, courseId) => CourseDetailsController(ref, courseId),
+  CourseDetailsController.new,
 );
 
 class CourseDetailsController extends StateNotifier<CourseDetailsState>

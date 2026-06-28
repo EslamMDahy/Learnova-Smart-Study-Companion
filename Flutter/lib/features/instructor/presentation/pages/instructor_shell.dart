@@ -59,7 +59,9 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
     if (path.startsWith(Routes.instructorCourses)) return InstructorTabs.course;
     if (path.startsWith(Routes.instructorExamCorrection)) return InstructorTabs.examCorrection;
     if (path.startsWith(Routes.instructorQuizzes) ||
-        path.startsWith(Routes.instructorQuizzesLegacy)) return InstructorTabs.quizzes;
+        path.startsWith(Routes.instructorQuizzesLegacy)) {
+      return InstructorTabs.quizzes;
+    }
     if (path.startsWith(Routes.instructorSettings)) return InstructorTabs.settings;
     if (path.startsWith(Routes.instructorHelp)) return InstructorTabs.help;
 

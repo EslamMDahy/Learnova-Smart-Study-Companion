@@ -1079,8 +1079,8 @@ Future<T?> showFigmaUmMenu<T>({
       yOffset: yOffset,
       minWidth: minWidth,
       maxWidth: maxWidth,
-      onSelect: (v) => close(v),
-      onDismiss: () => close(),
+      onSelect: close,
+      onDismiss: close,
     ),
   );
 

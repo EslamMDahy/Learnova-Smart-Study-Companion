@@ -873,7 +873,7 @@ class _QuestionTargetPickerState extends State<_QuestionTargetPicker> {
     final int? result = await showDialog<int>(
       context: context,
       barrierDismissible: false,
-      barrierColor: Colors.black.withOpacity(0.30),
+      barrierColor: Colors.black.withValues(alpha: 0.30),
       builder: (_) => _QuestionTargetPickerDialog(
         targets: widget.targets,
         selectedTopicId: widget.selectedTopicId,
@@ -1160,7 +1160,7 @@ class _QuestionTargetPickerDialogState extends State<_QuestionTargetPickerDialog
           color: selected ? AppColors.selectedBg : AppColors.surfaceBg,
           borderRadius: BorderRadius.circular(13),
           border: Border.all(
-            color: selected ? AppColors.primary.withOpacity(0.50) : AppColors.borderGray,
+            color: selected ? AppColors.primary.withValues(alpha: 0.50) : AppColors.borderGray,
           ),
         ),
         child: Row(
@@ -1332,7 +1332,7 @@ Future<void> showAddQuestionDialog(
 
   return showDialog<void>(
     context: context,
-    barrierColor: Colors.black.withOpacity(0.36),
+    barrierColor: Colors.black.withValues(alpha: 0.36),
     builder: (_) => Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.symmetric(

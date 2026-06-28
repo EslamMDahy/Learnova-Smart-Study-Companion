@@ -79,7 +79,7 @@ extension _SettingsPageSections on _SettingsPageState {
                   controller: firstName,
                   hint: 'First name',
                   icon: Icons.person_outline,
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) => _runStateUpdate(() {}),
                   validator: (v) => _required(v, 'First name is required'),
                 );
 
@@ -88,7 +88,7 @@ extension _SettingsPageSections on _SettingsPageState {
                   controller: lastName,
                   hint: 'Last name',
                   icon: Icons.person_outline,
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (_) => _runStateUpdate(() {}),
                   validator: (_) => null,
                 );
 
@@ -138,7 +138,7 @@ extension _SettingsPageSections on _SettingsPageState {
                           hint: '+1 ...',
                           icon: Icons.phone_outlined,
                           keyboardType: TextInputType.phone,
-                          onChanged: (_) => setState(() {}),
+                          onChanged: (_) => _runStateUpdate(() {}),
                           validator: _validatePhone,
                         );
 
@@ -166,7 +166,7 @@ extension _SettingsPageSections on _SettingsPageState {
                       controller: bio,
                       hint: 'Write something...',
                       icon: Icons.edit_outlined,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) => _runStateUpdate(() {}),
                       validator: (_) => null,
                     ),
                   ],
@@ -204,7 +204,7 @@ extension _SettingsPageSections on _SettingsPageState {
                       hint: 'Enter current password',
                       icon: Icons.lock_outline,
                       obscureText: _obscureCurrent,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) => _runStateUpdate(() {}),
                       validator: (v) => _required(v, 'Current password is required'),
                       suffix: IconButton(
                         icon: Icon(
@@ -214,7 +214,7 @@ extension _SettingsPageSections on _SettingsPageState {
                           color: AppColors.muted,
                           size: 20,
                         ),
-                        onPressed: () => setState(() => _obscureCurrent = !_obscureCurrent),
+                        onPressed: () => _runStateUpdate(() => _obscureCurrent = !_obscureCurrent),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -224,7 +224,7 @@ extension _SettingsPageSections on _SettingsPageState {
                       hint: 'Enter new password',
                       icon: Icons.lock_outline,
                       obscureText: _obscureNew,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) => _runStateUpdate(() {}),
                       validator: _validateNewPassword,
                       suffix: IconButton(
                         icon: Icon(
@@ -234,7 +234,7 @@ extension _SettingsPageSections on _SettingsPageState {
                           color: AppColors.muted,
                           size: 20,
                         ),
-                        onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                        onPressed: () => _runStateUpdate(() => _obscureNew = !_obscureNew),
                       ),
                     ),
                     const SizedBox(height: 20),
@@ -244,7 +244,7 @@ extension _SettingsPageSections on _SettingsPageState {
                       hint: 'Confirm new password',
                       icon: Icons.lock_outline,
                       obscureText: _obscureConfirm,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) => _runStateUpdate(() {}),
                       validator: _validateConfirmPassword,
                       suffix: IconButton(
                         icon: Icon(
@@ -254,7 +254,7 @@ extension _SettingsPageSections on _SettingsPageState {
                           color: AppColors.muted,
                           size: 20,
                         ),
-                        onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                        onPressed: () => _runStateUpdate(() => _obscureConfirm = !_obscureConfirm),
                       ),
                     ),
                     const SizedBox(height: 16),
@@ -287,7 +287,7 @@ extension _SettingsPageSections on _SettingsPageState {
                                     );
 
                                 if (!mounted || !ok) return;
-                                setState(() {
+                                _runStateUpdate(() {
                                   currentPassword.clear();
                                   newPassword.clear();
                                   confirmPassword.clear();
@@ -366,7 +366,7 @@ extension _SettingsPageSections on _SettingsPageState {
             ],
             onChanged: (v) {
               if (v == null) return;
-              setState(() => _language = v);
+              _runStateUpdate(() => _language = v);
             },
           ),
           const SizedBox(height: 16),
@@ -380,7 +380,7 @@ extension _SettingsPageSections on _SettingsPageState {
             ],
             onChanged: (v) {
               if (v == null) return;
-              setState(() => themeMode = v);
+              _runStateUpdate(() => themeMode = v);
               ref.read(settingsControllerProvider.notifier).applyLocalThemeMode(v);
             },
           ),
@@ -395,7 +395,7 @@ extension _SettingsPageSections on _SettingsPageState {
             ],
             onChanged: (v) {
               if (v == null) return;
-              setState(() => profileVisibility = v);
+              _runStateUpdate(() => profileVisibility = v);
             },
           ),
           const SizedBox(height: 16),
@@ -404,7 +404,7 @@ extension _SettingsPageSections on _SettingsPageState {
             title: 'Show Online Status',
             subtitle: "Allow others to see when you're online.",
             value: showOnlineStatus,
-            onChanged: (v) => setState(() => showOnlineStatus = v),
+            onChanged: (v) => _runStateUpdate(() => showOnlineStatus = v),
           ),
           const SizedBox(height: 24),
         ],
@@ -428,7 +428,7 @@ extension _SettingsPageSections on _SettingsPageState {
             title: 'Email Notifications',
             subtitle: 'Receive notifications by email.',
             value: emailNotifications,
-            onChanged: (v) => setState(() => emailNotifications = v),
+            onChanged: (v) => _runStateUpdate(() => emailNotifications = v),
           ),
           const SizedBox(height: 12),
           // ignore: deprecated_member_use_from_same_package
@@ -436,7 +436,7 @@ extension _SettingsPageSections on _SettingsPageState {
             title: 'Assignment Alerts',
             subtitle: 'Get notified when new assessments are posted.',
             value: assignmentAlerts,
-            onChanged: (v) => setState(() => assignmentAlerts = v),
+            onChanged: (v) => _runStateUpdate(() => assignmentAlerts = v),
           ),
           const SizedBox(height: 12),
           // ignore: deprecated_member_use_from_same_package
@@ -444,7 +444,7 @@ extension _SettingsPageSections on _SettingsPageState {
             title: 'Course Updates',
             subtitle: 'Updates about your courses.',
             value: courseUpdates,
-            onChanged: (v) => setState(() => courseUpdates = v),
+            onChanged: (v) => _runStateUpdate(() => courseUpdates = v),
           ),
           const SizedBox(height: 12),
           // ignore: deprecated_member_use_from_same_package
@@ -452,7 +452,7 @@ extension _SettingsPageSections on _SettingsPageState {
             title: 'Announcements',
             subtitle: 'Important announcements.',
             value: announcementNotifications,
-            onChanged: (v) => setState(() => announcementNotifications = v),
+            onChanged: (v) => _runStateUpdate(() => announcementNotifications = v),
           ),
           const SizedBox(height: 12),
           // ignore: deprecated_member_use_from_same_package
@@ -460,7 +460,7 @@ extension _SettingsPageSections on _SettingsPageState {
             title: 'Grading Notifications',
             subtitle: 'Grades & evaluation updates.',
             value: gradingNotifications,
-            onChanged: (v) => setState(() => gradingNotifications = v),
+            onChanged: (v) => _runStateUpdate(() => gradingNotifications = v),
           ),
           const SizedBox(height: 12),
           // ignore: deprecated_member_use_from_same_package
@@ -468,7 +468,7 @@ extension _SettingsPageSections on _SettingsPageState {
             title: 'Deadline Reminders',
             subtitle: 'Reminders before deadlines.',
             value: deadlineReminders,
-            onChanged: (v) => setState(() => deadlineReminders = v),
+            onChanged: (v) => _runStateUpdate(() => deadlineReminders = v),
           ),
         ],
       ),
@@ -573,7 +573,7 @@ extension _SettingsPageSections on _SettingsPageState {
     phoneNumber.text = st.profile!.phoneNumber ?? '';
     bio.text = st.profile!.bio ?? '';
 
-    setState(() {
+    _runStateUpdate(() {
       _language = _mapLangCodeToUi(st.profile!.languagePreference);
 
       // Only update prefs if they've loaded
@@ -753,11 +753,10 @@ class _DeleteAccountDialogState extends ConsumerState<_DeleteAccountDialog> {
       
       await ref.read(authRepositoryProvider).logout();
 
-      if (context.mounted) {
-        Navigator.of(context).pop();
-        // go to login
-        context.go(Routes.login);
-      }
+      if (!mounted) return;
+      Navigator.of(context).pop();
+      // go to login
+      context.go(Routes.login);
     }
   }
 

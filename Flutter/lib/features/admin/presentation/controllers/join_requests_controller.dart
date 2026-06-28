@@ -12,7 +12,7 @@ import 'join_requests_state.dart';
 
 final joinRequestsControllerProvider =
     StateNotifierProvider.autoDispose<JoinRequestsController, JoinRequestsState>(
-  (ref) => JoinRequestsController(ref),
+  JoinRequestsController.new,
 );
 
 class JoinRequestsController extends StateNotifier<JoinRequestsState> {

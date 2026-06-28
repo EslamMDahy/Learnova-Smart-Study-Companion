@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/ui/chat/rich_message_renderer.dart';
 import '../../../student/data/student_course_assistant_models.dart';
-import '../../../student/data/student_course_assistant_providers.dart';
 
 class InstructorCourseAssistantPanel extends StatefulWidget {
   final String courseTitle;
@@ -354,7 +353,7 @@ class _AssistantContextCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.selectedBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.primary.withOpacity(0.25)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.25)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -447,7 +446,7 @@ class _AssistantInputBarState extends State<_AssistantInputBar> {
                   border: Border.all(color: AppColors.border),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.07),
+                      color: Colors.black.withValues(alpha: 0.07),
                       blurRadius: 22,
                       offset: const Offset(0, 10),
                     ),
@@ -507,7 +506,7 @@ class _AssistantInputBarState extends State<_AssistantInputBar> {
                                   height: 1.35,
                                   fontWeight: FontWeight.w600,
                                 ),
-                                selectionColor: AppColors.primary.withOpacity(0.18),
+                                selectionColor: AppColors.primary.withValues(alpha: 0.18),
                                 enableSuggestions: true,
                                 autocorrect: true,
                                 scrollPadding: EdgeInsets.zero,
@@ -785,7 +784,7 @@ class _AssistantBotIcon extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.18),
+            color: AppColors.primary.withValues(alpha: 0.18),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -861,7 +860,7 @@ class InstructorCourseAssistantFab extends StatelessWidget {
             border: Border.all(color: AppColors.badgeBlueBorder),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.12),
+                color: Colors.black.withValues(alpha: 0.12),
                 blurRadius: 22,
                 offset: const Offset(0, 10),
               ),

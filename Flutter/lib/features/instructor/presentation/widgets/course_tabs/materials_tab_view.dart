@@ -27,7 +27,7 @@ extension _CourseMaterialsTabView on _CourseMaterialsTabState {
     void refreshModules() => _refreshStructureTree(st);
 
     void toggleSidebarCollapsed() {
-      setState(() {
+      _runStateUpdate(() {
         _sidebarCollapsed = !_sidebarCollapsed;
         _persistUiState();
       });
@@ -48,7 +48,7 @@ extension _CourseMaterialsTabView on _CourseMaterialsTabState {
           onModuleReorder: _handleModuleReorder,
           onDragChanged: (moduleId) {
             if (!mounted) return;
-            setState(() => _draggingModuleId = moduleId);
+            _runStateUpdate(() => _draggingModuleId = moduleId);
           },
           onRefresh: refreshModules,
           onToggleCollapsed: toggleSidebarCollapsed,
@@ -87,7 +87,7 @@ extension _CourseMaterialsTabView on _CourseMaterialsTabState {
         final sidebarHeight = constraints.maxHeight < 640 ? 212.0 : 286.0;
 
         void resizeSidebar(double delta) {
-          setState(() {
+          _runStateUpdate(() {
             final currentWidth = _sidebarWidth ?? sidebarWidth;
             _sidebarWidth = (currentWidth + delta)
                 .clamp(_CourseMaterialsTabState._sidebarMinWidth, maxSidebarWidth)
@@ -113,10 +113,10 @@ extension _CourseMaterialsTabView on _CourseMaterialsTabState {
             minWidth: _CourseMaterialsTabState._sidebarMinWidth,
             maxWidth: maxSidebarWidth,
             isResizing: _sidebarResizing,
-            onResizeStart: () => setState(() => _sidebarResizing = true),
+            onResizeStart: () => _runStateUpdate(() => _sidebarResizing = true),
             onResize: resizeSidebar,
             onResizeEnd: () {
-              setState(() => _sidebarResizing = false);
+              _runStateUpdate(() => _sidebarResizing = false);
               _persistUiState();
             },
             child: RepaintBoundary(child: sidebar(width: sidebarWidth)),
@@ -170,7 +170,7 @@ extension _CourseMaterialsTabView on _CourseMaterialsTabState {
               onGenerate: () => _openQuestionAuthoringFromSelection(footerCtx),
               onAskAi: widget.onOpenCourseAssistant,
               assistantBusy: widget.courseAssistantBusy,
-              onClose: () => setState(() {
+              onClose: () => _runStateUpdate(() {
                 if (_selectionMode && !_treeSelection.isEmpty) {
                   _treeSelection = _treeSelection.clear();
                   _hideFooterForActive = false;
@@ -222,7 +222,7 @@ extension _CourseMaterialsTabView on _CourseMaterialsTabState {
 
       final List<Map<String, dynamic>> targets = ((data['targets'] as List?) ?? const <dynamic>[])
           .whereType<Map>()
-          .map((Map item) => Map<String, dynamic>.from(item))
+          .map(Map<String, dynamic>.from)
           .toList();
 
       final Set<int> topicIds = <int>{};
@@ -239,7 +239,7 @@ extension _CourseMaterialsTabView on _CourseMaterialsTabState {
 
       final List<Map<String, dynamic>> questionMaps = questions
           .whereType<Map>()
-          .map((Map item) => Map<String, dynamic>.from(item))
+          .map(Map<String, dynamic>.from)
           .toList();
       for (final Map<String, dynamic> question in questionMaps) {
         final int? topicId = (question['topicId'] as num?)?.toInt();
@@ -300,7 +300,7 @@ extension _CourseMaterialsTabView on _CourseMaterialsTabState {
   }
 
   void _resumeQuestionDraft(_QuestionDraftInfo draft) {
-    setState(() {
+    _runStateUpdate(() {
       _authoringModuleIds = draft.moduleIds;
       _authoringMaterialIds = draft.materialIds;
       _authoringTopicIds = draft.topicIds;
@@ -315,7 +315,7 @@ extension _CourseMaterialsTabView on _CourseMaterialsTabState {
     _cachedQuestionDraftRaw = null;
     _cachedQuestionDraftInfo = null;
     _questionDraftStore.remove(_questionDraftKey);
-    setState(() {});
+    _runStateUpdate(() {});
   }
 
 }

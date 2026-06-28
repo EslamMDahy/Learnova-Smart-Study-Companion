@@ -197,7 +197,7 @@ class _StudentQuizActivePageState extends ConsumerState<StudentQuizActivePage> {
   TextEditingController _controllerFor(StudentExamQuestion question) {
     return _textControllers.putIfAbsent(
       question.examQuestionId,
-      () => TextEditingController(),
+      TextEditingController.new,
     );
   }
 
@@ -468,17 +468,6 @@ class _StudentQuizActivePageState extends ConsumerState<StudentQuizActivePage> {
     return '$minutes:$seconds';
   }
 
-  String _resultMessage(StudentExamSubmitResult result) {
-    final parts = <String>[];
-    if (result.percentageScore != null) {
-      parts.add('Score: ${_formatScore(result.percentageScore!)}%');
-    } else if (result.totalScore != null) {
-      parts.add('Score: ${_formatScore(result.totalScore!)}');
-    }
-    if (result.isPassed != null) parts.add(result.isPassed! ? 'Passed' : 'Not passed yet');
-    if (result.unansweredCount != null) parts.add('Unanswered: ${result.unansweredCount}');
-    return parts.isEmpty ? 'Your exam attempt was submitted successfully.' : parts.join('\n');
-  }
 }
 
 
@@ -505,7 +494,7 @@ class _SubmissionSuccessOverlay extends StatelessWidget {
     final total = state.totalQuestions <= 0 ? answered : state.totalQuestions;
 
     return Container(
-      color: Colors.black.withOpacity(0.36),
+      color: Colors.black.withValues(alpha: 0.36),
       alignment: Alignment.center,
       child: Container(
         width: 380,
@@ -517,7 +506,7 @@ class _SubmissionSuccessOverlay extends StatelessWidget {
           border: Border.all(color: AppColors.greenBorder),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.14),
+              color: Colors.black.withValues(alpha: 0.14),
               blurRadius: 34,
               offset: const Offset(0, 18),
             ),
@@ -845,7 +834,7 @@ class _PaletteLegend extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
       decoration: BoxDecoration(
-        color: AppColors.headerBg.withOpacity(0.55),
+        color: AppColors.headerBg.withValues(alpha: 0.55),
         border: Border(top: BorderSide(color: AppColors.border)),
       ),
       child: Column(
@@ -1216,10 +1205,16 @@ class _SingleOption extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final selected = selectedIndex == index;
-    return InkWell(
-      onTap: enabled ? () => onChanged(index) : null,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
+    return RadioGroup<int>(
+      groupValue: selectedIndex,
+      onChanged: (value) {
+        if (!enabled) return;
+        onChanged(value ?? index);
+      },
+      child: InkWell(
+        onTap: enabled ? () => onChanged(index) : null,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
         constraints: const BoxConstraints(minHeight: 50),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
@@ -1231,9 +1226,7 @@ class _SingleOption extends StatelessWidget {
           children: [
             Radio<int>(
               value: index,
-              groupValue: selectedIndex,
               activeColor: AppColors.primary,
-              onChanged: enabled ? (value) => onChanged(value ?? index) : null,
             ),
             const SizedBox(width: 4),
             Expanded(
@@ -1243,6 +1236,7 @@ class _SingleOption extends StatelessWidget {
               ),
             ),
           ],
+        ),
         ),
       ),
     );
@@ -1472,7 +1466,3 @@ String _titleCase(String value) {
       .join(' ');
 }
 
-String _formatScore(double value) {
-  if (value == value.roundToDouble()) return value.toStringAsFixed(0);
-  return value.toStringAsFixed(1);
-}

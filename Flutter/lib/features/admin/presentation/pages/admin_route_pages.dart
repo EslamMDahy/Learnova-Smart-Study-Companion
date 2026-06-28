@@ -39,6 +39,7 @@ class AdminUsersRoutePage extends ConsumerWidget {
             builder: (_) => const CreateOrgDialog(),
           );
           if (data == null) return;
+          if (!context.mounted) return;
 
           final name = (data['name'] ?? '').toString().trim();
           final desc = (data['description'] ?? '').toString().trim();

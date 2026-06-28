@@ -461,7 +461,7 @@ class _CreateExamFlowState extends ConsumerState<CreateExamFlow> {
       if (type == null) continue;
       final count = selected.where((question) => question.type == type).length;
       if (count < section.questionCount) {
-        gaps.add('${_shortTemplateTypeLabel(section.questionType)} ${count}/${section.questionCount}');
+        gaps.add('${_shortTemplateTypeLabel(section.questionType)} $count/${section.questionCount}');
       }
     }
     if (gaps.isEmpty) return null;

@@ -116,6 +116,11 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
   String get _uiStateKey => 'course:${widget.course.id}:materials_ui';
   String get _questionDraftKey => 'learnova:qauthor:${widget.course.id}:last';
 
+  void _runStateUpdate(VoidCallback update) {
+    if (!mounted) return;
+    setState(update);
+  }
+
   @override
   void initState() {
     super.initState();
@@ -545,7 +550,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    return this._buildMaterialsScaffold(context);
+    return _buildMaterialsScaffold(context);
   }
 
   _Ctx? _footerCtxFromSelection(CourseDetailsState st) {
@@ -1024,9 +1029,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
       onEditTopicStatus: () => _showTopicStatusDialog(c.module!, c.material!, activeTopic),
       onMapTopicOutcomes: () => _showTopicOutcomeMappingDialog(c.module!, c.material!, activeTopic),
       onDeleteTopic: () => _confirmDeleteTopic(c.module!, c.material!, activeTopic),
-      onOpenSubtopic: (TopicItem subtopic) {
-        _drillTopic(subtopic);
-      },
+      onOpenSubtopic: _drillTopic,
       onAddSubtopic: () => _showAddSubtopicDialog(c.module!, c.material!, activeTopic),
     );
   }
@@ -1035,7 +1038,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
 Future<void> _showRenameTopicDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
   final ctrl = TextEditingController(text: topic.title);
   final result = await _showManagedDialog<bool>(
-    barrierColor: Colors.black.withOpacity(0.38),
+    barrierColor: Colors.black.withValues(alpha: 0.38),
     builder: (_) => _PreferencesDialogShell(
       title: topic.parentTopicId == null ? 'Rename topic' : 'Rename subtopic',
       subtitle: 'This popup changes the title only.',
@@ -1083,7 +1086,7 @@ Future<void> _showTopicSummaryDialog(ModuleItem m, MaterialItem mat, TopicItem t
   final descriptionCtrl = TextEditingController(text: topic.description ?? '');
   final notesCtrl = TextEditingController(text: topic.instructorNotes ?? '');
   final result = await _showManagedDialog<bool>(
-    barrierColor: Colors.black.withOpacity(0.38),
+    barrierColor: Colors.black.withValues(alpha: 0.38),
     builder: (_) => _PreferencesDialogShell(
       title: 'Edit summary',
       subtitle: 'This popup only updates the scope and instructor notes.',
@@ -1147,7 +1150,7 @@ Future<void> _showTopicStatusDialog(ModuleItem m, MaterialItem mat, TopicItem to
   TopicReadiness readiness = topic.readiness;
 
   final result = await _showManagedDialog<bool>(
-    barrierColor: Colors.black.withOpacity(0.38),
+    barrierColor: Colors.black.withValues(alpha: 0.38),
     builder: (dialogContext) => StatefulBuilder(
       builder: (dialogContext, setDialogState) => _PreferencesDialogShell(
         title: 'Set delivery state',
@@ -1248,7 +1251,7 @@ Future<void> _showTopicOutcomeMappingDialog(ModuleItem m, MaterialItem mat, Topi
         .toList();
 
     await _showManagedDialog<void>(
-      barrierColor: Colors.black.withOpacity(0.35),
+      barrierColor: Colors.black.withValues(alpha: 0.35),
       builder: (_) => _PreferencesDialogShell(
         title: 'LO labels come from subtopics',
         subtitle: 'Sub LOs are mapped on subtopics. This topic shows the parent LO labels automatically.',
@@ -1331,7 +1334,7 @@ Future<void> _showTopicOutcomeMappingDialog(ModuleItem m, MaterialItem mat, Topi
       : parentIdForOutcomeId(selectedOutcomeIds.first);
 
   final result = await _showManagedDialog<bool>(
-    barrierColor: Colors.black.withOpacity(0.42),
+    barrierColor: Colors.black.withValues(alpha: 0.42),
     builder: (dialogContext) => StatefulBuilder(
       builder: (dialogContext, setDialogState) {
         final selectedCount = selectedOutcomeIds.length;
@@ -1491,7 +1494,7 @@ Future<void> _showTopicOutcomeMappingDialog(ModuleItem m, MaterialItem mat, Topi
 
 Future<void> _confirmDeleteTopic(ModuleItem m, MaterialItem mat, TopicItem topic) async {
   final ok = await _showManagedDialog<bool>(
-        barrierColor: Colors.black.withOpacity(0.38),
+        barrierColor: Colors.black.withValues(alpha: 0.38),
         builder: (_) => _ConfirmDialogWidget(
           title: topic.parentTopicId == null ? 'Delete Topic' : 'Delete Subtopic',
           body: 'Delete "${topic.title}"? This action cannot be undone.',
@@ -1524,7 +1527,7 @@ Future<void> _showAddSubtopicDialog(
   final outcomes = ref.read(courseLOProvider(widget.course.id));
 
   final result = await _showManagedDialog<_TopicDialogResult>(
-    barrierColor: Colors.black.withOpacity(0.42),
+    barrierColor: Colors.black.withValues(alpha: 0.42),
     builder: (_) => _AddTopicDialogV2(outcomes: outcomes, isSubtopic: true),
   );
 
@@ -1625,6 +1628,8 @@ Future<void> _showCreateModuleDialog() async {
           .loadMaterials(refreshedModule.id);
     }
 
+    if (!mounted) return;
+
     AppToast.success(
       context,
       title: 'Module copied',
@@ -1641,7 +1646,7 @@ Future<void> _showCreateModuleDialog() async {
 
   Future<void> _showUploadSheet(ModuleItem module) async {
     final saved = await _showManagedDialog<bool>(
-      barrierColor: Colors.black.withOpacity(0.35),
+      barrierColor: Colors.black.withValues(alpha: 0.35),
       builder: (_) => UploadMaterialSheet(
         moduleTitle: module.title,
         onUpload: (file, update) => _uploadAndWaitForMaterial(
@@ -1919,7 +1924,7 @@ Future<void> _showCreateModuleDialog() async {
 
   Future<void> _showShareModuleDialog(ModuleItem m) async {
     final targetCourse = await _showManagedDialog<MyCourseItem>(
-      barrierColor: Colors.black.withOpacity(0.35),
+      barrierColor: Colors.black.withValues(alpha: 0.35),
       builder: (_) => _ShareModuleDialog(module: m, currentCourseId: widget.course.id),
     );
     if (targetCourse == null || !mounted) return;
@@ -1950,7 +1955,7 @@ Future<void> _showCreateModuleDialog() async {
     final c = TextEditingController(text: m.title);
     final ok = await showDialog<bool>(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.35),
+      barrierColor: Colors.black.withValues(alpha: 0.35),
       builder: (_) => _SimpleDialog(
         title: 'Rename Module',
         ctrl: c,
@@ -1981,7 +1986,7 @@ Future<void> _showCreateModuleDialog() async {
     final c = TextEditingController(text: m.description ?? '');
     final ok = await showDialog<bool>(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.35),
+      barrierColor: Colors.black.withValues(alpha: 0.35),
       builder: (_) => _DescriptionDialog(ctrl: c),
     );
     final description = c.text.trim();
@@ -2029,7 +2034,7 @@ Future<void> _showCreateModuleDialog() async {
     final sortedModules = [...ref.read(courseDetailsControllerProvider(widget.course.id)).modules]
       ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
     final selected = await _showManagedDialog<int>(
-      barrierColor: Colors.black.withOpacity(0.35),
+      barrierColor: Colors.black.withValues(alpha: 0.35),
       builder: (_) => _ChangeModulePositionDialog(
         module: m,
         modules: sortedModules,
@@ -2057,7 +2062,7 @@ Future<void> _showCreateModuleDialog() async {
 
   Future<void> _confirmDeleteMaterial(ModuleItem module, MaterialItem material) async {
     final ok = await _showManagedDialog<bool>(
-          barrierColor: Colors.black.withOpacity(0.35),
+          barrierColor: Colors.black.withValues(alpha: 0.35),
           builder: (_) => _ConfirmDialogWidget(
             title: 'Delete File',
             body: 'Delete "${material.title}"? This will remove the PDF and its generated topics.',
@@ -2102,7 +2107,7 @@ Future<void> _showCreateModuleDialog() async {
 
   Future<void> _confirmDelete(ModuleItem m) async {
     final ok = await _showManagedDialog<bool>(
-        barrierColor: Colors.black.withOpacity(0.35),
+        barrierColor: Colors.black.withValues(alpha: 0.35),
         builder: (_) => _ConfirmDialogWidget(title: 'Delete Module',
             body: 'Delete "${m.title}"? This will also remove all its materials.',
             confirm: 'Delete', confirmColor: const Color(0xFFEF4444),),);
@@ -2164,666 +2169,6 @@ Future<void> _showCreateModuleDialog() async {
       message: 'Please try again.',
     );
     return false;
-  }
-
-  Future<void> _showAddTopicDialog(ModuleItem m, MaterialItem mat) async {
-    ref.read(courseLOProvider(widget.course.id));
-    final result = await _showManagedDialog<_TopicDialogResult>(
-      barrierColor: Colors.black.withOpacity(0.42),
-      builder: (_) => const _AddTopicDialogV2(),
-    );
-
-    if (result == null || !mounted) return;
-
-    if (result.mode == _TopicCreateMode.ai) {
-      _openGenerateDialog(moduleId: m.id, materialId: mat.id);
-      return;
-    }
-
-    final title = result.title.trim();
-    if (title.isEmpty) return;
-
-    final notifier =
-        ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
-
-    final topic = await notifier.createTopic(
-      moduleId: m.id,
-      materialId: mat.id,
-      payload: TopicCreateRequest(
-        title: title,
-        learningOutcomeIds: result.learningOutcomeIds,
-      ),
-    );
-
-    if (!mounted) return;
-
-    if (topic != null) {
-      AppToast.success(
-        context,
-        title: 'Topic added',
-        message: '"${topic.title}" created successfully.',
-      );
-    } else {
-      AppToast.error(
-        context,
-        title: 'Could not add topic',
-        message: 'Please try again.',
-      );
-    }
-  }
-
-  Future<void> _showEditTopicDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
-    final outcomes = ref.read(courseLOProvider(widget.course.id));
-    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
-
-    final titleCtrl = TextEditingController(text: topic.title);
-    final descriptionCtrl = TextEditingController(text: topic.description ?? '');
-    final notesCtrl = TextEditingController(text: topic.instructorNotes ?? '');
-    TopicDifficulty difficulty = topic.difficulty;
-    TopicReadiness readiness = topic.readiness;
-    final selectedOutcomeIds = <int>{...topic.learningOutcomeIds};
-    int? selectedParentTopicId = topic.parentTopicId;
-    final parentTopicOptions = ref
-        .read(courseDetailsControllerProvider(widget.course.id))
-        .topics[m.id]
-        ?.where((t) => t.materialId == mat.id && t.parentTopicId == null && t.id != topic.id)
-        .toList() ??
-        <TopicItem>[];
-
-    Color difficultyColor(TopicDifficulty value) {
-      switch (value) {
-        case TopicDifficulty.advanced:
-          return AppColors.dangerText;
-        case TopicDifficulty.intermediate:
-          return _K.amber;
-        case TopicDifficulty.beginner:
-          return _K.blue;
-      }
-    }
-
-    Color difficultyBg(TopicDifficulty value) {
-      switch (value) {
-        case TopicDifficulty.advanced:
-          return const Color(0xFFFFF1F2);
-        case TopicDifficulty.intermediate:
-          return const Color(0xFFFFFBEB);
-        case TopicDifficulty.beginner:
-          return AppColors.primarySoft;
-      }
-    }
-
-    Color readinessFg(TopicReadiness value) {
-      switch (value) {
-        case TopicReadiness.ready:
-          return _K.green;
-        case TopicReadiness.review:
-          return _K.amber;
-        case TopicReadiness.draft:
-          return AppColors.textMuted;
-      }
-    }
-
-    Color readinessBg(TopicReadiness value) {
-      switch (value) {
-        case TopicReadiness.ready:
-          return _K.greenSoft;
-        case TopicReadiness.review:
-          return _K.amberSoft;
-        case TopicReadiness.draft:
-          return AppColors.headerBg;
-      }
-    }
-
-    Future<bool> confirmDelete(BuildContext context) async {
-      final ok = await _showManagedDialog<bool>(
-            barrierColor: Colors.black.withOpacity(0.4),
-            builder: (_) => _ConfirmDialogWidget(
-              title: 'Delete Topic',
-              body: 'Delete "${topic.title}"? This action cannot be undone.',
-              confirm: 'Delete',
-              confirmColor: AppColors.dangerText,
-            ),
-          ) ??
-          false;
-      return ok;
-    }
-
-    final result = await _showManagedDialog<bool>(
-      barrierColor: Colors.black.withOpacity(0.42),
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) {
-          final selectedOutcomes = outcomes
-              .where((lo) => selectedOutcomeIds.contains(lo.id))
-              .toList();
-
-          return _PreferencesDialogShell(
-            title: 'Manage Topic',
-            subtitle: 'Update topic details, delivery state, and linked learning outcomes without leaving the material workspace.',
-            maxWidth: 760,
-            leading: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF2563EB), Color(0xFF7C3AED)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(14),
-              ),
-              child: const Icon(Icons.tune_rounded, color: Colors.white, size: 20),
-            ),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxHeight: 720),
-              child: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Color(0xFFF8FAFF), Color(0xFFFFFFFF)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: const Color(0xFFE8EEF8)),
-                      ),
-                      child: Wrap(
-                        spacing: 8,
-                        runSpacing: 8,
-                        children: [
-                          _TopicStatusChip(
-                            icon: topic.parentTopicId != null
-                                ? Icons.subdirectory_arrow_right_rounded
-                                : (topic.source == TopicSource.ai
-                                    ? Icons.auto_awesome_rounded
-                                    : Icons.edit_note_rounded),
-                            label: topic.parentTopicId != null
-                                ? 'Subtopic'
-                                : (topic.source == TopicSource.ai ? 'AI-assisted' : 'Manual topic'),
-                            fg: AppColors.primary,
-                            bg: AppColors.primarySoft,
-                          ),
-                          _TopicStatusChip(
-                            icon: Icons.signal_cellular_alt_rounded,
-                            label: difficulty.label,
-                            fg: difficultyColor(difficulty),
-                            bg: difficultyBg(difficulty),
-                          ),
-                          _TopicStatusChip(
-                            icon: Icons.track_changes_rounded,
-                            label: readiness.label,
-                            fg: readinessFg(readiness),
-                            bg: readinessBg(readiness),
-                          ),
-                          _TopicStatusChip(
-                            icon: Icons.flag_outlined,
-                            label: selectedOutcomeIds.isEmpty
-                                ? 'No outcomes linked'
-                                : '${selectedOutcomeIds.length} outcome(s) linked',
-                            fg: _K.blue,
-                            bg: _K.blueSoft,
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _CardWidget(
-                      header: const _HdrWidget(
-                        icon: Icons.edit_note_rounded,
-                        iconColor: AppColors.primary,
-                        title: 'Core details',
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Topic title',
-                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
-                            ),
-                            const SizedBox(height: 8),
-                            _DialogTextField(
-                              controller: titleCtrl,
-                              hintText: 'Write a concise, teachable topic name',
-                              autofocus: true,
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              'Description',
-                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
-                            ),
-                            const SizedBox(height: 8),
-                            _DialogTextField(
-                              controller: descriptionCtrl,
-                              hintText: 'Add a short summary, scope, or teaching angle for this topic',
-                              multiline: true,
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              'Hierarchy',
-                              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
-                            ),
-                            const SizedBox(height: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              decoration: BoxDecoration(
-                                color: AppColors.surfaceBg,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: _K.div),
-                              ),
-                              child: DropdownButtonHideUnderline(
-                                child: DropdownButton<int?>(
-                                  value: selectedParentTopicId,
-                                  isExpanded: true,
-                                  dropdownColor: AppColors.cardBg,
-                                  borderRadius: BorderRadius.circular(14),
-                                  items: [
-                                    const DropdownMenuItem<int?>(
-                                      child: Text('Top-level topic'),
-                                    ),
-                                    ...parentTopicOptions.map(
-                                      (parent) => DropdownMenuItem<int?>(
-                                        value: parent.id,
-                                        child: Text('Subtopic under ${parent.title}'),
-                                      ),
-                                    ),
-                                  ],
-                                  onChanged: (value) => setDialogState(() => selectedParentTopicId = value),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              selectedParentTopicId == null
-                                  ? 'This item appears as a top-level topic inside the material.'
-                                  : 'This item becomes a subtopic. Subtopics are final-level items and cannot contain children.',
-                              style: TextStyle(fontSize: 12, color: AppColors.textMuted, height: 1.45),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Expanded(
-                          child: _CardWidget(
-                            header: const _HdrWidget(
-                              icon: Icons.settings_suggest_rounded,
-                              iconColor: AppColors.primary,
-                              title: 'Delivery setup',
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Difficulty',
-                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: TopicDifficulty.values.map((value) {
-                                      final selected = difficulty == value;
-                                      return ChoiceChip(
-                                        label: Text(value.label),
-                                        selected: selected,
-                                        onSelected: (_) => setDialogState(() => difficulty = value),
-                                        labelStyle: TextStyle(
-                                          color: selected ? Colors.white : AppColors.textTitle,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                        selectedColor: difficultyColor(value),
-                                        backgroundColor: difficultyBg(value),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                                        side: BorderSide(
-                                          color: selected ? difficultyColor(value) : AppColors.borderGray,
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                  const SizedBox(height: 16),
-                                  Text(
-                                    'Readiness',
-                                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: TopicReadiness.values.map((value) {
-                                      final selected = readiness == value;
-                                      return ChoiceChip(
-                                        label: Text(value.label),
-                                        selected: selected,
-                                        onSelected: (_) => setDialogState(() => readiness = value),
-                                        labelStyle: TextStyle(
-                                          color: selected ? Colors.white : AppColors.textTitle,
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                        selectedColor: readinessFg(value),
-                                        backgroundColor: readinessBg(value),
-                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-                                        side: BorderSide(
-                                          color: selected ? readinessFg(value) : AppColors.borderGray,
-                                        ),
-                                      );
-                                    }).toList(),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: _CardWidget(
-                            header: const _HdrWidget(
-                              icon: Icons.sticky_note_2_outlined,
-                              iconColor: AppColors.primary,
-                              title: 'Instructor notes',
-                            ),
-                            child: Padding(
-                              padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Use notes for examples, misconceptions, teaching cues, or assessment reminders.',
-                                    style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  _DialogTextField(
-                                    controller: notesCtrl,
-                                    hintText: 'Add delivery notes for this topic',
-                                    multiline: true,
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    _CardWidget(
-                      header: const _HdrWidget(
-                        icon: Icons.flag_outlined,
-                        iconColor: AppColors.primary,
-                        title: 'Learning outcome alignment',
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Select the course outcomes this topic supports.',
-                              style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
-                            ),
-                            const SizedBox(height: 12),
-                            if (outcomes.isEmpty)
-                              Container(
-                                width: double.infinity,
-                                padding: const EdgeInsets.all(14),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceBg,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: AppColors.border),
-                                ),
-                                child: Text(
-                                  'No course outcomes yet. Add them in the Outcomes tab first.',
-                                  style: TextStyle(fontSize: 12.5, color: AppColors.textMuted),
-                                ),
-                              )
-                            else ...[
-                              if (selectedOutcomes.isNotEmpty) ...[
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
-                                  children: selectedOutcomes
-                                      .map(
-                                        (lo) => Container(
-                                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                                          decoration: BoxDecoration(
-                                            color: _K.blueSoft,
-                                            borderRadius: BorderRadius.circular(999),
-                                            border: Border.all(color: _K.blueMid),
-                                          ),
-                                          child: Text(
-                                            '${lo.code} • ${lo.title}',
-                                            style: const TextStyle(
-                                              fontSize: 12.5,
-                                              fontWeight: FontWeight.w700,
-                                              color: AppColors.primary,
-                                            ),
-                                          ),
-                                        ),
-                                      )
-                                      .toList(),
-                                ),
-                                const SizedBox(height: 12),
-                              ],
-                              Container(
-                                constraints: const BoxConstraints(maxHeight: 220),
-                                decoration: BoxDecoration(
-                                  color: AppColors.surfaceBg,
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(color: _K.div),
-                                ),
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(14),
-                                  child: ListView.separated(
-                                    shrinkWrap: true,
-                                    itemCount: outcomes.length,
-                                    separatorBuilder: (_, __) => const Divider(height: 1, color: Color(0xFFEAECEF)),
-                                    itemBuilder: (_, i) {
-                                      final lo = outcomes[i];
-                                      final selected = selectedOutcomeIds.contains(lo.id);
-                                      return InkWell(
-                                        hoverColor: Colors.transparent,
-                                        splashColor: Colors.transparent,
-                                        highlightColor: Colors.transparent,
-                                        overlayColor: const WidgetStatePropertyAll(Colors.transparent),
-                                        onTap: () => setDialogState(() {
-                                          if (selected) {
-                                            selectedOutcomeIds.remove(lo.id);
-                                          } else {
-                                            selectedOutcomeIds.add(lo.id);
-                                          }
-                                        }),
-                                        child: Padding(
-                                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                width: 18,
-                                                height: 18,
-                                                decoration: BoxDecoration(
-                                                  color: selected ? AppColors.primary : Colors.white,
-                                                  borderRadius: BorderRadius.circular(5),
-                                                  border: Border.all(
-                                                    color: selected ? AppColors.primary : const Color(0xFFCBD5E1),
-                                                    width: 1.4,
-                                                  ),
-                                                ),
-                                                child: selected
-                                                    ? const Icon(Icons.check, size: 12, color: Colors.white)
-                                                    : null,
-                                              ),
-                                              const SizedBox(width: 10),
-                                              Container(
-                                                padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.badgeBlueBg,
-                                                  borderRadius: BorderRadius.circular(6),
-                                                ),
-                                                child: Text(
-                                                  lo.code,
-                                                  style: TextStyle(
-                                                    fontSize: 10,
-                                                    fontWeight: FontWeight.w800,
-                                                    color: AppColors.badgeBlueFg,
-                                                  ),
-                                                ),
-                                              ),
-                                              const SizedBox(width: 8),
-                                              Expanded(
-                                                child: Text(
-                                                  lo.title,
-                                                  style: TextStyle(
-                                                    fontSize: 12.5,
-                                                    fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                                                    color: selected ? AppColors.textTitle : AppColors.textMuted,
-                                                  ),
-                                                ),
-                                              ),
-                                            ],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    _CardWidget(
-                      header: _HdrWidget(
-                        icon: Icons.warning_amber_rounded,
-                        iconColor: AppColors.dangerText,
-                        title: 'Danger zone',
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    'Delete this topic',
-                                    style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    'This removes the topic and its direct links from the material structure.',
-                                    style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            AppButton(
-                              label: 'Delete topic',
-                              onTap: () async {
-                                final ok = await confirmDelete(dialogContext);
-                                if (!ok) return;
-                                await notifier.deleteTopic(
-                                  moduleId: m.id,
-                                  topicId: topic.id,
-                                  materialId: mat.id,
-                                );
-                                if (mounted) Navigator.pop(dialogContext, true);
-                              },
-                              variant: AppButtonVariant.danger,
-                              height: 40,
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    _DialogActions(
-                      confirmLabel: 'Save changes',
-                      onCancel: () => Navigator.pop(dialogContext, false),
-                      onConfirm: () async {
-                        final title = titleCtrl.text.trim();
-                        if (title.isEmpty) {
-                          AppToast.error(
-                            context,
-                            title: 'Topic title required',
-                            message: 'Please enter a title before saving.',
-                          );
-                          return;
-                        }
-                        await notifier.updateTopic(
-                          topic.copyWith(
-                            moduleId: m.id,
-                            materialId: mat.id,
-                            title: title,
-                            description: descriptionCtrl.text.trim().isEmpty ? null : descriptionCtrl.text.trim(),
-                            learningOutcomeIds: selectedOutcomeIds.toList(),
-                            linkedOutcomeId: selectedOutcomeIds.isEmpty ? null : selectedOutcomeIds.first.toString(),
-                            linkedOutcomeIds: selectedOutcomeIds.map((id) => id.toString()).toList(),
-                            instructorNotes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-                            difficulty: difficulty,
-                            readiness: readiness,
-                            parentTopicId: selectedParentTopicId,
-                          ),
-                        );
-                        if (mounted) Navigator.pop(dialogContext, true);
-                      },
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        },
-      ),
-    );
-
-    if ((result ?? false) && mounted) {
-      AppToast.success(
-        context,
-        title: 'Topic updated',
-        message: 'Topic details were saved.',
-      );
-    }
-  }
-
-  Future<void> _showAddQuestionSheet(ModuleItem module, MaterialItem material, TopicItem topic) async {
-    if (mounted) setState(() => _dialogOpen = true);
-    try {
-      await showAddQuestionDialog(
-        context,
-        moduleId: module.id,
-        moduleName: module.title,
-        materialId: material.id,
-        materialName: material.displayTitle,
-        topicId: topic.id,
-        topicName: topic.title,
-        onAdd: (q) async {
-          final api = ref.read(questionsApiProvider);
-          final payload = api.buildCreatePayloadFromQuestion(q);
-          if (payload == null) {
-            throw StateError('Question type or topic is not compatible with backend.');
-          }
-          final saved = await api.createQuestion(
-            courseId: widget.course.id,
-            payload: payload,
-          );
-          ref.read(courseDetailsControllerProvider(widget.course.id).notifier).addQuestion(saved);
-        },
-      );
-    } finally {
-      if (mounted) setState(() => _dialogOpen = false);
-    }
   }
 
   Set<int> _leafTopicIdsForActive(_Ctx active, CourseDetailsState st) {
@@ -3228,9 +2573,9 @@ class _CriteriaIconDot extends StatelessWidget {
       width: 26,
       height: 26,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
+        color: color.withValues(alpha: 0.10),
         shape: BoxShape.circle,
-        border: Border.all(color: color.withOpacity(0.30)),
+        border: Border.all(color: color.withValues(alpha: 0.30)),
       ),
       child: Icon(_criteriaDifficultyIcon(difficulty), size: 14, color: color),
     );
@@ -3371,7 +2716,7 @@ class _CriteriaMappingTile extends StatelessWidget {
     final color = _criteriaDifficultyColor(criterion.difficulty);
     final description = (criterion.description ?? '').trim();
     return Material(
-      color: selected ? color.withOpacity(0.08) : AppColors.surfaceBg,
+      color: selected ? color.withValues(alpha: 0.08) : AppColors.surfaceBg,
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         onTap: onTap,
@@ -3380,7 +2725,7 @@ class _CriteriaMappingTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: selected ? color.withOpacity(0.38) : AppColors.border),
+            border: Border.all(color: selected ? color.withValues(alpha: 0.38) : AppColors.border),
           ),
           child: Row(
             children: [
@@ -3401,7 +2746,7 @@ class _CriteriaMappingTile extends StatelessWidget {
               const SizedBox(width: 10),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
-                decoration: BoxDecoration(color: color.withOpacity(0.09), borderRadius: BorderRadius.circular(999), border: Border.all(color: color.withOpacity(0.26))),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.09), borderRadius: BorderRadius.circular(999), border: Border.all(color: color.withValues(alpha: 0.26))),
                 child: Text(_criterionShortCode(criterion.code), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: color)),
               ),
               const SizedBox(width: 10),

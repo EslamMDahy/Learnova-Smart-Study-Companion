@@ -164,6 +164,8 @@ class _GlobalErrorToastListenerState
       ),
     );
 
+    if (!ctx.mounted) return;
+
     try {
       TokenStorage.clear();
       UserStorage.clear();

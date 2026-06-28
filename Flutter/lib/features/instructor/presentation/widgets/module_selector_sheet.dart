@@ -42,7 +42,7 @@ Future<ModuleSelectorResult?> showModuleSelectorSheet(
 
   return showDialog<ModuleSelectorResult>(
     context: context,
-    barrierColor: const Color(0xFF0B1A2B).withOpacity(0.55),
+    barrierColor: const Color(0xFF0B1A2B).withValues(alpha: 0.55),
     builder: (_) => Dialog(
       elevation: 0,
       backgroundColor: Colors.transparent,
@@ -135,7 +135,7 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
         borderRadius: BorderRadius.circular(10),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.12),
+            color: Colors.black.withValues(alpha: 0.12),
             blurRadius: 32,
             offset: const Offset(0, 14),
           ),
@@ -672,34 +672,6 @@ class _ModuleSelectorSheetState extends ConsumerState<_ModuleSelectorSheet> {
   }
 }
 
-
-class _PreviewMiniPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _PreviewMiniPill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.cardBg.withOpacity(0.08)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: Colors.white70),
-          const SizedBox(width: 6),
-          Text(label, style: const TextStyle(fontSize: 11.8, fontWeight: FontWeight.w600, color: Colors.white70)),
-        ],
-      ),
-    );
-  }
-}
-
 class _Header extends StatelessWidget {
   final String title;
   final String subtitle;
@@ -888,8 +860,6 @@ class _SectionCard extends StatelessWidget {
   final String title;
   final String subtitle;
   final Widget child;
-  final String? actionLabel;
-  final VoidCallback? onAction;
   final Widget? trailing;
   final bool expandChild;
 
@@ -897,8 +867,6 @@ class _SectionCard extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.child,
-    this.actionLabel,
-    this.onAction,
     this.trailing,
     this.expandChild = false,
   });
@@ -929,12 +897,6 @@ class _SectionCard extends StatelessWidget {
                 ),
               ),
               if (trailing != null) trailing!,
-              if (actionLabel != null)
-                TextButton.icon(
-                  onPressed: onAction,
-                  icon: const Icon(Icons.arrow_forward_rounded, size: 16),
-                  label: Text(actionLabel!),
-                ),
             ],
           ),
           const SizedBox(height: 14),

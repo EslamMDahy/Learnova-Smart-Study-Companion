@@ -237,7 +237,7 @@ class _StudyAssistantPanelState extends State<_StudyAssistantPanel> {
                               label: 'Summarize material',
                               onTap: hasContext
                                   ? () => widget.onSend(
-                                        'Summarize "${materialTitle!}" in clear bullet points.',
+                                        'Summarize "$materialTitle" in clear bullet points.',
                                       )
                                   : null,
                             ),
@@ -245,7 +245,7 @@ class _StudyAssistantPanelState extends State<_StudyAssistantPanel> {
                               label: 'Explain simply',
                               onTap: hasContext
                                   ? () => widget.onSend(
-                                        'Explain "${materialTitle!}" in simple terms with examples.',
+                                        'Explain "$materialTitle" in simple terms with examples.',
                                       )
                                   : null,
                             ),
@@ -253,7 +253,7 @@ class _StudyAssistantPanelState extends State<_StudyAssistantPanel> {
                               label: 'Quiz me',
                               onTap: hasContext
                                   ? () => widget.onSend(
-                                        'Quiz me on "${materialTitle!}", then wait for my answers.',
+                                        'Quiz me on "$materialTitle", then wait for my answers.',
                                       )
                                   : null,
                             ),
@@ -353,7 +353,7 @@ class _AssistantContextCard extends StatelessWidget {
         color: hasMaterial ? AppColors.selectedBg : AppColors.headerBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: hasMaterial ? AppColors.primary.withOpacity(0.25) : AppColors.border,
+          color: hasMaterial ? AppColors.primary.withValues(alpha: 0.25) : AppColors.border,
         ),
       ),
       child: Row(
@@ -449,7 +449,7 @@ class _AssistantInputBarState extends State<_AssistantInputBar> {
                   border: Border.all(color: AppColors.border),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.07),
+                      color: Colors.black.withValues(alpha: 0.07),
                       blurRadius: 22,
                       offset: const Offset(0, 10),
                     ),
@@ -509,7 +509,7 @@ class _AssistantInputBarState extends State<_AssistantInputBar> {
                                   height: 1.35,
                                   fontWeight: FontWeight.w600,
                                 ),
-                                selectionColor: AppColors.primary.withOpacity(0.18),
+                                selectionColor: AppColors.primary.withValues(alpha: 0.18),
                                 enableSuggestions: true,
                                 autocorrect: true,
                                 scrollPadding: EdgeInsets.zero,
@@ -653,237 +653,6 @@ class _AssistantBubble extends StatelessWidget {
     );
   }
 }
-
-
-class _AssistantMarkdownText extends StatelessWidget {
-  final String text;
-  const _AssistantMarkdownText({required this.text});
-  @override
-  Widget build(BuildContext context) {
-    return RichMessageRenderer(text: text);
-  }
-}
-
-class _AssistantMarkdownBullet extends StatelessWidget {
-  final String marker;
-  final String text;
-  final TextStyle baseStyle;
-
-  const _AssistantMarkdownBullet({
-    required this.marker,
-    required this.text,
-    required this.baseStyle,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SizedBox(
-          width: marker == '•' ? 14 : 24,
-          child: Text(
-            marker,
-            style: baseStyle.copyWith(
-              color: AppColors.textGray,
-              fontWeight: FontWeight.w800,
-            ),
-          ),
-        ),
-        Expanded(
-          child: _AssistantMarkdownLine(text: text, style: baseStyle),
-        ),
-      ],
-    );
-  }
-}
-
-class _AssistantMarkdownLine extends StatelessWidget {
-  final String text;
-  final TextStyle style;
-
-  const _AssistantMarkdownLine({required this.text, required this.style});
-
-  @override
-  Widget build(BuildContext context) {
-    return Text.rich(
-      TextSpan(children: _inlineSpans(text, style)),
-      textAlign: TextAlign.start,
-      softWrap: true,
-    );
-  }
-}
-
-List<TextSpan> _inlineSpans(String text, TextStyle baseStyle) {
-  final spans = <TextSpan>[];
-  var cursor = 0;
-
-  while (cursor < text.length) {
-    final token = _nextMarkdownToken(text, cursor);
-    if (token == null) {
-      spans.add(TextSpan(text: text.substring(cursor), style: baseStyle));
-      break;
-    }
-
-    if (token.start > cursor) {
-      spans.add(TextSpan(text: text.substring(cursor, token.start), style: baseStyle));
-    }
-
-    final content = text.substring(token.contentStart, token.contentEnd);
-    var tokenStyle = baseStyle;
-    switch (token.type) {
-      case _MarkdownInlineTokenType.bold:
-        tokenStyle = baseStyle.copyWith(
-          color: AppColors.textTitle,
-          fontWeight: FontWeight.w900,
-        );
-        break;
-      case _MarkdownInlineTokenType.italic:
-        tokenStyle = baseStyle.copyWith(
-          fontStyle: FontStyle.italic,
-          fontWeight: FontWeight.w600,
-        );
-        break;
-      case _MarkdownInlineTokenType.code:
-        tokenStyle = baseStyle.copyWith(
-          color: AppColors.textTitle,
-          fontFamily: 'monospace',
-          fontWeight: FontWeight.w700,
-          backgroundColor: AppColors.headerBg,
-        );
-        break;
-      case _MarkdownInlineTokenType.link:
-        tokenStyle = baseStyle.copyWith(
-          color: AppColors.primary,
-          fontWeight: FontWeight.w800,
-          decoration: TextDecoration.underline,
-        );
-        break;
-    }
-
-    spans.add(TextSpan(text: content, style: tokenStyle));
-    cursor = token.end;
-  }
-
-  return spans;
-}
-
-_MarkdownInlineToken? _nextMarkdownToken(String text, int start) {
-  _MarkdownInlineToken? best;
-
-  void consider(_MarkdownInlineToken? token) {
-    if (token == null) return;
-    if (best == null || token.start < best!.start) best = token;
-  }
-
-  consider(_findDelimitedToken(
-    text: text,
-    start: start,
-    delimiter: '**',
-    type: _MarkdownInlineTokenType.bold,
-  ));
-  consider(_findDelimitedToken(
-    text: text,
-    start: start,
-    delimiter: '__',
-    type: _MarkdownInlineTokenType.bold,
-  ));
-  consider(_findDelimitedToken(
-    text: text,
-    start: start,
-    delimiter: '`',
-    type: _MarkdownInlineTokenType.code,
-  ));
-  consider(_findDelimitedToken(
-    text: text,
-    start: start,
-    delimiter: '*',
-    type: _MarkdownInlineTokenType.italic,
-    ignoredPrefixes: const ['**'],
-  ));
-  consider(_findDelimitedToken(
-    text: text,
-    start: start,
-    delimiter: '_',
-    type: _MarkdownInlineTokenType.italic,
-    ignoredPrefixes: const ['__'],
-  ));
-  consider(_findMarkdownLink(text, start));
-
-  return best;
-}
-
-_MarkdownInlineToken? _findDelimitedToken({
-  required String text,
-  required int start,
-  required String delimiter,
-  required _MarkdownInlineTokenType type,
-  List<String> ignoredPrefixes = const [],
-}) {
-  var open = text.indexOf(delimiter, start);
-
-  while (open != -1) {
-    final shouldIgnore = ignoredPrefixes.any(
-      (prefix) => text.startsWith(prefix, open),
-    );
-    if (!shouldIgnore) {
-      final contentStart = open + delimiter.length;
-      final close = text.indexOf(delimiter, contentStart);
-      if (close != -1 && close > contentStart) {
-        return _MarkdownInlineToken(
-          type: type,
-          start: open,
-          contentStart: contentStart,
-          contentEnd: close,
-          end: close + delimiter.length,
-        );
-      }
-    }
-
-    open = text.indexOf(delimiter, open + delimiter.length);
-  }
-
-  return null;
-}
-
-_MarkdownInlineToken? _findMarkdownLink(String text, int start) {
-  final openBracket = text.indexOf('[', start);
-  if (openBracket == -1) return null;
-
-  final closeBracket = text.indexOf(']', openBracket + 1);
-  if (closeBracket == -1 || closeBracket + 1 >= text.length) return null;
-  if (text[closeBracket + 1] != '(') return null;
-
-  final closeParen = text.indexOf(')', closeBracket + 2);
-  if (closeParen == -1 || closeBracket == openBracket + 1) return null;
-
-  return _MarkdownInlineToken(
-    type: _MarkdownInlineTokenType.link,
-    start: openBracket,
-    contentStart: openBracket + 1,
-    contentEnd: closeBracket,
-    end: closeParen + 1,
-  );
-}
-
-enum _MarkdownInlineTokenType { bold, italic, code, link }
-
-class _MarkdownInlineToken {
-  final _MarkdownInlineTokenType type;
-  final int start;
-  final int contentStart;
-  final int contentEnd;
-  final int end;
-
-  const _MarkdownInlineToken({
-    required this.type,
-    required this.start,
-    required this.contentStart,
-    required this.contentEnd,
-    required this.end,
-  });
-}
-
 
 class _AssistantHistoryLoadingBubble extends StatelessWidget {
   const _AssistantHistoryLoadingBubble();

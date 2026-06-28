@@ -96,136 +96,6 @@ class _ProgressStep extends StatelessWidget {
   }
 }
 
-class _ScopeStep extends StatelessWidget {
-  final CourseDetailsState courseState;
-  final List<_TopicTarget> targets;
-  final List<QuestionModel> questions;
-  final List<QuestionModel> scopedQuestions;
-  final int? moduleId;
-  final int? materialId;
-  final int? topicId;
-  final int? outcomeId;
-  final ValueChanged<int?> onModuleChanged;
-  final ValueChanged<int?> onMaterialChanged;
-  final ValueChanged<int?> onTopicChanged;
-  final ValueChanged<int?> onOutcomeChanged;
-  final VoidCallback onClear;
-
-  const _ScopeStep({
-    required this.courseState,
-    required this.targets,
-    required this.questions,
-    required this.scopedQuestions,
-    required this.moduleId,
-    required this.materialId,
-    required this.topicId,
-    required this.outcomeId,
-    required this.onModuleChanged,
-    required this.onMaterialChanged,
-    required this.onTopicChanged,
-    required this.onOutcomeChanged,
-    required this.onClear,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final materialOptions = _materialOptions(targets, moduleId);
-    final topicOptions = _topicOptions(targets, moduleId, materialId);
-    final outcomeOptions = _outcomeOptions(questions);
-    final modules = courseState.modules;
-
-    return _Panel(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _PanelTitle(
-            icon: Icons.filter_alt_outlined,
-            title: 'Exam scope',
-            subtitle: 'Choose the content area first. The next step only shows matching question-bank items.',
-            trailing: TextButton.icon(
-              onPressed: onClear,
-              icon: const Icon(Icons.restart_alt_rounded, size: 16),
-              label: const Text('Clear scope'),
-            ),
-          ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final twoCols = constraints.maxWidth > 820;
-              final fields = [
-                _SelectField<int?>(
-                  label: 'Module',
-                  value: moduleId,
-                  hint: 'All modules',
-                  items: [
-                    const DropdownMenuItem<int?>(child: Text('All modules')),
-                    ...modules.map((module) => DropdownMenuItem<int?>(value: module.id, child: Text(module.title))),
-                  ],
-                  onChanged: onModuleChanged,
-                ),
-                _SelectField<int?>(
-                  label: 'Material',
-                  value: materialId,
-                  hint: 'All materials',
-                  items: [
-                    const DropdownMenuItem<int?>(child: Text('All materials')),
-                    ...materialOptions.map((material) => DropdownMenuItem<int?>(value: material.id, child: Text(material.displayTitle))),
-                  ],
-                  onChanged: onMaterialChanged,
-                ),
-                _SelectField<int?>(
-                  label: 'Topic / Subtopic',
-                  value: topicId,
-                  hint: 'All topics',
-                  items: [
-                    const DropdownMenuItem<int?>(child: Text('All topics / subtopics')),
-                    ...topicOptions.map((target) => DropdownMenuItem<int?>(value: target.topic.id, child: Text(target.topicLabel))),
-                  ],
-                  onChanged: onTopicChanged,
-                ),
-                _SelectField<int?>(
-                  label: 'Learning Outcome',
-                  value: outcomeId,
-                  hint: 'All LOs',
-                  items: [
-                    const DropdownMenuItem<int?>(child: Text('All learning outcomes')),
-                    ...outcomeOptions.map((outcome) => DropdownMenuItem<int?>(value: outcome.id, child: Text(outcome.title))),
-                  ],
-                  onChanged: onOutcomeChanged,
-                ),
-              ];
-
-              if (!twoCols) {
-                return Column(
-                  children: fields.map((field) => Padding(padding: const EdgeInsets.only(bottom: 14), child: field)).toList(),
-                );
-              }
-              return Column(
-                children: [
-                  Row(children: [Expanded(child: fields[0]), const SizedBox(width: 14), Expanded(child: fields[1])]),
-                  const SizedBox(height: 14),
-                  Row(children: [Expanded(child: fields[2]), const SizedBox(width: 14), Expanded(child: fields[3])]),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: 22),
-          Row(
-            children: [
-              Expanded(child: _ScopeMetric(label: 'Saved questions', value: '${questions.length}', icon: Icons.library_books_outlined)),
-              const SizedBox(width: 12),
-              Expanded(child: _ScopeMetric(label: 'Matching scope', value: '${scopedQuestions.length}', icon: Icons.fact_check_outlined)),
-              const SizedBox(width: 12),
-              Expanded(child: _ScopeMetric(label: 'Auto-gradable', value: '${scopedQuestions.where((q) => q.autoGradable).length}', icon: Icons.bolt_outlined)),
-            ],
-          ),
-          const SizedBox(height: 18),
-          _MiniQuestionPreview(questions: scopedQuestions.take(5).toList()),
-        ],
-      ),
-    );
-  }
-}
 
 class _SettingsStep extends StatelessWidget {
   final TextEditingController titleCtrl;
@@ -405,7 +275,7 @@ class _TemplateAppliedCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.primarySoft,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.primary.withOpacity(0.18)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -940,27 +810,24 @@ class _SelectField<T> extends StatelessWidget {
   final String hint;
   final List<DropdownMenuItem<T>> items;
   final ValueChanged<T?> onChanged;
-  final bool compact;
-
   const _SelectField({
     required this.label,
     required this.value,
     required this.hint,
     required this.items,
     required this.onChanged,
-    this.compact = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final dropdown = DropdownButtonFormField<T>(
-      value: value,
+      initialValue: value,
       isExpanded: true,
       hint: items.isNotEmpty ? items.first.child : null,
       items: items,
       onChanged: onChanged,
       decoration: _input(hint).copyWith(
-        contentPadding: EdgeInsets.symmetric(horizontal: 13, vertical: compact ? 11 : 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
       ),
       style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w800, fontSize: 13),
     );
@@ -982,8 +849,6 @@ class _TextInput extends StatelessWidget {
   final String? suffix;
   final int maxLines;
   final bool number;
-  final bool compact;
-
   const _TextInput({
     required this.label,
     required this.controller,
@@ -991,7 +856,6 @@ class _TextInput extends StatelessWidget {
     this.suffix,
     this.maxLines = 1,
     this.number = false,
-    this.compact = false,
   });
 
   @override
@@ -1002,30 +866,12 @@ class _TextInput extends StatelessWidget {
       keyboardType: number ? TextInputType.number : TextInputType.text,
       decoration: _input(hint).copyWith(
         suffixText: suffix,
-        contentPadding: EdgeInsets.symmetric(horizontal: 13, vertical: compact ? 11 : 14),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
       ),
       style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w700, fontSize: 13),
     );
     if (label.isEmpty) return field;
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_Label(label), field]);
-  }
-}
-
-class _SearchBox extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  const _SearchBox({required this.controller, required this.hint});
-
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller,
-      decoration: _input(hint).copyWith(
-        prefixIcon: Icon(Icons.search_rounded, color: AppColors.textMuted, size: 18),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 13),
-      ),
-      style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w700, fontSize: 13),
-    );
   }
 }
 
@@ -1215,118 +1061,6 @@ class _ScopeMetric extends StatelessWidget {
   }
 }
 
-class _MiniQuestionPreview extends StatelessWidget {
-  final List<QuestionModel> questions;
-  const _MiniQuestionPreview({required this.questions});
-
-  @override
-  Widget build(BuildContext context) {
-    if (questions.isEmpty) return const _EmptyState(title: 'No matching questions', message: 'This scope has no saved questions yet.');
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          for (var i = 0; i < questions.length; i++) ...[
-            _MiniQuestionRow(question: questions[i]),
-            if (i != questions.length - 1) Divider(height: 1, color: AppColors.border),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _MiniQuestionRow extends StatelessWidget {
-  final QuestionModel question;
-  const _MiniQuestionRow({required this.question});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(question.text.replaceAll('\n', ' '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w800, fontSize: 13)),
-          ),
-          const SizedBox(width: 8),
-          _TinyPill(label: question.typeLabel),
-          const SizedBox(width: 6),
-          _TinyPill(label: question.difficultyLabel),
-        ],
-      ),
-    );
-  }
-}
-
-class _ExamQuestionRow extends StatelessWidget {
-  final int index;
-  final QuestionModel question;
-  final _TopicTarget? target;
-  final bool selected;
-  final ValueChanged<bool> onSelected;
-  final VoidCallback? onReplace;
-
-  const _ExamQuestionRow({
-    required this.index,
-    required this.question,
-    required this.target,
-    required this.selected,
-    required this.onSelected,
-    this.onReplace,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: () => onSelected(!selected),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        color: selected ? AppColors.selectedBg : AppColors.cardBg,
-        child: Row(
-          children: [
-            Checkbox(value: selected, onChanged: (value) => onSelected(value ?? false)),
-            const SizedBox(width: 8),
-            _IndexBadge(index: index + 1, selected: selected),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 6,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(question.text.replaceAll('\n', ' '), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w900, fontSize: 13.5)),
-                  const SizedBox(height: 4),
-                  Text(_questionMeta(question), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w700, fontSize: 11)),
-                ],
-              ),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              flex: 3,
-              child: Text(_contextLabel(question, target), maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w800, fontSize: 12)),
-            ),
-            const SizedBox(width: 10),
-            _TinyPill(label: '${question.maxScore} pt'),
-            if (onReplace != null) ...[
-              const SizedBox(width: 8),
-              TextButton.icon(
-                onPressed: onReplace,
-                icon: const Icon(Icons.swap_horiz_rounded, size: 15),
-                label: const Text('Replace'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-
 class _PreviewQuestionTypeSection extends StatelessWidget {
   final QuestionType type;
   final List<QuestionModel> questions;
@@ -1464,7 +1198,7 @@ class _AnswerPreview extends StatelessWidget {
               decoration: BoxDecoration(
                 color: option.isCorrect ? AppColors.successBg : AppColors.surfaceBg,
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: option.isCorrect ? AppColors.successText.withOpacity(0.28) : AppColors.border),
+                border: Border.all(color: option.isCorrect ? AppColors.successText.withValues(alpha: 0.28) : AppColors.border),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -1649,7 +1383,7 @@ class _ErrorBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.dangerBg,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.dangerText.withOpacity(0.25)),
+        border: Border.all(color: AppColors.dangerText.withValues(alpha: 0.25)),
       ),
       child: Text(message, style: TextStyle(color: AppColors.dangerText, fontWeight: FontWeight.w800)),
     );
@@ -1692,35 +1426,6 @@ InputDecoration _input(String hint) {
   );
 }
 
-List<MaterialItem> _materialOptions(List<_TopicTarget> targets, int? moduleId) {
-  final seen = <int>{};
-  final result = <MaterialItem>[];
-  for (final target in targets) {
-    if (moduleId != null && target.module.id != moduleId) continue;
-    if (seen.add(target.material.id)) result.add(target.material);
-  }
-  result.sort((a, b) => a.displayTitle.compareTo(b.displayTitle));
-  return result;
-}
-
-List<_TopicTarget> _topicOptions(List<_TopicTarget> targets, int? moduleId, int? materialId) {
-  return targets.where((target) {
-    if (moduleId != null && target.module.id != moduleId) return false;
-    if (materialId != null && target.material.id != materialId) return false;
-    return true;
-  }).toList();
-}
-
-List<QuestionLearningOutcomeRef> _outcomeOptions(List<QuestionModel> questions) {
-  final byId = <int, QuestionLearningOutcomeRef>{};
-  for (final question in questions) {
-    for (final outcome in question.learningOutcomes) {
-      byId[outcome.id] = outcome;
-    }
-  }
-  final result = byId.values.toList()..sort((a, b) => a.title.compareTo(b.title));
-  return result;
-}
 
 _TopicTarget? _targetForQuestionStatic(List<_TopicTarget> targets, QuestionModel question) {
   final topicId = question.topicId;

@@ -117,7 +117,7 @@ class _CourseExamTemplatesTabState extends ConsumerState<CourseExamTemplatesTab>
                   customTemplates: customTemplates,
                   totalQuestions: totalQuestions,
                   onRefresh: _load,
-                  onCreate: () => _openEditor(),
+                  onCreate: _openEditor,
                 ),
                 const SizedBox(height: 16),
                 Expanded(
@@ -141,7 +141,7 @@ class _CourseExamTemplatesTabState extends ConsumerState<CourseExamTemplatesTab>
                           : _error != null
                               ? _TemplatesError(message: _error!, onRetry: _load)
                               : _templates.isEmpty
-                                  ? _TemplatesEmpty(onCreate: () => _openEditor())
+                                  ? _TemplatesEmpty(onCreate: _openEditor)
                                   : _TemplatesList(
                                       templates: _templates,
                                       onEdit: _openEditor,
@@ -189,7 +189,7 @@ class _TemplatesHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.18),
+            color: AppColors.primary.withValues(alpha: 0.18),
             blurRadius: 28,
             offset: const Offset(0, 12),
           ),
@@ -208,9 +208,9 @@ class _TemplatesHeader extends StatelessWidget {
                 onPressed: loading ? null : onRefresh,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  disabledForegroundColor: Colors.white.withOpacity(0.5),
-                  side: BorderSide(color: Colors.white.withOpacity(0.35)),
-                  backgroundColor: Colors.white.withOpacity(0.08),
+                  disabledForegroundColor: Colors.white.withValues(alpha: 0.5),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -255,14 +255,14 @@ class _TemplatesHeader extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.14),
+                  color: Colors.white.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(9),
-                  border: Border.all(color: Colors.white.withOpacity(0.18)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
                 ),
                 child: Text(
                   'Templates',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 11.5,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.4,
@@ -287,7 +287,7 @@ class _TemplatesHeader extends StatelessWidget {
                   fontSize: 13.5,
                   height: 1.55,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white.withOpacity(0.84),
+                  color: Colors.white.withValues(alpha: 0.84),
                 ),
               ),
             ],
@@ -339,9 +339,9 @@ class _TemplateHeaderCounter extends StatelessWidget {
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.22)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -359,7 +359,7 @@ class _TemplateHeaderCounter extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.78),
+              color: Colors.white.withValues(alpha: 0.78),
               fontSize: 11.2,
               fontWeight: FontWeight.w800,
             ),
@@ -811,7 +811,7 @@ class _TemplateEditorHeader extends StatelessWidget {
             decoration: BoxDecoration(
               gradient: const LinearGradient(colors: [Color(0xFF137FEC), Color(0xFF22C1F1)]),
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.20), blurRadius: 18, offset: const Offset(0, 8))],
+              boxShadow: [BoxShadow(color: AppColors.primary.withValues(alpha: 0.20), blurRadius: 18, offset: const Offset(0, 8))],
             ),
             child: const Icon(Icons.account_tree_outlined, color: Colors.white, size: 22),
           ),
@@ -1530,11 +1530,10 @@ class _EditorTextField extends StatelessWidget {
   final String label;
   final TextEditingController controller;
   final String hint;
-  final int maxLines;
   final bool number;
   final String? suffix;
 
-  const _EditorTextField({required this.label, required this.controller, required this.hint, this.maxLines = 1, this.number = false, this.suffix});
+  const _EditorTextField({required this.label, required this.controller, required this.hint, this.number = false, this.suffix});
 
   @override
   Widget build(BuildContext context) {
@@ -1547,7 +1546,7 @@ class _EditorTextField extends StatelessWidget {
         const SizedBox(height: 6),
         TextField(
           controller: controller,
-          maxLines: maxLines,
+          maxLines: 1,
           keyboardType: number ? TextInputType.number : TextInputType.text,
           style: TextStyle(color: AppColors.textTitle, fontSize: 13, fontWeight: FontWeight.w700),
           decoration: InputDecoration(
@@ -1556,7 +1555,7 @@ class _EditorTextField extends StatelessWidget {
             suffixText: suffix,
             filled: true,
             fillColor: AppColors.fieldBg,
-            contentPadding: EdgeInsets.symmetric(horizontal: 14, vertical: maxLines > 1 ? 12 : 12),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
             hintStyle: TextStyle(color: AppColors.textHint, fontSize: 13, fontWeight: FontWeight.w600),
             suffixStyle: TextStyle(color: AppColors.textMuted, fontSize: 12, fontWeight: FontWeight.w800),
             enabledBorder: OutlineInputBorder(borderRadius: radius, borderSide: BorderSide(color: AppColors.borderGray)),

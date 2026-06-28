@@ -4,9 +4,9 @@ enum LogLevel { debug, info, warn, error }
 
 /// Minimal logging abstraction.
 ///
-/// - In release builds, debug logs are dropped.
-/// - No external dependencies are introduced.
-/// - Callers should avoid logging sensitive data (tokens, passwords).
+/// Logging is intentionally disabled in release builds to avoid leaking
+/// sensitive payloads and to prevent heavy console serialization from slowing
+/// the web app down.
 class AppLogger {
   AppLogger._();
 
@@ -16,7 +16,7 @@ class AppLogger {
     Object? error,
     StackTrace? stackTrace,
   }) {
-    if (level == LogLevel.debug && kReleaseMode) return;
+    if (kReleaseMode) return;
 
     final prefix = switch (level) {
       LogLevel.debug => '[D]',
@@ -25,15 +25,13 @@ class AppLogger {
       LogLevel.error => '[E]',
     };
 
-    // ignore: avoid_print
     debugPrint('$prefix $message');
 
     if (error != null) {
-      // ignore: avoid_print
       debugPrint('$prefix error=$error');
     }
-    if (stackTrace != null && !kReleaseMode) {
-      // ignore: avoid_print
+
+    if (stackTrace != null) {
       debugPrint('$prefix stackTrace=\n$stackTrace');
     }
   }

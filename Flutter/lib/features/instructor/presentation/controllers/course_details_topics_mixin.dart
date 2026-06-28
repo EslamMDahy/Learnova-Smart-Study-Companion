@@ -265,7 +265,7 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
       final requestedOutcomeIds = payload.learningOutcomeIds.isNotEmpty
           ? payload.learningOutcomeIds
           : payload.linkedOutcomeIds
-              .map((s) => int.tryParse(s))
+              .map(int.tryParse)
               .whereType<int>()
               .toList();
       final normalizedOutcomeIds = requestedOutcomeIds.toSet().toList()..sort();
@@ -308,7 +308,7 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
               learningOutcomeIds: topic.learningOutcomeIds.isNotEmpty
                   ? topic.learningOutcomeIds
                   : topic.linkedOutcomeIds
-                      .map((s) => int.tryParse(s))
+                      .map(int.tryParse)
                       .whereType<int>()
                       .toList(),
             ),

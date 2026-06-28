@@ -12,7 +12,7 @@ import 'instructor_courses_state.dart';
 
 final instructorCoursesControllerProvider =
     StateNotifierProvider.autoDispose<InstructorCoursesController, InstructorCoursesState>(
-  (ref) => InstructorCoursesController(ref),
+  InstructorCoursesController.new,
 );
 
 class InstructorCoursesController extends StateNotifier<InstructorCoursesState> {

@@ -441,7 +441,7 @@ class _RefreshButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return OutlinedButton.icon(
-      onPressed: () => onRefresh(),
+      onPressed: onRefresh,
       icon: const Icon(Icons.refresh_rounded, size: 16),
       label: const Text('Refresh'),
       style: OutlinedButton.styleFrom(

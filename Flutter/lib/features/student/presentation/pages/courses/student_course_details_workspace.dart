@@ -521,7 +521,7 @@ class _StudentResizableSidebarHost extends StatelessWidget {
               child: Container(
                 width: _handleWidth,
                 color: isResizing
-                    ? AppColors.primary.withOpacity(0.08)
+                    ? AppColors.primary.withValues(alpha: 0.08)
                     : AppColors.bg,
                 child: Center(
                   child: Container(
@@ -529,8 +529,8 @@ class _StudentResizableSidebarHost extends StatelessWidget {
                     height: 38,
                     decoration: BoxDecoration(
                       color: isResizing
-                          ? AppColors.primary.withOpacity(0.65)
-                          : AppColors.textHint.withOpacity(0.28),
+                          ? AppColors.primary.withValues(alpha: 0.65)
+                          : AppColors.textHint.withValues(alpha: 0.28),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -938,7 +938,7 @@ class _StudentPdfViewerState extends State<_StudentPdfViewer> {
         border: Border.all(color: AppColors.border),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.10),
+            color: Colors.black.withValues(alpha: 0.10),
             blurRadius: 18,
             offset: const Offset(0, 8),
           ),

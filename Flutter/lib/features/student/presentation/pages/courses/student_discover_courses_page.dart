@@ -192,7 +192,7 @@ class _StudentDiscoverCoursesPageState
                       autocompleteQuery: state.autocompleteQuery,
                       autocompleteError: state.autocompleteError,
                       onChanged: _queueAutocomplete,
-                      onSearch: () => _runSearch(),
+                      onSearch: _runSearch,
                       onSuggestionSelected: _selectSuggestion,
                       onClear: _clearSearch,
                     ),
@@ -300,9 +300,7 @@ class _DiscoverCoursesTitleBlock extends StatelessWidget {
         OutlinedButton.icon(
           onPressed: searching
               ? null
-              : () {
-                  onRefresh();
-                },
+              : onRefresh,
           icon: searching
               ? const SizedBox(
                   width: 16,
@@ -392,7 +390,7 @@ class _SearchPublicCoursesCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border.withOpacity(0.74)),
+        border: Border.all(color: AppColors.border.withValues(alpha: 0.74)),
         boxShadow: [
           BoxShadow(
             color: AppColors.shadowThin,
@@ -537,9 +535,7 @@ class _SearchTextField extends StatelessWidget {
         ),
         suffixIcon: IconButton(
           tooltip: 'Clear search',
-          onPressed: () {
-            onClear();
-          },
+          onPressed: onClear,
           icon: Icon(
             Icons.close_rounded,
             color: AppColors.textHint,
@@ -579,9 +575,7 @@ class _SearchButton extends StatelessWidget {
     return ElevatedButton.icon(
       onPressed: searching
           ? null
-          : () {
-              onSearch();
-            },
+          : onSearch,
       icon: searching
           ? const SizedBox(
               width: 16,
@@ -894,7 +888,7 @@ class _StudentCourseListTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.cardBg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.border.withOpacity(0.72)),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.72)),
             boxShadow: [
               BoxShadow(
                 color: AppColors.shadowThin,
@@ -964,9 +958,7 @@ class _StudentCourseListTile extends StatelessWidget {
                 child: ElevatedButton.icon(
                   onPressed: isEnrolling || !canEnroll
                       ? null
-                      : () {
-                          onEnroll();
-                        },
+                      : onEnroll,
                   icon: isEnrolling
                       ? const SizedBox(
                           width: 14,
@@ -1032,7 +1024,7 @@ class _TopIconButton extends StatelessWidget {
             color: active ? AppColors.primarySoft : AppColors.cardBg,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: active ? AppColors.primary.withOpacity(0.14) : AppColors.border,
+              color: active ? AppColors.primary.withValues(alpha: 0.14) : AppColors.border,
             ),
           ),
           child: Icon(
@@ -1190,7 +1182,7 @@ class _PaginationArrow extends StatelessWidget {
           child: Icon(
             icon,
             size: 20,
-            color: enabled ? AppColors.textMuted : AppColors.textHint.withOpacity(0.45),
+            color: enabled ? AppColors.textMuted : AppColors.textHint.withValues(alpha: 0.45),
           ),
         ),
       ),

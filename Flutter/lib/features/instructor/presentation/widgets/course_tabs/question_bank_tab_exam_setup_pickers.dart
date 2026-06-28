@@ -126,7 +126,7 @@ class _ScopeModeOption extends StatelessWidget {
         decoration: BoxDecoration(
           color: selected ? AppColors.primarySoft : AppColors.surfaceMuted,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? AppColors.primary.withOpacity(0.28) : AppColors.borderGray),
+          border: Border.all(color: selected ? AppColors.primary.withValues(alpha: 0.28) : AppColors.borderGray),
         ),
         child: Row(
           children: [
@@ -295,7 +295,7 @@ class _SetupTopicTreePicker extends StatelessWidget {
                               decoration: BoxDecoration(
                                 color: selected ? AppColors.primarySoft : AppColors.cardBg,
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: selected ? AppColors.primary.withOpacity(0.24) : AppColors.borderGray),
+                                border: Border.all(color: selected ? AppColors.primary.withValues(alpha: 0.24) : AppColors.borderGray),
                               ),
                               child: Row(
                                 children: [
@@ -512,7 +512,7 @@ class _SetupOutcomePicker extends StatelessWidget {
               decoration: BoxDecoration(
                 color: selected ? AppColors.primarySoft : AppColors.cardBg,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: selected ? AppColors.primary.withOpacity(0.24) : AppColors.borderGray),
+                border: Border.all(color: selected ? AppColors.primary.withValues(alpha: 0.24) : AppColors.borderGray),
               ),
               child: Row(
                 children: [
@@ -733,149 +733,6 @@ class _SetupPickerEmpty extends StatelessWidget {
           fontSize: 12.2,
           fontWeight: FontWeight.w800,
         ),
-      ),
-    );
-  }
-}
-
-class _SetupInlineSummary extends StatelessWidget {
-  final int matchingCount;
-  final int targetCount;
-  final int durationMinutes;
-  final bool publishAfterSave;
-
-  const _SetupInlineSummary({
-    required this.matchingCount,
-    required this.targetCount,
-    required this.durationMinutes,
-    required this.publishAfterSave,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 40,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      decoration: BoxDecoration(
-        color: AppColors.headerBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderGray),
-      ),
-      child: Row(
-        children: [
-          Expanded(child: _SetupSummaryText(label: 'Matching', value: '$matchingCount')),
-          _SetupSummaryDivider(),
-          Expanded(child: _SetupSummaryText(label: 'Target', value: '$targetCount')),
-          _SetupSummaryDivider(),
-          Expanded(child: _SetupSummaryText(label: 'Duration', value: '$durationMinutes min')),
-          _SetupSummaryDivider(),
-          Expanded(child: _SetupSummaryText(label: 'Mode', value: publishAfterSave ? 'Publish' : 'Draft')),
-        ],
-      ),
-    );
-  }
-}
-
-class _SetupSummaryText extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _SetupSummaryText({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Flexible(
-          child: Text(
-            label,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 11.5,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-        ),
-        const SizedBox(width: 6),
-        Text(
-          value,
-          overflow: TextOverflow.ellipsis,
-          style: TextStyle(
-            color: AppColors.textTitle,
-            fontSize: 12.5,
-            fontWeight: FontWeight.w900,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _SetupSummaryDivider extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 1,
-      height: 20,
-      margin: const EdgeInsets.symmetric(horizontal: 10),
-      color: AppColors.borderGray,
-    );
-  }
-}
-
-class _StartTemplateDigest extends StatelessWidget {
-  final ExamTemplateModel template;
-
-  const _StartTemplateDigest({required this.template});
-
-  @override
-  Widget build(BuildContext context) {
-    final mode = template.publishAfterSave ? 'Publish after save' : 'Save as draft';
-    final distribution = _templateDistributionText(template);
-    return Container(
-      height: 70,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: AppColors.borderGray),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppColors.primarySoft,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Icon(Icons.description_outlined, color: AppColors.primary, size: 17),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  '${template.questionCount} questions • ${template.durationMinutes} min${distribution.isEmpty ? '' : ' • $distribution'}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.input.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  '${template.maxAttempts} attempt${template.maxAttempts == 1 ? '' : 's'} • ${template.passingScore.toStringAsFixed(0)}% pass • $mode',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: AppText.mutedSmall.copyWith(fontWeight: FontWeight.w700),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

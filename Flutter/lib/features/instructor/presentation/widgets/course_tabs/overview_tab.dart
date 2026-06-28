@@ -353,13 +353,13 @@ class _HeaderTitle extends StatelessWidget {
             ),
             _Chip(
               label: course.safeCourseCode,
-              background: onGradient ? Colors.white.withOpacity(0.16) : AppColors.primarySoft,
+              background: onGradient ? Colors.white.withValues(alpha: 0.16) : AppColors.primarySoft,
               foreground: onGradient ? Colors.white : AppColors.primary,
             ),
             _Chip(
               label: course.isPrivate ? 'Private' : 'Public',
-              background: onGradient ? Colors.white.withOpacity(0.14) : AppColors.surfaceBg,
-              foreground: onGradient ? Colors.white.withOpacity(0.92) : AppColors.textMuted,
+              background: onGradient ? Colors.white.withValues(alpha: 0.14) : AppColors.surfaceBg,
+              foreground: onGradient ? Colors.white.withValues(alpha: 0.92) : AppColors.textMuted,
             ),
           ],
         ),
@@ -386,7 +386,7 @@ class _HeaderTitle extends StatelessWidget {
             fontFamily: 'Inter',
             fontSize: 13,
             height: 1.55,
-            color: onGradient ? Colors.white.withOpacity(0.82) : AppColors.textMuted,
+            color: onGradient ? Colors.white.withValues(alpha: 0.82) : AppColors.textMuted,
           ),
         ),
       ],
@@ -418,10 +418,10 @@ class _ReadinessDial extends StatelessWidget {
       width: 210,
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: onGradient ? Colors.white.withOpacity(0.14) : AppColors.surfaceBg,
+        color: onGradient ? Colors.white.withValues(alpha: 0.14) : AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(
-          color: onGradient ? Colors.white.withOpacity(0.26) : AppColors.border,
+          color: onGradient ? Colors.white.withValues(alpha: 0.26) : AppColors.border,
         ),
       ),
       child: Row(
@@ -435,7 +435,7 @@ class _ReadinessDial extends StatelessWidget {
                 CircularProgressIndicator(
                   value: readiness,
                   strokeWidth: 7,
-                  backgroundColor: onGradient ? Colors.white.withOpacity(0.28) : AppColors.border,
+                  backgroundColor: onGradient ? Colors.white.withValues(alpha: 0.28) : AppColors.border,
                   color: onGradient ? Colors.white : AppColors.primary,
                 ),
                 Text(
@@ -470,7 +470,7 @@ class _ReadinessDial extends StatelessWidget {
                   style: TextStyle(
                     fontFamily: 'Inter',
                     fontSize: 11.5,
-                    color: onGradient ? Colors.white.withOpacity(0.72) : AppColors.textMuted,
+                    color: onGradient ? Colors.white.withValues(alpha: 0.72) : AppColors.textMuted,
                   ),
                 ),
               ],
@@ -550,7 +550,7 @@ class _SignalCard extends StatelessWidget {
             width: 42,
             height: 42,
             decoration: BoxDecoration(
-              color: signal.accent.withOpacity(0.10),
+              color: signal.accent.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(13),
             ),
             alignment: Alignment.center,
@@ -647,7 +647,7 @@ class _NextMoveCard extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: move.accent.withOpacity(0.12),
+                  color: move.accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(13),
                 ),
                 alignment: Alignment.center,
@@ -876,7 +876,7 @@ class _ModuleRow extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: accent.withOpacity(0.12),
+              color: accent.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
             alignment: Alignment.center,
@@ -1082,7 +1082,7 @@ class _Chip extends StatelessWidget {
       decoration: BoxDecoration(
         color: background,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: foreground.withOpacity(0.12)),
+        border: Border.all(color: foreground.withValues(alpha: 0.12)),
       ),
       child: Text(
         label,

@@ -569,7 +569,7 @@ class _AiLearningAnalysisPanel extends StatelessWidget {
       padding: const EdgeInsets.all(28),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.infoBg.withOpacity(0.55), AppColors.cardBg],
+          colors: [AppColors.infoBg.withValues(alpha: 0.55), AppColors.cardBg],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
@@ -761,7 +761,7 @@ class _AnalysisItem extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: bgColor.withOpacity(0.72),
+        color: bgColor.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: borderColor),
       ),
@@ -870,7 +870,7 @@ class _GradingProgressNotice extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: AppColors.infoBg.withOpacity(0.72),
+        color: AppColors.infoBg.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.infoBorder),
       ),
@@ -1124,7 +1124,7 @@ class _PendingAiFeedbackBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.infoBg.withOpacity(0.45),
+        color: AppColors.infoBg.withValues(alpha: 0.45),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: AppColors.infoBorder),
       ),
@@ -1162,7 +1162,7 @@ class _AnswerBox extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.all(13),
       decoration: BoxDecoration(
-        color: bg.withOpacity(0.72),
+        color: bg.withValues(alpha: 0.72),
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: border),
       ),

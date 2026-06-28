@@ -322,7 +322,7 @@ class ExamScanAnswer {
       detectedAnswer: json['detected_answer']?.toString(),
       detectedAnswers: ((json['detected_answers'] as List?) ?? const []).map((item) => item.toString()).toList(growable: false),
       selectedOptionIndex: _nullableInt(json['selected_option_index']),
-      selectedOptionIndices: (json['selected_option_indices'] as List?)?.map((item) => _asInt(item)).toList(growable: false),
+      selectedOptionIndices: (json['selected_option_indices'] as List?)?.map(_asInt).toList(growable: false),
       answerText: json['answer_text']?.toString(),
       confidence: _asDouble(json['confidence']),
       status: (json['status'] ?? '').toString(),

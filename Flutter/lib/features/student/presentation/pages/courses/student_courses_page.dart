@@ -298,7 +298,7 @@ class _StudentCourseListTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.cardBg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.border.withOpacity(0.72)),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.72)),
             boxShadow: [
               BoxShadow(
                 color: AppColors.shadowThin,
@@ -413,7 +413,7 @@ class _TopIconButton extends StatelessWidget {
             color: active ? AppColors.primarySoft : AppColors.cardBg,
             borderRadius: BorderRadius.circular(6),
             border: Border.all(
-              color: active ? AppColors.primary.withOpacity(0.14) : AppColors.border,
+              color: active ? AppColors.primary.withValues(alpha: 0.14) : AppColors.border,
             ),
           ),
           child: Icon(

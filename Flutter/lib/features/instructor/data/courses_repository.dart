@@ -1,7 +1,8 @@
-import '../../../core/log/app_logger.dart';
 import 'dart:typed_data';
 
 import 'package:dio/dio.dart';
+
+import '../../../core/log/app_logger.dart';
 import 'courses_api.dart';
 import 'courses_models.dart';
 import 'modules_api.dart';

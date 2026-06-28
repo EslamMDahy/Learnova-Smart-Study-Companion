@@ -53,7 +53,7 @@ class _ExamStudioHero extends StatelessWidget {
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(10),
-        boxShadow: [BoxShadow(color: AppColors.shadowBlue.withOpacity(0.34), blurRadius: 22, offset: const Offset(0, 12))],
+        boxShadow: [BoxShadow(color: AppColors.shadowBlue.withValues(alpha: 0.34), blurRadius: 22, offset: const Offset(0, 12))],
       ),
       child: Row(
         children: [
@@ -61,9 +61,9 @@ class _ExamStudioHero extends StatelessWidget {
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.14),
+              color: Colors.white.withValues(alpha: 0.14),
               borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.22)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
             ),
             child: const Icon(Icons.assignment_turned_in_outlined, color: Colors.white, size: 29),
           ),
@@ -76,7 +76,7 @@ class _ExamStudioHero extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   'Manage generated exams, publish them to students, and export backend-ready paper PDFs.',
-                  style: TextStyle(color: Colors.white.withOpacity(0.86), fontSize: 13, fontWeight: FontWeight.w700, height: 1.35),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.86), fontSize: 13, fontWeight: FontWeight.w700, height: 1.35),
                 ),
               ],
             ),
@@ -104,9 +104,9 @@ class _ExamStudioHero extends StatelessWidget {
                 label: Text(refreshing ? 'Loading...' : 'Refresh'),
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  disabledForegroundColor: Colors.white.withOpacity(0.55),
-                  side: BorderSide(color: Colors.white.withOpacity(0.35)),
-                  backgroundColor: Colors.white.withOpacity(0.08),
+                  disabledForegroundColor: Colors.white.withValues(alpha: 0.55),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
                 ),
               ),
               const SizedBox(height: 10),
@@ -117,8 +117,8 @@ class _ExamStudioHero extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   foregroundColor: AppColors.primary,
                   backgroundColor: Colors.white,
-                  disabledBackgroundColor: Colors.white.withOpacity(0.25),
-                  disabledForegroundColor: Colors.white.withOpacity(0.65),
+                  disabledBackgroundColor: Colors.white.withValues(alpha: 0.25),
+                  disabledForegroundColor: Colors.white.withValues(alpha: 0.65),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -143,16 +143,16 @@ class _HeroMetric extends StatelessWidget {
       width: 96,
       padding: const EdgeInsets.fromLTRB(13, 11, 13, 11),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.13),
+        color: Colors.white.withValues(alpha: 0.13),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.18)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900)),
           const SizedBox(height: 3),
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withOpacity(0.76), fontSize: 11, fontWeight: FontWeight.w800)),
+          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: Colors.white.withValues(alpha: 0.76), fontSize: 11, fontWeight: FontWeight.w800)),
         ],
       ),
     );
@@ -540,7 +540,7 @@ class _CourseTile extends StatelessWidget {
         decoration: BoxDecoration(
           color: active ? AppColors.selectedBg : AppColors.cardBg,
           borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: active ? AppColors.primary.withOpacity(0.42) : AppColors.border),
+          border: Border.all(color: active ? AppColors.primary.withValues(alpha: 0.42) : AppColors.border),
           boxShadow: active ? [BoxShadow(color: AppColors.shadowThin, blurRadius: 14, offset: const Offset(0, 8))] : null,
         ),
         child: Column(

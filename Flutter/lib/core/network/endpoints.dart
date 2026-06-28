@@ -6,7 +6,6 @@ class Endpoints {
   static const _settings = '/settings';
   static const _courses  = '/courses';
   static const _ocr      = '/ocr';
-  static const _ai       = '/ai';
 
   // ─── AUTH ────────────────────────────────────────────────────────────────
   static const login               = '$_auth/login';

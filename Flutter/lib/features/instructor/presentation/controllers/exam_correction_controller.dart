@@ -13,7 +13,7 @@ import 'exam_correction_state.dart';
 
 final examCorrectionControllerProvider = StateNotifierProvider.autoDispose<
     ExamCorrectionController, ExamCorrectionState>(
-  (ref) => ExamCorrectionController(ref),
+  ExamCorrectionController.new,
 );
 
 class ExamCorrectionController extends StateNotifier<ExamCorrectionState> {

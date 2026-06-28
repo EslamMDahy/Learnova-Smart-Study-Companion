@@ -1,174 +1,16 @@
 part of 'materials_tab.dart';
 
-class _TopicsSidebarWidget extends StatelessWidget {
-  final List<TopicItem> topics; final bool loading;
-  final void Function(TopicItem) onTopicTap;
-  final VoidCallback onAddManual, onGenerateAI;
-  const _TopicsSidebarWidget({required this.topics, required this.loading,
-      required this.onTopicTap, required this.onAddManual, required this.onGenerateAI,});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(
-        padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
-        child: Row(children: [
-          Container(
-            width: 24,
-            height: 24,
-            decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(7)),
-            alignment: Alignment.center,
-            child: const Icon(Icons.tag_rounded, size: 13, color: AppColors.primary),
-          ),
-          const SizedBox(width: 8),
-          Text('Topics', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-          if (!loading && topics.isNotEmpty) ...[
-            const SizedBox(width: 6),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(10)),
-              child: Text('${topics.length}', style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: AppColors.primary)),
-            ),
-          ],
-          const Spacer(),
-          if (loading) const SizedBox(width: 13, height: 13, child: CircularProgressIndicator(strokeWidth: 1.5)),
-        ],),
-      ),
-      Container(
-        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
-        child: SizedBox(
-          width: double.infinity,
-          child: _AddTopicBtnW(
-            icon: Icons.edit_rounded,
-            label: 'Add Topic',
-            onTap: onAddManual,
-            color: AppColors.primary,
-            bg: _K.blueSoft,
-          ),
-        ),
-      ),
-      Expanded(
-        child: loading
-            ? Center(
-                child: Column(mainAxisSize: MainAxisSize.min, children: [
-                  const CircularProgressIndicator(strokeWidth: 2),
-                  const SizedBox(height: 8),
-                  Text('Loading topics…', style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-                ],),
-              )
-            : topics.isEmpty
-                ? _TopicsEmptyW(onAddManual: onAddManual)
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 4),
-                    itemCount: topics.length,
-                    itemBuilder: (_, i) => _TopicItemW(topic: topics[i], index: i, onTap: () => onTopicTap(topics[i])),
-                  ),
-      ),
-    ],);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  Unified "Add Topic" button
-// ─────────────────────────────────────────────────────────────────────────────
-class _AddTopicUnifiedBtn extends StatelessWidget {
-  final VoidCallback onTap;
-  const _AddTopicUnifiedBtn({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return MouseRegion(
-      cursor: SystemMouseCursors.click,
-      child: GestureDetector(
-        onTap: onTap,
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            borderRadius: BorderRadius.circular(10),
-            boxShadow: [
-              const BoxShadow(
-                color: Color(0x1A137FEC),
-                blurRadius: 10,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: const Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.add_rounded, size: 16, color: Colors.white),
-              SizedBox(width: 5),
-              Text(
-                'Add Topic',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: Colors.white,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GhostActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color fg;
-  final Color bg;
-  final VoidCallback onTap;
-  const _GhostActionButton({required this.icon, required this.label, required this.fg, required this.bg, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    Theme.of(context);
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(10),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 14, color: fg),
-            const SizedBox(width: 6),
-            Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: fg)),
-          ],),
-        ),
-      ),
-    );
-  }
-}
-
-
-enum _TopicCreateMode { manual, ai }
-
 class _TopicDialogResult {
   final String title;
-  final _TopicCreateMode mode;
   final List<int> learningOutcomeIds;
 
-  const _TopicDialogResult.manual(this.title, {this.learningOutcomeIds = const []})
-      : mode = _TopicCreateMode.manual;
-  const _TopicDialogResult.ai()
-      : mode = _TopicCreateMode.ai,
-        title = '',
-        learningOutcomeIds = const [];
+  const _TopicDialogResult.manual(this.title, {this.learningOutcomeIds = const []});
 }
 
 class _AddTopicDialogV2 extends StatefulWidget {
   final List<LearningOutcome> outcomes;
   final bool isSubtopic;
-  const _AddTopicDialogV2({super.key, this.outcomes = const [], this.isSubtopic = false});
+  const _AddTopicDialogV2({this.outcomes = const [], this.isSubtopic = false});
 
   @override
   State<_AddTopicDialogV2> createState() => _AddTopicDialogV2State();
@@ -235,7 +77,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
               borderRadius: BorderRadius.circular(20),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.16),
+                  color: Colors.black.withValues(alpha: 0.16),
                   blurRadius: 42,
                   spreadRadius: 2,
                   offset: const Offset(0, 20),
@@ -368,7 +210,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                 style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textMuted),),
             const SizedBox(width: 6),
             Text('(required)',
-                style: TextStyle(fontSize: 11, color: AppColors.textMuted.withOpacity(0.7)),),
+                style: TextStyle(fontSize: 11, color: AppColors.textMuted.withValues(alpha: 0.7)),),
           ],),
           const SizedBox(height: 8),
           Container(
@@ -406,7 +248,7 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                       decoration: BoxDecoration(
-                        color: selected ? AppColors.primary.withOpacity(0.06) : Colors.transparent,
+                        color: selected ? AppColors.primary.withValues(alpha: 0.06) : Colors.transparent,
                         border: i < outcomes.length - 1
                             ? Border(bottom: BorderSide(color: AppColors.divider))
                             : null,
@@ -504,6 +346,10 @@ class _AddTopicDialogV2State extends State<_AddTopicDialogV2>
 
 
 
-bool _isDangerActionColor(Color color) => color.red >= 180 && color.green <= 120;
+bool _isDangerActionColor(Color color) {
+  final red = (color.r * 255.0).round().clamp(0, 255);
+  final green = (color.g * 255.0).round().clamp(0, 255);
+  return red >= 180 && green <= 120;
+}
 
 

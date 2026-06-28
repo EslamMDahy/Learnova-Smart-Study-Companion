@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'package:learnova/features/instructor/presentation/widgets/create_course_dialog.dart';
 import 'package:learnova/features/instructor/presentation/widgets/invite_students_dialog.dart';
-import 'package:learnova/features/instructor/data/courses_models.dart';
 import 'package:learnova/features/instructor/data/learning_outcomes_cache.dart';
 import 'package:learnova/features/instructor/data/learning_outcomes_models.dart';
 import 'package:learnova/features/instructor/data/modules_materials_providers.dart';
@@ -136,6 +135,7 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
     }
 
     // 4) If course is PRIVATE (needs invites), open upload dialog with courseId
+    if (!mounted) return;
     if (result.needsInvites) {
       await showDialog<bool>(
         context: context,
@@ -164,17 +164,7 @@ class _InstructorCourseRoutePageState extends ConsumerState<InstructorCourseRout
         payload: payload,
       ),
       onPublishCourse: controller.publishCourse,
-      onUploadCover: ({
-        required MyCourseItem course,
-        required List<int> bytes,
-        required String? contentType,
-        required String filename,
-      }) => controller.uploadCourseCover(
-        course: course,
-        bytes: bytes,
-        contentType: contentType,
-        filename: filename,
-      ),
+      onUploadCover: controller.uploadCourseCover,
     );
   }
 }

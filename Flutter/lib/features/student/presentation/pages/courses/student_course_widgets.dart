@@ -136,7 +136,7 @@ class StudentCourseCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: AppColors.cardBg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.border.withOpacity(0.72)),
+            border: Border.all(color: AppColors.border.withValues(alpha: 0.72)),
             boxShadow: [
               BoxShadow(
                 color: AppColors.shadowThin,
@@ -277,7 +277,7 @@ class _CourseCover extends StatelessWidget {
         children: [
           if (hasCover)
             Image.network(
-              coverUrl!,
+              coverUrl,
               fit: BoxFit.cover,
               filterQuality: FilterQuality.medium,
               loadingBuilder: (context, child, loadingProgress) {
@@ -330,8 +330,8 @@ class _CourseCover extends StatelessWidget {
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withOpacity(0.08),
-                  Colors.black.withOpacity(0.58),
+                  Colors.black.withValues(alpha: 0.08),
+                  Colors.black.withValues(alpha: 0.58),
                 ],
               ),
             ),
@@ -549,7 +549,7 @@ class StudentCourseDetailsDialog extends StatelessWidget {
                 children: [
                   if (hasCover)
                     Image.network(
-                      coverUrl!,
+                      coverUrl,
                       fit: BoxFit.cover,
                       filterQuality: FilterQuality.medium,
                       loadingBuilder: (context, child, loadingProgress) {
@@ -602,8 +602,8 @@ class StudentCourseDetailsDialog extends StatelessWidget {
                         begin: Alignment.topCenter,
                         end: Alignment.bottomCenter,
                         colors: [
-                          Colors.black.withOpacity(0.05),
-                          Colors.black.withOpacity(0.68),
+                          Colors.black.withValues(alpha: 0.05),
+                          Colors.black.withValues(alpha: 0.68),
                         ],
                       ),
                     ),
@@ -1071,7 +1071,7 @@ class _CourseMetaBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.20),
+        color: Colors.white.withValues(alpha: 0.20),
         borderRadius: BorderRadius.circular(4),
       ),
       child: ConstrainedBox(
@@ -1373,11 +1373,11 @@ class _CourseCoverPainter extends CustomPainter {
 
   void _paintCode(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = const Color(0xFF67E8F9).withOpacity(0.18)
+      ..color = const Color(0xFF67E8F9).withValues(alpha: 0.18)
       ..strokeWidth = 1.2
       ..strokeCap = StrokeCap.round;
     final textPaint = Paint()
-      ..color = Colors.white.withOpacity(0.09)
+      ..color = Colors.white.withValues(alpha: 0.09)
       ..strokeWidth = 2;
 
     for (var i = 0; i < 13; i++) {
@@ -1391,7 +1391,7 @@ class _CourseCoverPainter extends CustomPainter {
     }
 
     final gridPaint = Paint()
-      ..color = Colors.white.withOpacity(0.05)
+      ..color = Colors.white.withValues(alpha: 0.05)
       ..strokeWidth = 1;
     for (var x = 0.0; x < size.width; x += 42) {
       canvas.drawLine(Offset(x, 0), Offset(x + 50, size.height), gridPaint);
@@ -1400,10 +1400,10 @@ class _CourseCoverPainter extends CustomPainter {
 
   void _paintData(Canvas canvas, Size size) {
     final linePaint = Paint()
-      ..color = const Color(0xFF14B8A6).withOpacity(0.28)
+      ..color = const Color(0xFF14B8A6).withValues(alpha: 0.28)
       ..strokeWidth = 1.3;
     final axisPaint = Paint()
-      ..color = Colors.white.withOpacity(0.08)
+      ..color = Colors.white.withValues(alpha: 0.08)
       ..strokeWidth = 1;
 
     for (var x = 0.0; x <= size.width; x += 24) {
@@ -1424,10 +1424,10 @@ class _CourseCoverPainter extends CustomPainter {
   }
 
   void _paintMachine(Canvas canvas, Size size) {
-    final glow = Paint()..color = const Color(0xFF22D3EE).withOpacity(0.18);
-    final node = Paint()..color = const Color(0xFF14B8A6).withOpacity(0.44);
+    final glow = Paint()..color = const Color(0xFF22D3EE).withValues(alpha: 0.18);
+    final node = Paint()..color = const Color(0xFF14B8A6).withValues(alpha: 0.44);
     final stroke = Paint()
-      ..color = Colors.white.withOpacity(0.10)
+      ..color = Colors.white.withValues(alpha: 0.10)
       ..strokeWidth = 1.2;
 
     final points = <Offset>[
@@ -1448,7 +1448,7 @@ class _CourseCoverPainter extends CustomPainter {
     canvas.drawCircle(
       Offset(size.width * .78, size.height * .92),
       3,
-      Paint()..color = const Color(0xFF0891B2).withOpacity(0.55),
+      Paint()..color = const Color(0xFF0891B2).withValues(alpha: 0.55),
     );
   }
 
@@ -1463,7 +1463,7 @@ class _CourseCoverPainter extends CustomPainter {
           const Color(0xFFF97316),
           i / 8,
         )!
-            .withOpacity(0.34);
+            .withValues(alpha: 0.34);
       final path = Path()
         ..moveTo(-20, size.height * (.15 + i * .08))
         ..cubicTo(
@@ -1479,16 +1479,16 @@ class _CourseCoverPainter extends CustomPainter {
   }
 
   void _paintSoft(Canvas canvas, Size size) {
-    final paint = Paint()..color = Colors.white.withOpacity(0.11);
+    final paint = Paint()..color = Colors.white.withValues(alpha: 0.11);
     canvas.drawCircle(Offset(size.width * .72, size.height * .82), 58, paint);
     canvas.drawCircle(
       Offset(size.width * .45, size.height * .52),
       22,
-      Paint()..color = Colors.black.withOpacity(0.12),
+      Paint()..color = Colors.black.withValues(alpha: 0.12),
     );
     canvas.drawRect(
       Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint()..color = Colors.white.withOpacity(0.05),
+      Paint()..color = Colors.white.withValues(alpha: 0.05),
     );
   }
 

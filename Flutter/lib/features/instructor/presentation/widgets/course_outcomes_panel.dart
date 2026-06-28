@@ -68,8 +68,8 @@ Future<void> showCourseOutcomesDialog(
 ) {
   return showDialog(
     context: context,
-    builder: (_) => ProviderScope(
-      parent: ProviderScope.containerOf(context),
+    builder: (_) => UncontrolledProviderScope(
+      container: ProviderScope.containerOf(context),
       child: CourseOutcomesManager(courseId: courseId),
     ),
   );
@@ -468,7 +468,7 @@ class _OutcomesHero extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.18),
+            color: AppColors.primary.withValues(alpha: 0.18),
             blurRadius: 28,
             offset: const Offset(0, 12),
           ),
@@ -487,9 +487,9 @@ class _OutcomesHero extends StatelessWidget {
                 onPressed: loading ? null : onRefresh,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  disabledForegroundColor: Colors.white.withOpacity(0.5),
-                  side: BorderSide(color: Colors.white.withOpacity(0.35)),
-                  backgroundColor: Colors.white.withOpacity(0.08),
+                  disabledForegroundColor: Colors.white.withValues(alpha: 0.5),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -534,14 +534,14 @@ class _OutcomesHero extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.14),
+                  color: Colors.white.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(9),
-                  border: Border.all(color: Colors.white.withOpacity(0.18)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
                 ),
                 child: Text(
                   'Outcomes',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 11.5,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.4,
@@ -566,7 +566,7 @@ class _OutcomesHero extends StatelessWidget {
                   fontSize: 13.5,
                   height: 1.55,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white.withOpacity(0.84),
+                  color: Colors.white.withValues(alpha: 0.84),
                 ),
               ),
             ],
@@ -618,9 +618,9 @@ class _HeroMetric extends StatelessWidget {
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.22)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -638,7 +638,7 @@ class _HeroMetric extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.78),
+              color: Colors.white.withValues(alpha: 0.78),
               fontSize: 11.2,
               fontWeight: FontWeight.w800,
             ),
@@ -884,38 +884,11 @@ class _DifficultyDot extends StatelessWidget {
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: color.withOpacity(0.12),
+        color: color.withValues(alpha: 0.12),
         shape: BoxShape.circle,
-        border: Border.all(color: color.withOpacity(0.32)),
+        border: Border.all(color: color.withValues(alpha: 0.32)),
       ),
       child: Icon(_difficultyIcon(level), size: compact ? 12 : 15, color: color),
-    );
-  }
-}
-
-class _DifficultyPill extends StatelessWidget {
-  final OutcomeDifficulty level;
-
-  const _DifficultyPill({required this.level});
-
-  @override
-  Widget build(BuildContext context) {
-    final color = _difficultyColor(level);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.28)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(_difficultyIcon(level), size: 13, color: color),
-          const SizedBox(width: 5),
-          Text(level.label, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: color)),
-        ],
-      ),
     );
   }
 }

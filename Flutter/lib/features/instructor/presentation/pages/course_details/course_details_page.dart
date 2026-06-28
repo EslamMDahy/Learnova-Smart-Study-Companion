@@ -232,9 +232,9 @@ class _CourseDetailsPageState extends ConsumerState<CourseDetailsPage> {
       final asyncCourse =
           ref.watch(selectedCourseByIdProvider(widget.cachedCourseId!));
       return asyncCourse.when(
-        loading: () => _buildLoadingShell(),
+        loading: _buildLoadingShell,
         error: (e, _) => _buildErrorShell(mapApiFailure(e).message),
-        data: (course) => _buildContent(course),
+        data: _buildContent,
       );
     }
 
@@ -473,7 +473,7 @@ class _BackToCoursesButtonState extends State<_BackToCoursesButton> {
               boxShadow: _hovered
                   ? [
                       BoxShadow(
-                        color: Colors.black.withOpacity(0.06),
+                        color: Colors.black.withValues(alpha: 0.06),
                         blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
@@ -593,13 +593,13 @@ class _PillTabState extends State<_PillTab> {
             color: widget.selected
                 ? AppColors.cardBg
                 : _hovered
-                    ? AppColors.cardBg.withOpacity(0.62)
+                    ? AppColors.cardBg.withValues(alpha: 0.62)
                     : Colors.transparent,
             borderRadius: BorderRadius.circular(7),
             boxShadow: widget.selected
                 ? [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.07),
+                      color: Colors.black.withValues(alpha: 0.07),
                       blurRadius: 6,
                       offset: const Offset(0, 1),
                     ),

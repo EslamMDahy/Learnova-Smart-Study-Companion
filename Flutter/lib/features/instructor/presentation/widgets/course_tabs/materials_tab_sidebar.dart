@@ -133,7 +133,7 @@ class _SidebarWidget extends StatelessWidget {
                       color: selectionMode ? _K.blueSoft : AppColors.surfaceBg,
                       borderRadius: BorderRadius.circular(999),
                       border: Border.all(
-                        color: selectionMode ? AppColors.primary.withOpacity(0.18) : _K.div,
+                        color: selectionMode ? AppColors.primary.withValues(alpha: 0.18) : _K.div,
                       ),
                     ),
                     child: Row(
@@ -205,7 +205,7 @@ class _SidebarWidget extends StatelessWidget {
                                           borderRadius: BorderRadius.circular(12),
                                           boxShadow: [
                                             BoxShadow(
-                                              color: AppColors.primary.withOpacity(0.14),
+                                              color: AppColors.primary.withValues(alpha: 0.14),
                                               blurRadius: 16,
                                               offset: const Offset(0, 8),
                                             ),
@@ -347,7 +347,7 @@ class _ResizableSidebarHost extends StatelessWidget {
               child: Container(
                 width: _handleWidth,
                 color: isResizing
-                    ? AppColors.primary.withOpacity(0.08)
+                    ? AppColors.primary.withValues(alpha: 0.08)
                     : _K.bg,
                 child: Center(
                   child: Container(
@@ -355,8 +355,8 @@ class _ResizableSidebarHost extends StatelessWidget {
                     height: 38,
                     decoration: BoxDecoration(
                       color: isResizing
-                          ? AppColors.primary.withOpacity(0.65)
-                          : AppColors.textHint.withOpacity(0.28),
+                          ? AppColors.primary.withValues(alpha: 0.65)
+                          : AppColors.textHint.withValues(alpha: 0.28),
                       borderRadius: BorderRadius.circular(999),
                     ),
                   ),
@@ -1029,7 +1029,7 @@ class _MatRowWidget extends StatelessWidget {
                   height: 16,
                   alignment: Alignment.center,
                   decoration: BoxDecoration(
-                    color: col.withOpacity(0.10),
+                    color: col.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: Icon(ico, size: 10, color: col),
@@ -1323,7 +1323,7 @@ class _FooterWidget extends StatelessWidget {
       height: 56,
       decoration: BoxDecoration(color: Colors.white,
           border: const Border(top: BorderSide(color: _K.div)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05),
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05),
               blurRadius: 16, offset: const Offset(0, -4),),],),
       padding: const EdgeInsets.symmetric(horizontal: 18),
       child: Row(children: [

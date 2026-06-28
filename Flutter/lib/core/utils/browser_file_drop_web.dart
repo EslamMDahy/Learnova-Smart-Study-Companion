@@ -1,4 +1,4 @@
-// ignore_for_file: avoid_web_libraries_in_flutter
+// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:async';
 import 'dart:html' as html;
 import 'dart:typed_data';
@@ -9,7 +9,7 @@ typedef DropZoneHitTest = bool Function(double clientX, double clientY);
 typedef BrowserFilesDropped = Future<void> Function(List<PickedBrowserFile> files);
 
 class BrowserFileDropSubscription {
-  final List<StreamSubscription<html.Event>> _subscriptions;
+  final List<StreamSubscription<dynamic>> _subscriptions;
 
   BrowserFileDropSubscription._(this._subscriptions);
 
@@ -36,50 +36,45 @@ BrowserFileDropSubscription listenForBrowserFileDrops({
   }
 
   bool isFileDrag(html.MouseEvent event) {
-    final dataTransfer = event.dataTransfer;
-    if (dataTransfer == null) return false;
-    final types = dataTransfer.types;
-    if (types == null) return true;
-    return types.contains('Files') || types.contains('application/x-moz-file');
+    final types = event.dataTransfer.types;
+    return types?.contains('Files') == true ||
+        types?.contains('application/x-moz-file') == true;
   }
 
   bool isInside(html.MouseEvent event) {
     return isInsideDropZone(event.client.x.toDouble(), event.client.y.toDouble());
   }
 
-  final subscriptions = <StreamSubscription<html.Event>>[];
+  final subscriptions = <StreamSubscription<dynamic>>[];
 
-  subscriptions.add(html.window.onDragOver.listen((event) {
-    final mouseEvent = event as html.MouseEvent;
+  subscriptions.add(html.window.onDragOver.listen((mouseEvent) {
     if (!isFileDrag(mouseEvent)) return;
 
     final inside = isInside(mouseEvent);
     setHovering(inside);
 
     if (!inside) return;
-    event.preventDefault();
-    event.stopPropagation();
-    mouseEvent.dataTransfer?.dropEffect = 'copy';
+    mouseEvent.preventDefault();
+    mouseEvent.stopPropagation();
+    mouseEvent.dataTransfer.dropEffect = 'copy';
   }));
 
-  subscriptions.add(html.window.onDragLeave.listen((event) {
-    final mouseEvent = event as html.MouseEvent;
+  subscriptions.add(html.window.onDragLeave.listen((mouseEvent) {
     if (!isFileDrag(mouseEvent)) return;
     if (!isInside(mouseEvent)) setHovering(false);
   }));
 
-  subscriptions.add(html.window.onDrop.listen((event) async {
-    final mouseEvent = event as html.MouseEvent;
+  subscriptions.add(html.window.onDrop.listen((mouseEvent) async {
     if (!isFileDrag(mouseEvent)) return;
 
     final inside = isInside(mouseEvent);
     setHovering(false);
     if (!inside || dropping) return;
 
-    event.preventDefault();
-    event.stopPropagation();
+    mouseEvent.preventDefault();
+    mouseEvent.stopPropagation();
 
-    final files = mouseEvent.dataTransfer?.files;
+    final files = mouseEvent.dataTransfer.files;
     if (files == null || files.isEmpty) return;
 
     dropping = true;

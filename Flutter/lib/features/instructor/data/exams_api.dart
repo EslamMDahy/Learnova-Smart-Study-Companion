@@ -19,11 +19,6 @@ class ExamPdfExport {
 }
 
 
-DateTime _defaultBackendAvailableFrom() =>
-    DateTime.now().toUtc().subtract(const Duration(minutes: 5));
-
-DateTime _defaultBackendAvailableTo() =>
-    DateTime.now().toUtc().add(const Duration(days: 3650));
 
 String _backendIso(DateTime value) => value.toUtc().toIso8601String();
 

@@ -739,61 +739,6 @@ class _EditQuestionDialogState extends ConsumerState<_EditQuestionDialog> {
 
 }
 
-class _LockedQuestionTypeTabs extends StatelessWidget {
-  final QuestionType type;
-
-  const _LockedQuestionTypeTabs({required this.type});
-
-  static const _types = <QuestionType>[
-    QuestionType.multipleChoice,
-    QuestionType.multiSelect,
-    QuestionType.trueFalse,
-    QuestionType.shortAnswer,
-    QuestionType.essay,
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final displayedTypes = _types.contains(type) ? _types : <QuestionType>[..._types, type];
-    return Container(
-      height: 62,
-      decoration: BoxDecoration(
-        border: Border(bottom: BorderSide(color: AppColors.borderGray)),
-      ),
-      child: Row(
-        children: displayedTypes.map((item) {
-          final selected = item == type;
-          return Expanded(
-            child: Container(
-              height: double.infinity,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                border: Border(
-                  bottom: BorderSide(
-                    color: selected ? AppColors.primary : Colors.transparent,
-                    width: 2,
-                  ),
-                ),
-              ),
-              child: Text(
-                item.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
-                  color: selected ? AppColors.primary : AppColors.textMuted,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-}
-
 class _EditErrorBanner extends StatelessWidget {
   final String message;
 
@@ -941,7 +886,7 @@ class _TopicSelectorField extends StatelessWidget {
       final selected = await showDialog<int>(
         context: context,
         barrierDismissible: false,
-        barrierColor: Colors.black.withOpacity(0.30),
+        barrierColor: Colors.black.withValues(alpha: 0.30),
         builder: (_) => _TopicPickerDialog(
           selectedTopicId: value,
           targets: targets,
@@ -971,7 +916,7 @@ class _TopicSelectorField extends StatelessWidget {
             decoration: BoxDecoration(
               color: targets.isEmpty ? AppColors.surfaceBg : AppColors.primarySoft,
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: targets.isEmpty ? AppColors.border : AppColors.primary.withOpacity(0.45)),
+              border: Border.all(color: targets.isEmpty ? AppColors.border : AppColors.primary.withValues(alpha: 0.45)),
             ),
             child: Row(
               children: [
@@ -1212,7 +1157,7 @@ class _TopicPickerDialogState extends State<_TopicPickerDialog> {
           color: selected ? AppColors.selectedBg : AppColors.surfaceBg,
           borderRadius: BorderRadius.circular(13),
           border: Border.all(
-            color: selected ? AppColors.primary.withOpacity(0.50) : AppColors.borderGray,
+            color: selected ? AppColors.primary.withValues(alpha: 0.50) : AppColors.borderGray,
           ),
         ),
         child: Row(
@@ -1262,208 +1207,6 @@ class _TopicPickerDialogState extends State<_TopicPickerDialog> {
 
 }
 
-class _TopicPickerRow extends StatelessWidget {
-  final _TopicTarget target;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _TopicPickerRow({required this.target, required this.selected, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Container(
-        padding: const EdgeInsets.all(13),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primarySoft : AppColors.cardBg,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: selected ? AppColors.primary : AppColors.headerBg,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                selected ? Icons.check_rounded : Icons.topic_outlined,
-                color: selected ? Colors.white : AppColors.textMuted,
-                size: 18,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(target.topic.title, style: TextStyle(color: AppColors.textTitle, fontSize: 13.2, fontWeight: FontWeight.w900)),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${target.module.title} → ${target.material.displayTitle}${target.parentTopicTitle == null ? '' : ' → ${target.parentTopicTitle}'}',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _EditOptionsPanel extends StatelessWidget {
-  final QuestionType type;
-  final List<_EditableOption> options;
-  final bool enabled;
-  final VoidCallback onChanged;
-  final VoidCallback onAdd;
-  final ValueChanged<int> onRemove;
-
-  const _EditOptionsPanel({
-    required this.type,
-    required this.options,
-    required this.enabled,
-    required this.onChanged,
-    required this.onAdd,
-    required this.onRemove,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text('Answer options', style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w900)),
-              ),
-              TextButton.icon(
-                onPressed: enabled && options.length < 8 ? onAdd : null,
-                icon: const Icon(Icons.add_rounded, size: 16),
-                label: const Text('Add option'),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ...List.generate(options.length, (index) {
-            final option = options[index];
-            final label = String.fromCharCode(65 + index);
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: Row(
-                children: [
-                  if (type == QuestionType.multiSelect)
-                    Checkbox(
-                      value: option.correct,
-                      onChanged: enabled
-                          ? (value) {
-                              option.correct = value ?? false;
-                              onChanged();
-                            }
-                          : null,
-                    )
-                  else
-                    Radio<int>(
-                      value: index,
-                      groupValue: options.indexWhere((item) => item.correct),
-                      onChanged: enabled
-                          ? (value) {
-                              if (value == null) return;
-                              for (var i = 0; i < options.length; i++) {
-                                options[i].correct = i == value;
-                              }
-                              onChanged();
-                            }
-                          : null,
-                    ),
-                  SizedBox(
-                    width: 28,
-                    child: Text(label, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w900)),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: TextField(
-                      controller: option.controller,
-                      enabled: enabled,
-                      onChanged: (_) => onChanged(),
-                      decoration: _editDecoration('Option ${index + 1}'),
-                    ),
-                  ),
-                  IconButton(
-                    onPressed: enabled && options.length > 2 ? () => onRemove(index) : null,
-                    icon: const Icon(Icons.delete_outline_rounded),
-                  ),
-                ],
-              ),
-            );
-          }),
-          Text(
-            type == QuestionType.multiSelect
-                ? 'Select every correct option.'
-                : 'Select exactly one correct option.',
-            style: TextStyle(color: AppColors.textMuted, fontSize: 11.5, fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _TrueFalseEditor extends StatelessWidget {
-  final bool? value;
-  final bool enabled;
-  final ValueChanged<bool> onChanged;
-
-  const _TrueFalseEditor({required this.value, required this.enabled, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text('Correct answer', style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w900)),
-          ),
-          ChoiceChip(
-            selected: value ?? false,
-            label: const Text('True'),
-            onSelected: enabled ? (_) => onChanged(true) : null,
-          ),
-          const SizedBox(width: 8),
-          ChoiceChip(
-            selected: value == false,
-            label: const Text('False'),
-            onSelected: enabled ? (_) => onChanged(false) : null,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _EditableOption {
   final TextEditingController controller;
   bool correct;
@@ -1485,126 +1228,6 @@ class _TopicTarget {
   });
 }
 
-class _TypeBadge extends StatelessWidget {
-  final String label;
-
-  const _TypeBadge({required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return _Badge(
-      label: label,
-      background: AppColors.badgeBlueBg,
-      foreground: AppColors.badgeBlueFg,
-      border: AppColors.badgeBlueBorder,
-    );
-  }
-}
-
-class _DifficultyBadge extends StatelessWidget {
-  final QuestionDifficulty diff;
-
-  const _DifficultyBadge({required this.diff});
-
-  @override
-  Widget build(BuildContext context) {
-    switch (diff) {
-      case QuestionDifficulty.easy:
-        return _Badge(
-          label: 'Easy',
-          background: AppColors.successBg,
-          foreground: AppColors.successText,
-          border: AppColors.greenBorder,
-        );
-      case QuestionDifficulty.medium:
-        return _Badge(
-          label: 'Medium',
-          background: AppColors.warningSoftBg,
-          foreground: AppColors.warningText,
-          border: AppColors.warningBorder,
-        );
-      case QuestionDifficulty.hard:
-        return _Badge(
-          label: 'Hard',
-          background: AppColors.dangerBg,
-          foreground: AppColors.dangerText,
-          border: AppColors.dangerBorder,
-        );
-    }
-  }
-}
-
-class _SourceBadge extends StatelessWidget {
-  final QuestionSource source;
-
-  const _SourceBadge({required this.source});
-
-  @override
-  Widget build(BuildContext context) {
-    switch (source) {
-      case QuestionSource.aiGenerated:
-        return _Badge(
-          label: 'AI generated',
-          background: AppColors.purpleBg,
-          foreground: AppColors.purpleText,
-          border: AppColors.purpleBorder,
-        );
-      case QuestionSource.nativeExtraction:
-        return _Badge(
-          label: 'Material extracted',
-          background: AppColors.infoBg,
-          foreground: AppColors.primary,
-          border: AppColors.primary.withOpacity(0.24),
-        );
-      case QuestionSource.imported:
-        return _Badge(
-          label: 'Imported',
-          background: AppColors.badgeIndigoBg,
-          foreground: AppColors.badgeIndigoFg,
-          border: AppColors.badgeIndigoBorder,
-        );
-      case QuestionSource.manual:
-        return _Badge(
-          label: 'Manual',
-          background: AppColors.surfaceBg,
-          foreground: AppColors.textMuted,
-          border: AppColors.border,
-        );
-    }
-  }
-}
-
-class _Badge extends StatelessWidget {
-  final String label;
-  final Color background;
-  final Color foreground;
-  final Color border;
-
-  const _Badge({
-    required this.label,
-    required this.background,
-    required this.foreground,
-    required this.border,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: background,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: border),
-      ),
-      child: Text(
-        label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(color: foreground, fontSize: 10.8, fontWeight: FontWeight.w900),
-      ),
-    );
-  }
-}
 
 class _TinyMeta extends StatelessWidget {
   final IconData icon;
@@ -1771,24 +1394,6 @@ class _QuestionBankError extends StatelessWidget {
   }
 }
 
-InputDecoration _editDecoration(String label) => InputDecoration(
-      labelText: label,
-      filled: true,
-      fillColor: AppColors.surfaceBg,
-      border: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.border),
-      ),
-      enabledBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide(color: AppColors.border),
-      ),
-      focusedBorder: OutlineInputBorder(
-        borderRadius: BorderRadius.circular(12),
-        borderSide: const BorderSide(color: AppColors.primary, width: 1.3),
-      ),
-    );
-
 
 bool _isCorrectOption(QuestionModel question, QuestionOption option, {int? index}) {
   if (option.isCorrect) return true;
@@ -1837,31 +1442,6 @@ String _jsonish(Object? value) {
     return value.toString();
   }
 }
-
-String _firstText(List<String?> values) {
-  for (final value in values) {
-    final clean = value?.trim();
-    if (clean != null && clean.isNotEmpty) return clean;
-  }
-  return '—';
-}
-
-String _optionalInt(int? value) => value == null ? '—' : '$value';
-
-String _successRate(double? value) {
-  if (value == null) return '—';
-  final normalized = value <= 1 ? value * 100 : value;
-  return '${normalized.toStringAsFixed(normalized == normalized.roundToDouble() ? 0 : 1)}%';
-}
-
-String _seconds(double? value) {
-  if (value == null) return '—';
-  if (value < 60) return '${value.toStringAsFixed(value == value.roundToDouble() ? 0 : 1)}s';
-  final minutes = value / 60;
-  return '${minutes.toStringAsFixed(minutes == minutes.roundToDouble() ? 0 : 1)}m';
-}
-
-
 class _FilterOption {
   final int id;
   final String label;
@@ -1905,42 +1485,6 @@ List<_FilterOption> _materialFilterOptions(List<_TopicTarget> targets, int? modu
   return result;
 }
 
-List<_FilterOption> _topicFilterOptions(
-  List<_TopicTarget> targets, {
-  int? moduleId,
-  int? materialId,
-}) {
-  final seen = <int>{};
-  final result = <_FilterOption>[];
-  for (final target in targets) {
-    if (moduleId != null && target.module.id != moduleId) continue;
-    if (materialId != null && target.material.id != materialId) continue;
-    if (!seen.add(target.topic.id)) continue;
-    final topicLabel = target.parentTopicTitle == null
-        ? target.topic.title
-        : '${target.parentTopicTitle} / ${target.topic.title}';
-    result.add(_FilterOption(
-      id: target.topic.id,
-      label: '${target.material.displayTitle} / $topicLabel',
-    ),);
-  }
-  result.sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
-  return result;
-}
-
-List<_FilterOption> _learningOutcomeFilterOptions(List<QuestionModel> questions) {
-  final seen = <int>{};
-  final result = <_FilterOption>[];
-  for (final question in questions) {
-    for (final outcome in question.learningOutcomes) {
-      if (!seen.add(outcome.id)) continue;
-      result.add(_FilterOption(id: outcome.id, label: outcome.title));
-    }
-  }
-  result.sort((a, b) => a.label.toLowerCase().compareTo(b.label.toLowerCase()));
-  return result;
-}
-
 List<_FilterOption> _learningOutcomeSetupOptions(
   List<QuestionModel> questions,
   List<LearningOutcome> courseOutcomes,
@@ -1971,14 +1515,6 @@ String _selectedMaterialFilterLabel(List<_FilterOption> options, int? id) {
   return 'All materials';
 }
 
-String _selectedTopicFilterLabel(List<_FilterOption> options, int? id) {
-  if (id == null) return 'All topics / subtopics';
-  for (final option in options) {
-    if (option.id == id) return option.label;
-  }
-  return 'All topics / subtopics';
-}
-
 String _selectedOutcomeFilterLabel(List<_FilterOption> options, int? id) {
   if (id == null) return 'All LOs';
   for (final option in options) {
@@ -2000,62 +1536,12 @@ String _sourceLabel(QuestionSource source) {
   }
 }
 
-QuestionSource? _sourceFromLabel(String label) {
-  switch (label) {
-    case 'AI':
-      return QuestionSource.aiGenerated;
-    case 'Material':
-      return QuestionSource.nativeExtraction;
-    case 'Imported':
-      return QuestionSource.imported;
-    case 'Manual':
-      return QuestionSource.manual;
-    default:
-      return null;
-  }
-}
-
-bool? _usageFromLabel(String label) {
-  switch (label) {
-    case 'Used in exams':
-      return true;
-    case 'Unused':
-      return false;
-    default:
-      return null;
-  }
-}
-
-String _approvalLabel(QuestionApprovalStatus status) {
-  switch (status) {
-    case QuestionApprovalStatus.pending:
-      return 'Pending review';
-    case QuestionApprovalStatus.rejected:
-      return 'Rejected';
-    case QuestionApprovalStatus.approved:
-      return 'Approved';
-  }
-}
-
 String _usageLabel(int count) => count == 0 ? 'Unused' : 'Used in $count exam${count == 1 ? '' : 's'}';
-
-String _shortDate(DateTime date) {
-  if (date.millisecondsSinceEpoch == 0) return 'Unknown date';
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return '${date.day} ${months[date.month - 1]} ${date.year}';
-}
 
 String _topicPathFromTarget(_TopicTarget? target, QuestionModel question) {
   if (target == null) return question.topicName ?? 'Not assigned';
   if (target.parentTopicTitle == null) return target.topic.title;
   return '${target.parentTopicTitle} / ${target.topic.title}';
-}
-
-String _contextLabel(QuestionModel question) {
-  if ((question.topicName ?? '').trim().isNotEmpty) return question.topicName!.trim();
-  if ((question.materialName ?? '').trim().isNotEmpty) return question.materialName!.trim();
-  if ((question.moduleName ?? '').trim().isNotEmpty) return question.moduleName!.trim();
-  return 'Not assigned';
 }
 
 String _answerText(QuestionModel question) {
@@ -2100,19 +1586,6 @@ String _selectedModuleLabel(List<ModuleItem> modules, int? id) {
     if (module.id == id) return _moduleLabel(module);
   }
   return 'All modules';
-}
-
-QuestionDifficulty? _difficultyFromLabel(String label) {
-  switch (label) {
-    case 'Easy':
-      return QuestionDifficulty.easy;
-    case 'Medium':
-      return QuestionDifficulty.medium;
-    case 'Hard':
-      return QuestionDifficulty.hard;
-    default:
-      return null;
-  }
 }
 
 QuestionType? _typeFromLabel(String label) {
@@ -2175,30 +1648,6 @@ bool _isNegativeNumber(String raw) {
 }
 
 String? _topicPickerLabel(List<_TopicTarget> targets, int? topicId) {
-  if (topicId == null) return null;
-  for (final target in targets) {
-    if (target.topic.id == topicId) return target.topic.title;
-  }
-  return null;
-}
-
-String? _moduleNameFromTargets(List<_TopicTarget> targets, int? topicId) {
-  if (topicId == null) return null;
-  for (final target in targets) {
-    if (target.topic.id == topicId) return target.module.title;
-  }
-  return null;
-}
-
-String? _materialNameFromTargets(List<_TopicTarget> targets, int? topicId) {
-  if (topicId == null) return null;
-  for (final target in targets) {
-    if (target.topic.id == topicId) return target.material.displayTitle;
-  }
-  return null;
-}
-
-String? _topicNameFromTargets(List<_TopicTarget> targets, int? topicId) {
   if (topicId == null) return null;
   for (final target in targets) {
     if (target.topic.id == topicId) return target.topic.title;

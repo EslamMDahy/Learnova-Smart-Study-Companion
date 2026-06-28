@@ -15,7 +15,7 @@ final studentCoursesApiProvider = Provider<StudentCoursesApi>((ref) {
 final studentCourseContentProvider = FutureProvider.autoDispose
     .family<StudentCourseContent, int>((ref, courseId) async {
   final cancelToken = CancelToken();
-  ref.onDispose(() => cancelToken.cancel());
+  ref.onDispose(cancelToken.cancel);
 
   return ref.read(studentCoursesApiProvider).courseContent(
         courseId: courseId,
@@ -50,7 +50,7 @@ class StudentMaterialTopicsArgs {
 final studentMaterialTopicsProvider = FutureProvider.autoDispose
     .family<List<StudentCourseTopic>, StudentMaterialTopicsArgs>((ref, args) async {
   final cancelToken = CancelToken();
-  ref.onDispose(() => cancelToken.cancel());
+  ref.onDispose(cancelToken.cancel);
 
   return ref.read(studentCoursesApiProvider).listMaterialTopics(
         courseId: args.courseId,
@@ -83,7 +83,7 @@ class StudentExamAttemptArgs {
 final studentExamAttemptProvider = FutureProvider.autoDispose
     .family<StudentExamAttempt, StudentExamAttemptArgs>((ref, args) async {
   final cancelToken = CancelToken();
-  ref.onDispose(() => cancelToken.cancel());
+  ref.onDispose(cancelToken.cancel);
 
   return ref.read(studentCoursesApiProvider).startStudentExamAttempt(
         courseId: args.courseId,
@@ -116,7 +116,7 @@ class StudentExamResultArgs {
 final studentExamLatestResultProvider = FutureProvider.autoDispose
     .family<StudentExamLatestResult, StudentExamResultArgs>((ref, args) async {
   final cancelToken = CancelToken();
-  ref.onDispose(() => cancelToken.cancel());
+  ref.onDispose(cancelToken.cancel);
 
   return ref.read(studentCoursesApiProvider).latestStudentExamResult(
         courseId: args.courseId,

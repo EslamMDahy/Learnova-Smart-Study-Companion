@@ -34,7 +34,7 @@ class _QuestionBankHeader extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.18),
+            color: AppColors.primary.withValues(alpha: 0.18),
             blurRadius: 28,
             offset: const Offset(0, 12),
           ),
@@ -53,8 +53,8 @@ class _QuestionBankHeader extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: AppColors.primary,
-                  disabledBackgroundColor: Colors.white.withOpacity(0.45),
-                  disabledForegroundColor: AppColors.primary.withOpacity(0.45),
+                  disabledBackgroundColor: Colors.white.withValues(alpha: 0.45),
+                  disabledForegroundColor: AppColors.primary.withValues(alpha: 0.45),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -65,9 +65,9 @@ class _QuestionBankHeader extends StatelessWidget {
                 onPressed: loading ? null : onRefresh,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.white,
-                  disabledForegroundColor: Colors.white.withOpacity(0.5),
-                  side: BorderSide(color: Colors.white.withOpacity(0.35)),
-                  backgroundColor: Colors.white.withOpacity(0.08),
+                  disabledForegroundColor: Colors.white.withValues(alpha: 0.5),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -79,8 +79,8 @@ class _QuestionBankHeader extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   backgroundColor: Colors.white,
                   foregroundColor: AppColors.primary,
-                  disabledBackgroundColor: Colors.white.withOpacity(0.45),
-                  disabledForegroundColor: AppColors.primary.withOpacity(0.45),
+                  disabledBackgroundColor: Colors.white.withValues(alpha: 0.45),
+                  disabledForegroundColor: AppColors.primary.withValues(alpha: 0.45),
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 15),
                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                 ),
@@ -108,14 +108,14 @@ class _QuestionBankHeader extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.14),
+                  color: Colors.white.withValues(alpha: 0.14),
                   borderRadius: BorderRadius.circular(9),
-                  border: Border.all(color: Colors.white.withOpacity(0.18)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
                 ),
                 child: Text(
                   'Question bank',
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontSize: 11.5,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.4,
@@ -140,7 +140,7 @@ class _QuestionBankHeader extends StatelessWidget {
                   fontSize: 13.5,
                   height: 1.55,
                   fontWeight: FontWeight.w600,
-                  color: Colors.white.withOpacity(0.84),
+                  color: Colors.white.withValues(alpha: 0.84),
                 ),
               ),
             ],
@@ -193,9 +193,9 @@ class _HeaderCounter extends StatelessWidget {
       height: 42,
       padding: const EdgeInsets.symmetric(horizontal: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.12),
+        color: Colors.white.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.white.withOpacity(0.22)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -213,7 +213,7 @@ class _HeaderCounter extends StatelessWidget {
           Text(
             label,
             style: TextStyle(
-              color: Colors.white.withOpacity(0.78),
+              color: Colors.white.withValues(alpha: 0.78),
               fontSize: 11.2,
               fontWeight: FontWeight.w800,
             ),
@@ -656,48 +656,6 @@ class _QuestionBankToolbar extends StatelessWidget {
   }
 }
 
-class _FilterField extends StatelessWidget {
-  final String label;
-  final double width;
-  final Widget child;
-
-  const _FilterField({
-    required this.label,
-    required this.width,
-    required this.child,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: width,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 2, bottom: 6),
-            child: Text(
-              label,
-              style: TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 10.8,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.35,
-              ),
-            ),
-          ),
-          child,
-        ],
-      ),
-    );
-  }
-}
-
-
-
-
-
 class _QuestionTableHeader extends StatelessWidget {
   const _QuestionTableHeader();
 
@@ -814,7 +772,7 @@ class _QuestionRow extends StatelessWidget {
     final q = question;
     final topic = _topicPathFromTarget(topicTarget, q);
 
-    final rowColor = index.isEven ? AppColors.cardBg : AppColors.surfaceBg.withOpacity(0.45);
+    final rowColor = index.isEven ? AppColors.cardBg : AppColors.surfaceBg.withValues(alpha: 0.45);
 
     return Material(
       color: rowColor,
@@ -1047,48 +1005,6 @@ class _SoftStatusPill extends StatelessWidget {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _DifficultyPill extends StatelessWidget {
-  final QuestionDifficulty difficulty;
-
-  const _DifficultyPill({required this.difficulty});
-
-  @override
-  Widget build(BuildContext context) {
-    Color color;
-    switch (difficulty) {
-      case QuestionDifficulty.easy:
-        color = AppColors.successText;
-        break;
-      case QuestionDifficulty.medium:
-        color = AppColors.warningText;
-        break;
-      case QuestionDifficulty.hard:
-        color = AppColors.dangerText;
-        break;
-    }
-    return Container(
-      height: 30,
-      alignment: Alignment.center,
-      padding: const EdgeInsets.symmetric(horizontal: 9),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.08),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: color.withOpacity(0.22)),
-      ),
-      child: Text(
-        difficulty.label,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          color: color,
-          fontSize: 11.2,
-          fontWeight: FontWeight.w900,
-        ),
       ),
     );
   }

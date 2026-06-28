@@ -123,8 +123,6 @@ class _ManualExamDraft {
   final double? passingScore;
   final bool shuffleQuestions;
   final bool shuffleOptions;
-  final DateTime? availableFrom;
-  final DateTime? availableTo;
 
   const _ManualExamDraft({
     required this.title,
@@ -136,8 +134,6 @@ class _ManualExamDraft {
     this.passingScore,
     required this.shuffleQuestions,
     required this.shuffleOptions,
-    this.availableFrom,
-    this.availableTo,
   });
 }
 
@@ -258,7 +254,7 @@ class _ManualExamDraftDialogState extends State<_ManualExamDraftDialog> {
                     ),
                     const SizedBox(height: 12),
                     DropdownButtonFormField<String>(
-                      value: _examType,
+                      initialValue: _examType,
                       decoration: _dialogInputDecoration('Exam type'),
                       items: const [
                         DropdownMenuItem(value: 'quiz', child: Text('Quiz')),
@@ -395,7 +391,7 @@ class _ManualSectionDialogState extends State<_ManualSectionDialog> {
               _DialogTextField(label: 'Section title', controller: _titleCtrl),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _questionType,
+                initialValue: _questionType,
                 decoration: _dialogInputDecoration('Question type'),
                 items: const [
                   DropdownMenuItem(value: 'multiple_choice', child: Text('Multiple Choice')),

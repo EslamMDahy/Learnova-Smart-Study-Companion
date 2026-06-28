@@ -381,12 +381,12 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
             borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withOpacity(0.10),
+                color: AppColors.primary.withValues(alpha: 0.10),
                 blurRadius: 60,
                 offset: const Offset(0, 18),
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.16),
+                color: Colors.black.withValues(alpha: 0.16),
                 blurRadius: 30,
                 offset: const Offset(0, 8),
               ),
@@ -508,7 +508,7 @@ class _LeftPanel extends StatelessWidget {
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    AppColors.primary.withOpacity(0.16 + pulse.value * 0.05),
+                    AppColors.primary.withValues(alpha: 0.16 + pulse.value * 0.05),
                     Colors.transparent,
                   ],
                 ),
@@ -526,9 +526,9 @@ class _LeftPanel extends StatelessWidget {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.20),
+                    color: AppColors.primary.withValues(alpha: 0.20),
                     borderRadius: BorderRadius.circular(9),
-                    border: Border.all(color: AppColors.primary.withOpacity(0.38)),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.38)),
                   ),
                   child: Icon(Icons.upload_file_rounded, size: 20, color: AppColors.infoText),
                 ),
@@ -550,7 +550,7 @@ class _LeftPanel extends StatelessWidget {
                       '→ $moduleTitle',
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontSize: 11, color: Colors.white.withOpacity(0.46)),
+                      style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.46)),
                     ),
                   ]),
                 ),
@@ -569,7 +569,7 @@ class _LeftPanel extends StatelessWidget {
               const SizedBox(height: 12),
               Text(
                 'One file is processed at a time · PDF only · Max 50 MB',
-                style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.48)),
+                style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.48)),
               ),
               const SizedBox(height: 34),
               Expanded(
@@ -586,13 +586,13 @@ class _LeftPanel extends StatelessWidget {
                         width: double.infinity,
                         decoration: BoxDecoration(
                           color: activeHover
-                              ? AppColors.primary.withOpacity(0.12)
-                              : Colors.white.withOpacity(0.04 + pulse.value * 0.015),
+                              ? AppColors.primary.withValues(alpha: 0.12)
+                              : Colors.white.withValues(alpha: 0.04 + pulse.value * 0.015),
                           borderRadius: BorderRadius.circular(14),
                           border: Border.all(
                             color: activeHover
                                 ? AppColors.primary
-                                : Colors.white.withOpacity(0.12 + pulse.value * 0.05),
+                                : Colors.white.withValues(alpha: 0.12 + pulse.value * 0.05),
                             width: activeHover ? 2 : 1.3,
                           ),
                         ),
@@ -609,12 +609,12 @@ class _LeftPanel extends StatelessWidget {
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
                                     color: activeHover
-                                        ? AppColors.primary.withOpacity(0.24)
-                                        : Colors.white.withOpacity(0.07),
+                                        ? AppColors.primary.withValues(alpha: 0.24)
+                                        : Colors.white.withValues(alpha: 0.07),
                                     border: Border.all(
                                       color: activeHover
-                                          ? AppColors.infoText.withOpacity(0.58)
-                                          : Colors.white.withOpacity(0.15),
+                                          ? AppColors.infoText.withValues(alpha: 0.58)
+                                          : Colors.white.withValues(alpha: 0.15),
                                     ),
                                   ),
                                   child: Icon(
@@ -622,7 +622,7 @@ class _LeftPanel extends StatelessWidget {
                                     size: 34,
                                     color: processing
                                         ? AppColors.infoText
-                                        : Colors.white.withOpacity(0.62),
+                                        : Colors.white.withValues(alpha: 0.62),
                                   ),
                                 ),
                               ),
@@ -641,7 +641,7 @@ class _LeftPanel extends StatelessWidget {
                                 fontWeight: FontWeight.w800,
                                 color: activeHover
                                     ? AppColors.infoText
-                                    : Colors.white.withOpacity(0.86),
+                                    : Colors.white.withValues(alpha: 0.86),
                                 letterSpacing: -0.2,
                               ),
                             ),
@@ -651,7 +651,7 @@ class _LeftPanel extends StatelessWidget {
                                   ? 'Files will move from queued → processing → ready'
                                   : '$queueCount file${queueCount == 1 ? '' : 's'} in queue',
                               textAlign: TextAlign.center,
-                              style: TextStyle(fontSize: 12.5, color: Colors.white.withOpacity(0.42)),
+                              style: TextStyle(fontSize: 12.5, color: Colors.white.withValues(alpha: 0.42)),
                             ),
                             const SizedBox(height: 24),
                             IgnorePointer(
@@ -667,7 +667,7 @@ class _LeftPanel extends StatelessWidget {
                                       borderRadius: BorderRadius.circular(9),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: AppColors.primary.withOpacity(0.34),
+                                          color: AppColors.primary.withValues(alpha: 0.34),
                                           blurRadius: 18,
                                           offset: const Offset(0, 5),
                                         ),
@@ -715,7 +715,7 @@ class _Tip extends StatelessWidget {
   Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
         Icon(icon, size: 13, color: AppColors.infoText),
         const SizedBox(width: 6),
-        Text(text, style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.46))),
+        Text(text, style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.46))),
       ]);
 }
 
@@ -726,7 +726,7 @@ class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.025)
+      ..color = Colors.white.withValues(alpha: 0.025)
       ..strokeWidth = 1;
     const step = 48.0;
     for (double x = 0; x < size.width; x += step) {

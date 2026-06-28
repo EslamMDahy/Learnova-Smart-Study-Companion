@@ -29,7 +29,7 @@ class _ExamSetupHeader extends StatelessWidget {
             decoration: BoxDecoration(
               color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.primary.withOpacity(0.16)),
+              border: Border.all(color: AppColors.primary.withValues(alpha: 0.16)),
             ),
             child: const Icon(Icons.assignment_outlined, color: AppColors.primary, size: 24),
           ),
@@ -224,7 +224,7 @@ class _SetupStepTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: active && compact ? AppColors.primarySoft : Colors.transparent,
         borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: active && compact ? AppColors.primary.withOpacity(0.18) : Colors.transparent),
+        border: Border.all(color: active && compact ? AppColors.primary.withValues(alpha: 0.18) : Colors.transparent),
       ),
       child: Row(
         children: [
@@ -235,7 +235,7 @@ class _SetupStepTile extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: active ? AppColors.primary : completed ? AppColors.primarySoft : AppColors.cardBg,
-              border: Border.all(color: active || completed ? AppColors.primary.withOpacity(0.35) : AppColors.borderGray),
+              border: Border.all(color: active || completed ? AppColors.primary.withValues(alpha: 0.35) : AppColors.borderGray),
             ),
             child: completed
                 ? const Icon(Icons.check_rounded, color: AppColors.primary, size: 18)
@@ -782,7 +782,7 @@ class _DifficultyPresetChip extends StatelessWidget {
         visualDensity: VisualDensity.compact,
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
         foregroundColor: AppColors.primary,
-        side: BorderSide(color: enabled ? AppColors.primary.withOpacity(0.25) : AppColors.borderGray),
+        side: BorderSide(color: enabled ? AppColors.primary.withValues(alpha: 0.25) : AppColors.borderGray),
         backgroundColor: AppColors.cardBg,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
       ),
@@ -1136,137 +1136,6 @@ class _SetupTextField extends StatelessWidget {
   }
 }
 
-class _TemplateInsightCard extends StatelessWidget {
-  final ExamTemplateModel template;
-
-  const _TemplateInsightCard({required this.template});
-
-  @override
-  Widget build(BuildContext context) {
-    final distribution = _templateDistributionText(template);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceMuted,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: AppColors.borderGray),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 38,
-            height: 38,
-            decoration: BoxDecoration(
-              color: AppColors.primarySoft,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: const Icon(Icons.article_outlined, color: AppColors.primary, size: 20),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  template.name,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: AppColors.textTitle, fontSize: 13.4, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  distribution.isEmpty ? 'Uses total question count.' : 'Sections: $distribution',
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: AppColors.textMuted, fontSize: 11.7, height: 1.35, fontWeight: FontWeight.w600),
-                ),
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 6,
-                  runSpacing: 6,
-                  children: [
-                    _SetupChip(label: template.examType.toUpperCase()),
-                    _SetupChip(label: '${template.questionCount} questions'),
-                    _SetupChip(label: '${template.durationMinutes} min'),
-                    _SetupChip(label: template.backendId == null ? 'Local template' : 'Backend template'),
-                  ],
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SetupMetricGrid extends StatelessWidget {
-  final int matchingCount;
-  final int targetCount;
-  final int durationMinutes;
-  final bool publishAfterSave;
-
-  const _SetupMetricGrid({
-    required this.matchingCount,
-    required this.targetCount,
-    required this.durationMinutes,
-    required this.publishAfterSave,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final twoCols = constraints.maxWidth >= 300;
-        final width = twoCols ? (constraints.maxWidth - 10) / 2 : constraints.maxWidth;
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: [
-            _SetupMetricTile(width: width, label: 'Matching', value: '$matchingCount'),
-            _SetupMetricTile(width: width, label: 'Target', value: '$targetCount'),
-            _SetupMetricTile(width: width, label: 'Duration', value: '$durationMinutes min'),
-            _SetupMetricTile(width: width, label: 'Mode', value: publishAfterSave ? 'Publish' : 'Draft'),
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _SetupMetricTile extends StatelessWidget {
-  final double width;
-  final String label;
-  final String value;
-
-  const _SetupMetricTile({required this.width, required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: width,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 11),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.borderGray),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 10.5, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 4),
-          Text(value, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textTitle, fontSize: 14.5, fontWeight: FontWeight.w900)),
-        ],
-      ),
-    );
-  }
-}
-
 class _SetupChip extends StatelessWidget {
   final String label;
 
@@ -1284,65 +1153,6 @@ class _SetupChip extends StatelessWidget {
       child: Text(
         label,
         style: TextStyle(color: AppColors.textMuted, fontSize: 10.2, fontWeight: FontWeight.w900, letterSpacing: 0.2),
-      ),
-    );
-  }
-}
-
-class _BackendGenerateStatus extends StatelessWidget {
-  final bool enabled;
-  final bool templateWillBeSaved;
-  final String message;
-
-  const _BackendGenerateStatus({
-    required this.enabled,
-    required this.templateWillBeSaved,
-    required this.message,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final color = enabled ? AppColors.successText : AppColors.warningText;
-    final bg = enabled ? AppColors.successBg : AppColors.warningSoftBg;
-    final border = enabled ? AppColors.greenBorder : AppColors.warningBorder;
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: bg,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: border),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(enabled ? Icons.rocket_launch_rounded : Icons.rule_rounded, color: color, size: 19),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text(
-                  enabled ? 'Backend generate-exam is ready' : 'Generate-exam requirements',
-                  style: TextStyle(color: color, fontSize: 12.4, fontWeight: FontWeight.w900),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  message,
-                  style: TextStyle(color: color, fontSize: 11.8, height: 1.35, fontWeight: FontWeight.w700),
-                ),
-                if (enabled && templateWillBeSaved) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    'This local template will be created in the backend automatically before generation.',
-                    style: TextStyle(color: color, fontSize: 11.4, height: 1.35, fontWeight: FontWeight.w700),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
       ),
     );
   }

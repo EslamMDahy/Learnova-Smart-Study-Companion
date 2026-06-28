@@ -43,83 +43,6 @@ class _CourseSidebarHeader extends StatelessWidget {
   }
 }
 
-class _SidebarMetricPill extends StatelessWidget {
-  final String value;
-  final String label;
-
-  const _SidebarMetricPill({required this.value, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(11),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: TextStyle(
-              color: AppColors.textTitle,
-              fontSize: 13,
-              height: 1,
-              fontWeight: FontWeight.w900,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: TextStyle(
-              color: AppColors.textMuted,
-              fontSize: 9.5,
-              height: 1,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _SidebarSectionLabel extends StatelessWidget {
-  final IconData icon;
-  final String label;
-
-  const _SidebarSectionLabel({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(2, 2, 2, 8),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.textHint, size: 15),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              label.toUpperCase(),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 10.5,
-                fontWeight: FontWeight.w900,
-                letterSpacing: 0.8,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _CourseExamsTreeCard extends StatelessWidget {
   final List<StudentCourseExam> exams;
   final String? loadError;
@@ -161,7 +84,7 @@ class _CourseExamsTreeCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: active ? AppColors.shadowBlue.withOpacity(0.18) : AppColors.shadowThin,
+            color: active ? AppColors.shadowBlue.withValues(alpha: 0.18) : AppColors.shadowThin,
             blurRadius: active ? 18 : 10,
             offset: const Offset(0, 6),
           ),
@@ -509,7 +432,7 @@ class _CourseModuleCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: active ? AppColors.shadowBlue.withOpacity(0.18) : AppColors.shadowThin,
+            color: active ? AppColors.shadowBlue.withValues(alpha: 0.18) : AppColors.shadowThin,
             blurRadius: active ? 18 : 10,
             offset: const Offset(0, 6),
           ),
@@ -608,7 +531,7 @@ class _CourseModuleCard extends StatelessWidget {
                                   for (var i = 0; i < module.materials.length; i++) ...[
                                     _ContentMaterialNode(
                                       material: module.materials[i],
-                                      indexLabel: '${moduleNumber}.${i + 1}',
+                                      indexLabel: '$moduleNumber.${i + 1}',
                                       selected: module.materials[i].id == selectedMaterialId,
                                       onTap: () => onSelectMaterial(module.materials[i]),
                                     ),
@@ -758,37 +681,6 @@ class _ContentMaterialNode extends StatelessWidget {
       prefix: indexLabel,
       badge: isPdf ? 'PDF' : _titleCase(material.safeType),
       trailing: _NodeStatusDot(status: material.status),
-    );
-  }
-}
-
-class _ModuleExamTile extends StatelessWidget {
-  final StudentCourseExam exam;
-  final bool selected;
-  final VoidCallback onTap;
-
-  const _ModuleExamTile({
-    required this.exam,
-    required this.selected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return _SidebarLeafTile(
-      icon: Icons.assignment_turned_in_outlined,
-      iconBg: AppColors.infoBg,
-      iconColor: AppColors.primary,
-      title: exam.safeTitle,
-      subtitle: '${exam.totalQuestions} questions • ${_formatScore(exam.totalScore)} pts',
-      selected: selected,
-      onTap: onTap,
-      badge: _titleCase(exam.safeType),
-      trailing: Icon(
-        Icons.play_arrow_rounded,
-        color: exam.isAvailable ? AppColors.primary : AppColors.textHint,
-        size: 18,
-      ),
     );
   }
 }
@@ -1045,94 +937,3 @@ class _MobileModuleSelector extends StatelessWidget {
     );
   }
 }
-
-class _ModuleNumberBadge extends StatelessWidget {
-  final int number;
-  final bool active;
-  final bool done;
-
-  const _ModuleNumberBadge({
-    required this.number,
-    required this.active,
-    required this.done,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    if (done && !active) {
-      return Container(
-        width: 22,
-        height: 22,
-        decoration: BoxDecoration(
-          color: AppColors.successBg,
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(
-          Icons.check_rounded,
-          color: AppColors.successDot,
-          size: 15,
-        ),
-      );
-    }
-
-    return Container(
-      width: 22,
-      height: 22,
-      alignment: Alignment.center,
-      decoration: BoxDecoration(
-        color: active ? AppColors.infoBg : AppColors.headerBg,
-        shape: BoxShape.circle,
-      ),
-      child: active
-          ? const Icon(Icons.water_drop_rounded, color: AppColors.primary, size: 14)
-          : Text(
-              number.toString(),
-              style: TextStyle(
-                color: AppColors.textMuted,
-                fontSize: 11,
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-    );
-  }
-}
-
-class _TabLabel extends StatelessWidget {
-  final String label;
-  final bool active;
-  final bool alignRight;
-
-  const _TabLabel({
-    required this.label,
-    required this.active,
-    this.alignRight = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 46,
-      margin: EdgeInsets.only(left: alignRight ? 0 : 20, right: alignRight ? 26 : 0),
-      padding: const EdgeInsets.symmetric(horizontal: 2),
-      decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(
-            color: active ? AppColors.primary : Colors.transparent,
-            width: 2,
-          ),
-        ),
-      ),
-      alignment: Alignment.center,
-      child: Text(
-        label,
-        style: TextStyle(
-          color: active ? AppColors.primary : AppColors.textMuted,
-          fontSize: 12.5,
-          fontWeight: active ? FontWeight.w900 : FontWeight.w600,
-        ),
-      ),
-    );
-  }
-}
-
-

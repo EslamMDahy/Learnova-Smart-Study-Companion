@@ -111,7 +111,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
           borderRadius: BorderRadius.circular(24),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 40,
               offset: const Offset(0, 20),
             ),
@@ -157,7 +157,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: _accentColor.withOpacity(0.1),
+              color: _accentColor.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(Icons.group_add_rounded, color: _accentColor, size: 28),
@@ -194,9 +194,9 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.amber.withOpacity(0.05),
+        color: Colors.amber.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.amber.withOpacity(0.2)),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -232,7 +232,7 @@ class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
         padding: const EdgeInsets.all(40),
         decoration: BoxDecoration(
           color: _pickedFile != null
-              ? _accentColor.withOpacity(0.02)
+              ? _accentColor.withValues(alpha: 0.02)
               : _bgLight,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(

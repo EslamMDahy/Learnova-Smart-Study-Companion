@@ -22,7 +22,12 @@ class CoursesApi {
 
     final data = res.data;
     if (data is Map<String, dynamic>) {
-      AppLogger.log('GET ${Endpoints.myCourses} -> $data', level: LogLevel.debug);
+      final items = data['items'];
+      final count = items is List ? items.length : null;
+      AppLogger.log(
+        'GET ${Endpoints.myCourses} succeeded${count == null ? '' : ' ($count items)'}.',
+        level: LogLevel.debug,
+      );
       return MyCoursesResponse.fromJson(data);
     }
     throw const FormatException('Invalid response from /courses/my');

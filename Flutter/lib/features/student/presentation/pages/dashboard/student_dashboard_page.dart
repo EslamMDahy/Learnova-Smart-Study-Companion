@@ -439,7 +439,7 @@ class _CourseCoverFallback extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.10),
+                  color: Colors.white.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Icon(
@@ -462,7 +462,6 @@ class _CourseCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final coverUrl = _normalizeNetworkImageUrl(course.coverImageUrl);
-    final hasCover = coverUrl != null;
 
     return Container(
       decoration: BoxDecoration(
@@ -487,9 +486,9 @@ class _CourseCard extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                if (hasCover)
+                if (coverUrl != null)
                   Image.network(
-                    coverUrl!,
+                    coverUrl,
                     fit: BoxFit.cover,
                     filterQuality: FilterQuality.medium,
                     loadingBuilder: (context, child, loadingProgress) {
@@ -506,8 +505,8 @@ class _CourseCard extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        Colors.black.withOpacity(0.04),
-                        Colors.black.withOpacity(0.42),
+                        Colors.black.withValues(alpha: 0.04),
+                        Colors.black.withValues(alpha: 0.42),
                       ],
                     ),
                   ),
@@ -519,7 +518,7 @@ class _CourseCard extends StatelessWidget {
                     width: 128,
                     height: 128,
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.06),
+                      color: Colors.white.withValues(alpha: 0.06),
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -530,7 +529,7 @@ class _CourseCard extends StatelessWidget {
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.42),
+                      color: Colors.black.withValues(alpha: 0.42),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Text(

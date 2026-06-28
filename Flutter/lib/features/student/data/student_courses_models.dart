@@ -16,7 +16,6 @@ DateTime? _asDate(Object? value) => jsonDate(value);
 
 String _asString(Object? value) => jsonString(value);
 
-String? _asNullableString(Object? value) => jsonNullableString(value);
 
 String? _firstNonEmptyString(Iterable<Object?> values) =>
     jsonFirstNonEmptyString(values);
