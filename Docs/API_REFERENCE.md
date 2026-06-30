@@ -478,6 +478,175 @@ List invitation records for a course.
 
 ---
 
+### `PATCH /courses/{course_id}`
+Update course metadata.
+
+**Request** (all fields optional)
+- `title`
+- `description`
+- `category`
+- `course_code`
+- `is_open_for_enrollment`
+- `requires_enrollment_approval`
+- `visibility_level`
+- `tags`
+
+**Response**
+- full course object (same shape as `MyCourseItem`)
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- Follows the project-wide dynamic update pattern: `null` = ignore field, whitespace-only string = clear the value, actual value = update.
+
+---
+
+### `POST /courses/{course_id}/publish`
+Publish a course, making it visible according to its `visibility_level`.
+
+**Response**
+- `id`
+- `status`
+- `message`
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- A draft course is not visible to anyone. Publishing activates visibility rules based on `visibility_level`.
+- After publishing: `public` courses appear in search; `unlisted` courses are accessible via direct link only; `private` courses are accessible to enrolled users only.
+- Enrollment is only possible on published courses.
+
+---
+
+### `POST /courses/{course_id}/cover/initiate`
+Request a signed upload URL for a course cover image.
+
+**Request**
+- `content_type`
+- `file_size_bytes`
+
+**Response**
+- `upload_url`
+- `path`
+- `token`
+- `content_type`
+- `max_bytes`
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- Same staged upload pattern used for avatars and materials.
+
+---
+
+### `POST /courses/{course_id}/cover/confirm`
+Confirm course cover upload completion.
+
+**Response**
+- `cover_url`
+- `updated_at`
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- Finalizes the cover update. The `cover_url` is returned and reflected in subsequent course listing responses.
+
+---
+
+### `POST /courses/{course_id}/enroll`
+Enroll the current student in a course.
+
+**Response**
+- `enrollment_id`
+- `course_id`
+- `status`
+- `enrollment_type`
+- `enrolled_at`
+
+**Authorization**
+- Student only
+
+**Notes**
+- Only available for published courses.
+- If `requires_enrollment_approval` is true, enrollment status is `pending` until approved by the instructor.
+- If `is_open_for_enrollment` is false, enrollment is not permitted.
+
+---
+
+### `GET /courses/{course_id}/enrollment-requests`
+List pending enrollment requests for a course.
+
+**Response**
+- `course_id`
+- `total`
+- `requests`: list of `{ enrollment_id, student_id, full_name, email, status, enrolled_at }`
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `PATCH /courses/{course_id}/enrollment-requests/{enrollment_id}`
+Approve or decline an enrollment request.
+
+**Request**
+- `status`: `approved` | `declined`
+
+**Response**
+- `enrollment_id`
+- `status`
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `GET /courses/search`
+Search published courses.
+
+**Query Parameters**
+- `q` (required)
+- `limit` (default: 20)
+- `offset` (default: 0)
+
+**Response**
+- `total`
+- `limit`
+- `offset`
+- `results`: list of `{ id, title, description, category, tags, cover_image_key, banner_image_key, enrollment_count, average_rating, requires_enrollment_approval }`
+
+**Authorization**
+- Authenticated user
+
+**Notes**
+- Only returns published courses.
+- Results are ranked by relevance using pre-computed search weights stored via a DB trigger on course creation/update.
+- `public` visibility only — `private` and `unlisted` courses do not appear in search results.
+
+---
+
+### `GET /courses/search/autocomplete`
+Return autocomplete suggestions for a course search query.
+
+**Query Parameters**
+- `q` (required)
+
+**Response**
+- `suggestions`: list of strings (up to 10 matching course titles)
+
+**Authorization**
+- Authenticated user
+
+**Notes**
+- Returns prefix-matched course title suggestions from the database.
+- Intended for real-time search-as-you-type UI flows.
+
+---
+
 ## 7. Learning Outcomes
 
 All learning outcome routes are nested under a course.
@@ -1103,7 +1272,629 @@ Get full details for a single question.
 
 ---
 
-## 12. Settings
+### `PATCH /courses/{course_id}/questions/{question_id}/update`
+Update an existing question in the course question bank.
+
+**Request** (all fields optional)
+- `topic_id`
+- `question_text`
+- `difficulty`
+- `explanation`
+- `options`
+- `expected_answer`
+- `grading_rubric`
+- `tags`
+
+**Response**
+- full question object (same shape as `QuestionCreateResponse`)
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- Follows the project-wide dynamic update pattern: `null` = ignore, whitespace-only string = clear, actual value = update.
+- Each field is individually validated before update (e.g., a field that cannot logically be an empty string is rejected if whitespace is passed).
+- `type` is not updatable after creation.
+
+---
+
+### `POST /courses/{course_id}/questions/ai-generate`
+Request AI-assisted question generation for selected topics.
+
+**Request**
+- `topics`: list of `{ topic_id, question_configs: [{ type, difficulty, count }] }`
+
+**Response**
+- `status`
+- `ai_processing_started`
+- `message`
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- This is an async operation. The response confirms that the AI request was dispatched, not that questions are ready.
+- Generated questions are delivered via the `POST /ai/callback` endpoint under operation type `question_generation`.
+- Generated questions are inserted with `source = ai_generated` and `approval_status = pending`.
+- Multiple topic/config combinations can be submitted in a single request.
+
+---
+
+## 12. Exams
+
+The exam system is organized under `/courses/{course_id}/exams`.
+Instructor-facing endpoints are prefixed with `/instructor`.
+Student-facing endpoints are prefixed with `/student`.
+
+All instructor endpoints are ownership-restricted.
+All student endpoints require active enrollment in the course.
+
+---
+
+### Exam Hierarchy
+
+```
+Course
+└── Exam
+    └── Section  (single question type per section)
+        └── Questions (from course question bank)
+```
+
+Questions are stored by reference (ID only) until the exam is published. On publish, a full snapshot of question data is taken and frozen. After publish, question bank updates no longer affect the exam.
+
+---
+
+### `POST /courses/{course_id}/exams/instructor`
+Create a new exam.
+
+**Request**
+- `title`
+- `description` (optional)
+- `instructions` (optional)
+- `exam_type`
+- `duration_minutes` (optional)
+- `max_attempts` (default: 1)
+- `passing_score` (optional)
+- `shuffle_questions` (default: false)
+- `shuffle_options` (default: false)
+- `available_from` (optional)
+- `available_to` (optional)
+- `access_code` (optional)
+
+**Response**
+- full exam object including proctoring flags and security settings
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `PATCH /courses/{course_id}/exams/instructor/{exam_id}`
+Update exam metadata.
+
+**Request** (all fields optional, same fields as create)
+
+**Response**
+- full exam object
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- Not available after the exam is published.
+
+---
+
+### `GET /courses/{course_id}/exams/instructor`
+List all exams for a course.
+
+**Response**
+- `course_id`
+- `total`
+- `exams`: list of exam summary objects
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `GET /courses/{course_id}/exams/instructor/{exam_id}`
+Get full exam details including all sections and their questions.
+
+**Response**
+- full exam object with nested `sections`, each section containing its `questions`
+- questions returned live from question bank if exam is not yet published
+- questions returned from snapshot if exam is published
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `POST /courses/{course_id}/exams/instructor/{exam_id}/publish`
+Publish an exam and freeze a snapshot of all question data.
+
+**Response**
+- `exam_id`
+- `course_id`
+- `is_published`
+- `total_questions`
+- `total_score`
+- `message`
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- After publishing, exam structure and question content are frozen.
+- Students can only attempt published exams.
+- Exam metadata and questions cannot be modified after publish.
+
+---
+
+### `POST /courses/{course_id}/exams/instructor/{exam_id}/sections`
+Add a section to an exam.
+
+**Request**
+- `title`
+- `description` (optional)
+- `question_type`
+- `time_limit_minutes` (optional)
+- `must_complete` (default: true)
+
+**Response**
+- section object: `{ id, exam_id, title, description, question_type, order_index, question_count, section_score, time_limit_minutes, must_complete, created_at, updated_at }`
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- Each section holds questions of a single type only, enforced by `question_type`.
+
+---
+
+### `PATCH /courses/{course_id}/exams/instructor/{exam_id}/sections/reorder`
+Reorder sections within an exam.
+
+**Request**
+- `section_ids`: ordered list of section IDs
+
+**Response**
+- `exam_id`, `course_id`, `section_ids`, `message`
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `PATCH /courses/{course_id}/exams/instructor/{exam_id}/sections/{section_id}`
+Update a section.
+
+**Request** (all fields optional)
+- `title`
+- `description`
+- `question_type`
+- `time_limit_minutes`
+- `must_complete`
+
+**Response**
+- section object
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `DELETE /courses/{course_id}/exams/instructor/{exam_id}/sections/{section_id}`
+Delete a section and its associated question references.
+
+**Response**
+- `exam_id`, `course_id`, `deleted_section_id`, `message`
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `POST /courses/{course_id}/exams/instructor/{exam_id}/sections/{section_id}/questions`
+Add questions from the course question bank to a section.
+
+**Request**
+- `question_ids`: list of question IDs
+
+**Response**
+- `exam_id`, `course_id`, `section_id`, `added_count`, `section_question_count`, `section_score`, `exam_total_questions`, `exam_total_score`
+- `questions`: list of exam question items
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- Questions must belong to the same course and match the section's `question_type`.
+- Questions are stored by reference only until publish.
+
+---
+
+### `PATCH /courses/{course_id}/exams/instructor/{exam_id}/sections/{section_id}/questions/reorder`
+Reorder questions within a section.
+
+**Request**
+- `exam_question_ids`: ordered list of exam-question link IDs
+
+**Response**
+- `exam_id`, `course_id`, `section_id`, `exam_question_ids`, `message`
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `DELETE /courses/{course_id}/exams/instructor/{exam_id}/sections/{section_id}/questions/{exam_question_id}`
+Remove a question from a section.
+
+**Response**
+- `exam_id`, `course_id`, `section_id`, `removed_exam_question_id`, updated counts and scores, `message`
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `GET /courses/{course_id}/exams/instructor/{exam_id}/export/pdf`
+Export a published exam as a PDF file.
+
+**Query Parameters** (all boolean, all optional with defaults)
+- `include_learnova_logo` (default: true)
+- `include_course_title` (default: true)
+- `include_course_code` (default: false)
+- `include_exam_metadata` (default: true)
+- `include_instructions` (default: true)
+- `include_section_descriptions` (default: true)
+- `include_points` (default: true)
+- `include_student_info_fields` (default: true)
+- `include_answer_space` (default: true)
+- `include_ocr_support` (default: false)
+- `shuffle_questions` (optional override)
+- `shuffle_options` (optional override)
+
+**Response**
+- PDF file stream
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- `include_ocr_support` switches to an OCR-compatible PDF format for scanned answer sheet workflows.
+
+---
+
+### Exam Templates
+
+Templates define a reusable exam structure (metadata + sections with question counts and point values). When a course is created, 4 default templates are automatically generated.
+
+---
+
+### `GET /courses/{course_id}/exams/instructor/templates`
+List all exam templates for a course.
+
+**Response**
+- `course_id`, `total`
+- `templates`: list of `{ id, name, exam_type, is_default, duration_minutes, total_questions, total_score, sections_count }`
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `GET /courses/{course_id}/exams/instructor/templates/{template_id}`
+Get full template details including sections.
+
+**Response**
+- full template object with `sections`: `[ { id, template_id, title, question_type, question_count, points_per_question, section_score, order_index, ... } ]`
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `POST /courses/{course_id}/exams/instructor/templates`
+Create a new exam template.
+
+**Request**
+- `name`
+- `exam_type`
+- `duration_minutes` (optional)
+- `max_attempts` (default: 1)
+- `passing_score` (optional)
+- `shuffle_questions` (default: true)
+- `shuffle_options` (default: true)
+
+**Response**
+- full template object
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `PATCH /courses/{course_id}/exams/instructor/templates/{template_id}`
+Update template metadata.
+
+**Request** (all fields optional, same as create)
+
+**Response**
+- full template object
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `DELETE /courses/{course_id}/exams/instructor/templates/{template_id}`
+Delete an exam template.
+
+**Response**
+- `course_id`, `deleted_template_id`, `message`
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `POST /courses/{course_id}/exams/instructor/templates/{template_id}/sections`
+Add a section to a template.
+
+**Request**
+- `title`
+- `question_type`
+- `question_count`
+- `points_per_question`
+
+**Response**
+- `{ id, template_id, title, question_type, question_count, points_per_question, section_score, order_index, created_at, updated_at }`
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `PATCH /courses/{course_id}/exams/instructor/templates/{template_id}/sections/{section_id}`
+Update a template section.
+
+**Request** (all fields optional)
+- `title`, `question_type`, `question_count`, `points_per_question`
+
+**Response**
+- section object
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `DELETE /courses/{course_id}/exams/instructor/templates/{template_id}/sections/{section_id}`
+Delete a template section.
+
+**Response**
+- `course_id`, `template_id`, `deleted_section_id`, `total_questions`, `total_score`, `message`
+
+**Authorization**
+- Instructor — course owner only
+
+---
+
+### `POST /courses/{course_id}/exams/instructor/templates/{template_id}/generate-exam`
+Generate a fully populated exam from a template with randomly selected questions.
+
+**Request**
+- `title`
+- `topic_ids` (optional — filter source questions by specific topics)
+- `section_difficulty_distribution` (optional — map of section index to difficulty level)
+
+**Response**
+- full exam object with all sections and questions already populated
+- `{ id, course_id, title, exam_type, is_published, duration_minutes, max_attempts, shuffle_questions, shuffle_options, total_questions, total_score, created_at, updated_at, sections: [ { ..., questions: [...] } ] }`
+
+**Authorization**
+- Instructor — course owner only
+
+**Notes**
+- Questions are selected randomly per section from the course question bank, filtered by `question_type` and optionally `difficulty` and `topic_ids`.
+- Each generation call may produce a different question set.
+- The generated exam is created in draft state and must be published separately.
+
+---
+
+### Student Exam Endpoints
+
+---
+
+### `GET /courses/{course_id}/exams/student/exams`
+List all published exams available to the current student in this course.
+
+**Response**
+- `course_id`, `total`
+- `exams`: list of `{ id, title, description, exam_type, duration_minutes, max_attempts, passing_score, total_questions, total_score, available_from, available_to, is_available }`
+
+**Authorization**
+- Student — enrolled in course
+
+---
+
+### `POST /courses/{course_id}/exams/student/exams/{exam_id}/attempt`
+Start a new exam attempt.
+
+**Response**
+- `{ exam_id, attempt_id, attempt_number, status, started_at, expires_at, title, description, instructions, exam_type, duration_minutes, total_questions, total_score, shuffle_questions, shuffle_options, proctoring flags, sections: [ { ..., questions: [...] } ] }`
+
+**Authorization**
+- Student — enrolled in course
+
+**Notes**
+- Returns the full exam structure with questions for the student to answer.
+- `expires_at` is set based on `duration_minutes` if defined.
+- Respects `max_attempts` — rejected if the student has exhausted attempts.
+
+---
+
+### `PUT /courses/{course_id}/exams/student/exams/{exam_id}/attempts/{attempt_id}/answers`
+Save or update a single answer during an active attempt.
+
+**Request**
+- `exam_question_id`
+- `selected_option_index` (optional — for single-choice questions)
+- `selected_option_indices` (optional — for multi-choice questions)
+- `answer_text` (optional — for essay/short-answer questions)
+- `time_taken_seconds` (optional)
+
+**Response**
+- `attempt_id`, `exam_question_id`, `saved`
+
+**Authorization**
+- Student — owner of the attempt
+
+**Notes**
+- Designed for incremental answer saving during the attempt (e.g., auto-save or recovery from disconnection).
+- Can be called multiple times for the same question — last write wins.
+
+---
+
+### `POST /courses/{course_id}/exams/student/exams/{exam_id}/attempts/{attempt_id}/submit`
+Submit an exam attempt for grading.
+
+**Request**
+- `answers` (optional — final batch of answers to save before submission)
+- `time_spent_seconds` (optional)
+
+**Response**
+- `{ attempt_id, exam_id, status, total_score, percentage_score, is_passed, correct_count, incorrect_count, unanswered_count, submitted_at }`
+
+**Authorization**
+- Student — owner of the attempt
+
+**Notes**
+- Auto-gradable questions (MCQ, true/false) are graded immediately.
+- Essay and short-answer questions are sent to the AI service for grading. Results are delivered asynchronously via `POST /ai/callback` under operation type `exam_grading`.
+- The response reflects partial results at submission time. Use `get_exam_attempt_result` to check final grading status via the `is_fully_graded` flag.
+
+---
+
+### `GET /courses/{course_id}/exams/{exam_id}/attempts`
+List all completed or submitted attempts for this exam by the current student.
+
+**Response**
+- `exam_id`
+- `attempts`: list of `{ attempt_id, attempt_number, status, started_at, submitted_at, graded_at, total_score, earned_score, percentage_score, is_passed }`
+
+**Authorization**
+- Student — enrolled in course
+
+---
+
+### `GET /courses/{course_id}/exams/{exam_id}/attempt/{attempt_id}/result`
+Get the full graded result of a specific attempt.
+
+**Response**
+- `{ exam_id, attempt_id, attempt_number, status, is_fully_graded, started_at, submitted_at, graded_at, time_spent_seconds, total_score, earned_score, percentage_score, is_passed, correct_count, incorrect_count, unanswered_count, sections: [ { ..., questions: [ { ..., student_answer, correct_answer, is_correct, points_earned, teacher_feedback } ] } ] }`
+
+**Authorization**
+- Student — owner of the attempt
+
+**Notes**
+- `is_fully_graded` is `false` when AI grading for essay/short-answer questions is still pending.
+- Partial results are returned immediately — auto-graded questions show their results even before AI grading completes.
+
+---
+
+## 13. AI Chat
+
+The AI chat domain provides a RAG-powered conversational study assistant scoped to a specific course. All endpoints are student-facing and require active enrollment.
+
+Responses are delivered asynchronously: the student sends a message, the backend forwards it to the AI service, and the AI response is delivered via `POST /ai/callback` under operation type `rag_response`. The student polls for the response using the SSE stream endpoint.
+
+---
+
+### `POST /courses/{course_id}/ai-chat/sessions`
+Create a new chat session and send the first message.
+
+**Request**
+- `content` (1–2000 characters)
+
+**Response**
+- `session`: `{ id, course_id, session_title, is_active, started_at, last_message_at }`
+- `message`: `{ id, session_id, message_type, content, sources, created_at }`
+
+**Authorization**
+- Student — enrolled in course
+
+**Notes**
+- Session title is automatically derived from the first 50 characters of the message content.
+- The returned `message` represents the student's own message. The AI response is delivered asynchronously via the stream endpoint.
+
+---
+
+### `GET /courses/{course_id}/ai-chat/sessions`
+List all chat sessions for the current student in this course.
+
+**Response**
+- `course_id`, `total`
+- `sessions`: list of `{ id, course_id, session_title, is_active, started_at, last_message_at }`
+
+**Authorization**
+- Student — enrolled in course
+
+---
+
+### `GET /courses/{course_id}/ai-chat/sessions/{session_id}`
+Get full session history including all messages.
+
+**Response**
+- `{ id, course_id, context_type, session_title, is_active, started_at, last_message_at, messages: [ { id, session_id, message_type, content, sources, created_at } ] }`
+
+**Authorization**
+- Student — owner of the session
+
+**Notes**
+- `sources` contains references used by the RAG system: `[ { title, page } ]`
+
+---
+
+### `POST /courses/{course_id}/ai-chat/sessions/{session_id}/messages`
+Send a follow-up message in an existing session.
+
+**Request**
+- `content` (1–2000 characters)
+
+**Response**
+- `{ id, session_id, message_type, content, sources, created_at }`
+
+**Authorization**
+- Student — owner of the session
+
+**Notes**
+- The message is stored and forwarded to the AI service immediately.
+- The AI response arrives asynchronously. Use the stream endpoint to receive it.
+
+---
+
+### `GET /courses/{course_id}/ai-chat/sessions/{session_id}/messages/{message_id}/stream`
+Stream the AI response for a specific message using Server-Sent Events (SSE).
+
+**Response**
+- SSE stream — delivers the AI response event when it becomes available
+
+**Authorization**
+- Student — owner of the session
+
+**Notes**
+- The frontend should call this endpoint immediately after sending a message and hold the connection open.
+- The event is fired once the AI callback is received and the response is persisted.
+- This endpoint uses SSE (not WebSocket). The frontend must use `fetch` with `ReadableStream` rather than `EventSource` due to `Authorization` header requirements.
+- The SQLAlchemy session is closed before the SSE stream starts to avoid holding a DB connection during the wait.
+
+---
+
+## 14. Settings
 
 These endpoints manage the authenticated user’s profile, account security, avatar workflow, and preferences.
 
@@ -1260,7 +2051,7 @@ Update the current user’s preferences.
 
 ---
 
-## 13. Organizations
+## 15. Organizations
 
 These endpoints exist in the current backend but are not part of the main mature product flow yet.
 
@@ -1318,7 +2109,7 @@ Update an organization member’s status.
 
 ---
 
-## 14. AI Integration (Internal / Callback)
+## 16. AI Integration (Internal / Callback)
 
 ### `POST /ai/callback`
 Receive an asynchronous callback from the AI service after backend-initiated AI processing completes.
@@ -1338,13 +2129,18 @@ Receive an asynchronous callback from the AI service after backend-initiated AI 
 **Notes**
 - Callback authenticity is verified before the request enters business logic.
 - Callback handling is dispatched based on `operation_type`.
-- The currently supported callback-driven operation is:
-  - `content_structure_generation`
+- The currently supported callback-driven operations are:
+
+- `content_structure_generation` — extracts topics, subtopics, and learning outcomes from uploaded materials
+- `question_generation` — inserts AI-generated questions into the course question bank under the questions domain
+- `exam_grading` — delivers grading results for essay and short-answer questions from a submitted exam attempt
+- `rag_chat` — delivers the AI assistant's reply for a student chat message in the AI chat domain
+
 - This endpoint is part of the backend's internal AI integration flow rather than the normal frontend-facing API surface.
 
 ---
 
-## 15. Endpoint Summary by Feature
+## 17. Endpoint Summary by Feature
 
 ### Authentication
 - `POST /auth/register`
@@ -1365,6 +2161,15 @@ Receive an asynchronous callback from the AI service after backend-initiated AI 
 - `POST /courses/invitations/accept`
 - `GET /courses/my`
 - `GET /courses/{course_id}/invitations`
+- `PATCH /courses/{course_id}`
+- `POST /courses/{course_id}/publish`
+- `POST /courses/{course_id}/cover/initiate`
+- `POST /courses/{course_id}/cover/confirm`
+- `POST /courses/{course_id}/enroll`
+- `GET /courses/{course_id}/enrollment-requests`
+- `PATCH /courses/{course_id}/enrollment-requests/{enrollment_id}`
+- `GET /courses/search`
+- `GET /courses/search/autocomplete`
 
 ### Learning Outcomes
 - `POST /courses/{course_id}/learning-outcomes`
@@ -1404,6 +2209,45 @@ Receive an asynchronous callback from the AI service after backend-initiated AI 
 - `GET /courses/{course_id}/modules/{module_id}/questions`
 - `GET /courses/{course_id}/questions`
 - `GET /courses/{course_id}/questions/{question_id}`
+- `PATCH /courses/{course_id}/questions/{question_id}/update`
+- `POST /courses/{course_id}/questions/ai-generate`
+
+### Exams
+- `POST /courses/{course_id}/exams/instructor`
+- `PATCH /courses/{course_id}/exams/instructor/{exam_id}`
+- `GET /courses/{course_id}/exams/instructor`
+- `GET /courses/{course_id}/exams/instructor/{exam_id}`
+- `POST /courses/{course_id}/exams/instructor/{exam_id}/publish`
+- `POST /courses/{course_id}/exams/instructor/{exam_id}/sections`
+- `PATCH /courses/{course_id}/exams/instructor/{exam_id}/sections/reorder`
+- `PATCH /courses/{course_id}/exams/instructor/{exam_id}/sections/{section_id}`
+- `DELETE /courses/{course_id}/exams/instructor/{exam_id}/sections/{section_id}`
+- `POST /courses/{course_id}/exams/instructor/{exam_id}/sections/{section_id}/questions`
+- `PATCH /courses/{course_id}/exams/instructor/{exam_id}/sections/{section_id}/questions/reorder`
+- `DELETE /courses/{course_id}/exams/instructor/{exam_id}/sections/{section_id}/questions/{exam_question_id}`
+- `GET /courses/{course_id}/exams/instructor/{exam_id}/export/pdf`
+- `GET /courses/{course_id}/exams/instructor/templates`
+- `GET /courses/{course_id}/exams/instructor/templates/{template_id}`
+- `POST /courses/{course_id}/exams/instructor/templates`
+- `PATCH /courses/{course_id}/exams/instructor/templates/{template_id}`
+- `DELETE /courses/{course_id}/exams/instructor/templates/{template_id}`
+- `POST /courses/{course_id}/exams/instructor/templates/{template_id}/sections`
+- `PATCH /courses/{course_id}/exams/instructor/templates/{template_id}/sections/{section_id}`
+- `DELETE /courses/{course_id}/exams/instructor/templates/{template_id}/sections/{section_id}`
+- `POST /courses/{course_id}/exams/instructor/templates/{template_id}/generate-exam`
+- `GET /courses/{course_id}/exams/student/exams`
+- `POST /courses/{course_id}/exams/student/exams/{exam_id}/attempt`
+- `PUT /courses/{course_id}/exams/student/exams/{exam_id}/attempts/{attempt_id}/answers`
+- `POST /courses/{course_id}/exams/student/exams/{exam_id}/attempts/{attempt_id}/submit`
+- `GET /courses/{course_id}/exams/{exam_id}/attempts`
+- `GET /courses/{course_id}/exams/{exam_id}/attempt/{attempt_id}/result`
+
+### AI Chat
+- `POST /courses/{course_id}/ai-chat/sessions`
+- `GET /courses/{course_id}/ai-chat/sessions`
+- `GET /courses/{course_id}/ai-chat/sessions/{session_id}`
+- `POST /courses/{course_id}/ai-chat/sessions/{session_id}/messages`
+- `GET /courses/{course_id}/ai-chat/sessions/{session_id}/messages/{message_id}/stream`
 
 ### Settings
 - `PATCH /settings/profile`

@@ -68,7 +68,7 @@ Learnova is designed to support organization-based learning environments (e.g., 
 
 The current system is centered around the instructor experience:
 
-- Create courses
+ Create courses
 - Organize courses into modules
 - Upload materials
 - Choose between:
@@ -79,16 +79,25 @@ The current system is centered around the instructor experience:
   - learning outcomes
 - Create and manage questions
 - Build a course-level question bank
+- Generate questions manually or using AI
+- Control course visibility and publishing
+- Manage enrollment, including invitation-based and approval-based access
+- Build full exams from the question bank, organized into sections
+- Use reusable exam templates to generate exams quickly
+- Export exams as PDF, including an OCR-compatible format
 
 ---
 
-### Learner Experience (Evolving)
+## Learner Experience
 
-The learner experience is being built on top of the instructor workflow and includes:
+The learner experience is now an implemented, active part of the platform, built on top of the instructor workflow:
 
-- Accessing structured course content
-- Practicing questions linked to specific topics
-- (Upcoming) AI-assisted learning and weak-point guidance
+- Discovering and enrolling in courses through search or direct access
+- Accessing structured course content once enrolled
+- Practicing and taking exams built from the course question bank
+- Receiving a mix of automatic and AI-assisted grading on submitted exams
+- Studying with a course-scoped AI chat companion that answers questions grounded in the course's own material
+
 
 ---
 
@@ -126,16 +135,20 @@ From uploaded materials, the AI can extract:
 - Learning outcomes
 
 ### Question Generation
-The AI can generate questions:
-- Based on selected topics
-- With controlled types and quantities
+
+The AI generates questions:
+- Based on selected topics, with one or more configurations per topic
+- With controlled types, difficulty levels, and quantities
 - Aligned with the course structure
 
-### Learning Support (Ongoing / Upcoming)
-The platform is designed to support:
-- learner understanding
-- performance analysis
-- personalized learning guidance
+Generated questions enter the question bank as AI-suggested content pending instructor review, consistent with how AI-generated topics and learning outcomes are treated.
+
+### Learning Support
+
+The platform now includes an implemented AI study companion: a course-scoped, RAG-based chat assistant that lets enrolled students ask questions and receive answers grounded in their course's own material, delivered in real time.
+
+On the assessment side, AI assistance extends to grading: subjective exam answers (essay and short-answer questions) are evaluated by the AI service, while objective question types are graded automatically by the backend.
+
 
 ### AI Processing Flow (High-Level)
 1. Instructor uploads material
@@ -192,25 +205,33 @@ At the core of Learnova is the **course question bank system**:
   - generate questions using AI
 - Questions are structured and reusable
 
-The platform supports:
-- building assessments from approved questions  
-- and forming structured evaluation workflows based on the question bank
+The course question bank now powers a complete exam system:
+
+- Instructors build exams as a structured hierarchy of sections, each holding questions of a single type
+- Exams can be authored manually or generated from a reusable template
+- Published exams are protected by a frozen snapshot of their question content, so later question bank edits cannot affect an exam students have already started taking
+- Students attempt exams, save answers incrementally, and receive a mix of automatic and AI-assisted grading
 
 ---
 
 ## 8. Access Models
 
-Learnova supports flexible course access models:
+Learnova supports flexible course access through two independent dimensions: who can discover a course, and who can enroll in it.
 
-- **Open Enrollment**  
-  Any user can enroll in the course
+**Visibility**
+- **Public** — discoverable through search, accessible to anyone
+- **Unlisted** — not discoverable through search, accessible via direct link
+- **Private** — accessible only to the owner and enrolled users
 
-- **Controlled Enrollment (Invitation-Based)**  
-  Access is restricted to specific users via email invitations
+**Enrollment**
+- **Open Enrollment** — any user can enroll directly
+- **Approval-Based Enrollment** — enrollment requests require instructor approval
+- **Invitation-Based Enrollment** — access is restricted to specific users via email invitations
 
-This allows instructors to:
-- run public courses
-- or manage private groups (e.g., academic sections)
+A course remains in draft state, visible only to its owner, until explicitly published. This allows instructors to:
+- run fully open public courses
+- share unlisted courses with a specific link
+- manage fully private, invitation-only groups (e.g. academic sections)
 
 ---
 
@@ -220,12 +241,17 @@ The current implementation focuses on building a strong instructor-driven founda
 
 - Authentication and account management
 - Instructor role workflows
-- Course creation and management
+- Course creation, publishing, and visibility-based access control
+- Course discovery through search and autocomplete
+- Student enrollment, including open, approval-based, and invitation-based access
 - Module and material organization
 - Topic and subtopic management
 - Learning outcomes management
-- Question creation and question bank foundation
-- Invitation-based access control
+- Question creation, AI-assisted question generation, and question bank management
+- A complete exam system: authoring, sections, templates, generation, publishing, and PDF export
+- Student exam attempts with automatic and AI-assisted grading
+- A real-time, RAG-based AI study companion scoped to each course
+
 
 ---
 
@@ -234,10 +260,11 @@ The current implementation focuses on building a strong instructor-driven founda
 Learnova is designed to expand into a more complete learning ecosystem, including:
 
 - Organization-based learning environments
-- Full learner experience and study workflows
-- Advanced performance analytics and weak-point tracking
-- Expanded AI study companion capabilities
-- Full assessment and exam workflows built on top of the question bank
+- Advanced performance analytics and weak-point tracking, built on top of exam attempt data
+- Expanded AI study companion capabilities beyond the current course-scoped chat
+- Broader learner-side study workflows beyond exams and chat
+
+(The previously listed "Full learner experience and study workflows" and "Full assessment and exam workflows built on top of the question bank" are now implemented and have moved to Section 9 — Current Scope.)
 
 ---
 

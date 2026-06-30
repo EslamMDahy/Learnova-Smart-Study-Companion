@@ -64,6 +64,17 @@ The backend currently handles the following major responsibilities:
 - question creation and multi-scope question retrieval
 - limited organization demo flows
 - integration boundaries for future AI extraction and AI-assisted learning workflows
+- course publishing and visibility-based access control
+- course discovery through full-text search and autocomplete
+- student-initiated course enrollment, including open and approval-based enrollment requests
+- course cover image upload flows
+- dynamic, partial updates to existing question bank entries
+- AI-assisted question generation scoped to selected topics
+- full exam authoring workflow: sections, question assignment, ordering, and publish-time snapshotting
+- reusable exam templates with randomized exam generation
+- exam PDF export, including an OCR-compatible export mode
+- student exam attempt lifecycle: incremental answer saving, submission, and mixed automatic/AI-assisted grading
+- a course-scoped, RAG-based AI study companion delivered through real-time chat sessions
 
 ---
 
@@ -84,6 +95,8 @@ The backend currently registers routers for:
 - materials
 - topics
 - questions
+- exams
+- ai_chat
 - organizations
 - settings
 - ai
@@ -110,7 +123,7 @@ Backend/
 ├── app/
 │  ├── core/
 │  ├── db/
-│  ├── features/
+│  ├── domains/
 │  ├── models/
 │  └── main.py
 ├── assets/
@@ -137,7 +150,7 @@ Contains shared infrastructure and cross-cutting backend utilities such as:
 #### `app/db/`
 Contains database session setup and database base wiring.
 
-#### `app/features/`
+#### `app/domains/`
 Contains the actual business domains of the application.
 
 #### `app/models/`
@@ -167,10 +180,12 @@ This keeps the default feature structure simple while still allowing justified i
 ### Feature Packages
 
 ```text
-features/
+domains/
 ├── ai/
+├── ai_chat/
 ├── auth/
 ├── courses/
+├── exams/
 ├── learningOutcomes/
 ├── materials/
 ├── modules/
@@ -704,11 +719,17 @@ The course feature is the root of the instructional side of the system.
 ### Current Responsibilities
 
 - course creation
+- course metadata update
+- course publishing
+- cover image upload (staged: initiate → confirm)
 - invitation upload via Excel
 - invitation sending
 - invitation acceptance
-- listing current user’s accessible courses
+- open and approval-based enrollment
+- enrollment request listing and approval/decline
+- listing current user's accessible courses
 - listing course invitations
+- full-text course search and autocomplete
 
 ### Architectural Importance
 
@@ -719,16 +740,86 @@ Courses establish:
 
 ---
 
-## 15. Invitation and Access Model
+## 15. Course Visibility and Access Lifecycle
+<!-- *(insert after Section 14, before the existing Section 15 "Invitation and Access Model")* -->
+
+A course moves through a deliberate visibility lifecycle rather than being accessible by default.
+
+### Draft State
+
+A newly created course starts in `draft` status and is visible only to its owner. No visibility level, enrollment setting, or invitation can override this — publishing is a required, explicit transition before any other user can see the course in any form.
+
+### Publishing and Visibility Levels
+
+Publishing a course activates one of three visibility levels, each with a distinct access boundary:
+
+- **`public`** — visible to everyone, included in search results
+- **`unlisted`** — accessible only via direct link; excluded from search
+- **`private`** — accessible only to the owner and enrolled users; not reachable by link or search
+
+### Enrollment as a Separate Axis
+
+Visibility controls *who can see the course exists*. Enrollment controls *who can access its content*. These are deliberately independent:
+
+- `is_open_for_enrollment` determines whether enrollment is currently allowed, regardless of visibility
+- `requires_enrollment_approval` determines whether enrollment is immediate or pending instructor approval
+- enrollment is only possible on a published course
+
+A user can be enrolled in a `private` course (via direct instructor action or a prior invitation) and retain full access even if the course's visibility never makes it independently discoverable.
+
+### Pre-Enrollment Content Boundary
+
+A non-enrolled user who reaches a course (via search, direct link, or invitation) sees a restricted view: course metadata, the module list, and learning outcomes — not full module/material content. This is implemented by making `list_modules` and `list_learning_outcomes` visibility-aware rather than gating access at the course level alone, allowing prospective students to evaluate a course before enrolling.
+
+### Architectural Rationale
+
+Separating visibility, enrollment permission, and content access into independent checks (rather than a single course-level flag) allows the same course entity to support open public courses, invite-only private cohorts, and link-shared unlisted courses without divergent code paths.
+
+---
+
+## 16. Course Search Architecture
+*(insert after the new "Course Visibility and Access Lifecycle" section)*
+
+Course discovery is implemented using PostgreSQL's native full-text search rather than an external search engine. This keeps search capability inside the system of record instead of introducing a separate infrastructure dependency and synchronization concern.
+
+### Search Vector Column
+
+The `courses` table carries a `search_vector` column of type `tsvector`, indexed with a GIN index for efficient text search at the current and expected scale.
+
+### Weighted Ranking
+
+The search vector is built from multiple course fields with weighted relevance:
+
+- **Weight A (highest):** `title`
+- **Weight B:** `category`
+- **Weight C:** `description` and `tags` (aggregated)
+
+This means a match on the course title ranks above a match found only in the description or tags.
+
+### Trigger-Maintained Consistency
+
+The `search_vector` column is kept in sync through a database trigger (`BEFORE INSERT OR UPDATE`) rather than being recomputed in application code. This guarantees the search index can never drift out of sync with course data, regardless of which service or code path performs the write — consistent with the backend's broader principle of keeping the database authoritative for derived state it can own directly.
+
+### Search Scope
+
+Search results are restricted to published, `public` courses, consistent with the visibility model — `private` and `unlisted` courses never appear in search regardless of relevance match.
+
+### Autocomplete as a Separate Concern
+
+Autocomplete suggestions are served by a lightweight, independent prefix-match query against course titles rather than reusing the full-text ranked search path. This keeps the type-ahead experience fast and simple, decoupled from the heavier weighted-relevance search used for actual search submissions.
+
+---
+
+## 17. Invitation and Access Model
 
 A key design choice in Learnova is support for both open and controlled course access.
 
-### 15.1 Supported Access Patterns
+### 17.1 Supported Access Patterns
 
 - **Open enrollment**
 - **Invitation-based controlled enrollment**
 
-### 15.2 Invitation Flow
+### 17.2 Invitation Flow
 
 For controlled access, instructors can:
 
@@ -742,7 +833,7 @@ This is particularly important for real teaching scenarios where instructors wan
 
 ---
 
-## 16. Module Architecture
+## 18. Module Architecture
 
 Modules are ordered child entities under a course.
 
@@ -764,7 +855,7 @@ Ordering is explicitly managed through backend-controlled reorder logic rather t
 
 ---
 
-## 17. Material Architecture
+## 19. Material Architecture
 
 Materials represent uploaded educational files under a module.
 
@@ -814,7 +905,7 @@ After callback verification and dispatch, the backend persists the returned stru
 
 ---
 
-## 18. Topic Architecture
+## 20. Topic Architecture
 
 Topics are material-scoped content units and are one of the most important structural entities in the backend.
 
@@ -837,7 +928,7 @@ This decision avoids maintaining separate topic and subtopic entity types while 
 
 ---
 
-## 19. Learning Outcome Architecture
+## 21. Learning Outcome Architecture
 
 Learning outcomes are course-scoped instructional goals linked to topics.
 
@@ -859,11 +950,11 @@ The many-to-many relationship between learning outcomes and topics allows the ba
 
 ---
 
-## 20. Question Architecture
+## 22. Question Architecture
 
 The question domain is one of the most important backend areas because it directly supports the product’s question-bank identity.
 
-### 20.1 Topic-Scoped Question Ownership
+### 22.1 Topic-Scoped Question Ownership
 
 All questions are linked directly to a `topic_id`.
 
@@ -874,7 +965,7 @@ This is a deliberate architectural choice because:
 
 ---
 
-### 20.2 Unified Question Table Strategy
+### 22.2 Unified Question Table Strategy
 
 The backend uses a unified question model instead of separate tables for each question type.
 
@@ -886,7 +977,7 @@ This supports:
 
 ---
 
-### 20.3 Type-Aware Validation
+### 22.3 Type-Aware Validation
 
 Although persistence is unified, validation is type-aware.
 
@@ -906,7 +997,7 @@ Supported and planned question types include:
 
 ---
 
-### 20.4 Multi-Scope Question Retrieval
+### 22.4 Multi-Scope Question Retrieval
 
 The backend supports question retrieval across multiple scopes:
 
@@ -920,7 +1011,7 @@ Even though questions are directly topic-scoped, broader listing endpoints deriv
 
 ---
 
-### 20.5 Question Bank Foundation
+### 22.5 Question Bank Foundation
 
 At the product level, the implemented question domain forms the foundation of the **course question bank**.
 
@@ -928,7 +1019,185 @@ This is strategically important because the next major workflow is assessment co
 
 ---
 
-## 21. Settings and User Account Architecture
+### 22.6 Dynamic Question Update
+
+Question updates follow the same project-wide partial-update convention used elsewhere in the backend: a `null` field is ignored, a whitespace-only string clears the field, and an actual value updates it. Each field is validated individually before this rule is applied, since not every field can legitimately be cleared to empty (e.g. `question_text`).
+
+The question's `type` is immutable after creation, since downstream exam sections enforce a single question type per section — allowing `type` to change post-creation could silently break exam section type constraints.
+
+---
+
+### 22.7 AI-Assisted Question Generation
+
+Question generation reuses the same AI service integration foundation as material content-structure extraction (Section 9.10–9.15), rather than implementing separate transport, signing, or tracking logic.
+
+A generation request is grouped per topic, with one or more `(type, difficulty, count)` configurations per topic, allowing an instructor to request a varied mix of question types and difficulty levels in a single call.
+
+Generated questions are inserted with `source = ai_generated` and `approval_status = pending`, mirroring the same "suggested, not yet accepted" treatment already used for AI-generated topics and learning outcomes (Section 30.15). The AI layer proposes content; the backend and instructor remain the authority over what becomes accepted question-bank content.
+
+---
+
+## 23. Exam Architecture
+*(insert after Section 20 — Question Architecture, as a new major section)*
+
+The exam domain is the largest feature area in the backend and is built directly on top of the question bank rather than as a parallel, disconnected assessment system.
+
+### Hierarchy
+
+```text
+Course
+└── Exam
+    └── Section  (single question type per section)
+        └── Questions (referenced from the course question bank)
+```
+
+Each section enforces a single `question_type`. This keeps section-level behavior (timing, scoring, rendering) predictable and avoids mixed-type sections that would complicate both grading and PDF export logic.
+
+### Reference-Until-Publish, Snapshot-at-Publish
+
+While an exam is in draft state, its questions are stored as references (IDs) into the question bank only. When the exam is retrieved (e.g. `get_exam`), question content is read live from the question bank — meaning an instructor's edits to a question are reflected in any draft exam that references it.
+
+When the exam is published, the backend takes a full snapshot of every question's current data and freezes it onto the exam. After publishing:
+
+- the exam's question content can no longer be affected by later question bank edits
+- the exam's structure (sections, questions, metadata) becomes immutable
+
+This two-phase strategy gives instructors the flexibility to keep refining the question bank while drafting an exam, while guaranteeing that once an exam is live to students, its content is stable and auditable — a student's graded result will always correspond to the exact question wording and options they were shown.
+
+### Exam Templates
+
+Exam templates are a separate, parallel hierarchy that defines reusable exam *shape* without binding to actual question instances:
+
+```text
+Course
+└── Exam Template
+    └── Template Section  (question_type, question_count, points_per_question)
+```
+
+Template sections store counts and scoring parameters only — no question references. This keeps templates structurally simple and reusable across many generated exams.
+
+Four default templates are automatically created whenever a course is created, giving every instructor a working starting point instead of an empty state. Default template values are backend-defined and applied through the existing `create_course` flow rather than as a separate provisioning step.
+
+### Exam Generation from Template
+
+`generate_exam_from_template` builds a fully populated exam from a template in a single operation: for each template section, questions are selected **randomly** from the course question bank, filtered by `question_type` and the requested difficulty for that section (and optionally constrained to specific topics).
+
+Randomization is intentional and repeatable-by-design to be *non-repeatable*: each generation call can produce a different question set even from the same template and parameters. This supports practice-exam and repeated-attempt use cases where instructors want variation rather than a deterministic draw. The generated exam is created in draft state and still requires an explicit publish step — generation does not bypass the snapshot-at-publish safeguard.
+
+### Grading Split: Automatic vs AI-Assisted
+
+Exam submission triggers two parallel grading paths based on question type:
+
+- **Auto-gradable types** (multiple choice, true/false) are graded synchronously at submission time, with no external dependency
+- **Subjective types** (essay, short answer) are dispatched to the AI service through the same AI integration foundation used elsewhere in the backend, and graded asynchronously via the `exam_grading` callback operation
+
+This split exists because objective question types have a deterministic correct answer that the backend can evaluate directly, while subjective answers require judgment that only the AI service (or a human reviewer, in the future) can reasonably provide.
+
+### Partial Results and the `is_fully_graded` Flag
+
+Because AI grading is asynchronous, the `submit_exam` response cannot wait for it without blocking the student. Instead, submission returns immediately with whatever results are available — auto-graded questions are scored right away, while AI-graded questions remain pending.
+
+The `is_fully_graded` flag distinguishes a fully scored attempt from one still awaiting AI grading. The attempt-result endpoint is the canonical place to check final state once AI grading completes and is persisted via the callback handler. This favors availability of partial results over forcing the student (or frontend) to block on a synchronous, all-or-nothing grading response.
+
+### PDF Export
+
+Exam PDF export operates on the same snapshot data used by the live exam, and supports two structurally different output modes selected per request:
+
+- a **standard** exam PDF
+- an **OCR-compatible** PDF, designed for scanned answer-sheet workflows
+
+Both modes accept the same set of per-request toggles (logo, course title/code, exam metadata, instructions, section descriptions, point values, student info fields, answer space) via query parameters, allowing the instructor to tailor the exported document without needing separate export endpoints per configuration.
+
+---
+
+## 24. Real-Time Communication Layer
+<!-- *(insert after Section 9 — Shared Core Layer, as a new subsection 9.16, or as its own top-level section before Section 10)* -->
+
+The backend includes a dedicated real-time communication layer in `app/core/event_bus/`, built on PostgreSQL's native `LISTEN`/`NOTIFY` mechanism.
+
+### Why LISTEN/NOTIFY
+
+`LISTEN`/`NOTIFY` was chosen over introducing Redis pub/sub or relying on database polling. This avoids adding a new infrastructure dependency purely for event delivery, and keeps the database as the single authoritative source for both application state and the notifications derived from it — consistent with the backend's broader "backend/database as source of truth" principle.
+
+### Connection Pool Lifecycle
+
+`connections.py` manages a dedicated `asyncpg` connection pool, separate from the main SQLAlchemy session machinery, initialized once at application startup (`init_event_bus`) and torn down at shutdown (`close_event_bus`). Feature code accesses the pool only through `get_pool()`, which raises explicitly if the pool was never initialized — preventing silent no-op behavior if startup wiring is missing.
+
+### Dual Publish Paths
+
+The layer exposes two publish functions:
+
+- `publish(...)` — async, used from async request/service code, acquires a pooled `asyncpg` connection and issues `pg_notify`
+- `publish_sync(...)` — synchronous, using a direct `psycopg` connection, used from contexts that are not async
+
+`publish_sync` exists specifically because AI callback handlers (e.g. `exam_grading`, the RAG chat callback) run inside the backend's existing synchronous SQLAlchemy request/service flow. Rather than converting the entire callback chain to async to gain access to the event bus, a synchronous publish path lets those handlers notify listeners without changing the architecture of the callback feature.
+
+### Subscribe as a Bounded, Single-Shot Wait
+
+`subscribe(...)` is an async generator, but it is not a long-lived multiplexed subscription. Each call:
+
+1. acquires a pooled connection and registers a listener callback for the given channel
+2. waits on an `asyncio.Queue` for exactly one payload, bounded by a timeout (default 30s)
+3. yields the received payload, or an empty string if the wait times out
+4. always removes the listener and releases the connection back to the pool in a `finally` block, regardless of outcome
+
+This bounded, single-shot design keeps connection pool usage predictable — each SSE wait holds exactly one pooled connection for at most the timeout duration, with guaranteed cleanup, rather than allowing long-lived or leaked listener connections to accumulate.
+
+### Interaction with the SQLAlchemy Session
+
+Endpoints that wait on `subscribe(...)` (the SSE stream endpoint) close their SQLAlchemy session before entering the wait. The event bus uses its own independent connection pool, so holding both a live ORM session and an open event-bus wait simultaneously would needlessly tie up two separate database connections for the duration of the wait.
+
+### Shared Core Infrastructure, Not Feature-Local
+
+Although currently consumed only by the AI chat domain, the event bus is implemented as shared `core` infrastructure rather than chat-specific code — the same architectural treatment already given to the AI service integration foundation (Section 9.10–9.15). This allows any future feature requiring real-time push behavior to reuse the same publish/subscribe primitives without reimplementing connection or lifecycle handling.
+
+---
+
+## 25. AI Chat / RAG Architecture
+<!-- *(insert after the Exam Architecture section)* -->
+
+The AI chat domain provides a course-scoped, RAG-based study companion. It is enrollment-gated like other student-facing course content.
+
+### Session and Message Model
+
+A chat session groups an ongoing conversation. The session title is automatically derived from the first 50 characters of the session's first message, removing the need for the student to manually name a session.
+
+### Inverse Correlation Between AI Replies and User Messages
+
+Rather than modeling a conversation as paired "exchange" rows or a separate join table, an AI-generated message stores a `user_message_id` pointing back to the specific user message it answers. A populated `user_message_id` is also how a message row is identified as an AI reply rather than a user message. This keeps the message table flat (one row per message, of either origin) while still preserving an explicit, queryable link between a question and its answer.
+
+### Send Flow and AI Dispatch
+
+Sending a message is a two-part action: the message is persisted immediately, then forwarded to the AI service through the same AI service integration foundation used by material processing and question generation (Section 9.10–9.15). The chat domain does not implement its own request signing, transport, or tracking logic — it reuses the shared integration layer like every other AI-driven feature.
+
+### Asynchronous Response Delivery
+
+The AI's reply does not return synchronously. It arrives later through the generic `POST /ai/callback` endpoint under operation type `rag_chat`, where a dedicated handler validates and persists it using the same registry-based dispatch pattern described in Section 30.6.
+
+### Real-Time Delivery via Message-Scoped Channels
+
+The frontend learns the AI has responded through the real-time communication layer (see "Real-Time Communication Layer" section), using a channel name derived from the **user's message ID**:
+
+```python
+# Frontend opens a stream scoped to the message it just sent:
+async for payload in subscribe(channel=f"chat_{message_id}"):
+    ...
+
+# The rag_chat callback handler publishes once the reply is persisted:
+publish_sync(channel=f"chat_{message_id}", payload="ready")
+```
+
+Channels are scoped to the message ID rather than the session ID so that each stream connection corresponds to exactly one pending AI reply. If a student sends a second message before the first reply arrives, each message's stream is independently scoped and cannot cross-talk with the other.
+
+The publish payload itself is a lightweight "ready" signal rather than the message content — once the frontend receives it, it is expected to fetch the persisted message content through the regular session/message endpoints rather than receiving the AI response body directly over the SSE channel.
+
+### Transport Choice: fetch + ReadableStream over EventSource
+
+The SSE stream is consumed using `fetch` with `ReadableStream` rather than the browser's native `EventSource` API, because `EventSource` cannot send a custom `Authorization` header, which this backend requires for authenticated access to the stream endpoint.
+
+---
+
+## 26. Settings and User Account Architecture
 
 The settings domain handles authenticated user profile and account lifecycle operations.
 
@@ -953,7 +1222,7 @@ This reflects a conservative design for destructive account operations.
 
 ---
 
-## 22. Organization Architecture
+## 27. Organization Architecture
 
 The organization feature exists as an early or demo-oriented domain and is not yet the central product focus.
 
@@ -971,7 +1240,7 @@ It is best understood as a direction-setting domain rather than the operational 
 
 ---
 
-## 23. Storage and File Security Model
+## 28. Storage and File Security Model
 
 The backend follows a strict storage-security principle:
 
@@ -993,7 +1262,7 @@ This separation reflects different security expectations for different file cate
 
 ---
 
-## 24. Data Access Strategy
+## 29. Data Access Strategy
 
 The visible implementation uses explicit SQL queries in feature services rather than deeply embedding ORM models into every workflow.
 
@@ -1015,7 +1284,7 @@ Within this backend, the service-oriented architecture already provides the righ
 
 ---
 
-## 25. Transaction and State Handling
+## 30. Transaction and State Handling
 
 Many feature workflows involve multi-step state changes rather than single inserts or updates.
 
@@ -1031,7 +1300,7 @@ The service layer is therefore responsible not only for validation and database 
 
 ---
 
-## 26. Error Handling Philosophy
+## 31. Error Handling Philosophy
 
 The backend uses explicit HTTP exceptions to represent failures clearly and intentionally.
 
@@ -1048,7 +1317,7 @@ This helps feature behavior remain predictable and easier to debug.
 
 ---
 
-## 27. AI Integration Boundary
+## 32. AI Integration Boundary
 
 The backend is designed to integrate with AI workflows without giving the AI layer direct authority over application state.
 
@@ -1099,12 +1368,12 @@ For example:
 
 This boundary is important because the AI service should be able to participate in a stable communication contract without gaining ownership of backend state management.
 
-At the current stage, the implemented callback-driven operation for material structure processing is `content_structure_generation`.  
+At the current stage, the backend implements four callback-driven AI operations: `content_structure_generation`, `question_generation`, `exam_grading`, and `rag_chat`. Each is handled by its own operation-specific handler behind the same registry-based dispatch described in Section 30.6. The earlier temporary name `material_extraction` should be treated as deprecated.
 The earlier temporary name `material_extraction` should be treated as deprecated.
 
 ---
 
-## 28. AI Communication Security
+## 33. AI Communication Security
 
 The backend secures communication with AI services using an HMAC-based request authentication model backed by a shared secret.
 
@@ -1181,7 +1450,7 @@ This model helps ensure:
 The result is an AI communication model that is explicit, reusable, and aligned with the backend principle that external systems must be verified before they influence application behavior.
 
 
-## 29. AI Request Tracking and Lifecycle Logging
+## 34. AI Request Tracking and Lifecycle Logging
 
 The backend includes a dedicated request-tracking layer for AI communication so that outbound operations can be monitored across their full lifecycle.
 
@@ -1244,22 +1513,22 @@ This distinction keeps the protocol portable while preserving backend ownership 
 ---
 
 
-## 30. AI Callback Handling Architecture
+## 35. AI Callback Handling Architecture
 
 The backend now includes implemented callback support for asynchronous AI workflows.
 
 This is not just a protocol capability in `core`.  
 It is a full feature-level architecture that receives verified AI callbacks, correlates them with tracked requests, dispatches them by operation type, and persists accepted results through backend-controlled business logic.
 
-### 30.1 Callback Entry Point
+### 35.1 Callback Entry Point
 
 The implemented callback endpoint is:
 
 - `POST /ai/callback`
 
-This endpoint is exposed through a dedicated AI router under `app/features/ai/` and is registered in `main.py` as part of the application router composition.
+This endpoint is exposed through a dedicated AI router under `app/domains/ai/` and is registered in `main.py` as part of the application router composition.
 
-### 30.2 Thin Router Design
+### 35.2 Thin Router Design
 
 The AI callback router remains intentionally thin.
 
@@ -1272,7 +1541,7 @@ Its responsibility is limited to:
 
 It does not contain operation-specific business logic, persistence rules, or transaction orchestration.
 
-### 30.3 Request-Boundary Verification
+### 35.3 Request-Boundary Verification
 
 Callback authenticity is verified before the request enters business logic.
 
@@ -1286,11 +1555,11 @@ That verification includes:
 Only after this succeeds does the backend pass a `VerifiedAICallbackRequest` object into the feature service.  
 This preserves the architectural rule that external payloads must be authenticated before they influence application behavior.
 
-### 30.4 AI Feature Package Structure
+### 35.4 AI Feature Package Structure
 
 The callback feature is implemented under:
 
-- `app/features/ai/`
+- `app/domains/ai/`
 
 Its internal structure follows the same architectural discipline as the rest of the backend while allowing a justified handler-driven extension:
 
@@ -1302,7 +1571,7 @@ Its internal structure follows the same architectural discipline as the rest of 
 This is an intentional design choice rather than an accidental deviation from the standard feature pattern.  
 The callback feature is handler-driven by nature because one verified entrypoint may dispatch to multiple AI operation handlers over time.
 
-### 30.5 Generic Service Responsibilities
+### 35.5 Generic Service Responsibilities
 
 The AI feature service is designed to stay as generic as possible.
 
@@ -1323,7 +1592,7 @@ Its responsibilities include:
 
 This service deliberately does not contain operation-specific content insertion logic.
 
-### 30.6 Registry-Based Operation Dispatch
+### 35.6 Registry-Based Operation Dispatch
 
 Callback dispatch is registry-based rather than hardcoded as one growing conditional flow.
 
@@ -1334,16 +1603,23 @@ This allows the backend to support additional AI operations later by:
 
 without redesigning the generic callback service.
 
-### 30.7 Current Implemented Operation
+This design is no longer purely forward-looking — the registry now dispatches across four distinct operations (`content_structure_generation`, `question_generation`, `exam_grading`, `rag_chat`), each added without modifying the generic callback service itself, confirming the original extensibility goal in practice rather than just in intent.
 
-The currently implemented callback-handled operation is:
 
-- `content_structure_generation`
+### 35.7 Current Implemented Operation
 
-This is the finalized operation name used across request dispatch, callback payloads, operation-type definitions, and backend documentation.  
-The earlier temporary name `material_extraction` should be treated as deprecated.
+The backend currently implements four callback-handled operations:
 
-### 30.8 Operation-Specific Handler Responsibilities
+- **`content_structure_generation`** — extracts topics, subtopics, and learning outcomes from an uploaded material
+- **`question_generation`** — inserts AI-generated questions into the course question bank for selected topics
+- **`exam_grading`** — delivers AI-assessed grading results for essay and short-answer questions on a submitted exam attempt
+- **`rag_chat`** — delivers the AI study companion's reply to a student message in the AI chat domain
+
+These are the finalized operation names used across request dispatch, callback payloads, operation-type definitions, and backend documentation. The earlier temporary name `material_extraction` should be treated as deprecated.
+
+Each operation has its own dedicated handler under the registry-based dispatch model (Section 30.6), but all four share the same generic service responsibilities (Section 30.5), request-boundary verification (Section 30.3), and transaction strategy (Section 30.13).
+
+### 35.8 Operation-Specific Handler Responsibilities
 
 The current handler is responsible only for `content_structure_generation` business logic.
 
@@ -1359,7 +1635,7 @@ Its responsibilities include:
 
 The handler does not perform callback verification, request-log lookup, lifecycle orchestration, or transaction commits/rollbacks.
 
-### 30.9 Persistence Helpers and Responsibility Split
+### 35.9 Persistence Helpers and Responsibility Split
 
 Persistence is intentionally divided across feature-scoped helpers.
 
@@ -1402,7 +1678,7 @@ The material helper updates:
 - `ai_processed_at = NOW()`
 - `updated_at = NOW()`
 
-### 30.10 Temporary ID Mapping Strategy
+### 35.10 Temporary ID Mapping Strategy
 
 The backend does not persist AI temporary identifiers as long-term database reference keys.
 
@@ -1414,7 +1690,7 @@ Instead, temp IDs exist only during the processing of the current callback, wher
 After persistence completes, these temp IDs are not retained as durable application identifiers.  
 Accordingly, `ai_ref_key` is not part of the intended long-term linkage strategy for this flow.
 
-### 30.11 Idempotent Relation Insertion
+### 35.11 Idempotent Relation Insertion
 
 Topic-to-learning-outcome relation insertion is intentionally idempotent.
 
@@ -1424,7 +1700,7 @@ To tolerate duplicate callbacks, retries, or repeated network delivery, relation
 
 This prevents avoidable crashes and unnecessary rollbacks when a duplicate relation arrives during callback replay scenarios.
 
-### 30.12 Material AI Processing State
+### 35.12 Material AI Processing State
 
 Successful callback processing does not repurpose the material's general status field as AI completion state.
 
@@ -1436,7 +1712,7 @@ Instead, AI completion is tracked separately through dedicated material fields s
 
 This preserves a clean separation between the material's upload/status lifecycle and its AI-processing lifecycle.
 
-### 30.13 Transaction Strategy
+### 35.13 Transaction Strategy
 
 Transaction ownership remains centralized in the generic AI callback service.
 
@@ -1451,14 +1727,14 @@ The adopted strategy is:
 
 This keeps the callback flow atomic and avoids fragmented transaction control across layers.
 
-### 30.14 Flush Usage Within the Callback Flow
+### 35.14 Flush Usage Within the Callback Flow
 
 The service performs `db.flush()` after marking callback receipt.
 
 This keeps the callback-received update inside the same transaction without introducing a partial commit.  
 If a later handler step fails, the entire operation can still be rolled back atomically.
 
-### 30.15 AI-Generated Content State
+### 35.15 AI-Generated Content State
 
 Rows created from AI callback output are inserted as AI-generated but not yet reviewed.
 
@@ -1471,7 +1747,7 @@ This keeps AI-produced instructional content distinguishable from manually autho
 
 ---
 
-## 31. Security Model Summary
+## 36. Security Model Summary
 
 The backend security model combines multiple layers:
 
@@ -1490,40 +1766,41 @@ This layered approach is especially important in an educational system where lea
 
 ---
 
-## 32. Current Architectural Focus
+## 37. Current Architectural Focus
 
-The current backend is intentionally centered on the instructor-side foundation of the platform.
+The backend's architectural focus has expanded from a purely instructor-driven foundation into a system that also supports core learner-facing workflows, while the instructor-authored content layer underneath remains foundational.
 
-Its primary focus areas are:
+Its primary focus areas now include:
 
 - authenticated account lifecycle
-- course ownership and access control
+- course ownership, visibility, and access control
 - structured instructional hierarchy
 - file-backed material workflows
 - learning outcomes and topic mapping
-- course question bank foundation
-- secure, explicit backend validation
+- a question bank with both manual and AI-assisted authoring
+- a full exam authoring, publishing, and grading workflow
+- student-facing exam attempts with mixed automatic and AI-assisted grading
+- a real-time, RAG-based AI study companion
+- secure, explicit backend validation across both instructor and student-facing flows
 
 This sequencing makes sense because the learner experience depends on a strong instructor-authored content structure beneath it.
 
 ---
 
-## 33. Future Architectural Direction
+## 38. Future Architectural Direction
 
 The current architecture is already positioned to support the next major phases of the platform, including:
 
-- deeper AI extraction integration
-- AI-assisted learner support
-- richer student performance analytics
-- full assessment and exam workflows
+- per-topic student performance analytics and weak-point tracking, built on top of submitted exam attempt data (designed, not yet implemented)
+- deeper AI extraction integration improvements
 - broader organization-based environments
-- expanded learner-side study flows
+- expanded learner-side study flows beyond the current AI chat companion
 
 Because the backend is modular, feature-oriented, and service-driven, these future additions can be integrated incrementally without requiring a full architectural rewrite.
 
 ---
 
-## 34. Summary
+## 39. Summary
 
 The Learnova backend follows a feature-oriented, service-driven architecture where the backend acts as the central authority for data integrity, authorization, storage access, and workflow orchestration.
 
@@ -1541,7 +1818,7 @@ This architecture provides a strong and realistic foundation for turning Learnov
 
 ---
 
-## 35. Anti-Patterns to Avoid
+## 40. Anti-Patterns to Avoid
 
 - Do not trust frontend-provided IDs without hierarchy validation
 - Do not expose storage keys directly
@@ -1550,7 +1827,7 @@ This architecture provides a strong and realistic foundation for turning Learnov
 
 ---
 
-## 36. Development Rules (Non-Negotiable)
+## 41. Development Rules (Non-Negotiable)
 
 - All database access MUST use sqlalchemy.text(...)
 - No ORM relationships inside services
