@@ -189,6 +189,7 @@ class QuestionDifficulty(str, Enum):
 class QuestionSource(str, Enum):
     manual = "manual"
     ai_generated = "ai_generated"
+    native_extraction = "native_extraction"
     imported = "imported"
 
 class QuestionApprovalStatus(str, Enum):
@@ -240,6 +241,19 @@ class LearningRecommendationType(str, Enum):
     question = "question"
     topic_review = "topic_review"
     practice_session = "practice_session"
+
+class AIRequestStatus(str, Enum):
+    PENDING = "pending"
+    SENT = "sent"
+    CALLBACK_RECEIVED = "callback_received"
+    COMPLETED = "completed"
+    FAILED = "failed"
+    EXPIRED = "expired"
+    INVALID_CALLBACK = "invalid_callback"
+
+class AIOperationType(str, Enum):
+    MATERIAL_EXTRACTION = "content_structure_generation"
+    QUESTION_GENERATION = "question_generation"
 
 class AIChatContextType(str, Enum):
     general = "general"

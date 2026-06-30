@@ -1,0 +1,1147 @@
+from __future__ import annotations
+
+from fastapi import HTTPException, status
+from sqlalchemy.orm import Session
+
+from app.core.ai_service_integration.ai_callback_verifier import VerifiedAICallbackRequest
+from app.core.event_bus.publish import publish_sync
+
+from app.domains.topics.helpers import bulk_insert_ai_topics
+from app.domains.learningOutcomes.helpers import bulk_insert_ai_learning_outcomes
+from app.domains.questions.helpers import validate_and_prepare_ai_generated_questions, insert_ai_generated_questions, bulk_insert_pool_questions 
+from app.domains.exams.helpers import save_ai_exam_grading_results
+from app.domains.ai_chat.helpers import save_rag_chat_response
+from app.domains.ai.helpers import (
+    insert_topic_learning_outcome_relations,
+    mark_material_ai_processing_completed,)
+
+
+
+
+def handle_content_structure_generation(*, db: Session, verified_callback: VerifiedAICallbackRequest, request_log: dict,) -> dict:
+    payload = verified_callback.payload
+    body = _extract_callback_body(payload)
+
+    callback_status = _extract_required_str(
+        payload,
+        "status",
+        "Missing status in callback payload",
+    ).lower()
+
+    if callback_status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="content_structure_generation callback status must be 'completed'",
+        )
+
+    course_id = _extract_required_positive_int(
+        payload,
+        "course_id",
+        "Missing or invalid course_id in callback payload",
+    )
+
+    module_id = _extract_required_positive_int(
+        body,
+        "module_id",
+        "Missing or invalid module_id in callback body",
+    )
+
+    material_id = _extract_required_positive_int(
+        body,
+        "material_id",
+        "Missing or invalid material_id in callback body",
+    )
+
+    topics = _extract_required_list(
+        body,
+        "topics",
+        "Missing topics list in callback body",
+    )
+
+    learning_outcomes = _extract_required_list(
+        body,
+        "learning_outcomes",
+        "Missing learning_outcomes list in callback body",
+    )
+
+    relations = _extract_required_list(
+        body,
+        "topic_learning_outcome_relations",
+        "Missing topic_learning_outcome_relations list in callback body",
+    )
+
+    _validate_request_log_context(
+        request_log=request_log,
+        course_id=course_id,
+        material_id=material_id,
+    )
+
+    # =========================
+    # 1) Validate topics payload
+    # =========================
+    seen_topic_temp_ids: set[str] = set()
+
+    for item in topics:
+        if not isinstance(item, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each topic item must be an object",
+            )
+
+        temp_id = _extract_required_str(
+            item,
+            "temp_id",
+            "Each topic must include a non-empty temp_id",
+        )
+
+        _extract_required_str(
+            item,
+            "title",
+            "Each topic must include a non-empty title",
+        )
+
+        order_index = item.get("order_index")
+        if not isinstance(order_index, int) or order_index < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each topic must include a valid non-negative order_index",
+            )
+
+        parent_temp_id = item.get("parent_temp_id")
+        if parent_temp_id is not None:
+            if not isinstance(parent_temp_id, str) or not parent_temp_id.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="topic.parent_temp_id must be null or a non-empty string",
+                )
+
+        page_start = item.get("page_start")
+        page_end = item.get("page_end")
+
+        if (page_start is None) != (page_end is None):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="page_start and page_end must both be provided or both be null",
+            )
+
+        if page_start is not None and page_end is not None:
+            if not isinstance(page_start, int) or page_start <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="page_start must be a positive integer",
+                )
+            if not isinstance(page_end, int) or page_end <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="page_end must be a positive integer",
+                )
+            if page_start > page_end:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="page_start must be less than or equal to page_end",
+                )
+
+        if temp_id in seen_topic_temp_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate topic temp_id: {temp_id}",
+            )
+
+        seen_topic_temp_ids.add(temp_id)
+
+    # =========================
+    # 2) Validate learning outcomes payload
+    # =========================
+    seen_lo_temp_ids: set[str] = set()
+
+    for item in learning_outcomes:
+        if not isinstance(item, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each learning outcome item must be an object",
+            )
+
+        temp_id = _extract_required_str(
+            item,
+            "temp_id",
+            "Each learning outcome must include a non-empty temp_id",
+        )
+
+        _extract_required_str(
+            item,
+            "title",
+            "Each learning outcome must include a non-empty title",
+        )
+
+        parent_temp_id = item.get("parent_temp_id")
+        if parent_temp_id is not None:
+            if not isinstance(parent_temp_id, str) or not parent_temp_id.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="learning_outcome.parent_temp_id must be null or a non-empty string",
+                )
+            level = item.get("level")
+            if not level or not isinstance(level, str) or not level.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Sub learning outcome must include a non-empty level",
+                )
+
+        if temp_id in seen_lo_temp_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Duplicate learning outcome temp_id: {temp_id}",
+            )
+
+        seen_lo_temp_ids.add(temp_id)
+
+    # =========================
+    # 3) Validate relations payload
+    # =========================
+    seen_relation_pairs: set[tuple[str, str]] = set()
+
+    for item in relations:
+        if not isinstance(item, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each topic-learning-outcome relation item must be an object",
+            )
+
+        topic_temp_id = _extract_required_str(
+            item,
+            "topic_temp_id",
+            "Each relation must include a non-empty topic_temp_id",
+        )
+
+        learning_outcome_temp_id = _extract_required_str(
+            item,
+            "learning_outcome_temp_id",
+            "Each relation must include a non-empty learning_outcome_temp_id",
+        )
+
+        if topic_temp_id not in seen_topic_temp_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Relation references unknown topic_temp_id: {topic_temp_id}",
+            )
+
+        if learning_outcome_temp_id not in seen_lo_temp_ids:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Relation references unknown learning_outcome_temp_id: "
+                    f"{learning_outcome_temp_id}"
+                ),
+            )
+
+        pair = (topic_temp_id, learning_outcome_temp_id)
+        if pair in seen_relation_pairs:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    "Duplicate topic-learning-outcome relation: "
+                    f"{topic_temp_id} -> {learning_outcome_temp_id}"
+                ),
+            )
+
+        seen_relation_pairs.add(pair)
+
+    learning_outcome_id_map = bulk_insert_ai_learning_outcomes(
+        db=db,
+        course_id=course_id,
+        learning_outcomes=learning_outcomes,
+    )
+
+    topic_id_map = bulk_insert_ai_topics(
+        db=db,
+        material_id=material_id,
+        topics=topics,
+    )
+
+    inserted_relations_count = insert_topic_learning_outcome_relations(
+        db=db,
+        relations=relations,
+        topic_id_map=topic_id_map,
+        learning_outcome_id_map=learning_outcome_id_map,
+    )
+
+    mark_material_ai_processing_completed(
+        db=db,
+        material_id=material_id,
+    )
+
+    publish_sync(
+        channel=f"content_structure_generation_{material_id}",
+        payload="ready",
+    )
+
+    return {
+        "course_id": course_id,
+        "module_id": module_id,
+        "material_id": material_id,
+        "inserted_learning_outcomes": len(learning_outcome_id_map),
+        "inserted_topics": len(topic_id_map),
+        "inserted_topic_learning_outcome_relations": inserted_relations_count,
+    }
+
+
+
+def handle_question_generation(*, db: Session, verified_callback: VerifiedAICallbackRequest, request_log: dict,) -> dict:
+    payload = verified_callback.payload
+    body = _extract_callback_body(payload)
+
+    print("\n========== ENTERED handle_question_generation ==========")
+    print(f"PAYLOAD KEYS: {list(payload.keys())}")
+    print("=====================================================\n")
+
+    callback_status = _extract_required_str(
+        payload,
+        "status",
+        "Missing status in callback payload",
+    ).lower()
+
+    if callback_status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="question_generation callback status must be 'completed'",
+        )
+
+    course_id = _extract_required_positive_int(
+        payload,
+        "course_id",
+        "Missing or invalid course_id in callback payload",
+    )
+
+    print(f"\nCOURSE_ID = {course_id}\n")
+
+    questions = _extract_required_list(
+        body,
+        "questions",
+        "Missing questions list in callback body",
+    )
+
+    print(f"\nQUESTIONS COUNT = {len(questions)}\n")
+
+
+    print("\n========== BEFORE _validate_request_log_context ==========")
+    print(f"REQUEST LOG = {request_log}")
+    print("========================================================\n")
+
+    destination = body.get("destination", "question_bank")
+
+    # =========================
+    # 1) Verify request_log context
+    # =========================
+    _validate_question_generation_request_log_context(
+        request_log=request_log,
+        course_id=course_id,
+    )
+
+    print("\n========== AFTER _validate_request_log_context ==========\n")
+
+
+    print("\n========== BEFORE validate_and_prepare_ai_generated_questions ==========\n")
+
+    # =========================
+    # 2) Validate + normalize all questions
+    # =========================
+    prepared_questions = validate_and_prepare_ai_generated_questions(
+        course_id=course_id,
+        questions=questions,
+        db=db,
+    )
+
+    print(f"\nPREPARED QUESTIONS COUNT = {len(prepared_questions)}\n")
+
+
+    print("\n========== BEFORE insert_ai_generated_questions ==========\n")
+
+    # =========================
+    # 3) Insert questions into DB
+    # =========================
+    if destination == "pool":
+        insert_result = bulk_insert_pool_questions(
+            course_id=course_id,
+            prepared_questions=prepared_questions,
+            db=db,
+        )
+    else:
+        insert_result = insert_ai_generated_questions(
+            course_id=course_id,
+            prepared_questions=prepared_questions,
+            db=db,
+            created_by=request_log.get("created_by"),
+        )
+
+    print(f"\nINSERT RESULT = {insert_result}\n")
+
+
+    print("\n========== QUESTION GENERATION COMPLETED ==========\n")
+
+    # =========================
+    # 4) Return summary
+    # =========================
+    return {
+        "course_id": course_id,
+        "inserted_count": insert_result["inserted_count"],
+        "question_ids": insert_result["question_ids"],
+    }
+
+
+
+def handle_exam_grading(*, db: Session, verified_callback: VerifiedAICallbackRequest, request_log: dict,) -> dict:
+    payload = verified_callback.payload
+    body    = _extract_callback_body(payload)
+
+    # =========================
+    # 1) Validate callback status
+    # =========================
+    callback_status = _extract_required_str(
+        payload,
+        "status",
+        "Missing status in callback payload",
+    ).lower()
+
+    if callback_status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="exam_grading callback status must be 'completed'",
+        )
+
+    # =========================
+    # 2) Validate course_id matches request log
+    # =========================
+    course_id = _extract_required_positive_int(
+        payload,
+        "course_id",
+        "Missing or invalid course_id in callback payload",
+    )
+
+    request_log_course_id = request_log.get("course_id")
+    if request_log_course_id is None or int(request_log_course_id) != course_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback course_id does not match AI request log",
+        )
+
+    # =========================
+    # 3) Validate primary entity in request log
+    # =========================
+    request_log_entity_type = (
+        request_log.get("primary_entity_type") or ""
+    ).strip().lower()
+
+    if request_log_entity_type != "attempt":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="AI request log primary_entity_type must be 'attempt'",
+        )
+
+    # =========================
+    # 4) Validate attempt_id + exam_id from body
+    # =========================
+    attempt_id = _extract_required_positive_int(
+        body,
+        "attempt_id",
+        "Missing or invalid attempt_id in callback body",
+    )
+
+    exam_id = _extract_required_positive_int(
+        body,
+        "exam_id",
+        "Missing or invalid exam_id in callback body",
+    )
+
+    request_log_entity_id = request_log.get("primary_entity_id")
+    if request_log_entity_id is None or int(request_log_entity_id) != attempt_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback attempt_id does not match AI request log",
+        )
+
+    # =========================
+    # 5) Validate results list
+    # =========================
+    results = _extract_required_list(
+        body,
+        "results",
+        "Missing results list in callback body",
+    )
+
+    if not results:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback results list must not be empty",
+        )
+
+    # =========================
+    # 6) Validate all sent question IDs are present in results
+    # =========================
+    request_payload        = request_log.get("request_payload") or {}
+    request_body           = request_payload.get("body") or {}
+    sent_questions         = request_body.get("questions") or []
+
+    sent_exam_question_ids: set[int] = {
+        int(q["exam_question_id"])
+        for q in sent_questions
+        if isinstance(q, dict) and q.get("exam_question_id")
+    }
+
+    returned_exam_question_ids: set[int] = set()
+    for item in results:
+        if not isinstance(item, dict):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each result item must be an object",
+            )
+
+        result_qid = item.get("exam_question_id")
+        if not isinstance(result_qid, int) or result_qid <= 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Each result must include a valid exam_question_id",
+            )
+
+        points_earned = item.get("points_earned")
+        if not isinstance(points_earned, (int, float)) or points_earned < 0:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid points_earned for exam_question_id {result_qid}",
+            )
+
+        returned_exam_question_ids.add(result_qid)
+
+    missing_ids = sent_exam_question_ids - returned_exam_question_ids
+    if missing_ids:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"AI response is missing results for exam_question_ids: {sorted(missing_ids)}",
+        )
+
+    # =========================
+    # 7) Save grading results
+    # =========================
+    return save_ai_exam_grading_results(
+        db=db,
+        attempt_id=attempt_id,
+        exam_id=exam_id,
+        results=results,
+    )
+
+
+
+def handle_rag_chat(*, db: Session, verified_callback: VerifiedAICallbackRequest, request_log: dict,) -> dict:
+    payload = verified_callback.payload
+    body = _extract_callback_body(payload)
+
+    print(f"[rag_chat] payload keys: {list(payload.keys())}")
+    print(f"[rag_chat] body keys: {list(body.keys())}")
+
+    message_id = _extract_required_positive_int(
+        body,
+        "message_id",
+        "Missing or invalid message_id in callback body",
+    )
+
+    print(f"[rag_chat] message_id: {message_id}")
+
+    # =========================
+    # 1) Validate callback status
+    # =========================
+    callback_status = _extract_required_str(
+        payload,
+        "status",
+        "Missing status in callback payload",
+    ).lower()
+
+    print(f"[rag_chat] callback_status: {callback_status}")
+
+    if callback_status != "completed":
+        publish_sync(channel=f"chat_{message_id}", payload="failed")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"rag_chat callback status {callback_status}, status must be 'completed'",
+        )
+    
+    # =========================
+    # 2) Validate course_id matches request log
+    # =========================
+    course_id = _extract_required_positive_int(
+        payload,
+        "course_id",
+        "Missing or invalid course_id in callback payload",
+    )
+    
+    request_log_course_id = request_log.get("course_id")
+    if request_log_course_id is None or int(request_log_course_id) != course_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback course_id does not match AI request log",
+        )
+
+    # =========================
+    # 3) Validate primary entity in request log
+    # =========================
+    request_log_entity_type = (
+        request_log.get("primary_entity_type") or ""
+    ).strip().lower()
+
+    if request_log_entity_type != "session":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="AI request log primary_entity_type must be 'session'",
+        )
+
+    # =========================
+    # 4) Validate session_id + message_id from body
+    # =========================
+    session_id = _extract_required_positive_int(
+        body,
+        "session_id",
+        "Missing or invalid session_id in callback body",
+    )
+
+
+    print(f"[rag_chat] course_id: {course_id}, session_id: {session_id}, message_id: {message_id}")
+
+    request_log_entity_id = request_log.get("primary_entity_id")
+    if request_log_entity_id is None or int(request_log_entity_id) != session_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback session_id does not match AI request log",
+        )
+
+    # =========================
+    # 5) Validate content
+    # =========================
+    content = _extract_required_str(
+        body,
+        "content",
+        "Missing or empty content in callback body",
+    )
+
+    # =========================
+    # 6) Extract optional sources
+    # =========================
+    sources = body.get("sources")
+
+    if sources is not None and not isinstance(sources, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="sources must be a list or null",
+        )
+
+    print(f"[rag_chat] content length: {len(content)}, sources: {sources}")
+
+    # =========================
+    # 7) Save response and publish event
+    # =========================
+    result = save_rag_chat_response(
+        db=db,
+        session_id=session_id,
+        user_message_id=message_id,
+        content=content,
+        sources=sources,
+    )
+
+    print(f"[rag_chat] save result: {result}")
+
+    publish_sync(channel=f"chat_{message_id}", payload="ready")
+
+    print(f"[rag_chat] published to chat_{message_id}")
+
+    return result
+
+
+
+def handle_extract_native_questions(*, db: Session, verified_callback: VerifiedAICallbackRequest, request_log: dict,) -> dict:
+    payload = verified_callback.payload
+    body = _extract_callback_body(payload)
+
+    # =========================
+    # 1) Validate status
+    # =========================
+    callback_status = _extract_required_str(
+        payload,
+        "status",
+        "Missing status in callback payload",
+    ).lower()
+
+    if callback_status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="extract_native_questions callback status must be 'completed'",
+        )
+
+    # =========================
+    # 2) Extract + validate identifiers
+    # =========================
+    course_id = _extract_required_positive_int(
+        payload,
+        "course_id",
+        "Missing or invalid course_id in callback payload",
+    )
+
+    material_id = _extract_required_positive_int(
+        body,
+        "material_id",
+        "Missing or invalid material_id in callback body",
+    )
+
+    extracted_questions = _extract_required_list(
+        body,
+        "extracted_questions",
+        "Missing extracted_questions list in callback body",
+    )
+
+    # =========================
+    # 3) Verify request_log context
+    # =========================
+    request_log_course_id = request_log.get("course_id")
+    request_log_primary_entity_type = (
+        request_log.get("primary_entity_type") or ""
+    ).strip().lower()
+    request_log_primary_entity_id = request_log.get("primary_entity_id")
+
+    if request_log_course_id is None or int(request_log_course_id) != int(course_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback course_id does not match AI request log",
+        )
+
+    if request_log_primary_entity_type != "material":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="AI request log primary_entity_type must be 'material'",
+        )
+
+    if request_log_primary_entity_id is None or int(request_log_primary_entity_id) != int(material_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback material_id does not match AI request log",
+        )
+
+    # =========================
+    # 4) Validate + prepare questions
+    # =========================
+    prepared_questions = validate_and_prepare_ai_generated_questions(
+        course_id=course_id,
+        questions=extracted_questions,
+        db=db,
+    )
+
+    # =========================
+    # 5) Insert questions
+    # =========================
+    insert_result = insert_ai_generated_questions(
+        course_id=course_id,
+        prepared_questions=prepared_questions,
+        db=db,
+        created_by=request_log.get("created_by"),
+    )
+
+    # =========================
+    # 6) Notify SSE subscribers
+    # =========================
+    publish_sync(
+        channel=f"material_questions_{material_id}",
+        payload="ready",
+    )
+
+    # =========================
+    # 7) Return summary
+    # =========================
+    return {
+        "course_id": course_id,
+        "material_id": material_id,
+        "inserted_count": insert_result["inserted_count"],
+        "question_ids": insert_result["question_ids"],
+    }
+
+
+
+
+
+def _extract_callback_body(payload: dict) -> dict:
+    body = payload.get("body")
+
+    if not isinstance(body, dict):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback payload body must be a JSON object",
+        )
+
+    return body
+
+
+def _extract_required_str(source: dict, key: str, error_message: str) -> str:
+    value = source.get(key)
+
+    if not isinstance(value, str):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message,
+        )
+
+    value = value.strip()
+    if not value:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message,
+        )
+
+    return value
+
+
+def _extract_required_positive_int(source: dict, key: str, error_message: str) -> int:
+    value = source.get(key)
+
+    if not isinstance(value, int) or value <= 0:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message,
+        )
+
+    return value
+
+
+def _extract_required_list(source: dict, key: str, error_message: str) -> list:
+    value = source.get(key)
+
+    if not isinstance(value, list):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=error_message,
+        )
+
+    return value
+
+
+def _validate_request_log_context(*, request_log: dict, course_id: int, material_id: int,) -> None:
+    request_log_course_id = request_log.get("course_id")
+    request_log_primary_entity_type = (request_log.get("primary_entity_type") or "").strip().lower()
+    request_log_primary_entity_id = request_log.get("primary_entity_id")
+
+    print("\n========== _validate_request_log_context ==========")
+    print(f"course_id = {course_id}")
+    print(f"material_id = {material_id}")
+    print(f"request_log_course_id = {request_log_course_id}")
+    print(f"request_log_primary_entity_type = {request_log_primary_entity_type}")
+    print(f"request_log_primary_entity_id = {request_log_primary_entity_id}")
+    print("==================================================\n")
+
+
+    if request_log_course_id is None or int(request_log_course_id) != int(course_id):
+        print("\n========== COURSE ID VALIDATION FAILED ==========")
+        print(f"CALLBACK COURSE_ID = {course_id}")
+        print(f"REQUEST LOG COURSE_ID = {request_log_course_id}")
+        print("================================================\n")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback course_id does not match AI request log",
+        )
+
+
+
+    if request_log_primary_entity_type != "material":
+        print("\n========== PRIMARY ENTITY TYPE VALIDATION FAILED ==========")
+        print(f"REQUEST LOG PRIMARY_ENTITY_TYPE = {request_log_primary_entity_type}")
+        print("EXPECTED = material")
+        print("=========================================================\n")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="AI request log primary_entity_type must be 'material'",
+        )
+
+
+
+    if request_log_primary_entity_id is None or int(request_log_primary_entity_id) != int(material_id):
+        print("\n========== MATERIAL ID VALIDATION FAILED ==========")
+        print(f"MATERIAL_ID ARGUMENT = {material_id}")
+        print(f"REQUEST LOG PRIMARY_ENTITY_ID = {request_log_primary_entity_id}")
+        print("==================================================\n")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback material_id does not match AI request log",
+        )
+
+
+def _validate_question_generation_request_log_context(
+    *,
+    request_log: dict,
+    course_id: int,
+) -> None:
+    request_log_course_id = request_log.get("course_id")
+    request_log_primary_entity_type = (
+        request_log.get("primary_entity_type") or ""
+    ).strip().lower()
+    request_log_primary_entity_id = request_log.get("primary_entity_id")
+
+    if request_log_course_id is None or int(request_log_course_id) != int(course_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback course_id does not match AI request log",
+        )
+
+    if request_log_primary_entity_type != "course":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="AI request log primary_entity_type must be 'course'",
+        )
+
+    if request_log_primary_entity_id is None or int(request_log_primary_entity_id) != int(course_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback course_id does not match AI request log primary_entity_id",
+        )
+
+
+# def _validate_topics_payload(topics: list[dict]) -> set[str]:
+#     seen_temp_ids: set[str] = set()
+
+#     for item in topics:
+#         if not isinstance(item, dict):
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Each topic item must be an object",
+#             )
+
+#         temp_id = _extract_required_str(
+#             item,
+#             "temp_id",
+#             "Each topic must include a non-empty temp_id",
+#         )
+
+#         _extract_required_str(
+#             item,
+#             "title",
+#             "Each topic must include a non-empty title",
+#         )
+
+#         order_index = item.get("order_index")
+#         if not isinstance(order_index, int) or order_index < 0:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Each topic must include a valid non-negative order_index",
+#             )
+
+#         parent_temp_id = item.get("parent_temp_id")
+#         if parent_temp_id is not None:
+#             if not isinstance(parent_temp_id, str) or not parent_temp_id.strip():
+#                 raise HTTPException(
+#                     status_code=status.HTTP_400_BAD_REQUEST,
+#                     detail="topic.parent_temp_id must be null or a non-empty string",
+#                 )
+
+#         if temp_id in seen_temp_ids:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail=f"Duplicate topic temp_id: {temp_id}",
+#             )
+
+#         seen_temp_ids.add(temp_id)
+
+#     return seen_temp_ids
+
+
+# def _validate_learning_outcomes_payload(learning_outcomes: list[dict]) -> set[str]:
+#     seen_temp_ids: set[str] = set()
+
+#     for item in learning_outcomes:
+#         if not isinstance(item, dict):
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Each learning outcome item must be an object",
+#             )
+
+#         temp_id = _extract_required_str(
+#             item,
+#             "temp_id",
+#             "Each learning outcome must include a non-empty temp_id",
+#         )
+
+#         _extract_required_str(
+#             item,
+#             "title",
+#             "Each learning outcome must include a non-empty title",
+#         )
+
+#         _extract_required_str(
+#             item,
+#             "level",
+#             "Each learning outcome must include a non-empty level",
+#         )
+
+#         if temp_id in seen_temp_ids:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail=f"Duplicate learning outcome temp_id: {temp_id}",
+#             )
+
+#         seen_temp_ids.add(temp_id)
+
+#     return seen_temp_ids
+
+
+# def _validate_relations_payload(
+#     *,
+#     relations: list[dict],
+#     topic_temp_ids: set[str],
+#     learning_outcome_temp_ids: set[str],
+# ) -> None:
+#     seen_pairs: set[tuple[str, str]] = set()
+
+#     for item in relations:
+#         if not isinstance(item, dict):
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail="Each topic-learning-outcome relation item must be an object",
+#             )
+
+#         topic_temp_id = _extract_required_str(
+#             item,
+#             "topic_temp_id",
+#             "Each relation must include a non-empty topic_temp_id",
+#         )
+
+#         learning_outcome_temp_id = _extract_required_str(
+#             item,
+#             "learning_outcome_temp_id",
+#             "Each relation must include a non-empty learning_outcome_temp_id",
+#         )
+
+#         if topic_temp_id not in topic_temp_ids:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail=f"Relation references unknown topic_temp_id: {topic_temp_id}",
+#             )
+
+#         if learning_outcome_temp_id not in learning_outcome_temp_ids:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail=(
+#                     "Relation references unknown learning_outcome_temp_id: "
+#                     f"{learning_outcome_temp_id}"
+#                 ),
+#             )
+
+#         pair = (topic_temp_id, learning_outcome_temp_id)
+#         if pair in seen_pairs:
+#             raise HTTPException(
+#                 status_code=status.HTTP_400_BAD_REQUEST,
+#                 detail=(
+#                     "Duplicate topic-learning-outcome relation: "
+#                     f"{topic_temp_id} -> {learning_outcome_temp_id}"
+#                 ),
+#             )
+
+#         seen_pairs.add(pair)
+        
+
+
+
+
+# def handle_question_generation(
+#     *,
+#     db: Session,
+#     verified_callback: VerifiedAICallbackRequest,
+#     request_log: dict,
+# ) -> dict:
+#     payload = verified_callback.payload
+#     body = _extract_callback_body(payload)
+
+#     # =========================
+#     # 1) Validate status
+#     # =========================
+#     callback_status = _extract_required_str(
+#         payload,
+#         "status",
+#         "Missing status in callback payload",
+#     ).lower()
+
+#     if callback_status != "completed":
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="question_generation callback status must be 'completed'",
+#         )
+
+#     # =========================
+#     # 2) Extract course_id
+#     # =========================
+#     course_id = _extract_required_positive_int(
+#         payload,
+#         "course_id",
+#         "Missing or invalid course_id in callback payload",
+#     )
+
+#     # =========================
+#     # 3) Extract questions
+#     # =========================
+#     questions = _extract_required_list(
+#         body,
+#         "questions",
+#         "Missing questions list in callback body",
+#     )
+
+#     # =========================
+#     # 4) Verify request_log context
+#     # =========================
+#     request_log_course_id = request_log.get("course_id")
+#     request_log_primary_entity_type = (
+#         request_log.get("primary_entity_type") or ""
+#     ).strip().lower()
+#     request_log_primary_entity_id = request_log.get("primary_entity_id")
+
+#     if request_log_course_id is None or int(request_log_course_id) != int(course_id):
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="Callback course_id does not match AI request log",
+#         )
+
+#     if request_log_primary_entity_type != "course":
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="AI request log primary_entity_type must be 'course'",
+#         )
+
+#     if request_log_primary_entity_id is None or int(request_log_primary_entity_id) != int(course_id):
+#         raise HTTPException(
+#             status_code=status.HTTP_400_BAD_REQUEST,
+#             detail="Callback course_id does not match AI request log primary_entity_id",
+#         )
+
+#     # =========================
+#     # 5) Validate + normalize all questions
+#     # =========================
+#     prepared_questions = validate_and_prepare_ai_generated_questions(
+#         course_id=course_id,
+#         questions=questions,
+#         db=db,
+#     )
+
+#     # =========================
+#     # 6) Insert questions into DB
+#     # =========================
+#     insert_result = insert_ai_generated_questions(
+#         course_id=course_id,
+#         prepared_questions=prepared_questions,
+#         db=db,
+#         created_by=request_log.get("created_by"),
+#     )
+
+#     # =========================
+#     # 7) Notify SSE subscribers
+#     # =========================
+#     publish_sync(
+#         channel=f"question_generation_{course_id}",
+#         payload="ready",
+#     )
+
+#     # =========================
+#     # 8) Return summary
+#     # =========================
+#     return {
+#         "course_id": course_id,
+#         "inserted_count": insert_result["inserted_count"],
+#         "question_ids": insert_result["question_ids"],
+#     }

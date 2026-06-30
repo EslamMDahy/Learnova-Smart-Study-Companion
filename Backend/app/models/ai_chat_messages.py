@@ -1,15 +1,15 @@
 from sqlalchemy import (
     DateTime,
     Integer,
+    String,
     Text,
     ForeignKey,
-    JSON,
-    String,
     Enum as SQLEnum,
     Index
 )
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
+from sqlalchemy.dialects.postgresql import JSONB
 
 from app.db.base import Base
 from app.models.enums import AIChatMessageType
@@ -43,34 +43,20 @@ class AIChatMessage(Base):
         nullable=False
     )
 
-    sources: Mapped[dict | None] = mapped_column(
-        JSON,
+    sources: Mapped[list | None] = mapped_column(
+        JSONB,
         nullable=True
     )
 
-    model_used: Mapped[str | None] = mapped_column(
-        String(100),
+    user_message_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ai_chat_messages.id", ondelete="SET NULL"),
         nullable=True
     )
 
-    credits_used: Mapped[int] = mapped_column(
-        Integer,
-        default=0
-    )
-
-    token_count: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True
-    )
-
-    prompt_tokens: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True
-    )
-
-    completion_tokens: Mapped[int | None] = mapped_column(
-        Integer,
-        nullable=True
+    status: Mapped[str] = mapped_column(
+        String(20),
+        nullable=False,
+        default="pending"
     )
 
     created_at: Mapped[datetime] = mapped_column(

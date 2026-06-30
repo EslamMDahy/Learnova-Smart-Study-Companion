@@ -2,6 +2,7 @@ from .ai_chat_messages import AIChatMessage
 from .ai_chat_sessions import AIChatSession
 from .ai_question_generation_log_questions import AIQuestionGenerationLogQuestion
 from .ai_question_generation_logs import AIQuestionGenerationLog
+from .ai_request_log import AIRequestLog
 from .analytics import AnalyticsDashboard
 
 from .course import Course
@@ -16,6 +17,8 @@ from .enums import *
 
 from .exam_question import ExamQuestion
 from .exam_sections import ExamSection
+from .exam_template import ExamTemplate
+from .exam_template_section import ExamTemplateSection
 from .exam import Exam
 
 from .learning_outcomes import LearningOutcome
@@ -39,6 +42,7 @@ from .practice_answers import PracticeAnswer
 from .practice_sessions import PracticeSession
 
 from .question import Question
+from .question_pool import QuestionPool
 from .question_recommendations import QuestionRecommendation
 from .question_tags import QuestionTag
 

@@ -5,11 +5,11 @@ from sqlalchemy import (
     Boolean,
     Text,
     ForeignKey,
-    JSON,
     Enum as SQLEnum,
     Index
 )
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 
 from app.db.base import Base
@@ -100,17 +100,17 @@ class StudentExamAttempt(Base):
     )
 
     cheating_flags: Mapped[dict | None] = mapped_column(
-        JSON,
+        JSONB,
         nullable=True
     )
 
     session_data: Mapped[dict | None] = mapped_column(
-        JSON,
+        JSONB,
         nullable=True
     )
 
     proctoring_data: Mapped[dict | None] = mapped_column(
-        JSON,
+        JSONB,
         nullable=True
     )
 

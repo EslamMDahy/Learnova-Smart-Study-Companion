@@ -1,3 +1,5 @@
+from typing import Optional
+
 from sqlalchemy import (
     String,
     DateTime,
@@ -35,6 +37,16 @@ class Topic(Base):
 
     description: Mapped[str | None] = mapped_column(
         Text,
+        nullable=True
+    )
+
+    page_start: Mapped[Optional[int]] = mapped_column(
+        Integer, 
+        nullable=True
+    )
+    
+    page_end: Mapped[Optional[int]] = mapped_column(
+        Integer, 
         nullable=True
     )
 

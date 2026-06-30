@@ -9,12 +9,19 @@ Backend/
 |
 ├─ app/
 │  ├─ core/
+|  |  ├─ ai_service_integration/
+|  |  |  ├─ ai_callback_verifier.py
+|  |  |  ├─ ai_protocol.py
+|  |  |  ├─ ai_request_tracking.py
+|  |  |  ├─ ai_signature.py
+|  |  |  └─ ai_transport.py
 |  |  ├─ config.py
 |  |  ├─ deps.py
 |  |  ├─ emailer.py
 |  |  ├─ excel_utils.py
 |  |  ├─ jwt.py
 |  |  ├─ security.py
+|  |  ├─ storage_utils.py
 |  |  ├─ supabase_clint.py
 │  │  └─ token_store.py
 |  |
@@ -23,12 +30,24 @@ Backend/
 │  │  └─ session.py
 |  | 
 │  ├─ features/
+|  |  ├─ ai/
+|  |  |  ├─ handlers.py
+|  |  |  ├─ helpers.py
+|  |  |  ├─ router.py
+|  |  |  └─ service.py
+|  |  |
 |  |  ├─ auth/
 |  |  |  ├─ router.py
 |  |  |  ├─ schemas.py
 |  |  |  └─ service.py
 |  |  |
 |  |  ├─ courses/
+|  |  |  ├─ router.py
+|  |  |  ├─ schemas.py
+|  |  |  └─ service.py
+|  |  |
+|  |  ├─ learningOutcomes/
+|  |  |  ├─ helpers.py
 |  |  |  ├─ router.py
 |  |  |  ├─ schemas.py
 |  |  |  └─ service.py
@@ -51,9 +70,16 @@ Backend/
 |  |  ├─ questions/
 |  |  |  ├─ router.py
 |  |  |  ├─ schemas.py
+|  |  |  ├─ service.py
+|  |  |  └─ helpers.py
+|  |  |
+|  |  ├─ settings/
+|  |  |  ├─ router.py
+|  |  |  ├─ schemas.py
 |  |  |  └─ service.py
 |  |  |
-|  |  └─ settings/
+|  |  └─ topics/
+|  |     ├─ helpers.py
 |  |     ├─ router.py
 |  |     ├─ schemas.py
 |  |     └─ service.py

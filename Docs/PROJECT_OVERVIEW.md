@@ -1,0 +1,271 @@
+# Learnova - Project Overview
+
+## 1. Project Overview
+
+Learnova is an AI-enhanced learning platform designed to support both instructors and learners through intelligent content structuring, question generation, and guided learning experiences.
+
+The platform combines course creation workflows with AI-powered assistance to transform raw learning materials into structured, interactive, and assessment-ready educational content. In parallel, Learnova is built to evolve into an AI study companion that supports learners both insde the courses and outside.
+
+---
+
+## 2. Vision and Purpose
+
+Learnova is built to address two core problems in modern learning environments:
+
+1. **Instructor inefficiency**
+   - Creating structured content, topics, and assessments is time-consuming and repetitive.
+   - Managing question banks and analyzing student performance requires significant effort.
+
+2. **Lack of personalized learner guidance**
+   - Students often struggle to identify weak areas.
+   - Learning is usually static and not adaptive to individual needs.
+
+Learnova aims to solve this by acting as:
+- A **powerful course authoring platform for instructors**
+- And a **smart AI study companion for learners**
+
+The long-term vision is to provide a system where:
+- instructors can build and manage courses efficiently
+- learners receive continuous, personalized, AI-guided support
+
+---
+
+## 3. Who Learnova Serves
+
+### Instructor
+Instructors use Learnova to:
+- Create and manage courses
+- Structure content into modules, materials, and topics
+- Define learning outcomes
+- Build and manage a course question bank
+- Generate questions manually or using AI
+- Control access to courses (open or invitation-based)
+
+Instructors can use the platform independently or as part of an organization-based environment.
+
+---
+
+### Learner / Student
+
+Learners use Learnova to:
+- Access course content (when enrolled)
+- Practice questions and assessments
+- (Planned) Receive AI-driven guidance based on performance
+
+Beyond course-based learning, Learnova is designed to act as a **direct AI study companion**, enabling learners to study their own materials and receive structured, guided support even outside formal courses.
+
+---
+
+### Organization (Future Direction)
+
+Learnova is designed to support organization-based learning environments (e.g., universities, schools), where instructors and learners operate under a shared system. This capability is part of the broader product direction and will be expanded in future iterations.
+
+---
+
+## 4. Core Product Experience
+
+### Instructor Workflow (Current Core Focus)
+
+The current system is centered around the instructor experience:
+
+ Create courses
+- Organize courses into modules
+- Upload materials
+- Choose between:
+  - AI-assisted content extraction
+  - Manual structuring
+- Manage:
+  - topics and subtopics
+  - learning outcomes
+- Create and manage questions
+- Build a course-level question bank
+- Generate questions manually or using AI
+- Control course visibility and publishing
+- Manage enrollment, including invitation-based and approval-based access
+- Build full exams from the question bank, organized into sections
+- Use reusable exam templates to generate exams quickly
+- Export exams as PDF, including an OCR-compatible format
+
+---
+
+## Learner Experience
+
+The learner experience is now an implemented, active part of the platform, built on top of the instructor workflow:
+
+- Discovering and enrolling in courses through search or direct access
+- Accessing structured course content once enrolled
+- Practicing and taking exams built from the course question bank
+- Receiving a mix of automatic and AI-assisted grading on submitted exams
+- Studying with a course-scoped AI chat companion that answers questions grounded in the course's own material
+
+
+---
+
+## 5. Course and Content Structure
+
+Learnova organizes educational content into a structured hierarchy:
+
+- **Course**
+  - **Learning Outcomes**
+  - **Modules**
+    - **Materials**
+      - **Topics**
+        - **Subtopics**
+
+Key relationships:
+- Questions are linked directly to **topics**
+- Learning outcomes are linked to **topics** (many-to-many relationship)
+- Subtopics are treated as topics with a parent relationship
+- A **course question bank** is built from all questions under the course
+
+This structure enables both:
+- precise content organization
+- and accurate mapping between learning objectives and assessment
+
+---
+
+## 6. AI-Assisted Workflows
+
+Learnova integrates AI to automate and enhance key parts of the learning process:
+
+### Content Structuring
+From uploaded materials, the AI can extract:
+- Topics
+- Subtopics
+- Learning outcomes
+
+### Question Generation
+
+The AI generates questions:
+- Based on selected topics, with one or more configurations per topic
+- With controlled types, difficulty levels, and quantities
+- Aligned with the course structure
+
+Generated questions enter the question bank as AI-suggested content pending instructor review, consistent with how AI-generated topics and learning outcomes are treated.
+
+### Learning Support
+
+The platform now includes an implemented AI study companion: a course-scoped, RAG-based chat assistant that lets enrolled students ask questions and receive answers grounded in their course's own material, delivered in real time.
+
+On the assessment side, AI assistance extends to grading: subjective exam answers (essay and short-answer questions) are evaluated by the AI service, while objective question types are graded automatically by the backend.
+
+
+### AI Processing Flow (High-Level)
+1. Instructor uploads material
+2. Backend decides if AI processing is requested
+3. Backend sends a signed AI request for the selected operation
+4. AI processes content asynchronously
+5. AI sends a callback to the backend when processing is complete
+6. Backend verifies the callback request before business logic
+7. Backend dispatches the callback by operation type
+8. Backend validates and persists the returned structured data
+
+### Asynchronous AI Processing and Callback Handling
+Learnova now includes implemented backend support for asynchronous AI processing and callback handling rather than relying only on one-way outbound AI requests.
+
+For supported AI-assisted workflows, the backend can:
+- send the AI request after the relevant backend workflow reaches the correct stage
+- receive the AI result through a dedicated callback endpoint
+- verify callback authenticity before entering business logic
+- dispatch processing based on the AI operation type
+- persist the returned structured data under backend-controlled rules
+
+The currently supported callback-driven operation is **`content_structure_generation`**, which is used in the material AI-processing flow. Through this flow, the backend can receive and store:
+- topics
+- learning outcomes
+- topic-learning outcome relations
+
+This keeps AI-assisted workflows consistent with Learnova's broader design principle that the backend remains the authority over validation, persistence, and accepted application state even when AI participates in content generation.
+
+
+### Backend-Controlled AI Integration Foundation
+To support AI workflows consistently across the platform, Learnova now includes a reusable backend-controlled integration foundation for communication with the AI service.
+
+This foundation is important because AI communication is not treated as ad-hoc feature logic. Instead, the backend manages a shared request structure, signed service-to-service communication, request tracking, and callback verification through a centralized integration layer.
+
+This gives the platform a more reliable base for:
+- AI-assisted content extraction
+- question generation workflows
+- future learner-support features
+- future AI-driven analysis and guidance flows
+
+As a result, Learnova is positioned to expand its AI capabilities without forcing each new feature to reimplement transport, security, or request-lifecycle handling from scratch.
+
+---
+
+## 7. Question Bank and Assessment Foundation
+
+At the core of Learnova is the **course question bank system**:
+
+- All questions are:
+  - linked to topics
+  - organized at the course level
+- Instructors can:
+  - create questions manually
+  - generate questions using AI
+- Questions are structured and reusable
+
+The course question bank now powers a complete exam system:
+
+- Instructors build exams as a structured hierarchy of sections, each holding questions of a single type
+- Exams can be authored manually or generated from a reusable template
+- Published exams are protected by a frozen snapshot of their question content, so later question bank edits cannot affect an exam students have already started taking
+- Students attempt exams, save answers incrementally, and receive a mix of automatic and AI-assisted grading
+
+---
+
+## 8. Access Models
+
+Learnova supports flexible course access through two independent dimensions: who can discover a course, and who can enroll in it.
+
+**Visibility**
+- **Public** — discoverable through search, accessible to anyone
+- **Unlisted** — not discoverable through search, accessible via direct link
+- **Private** — accessible only to the owner and enrolled users
+
+**Enrollment**
+- **Open Enrollment** — any user can enroll directly
+- **Approval-Based Enrollment** — enrollment requests require instructor approval
+- **Invitation-Based Enrollment** — access is restricted to specific users via email invitations
+
+A course remains in draft state, visible only to its owner, until explicitly published. This allows instructors to:
+- run fully open public courses
+- share unlisted courses with a specific link
+- manage fully private, invitation-only groups (e.g. academic sections)
+
+---
+
+## 9. Current Scope
+
+The current implementation focuses on building a strong instructor-driven foundation, including:
+
+- Authentication and account management
+- Instructor role workflows
+- Course creation, publishing, and visibility-based access control
+- Course discovery through search and autocomplete
+- Student enrollment, including open, approval-based, and invitation-based access
+- Module and material organization
+- Topic and subtopic management
+- Learning outcomes management
+- Question creation, AI-assisted question generation, and question bank management
+- A complete exam system: authoring, sections, templates, generation, publishing, and PDF export
+- Student exam attempts with automatic and AI-assisted grading
+- A real-time, RAG-based AI study companion scoped to each course
+
+
+---
+
+## 10. Future Direction
+
+Learnova is designed to expand into a more complete learning ecosystem, including:
+
+- Organization-based learning environments
+- Advanced performance analytics and weak-point tracking, built on top of exam attempt data
+- Expanded AI study companion capabilities beyond the current course-scoped chat
+- Broader learner-side study workflows beyond exams and chat
+
+(The previously listed "Full learner experience and study workflows" and "Full assessment and exam workflows built on top of the question bank" are now implemented and have moved to Section 9 — Current Scope.)
+
+---
+
+Learnova represents a shift from static learning systems toward an intelligent, adaptive platform where content, assessment, and guidance are all interconnected through AI.

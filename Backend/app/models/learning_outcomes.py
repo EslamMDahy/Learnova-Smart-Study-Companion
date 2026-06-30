@@ -40,21 +40,27 @@ class LearningOutcome(Base):
         nullable=True,
     )
 
+    parent_learning_outcome_id: Mapped[int | None] = mapped_column(
+        ForeignKey("learning_outcomes.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+
     level: Mapped[LearningOutcomeLevel] = mapped_column(
         SQLEnum(
             LearningOutcomeLevel,
             name="learning_outcome_level_enum",
             values_callable=lambda x: [e.value for e in x],
         ),
-        nullable=False,
+        nullable=True,
         default=LearningOutcomeLevel.foundational,
         index=True,
     )
 
-    ai_ref_key: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True,
-    )
+    # ai_ref_key: Mapped[str | None] = mapped_column(
+    #     String(100),
+    #     nullable=True,
+    # )
 
     is_ai_generated: Mapped[bool] = mapped_column(
         Boolean,
@@ -81,5 +87,6 @@ class LearningOutcome(Base):
 
     __table_args__ = (
         Index("ix_learning_outcomes_course_level", "course_id", "level"),
-        Index("ix_learning_outcomes_course_ai_ref", "course_id", "ai_ref_key"),
+        Index("ix_learning_outcomes_course_parent", "course_id", "parent_learning_outcome_id"),
+        # Index("ix_learning_outcomes_course_ai_ref", "course_id", "ai_ref_key"),
     )

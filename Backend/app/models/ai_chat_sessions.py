@@ -3,7 +3,6 @@ from sqlalchemy import (
     DateTime,
     Boolean,
     Integer,
-    Float,
     ForeignKey,
     Enum as SQLEnum,
     Index
@@ -58,11 +57,6 @@ class AIChatSession(Base):
         default=True
     )
 
-    credits_used: Mapped[int] = mapped_column(
-        Integer,
-        default=0
-    )
-
     started_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=datetime.utcnow
@@ -75,16 +69,6 @@ class AIChatSession(Base):
 
     ended_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
-        nullable=True
-    )
-
-    model_used: Mapped[str | None] = mapped_column(
-        String(100),
-        nullable=True
-    )
-
-    temperature: Mapped[float | None] = mapped_column(
-        Float,
         nullable=True
     )
 

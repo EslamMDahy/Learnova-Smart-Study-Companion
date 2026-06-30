@@ -1,0 +1,1328 @@
+from __future__ import annotations
+
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
+from app.core.ai_service_integration.ai_transport import send_ai_request
+
+from .schemas import (TopicCreateRequest
+                     ,TopicUpdateRequest)
+
+def create_topic(*, course_id: int, module_id: int, material_id: int, payload: TopicCreateRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can create topics")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    # =========================
+    # 2) Validate material -> module -> course + ownership
+    # =========================
+    material_row = db.execute(
+        text("""
+            SELECT
+                m.id AS material_id,
+                m.module_id,
+                mo.course_id,
+                c.created_by
+            FROM materials m
+            JOIN modules mo
+              ON mo.id = m.module_id
+            JOIN courses c
+              ON c.id = mo.course_id
+            WHERE m.id = :material_id
+            LIMIT 1
+        """),
+        {"material_id": material_id},
+    ).mappings().first()
+
+    if not material_row:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    if int(material_row["module_id"]) != int(module_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this module")
+
+    if int(material_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this course")
+
+    if int(material_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only manage topics for your own course")
+
+    # =========================
+    # 3) Prepare fields
+    # =========================
+    title = (payload.title or "").strip()
+    if not title:
+        raise HTTPException(status_code=422, detail="title is required")
+
+    description = payload.description
+    if isinstance(description, str):
+        description = description.strip() or None
+
+    page_start = payload.page_start
+    page_end = payload.page_end
+
+    parent_topic_id = payload.parent_topic_id
+
+    learning_outcome_ids = payload.learning_outcome_ids or []
+
+    # remove duplicates while preserving order
+    seen = set()
+    normalized_learning_outcome_ids = []
+    for lo_id in learning_outcome_ids:
+        if not isinstance(lo_id, int) or lo_id <= 0:
+            raise HTTPException(status_code=422, detail="learning_outcome_ids must contain valid positive integers")
+        if lo_id not in seen:
+            seen.add(lo_id)
+            normalized_learning_outcome_ids.append(lo_id)
+
+    # =========================
+    # 4) Validate page range (if provided)
+    # =========================           
+    if (page_start is None) != (page_end is None):
+        raise HTTPException(422, "page_start and page_end must both be provided or both be null")
+
+    if page_start is not None and page_end is not None:
+        if page_start > page_end:
+            raise HTTPException(422, "page_start must be less than or equal to page_end")
+        
+        if parent_topic_id is not None:
+            parent_range = db.execute(
+                text("SELECT page_start, page_end FROM topics WHERE id = :id"),
+                {"id": parent_topic_id}
+            ).mappings().first()
+            
+            if parent_range is None:
+                raise HTTPException(404, "Parent topic not found")
+            
+            if parent_range["page_start"] is None:
+                raise HTTPException(422, "Cannot set page range on subtopic when parent has no page range")
+            
+            if page_start < parent_range["page_start"] or page_end > parent_range["page_end"]:
+                raise HTTPException(422, "Subtopic page range must be within parent topic page range")
+
+    # =========================
+    # 5) Validate parent_topic_id (if provided)
+    # =========================
+    if parent_topic_id is not None:
+        parent_row = db.execute(
+            text("""
+                SELECT id, material_id
+                FROM topics
+                WHERE id = :parent_topic_id
+                LIMIT 1
+            """),
+            {"parent_topic_id": parent_topic_id},
+        ).mappings().first()
+
+        if not parent_row:
+            raise HTTPException(status_code=404, detail="Parent topic not found")
+
+        if int(parent_row["material_id"]) != int(material_id):
+            raise HTTPException(status_code=400, detail="Parent topic must belong to the same material")
+
+    # =========================
+    # 6) Validate learning outcomes belong to same course
+    # =========================
+    if normalized_learning_outcome_ids:
+        lo_rows = db.execute(
+            text("""
+                SELECT id, course_id, parent_learning_outcome_id
+                FROM learning_outcomes
+                WHERE id = ANY(:learning_outcome_ids)
+            """),
+            {"learning_outcome_ids": normalized_learning_outcome_ids},
+        ).mappings().all()
+
+        if len(lo_rows) != len(normalized_learning_outcome_ids):
+            raise HTTPException(status_code=404, detail="One or more learning outcomes were not found")
+
+        for row in lo_rows:
+            if int(row["course_id"]) != int(course_id):
+                raise HTTPException(
+                    status_code=400,
+                    detail="All learning outcomes must belong to the same course"
+                )
+            topic_is_subtopic = parent_topic_id is not None
+            lo_is_sub = row["parent_learning_outcome_id"] is not None
+
+            if topic_is_subtopic != lo_is_sub:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Topics and learning outcomes must be of the same level (both parent or both sub)"
+                )        
+
+    # =========================
+    # 7) Compute order_index inside same material
+    # =========================
+    next_order_index = db.execute(
+        text("""
+            SELECT COALESCE(MAX(order_index), -1) + 1 AS next_idx
+            FROM topics
+            WHERE material_id = :material_id
+        """),
+        {"material_id": material_id},
+    ).scalar()
+
+    if next_order_index is None:
+        next_order_index = 0
+
+    # =========================
+    # 8) Insert topic
+    # =========================
+    try:
+        topic_row = db.execute(
+            text("""
+                INSERT INTO topics (
+                    material_id,
+                    title,
+                    description,
+                    page_start,
+                    page_end,
+                    order_index,
+                    parent_topic_id,
+                    is_ai_generated,
+                    is_reviewed,
+                    created_at,
+                    updated_at
+                )
+                VALUES (
+                    :material_id,
+                    :title,
+                    :description,
+                    :page_start,
+                    :page_end,
+                    :order_index,
+                    :parent_topic_id,
+                    :is_ai_generated,
+                    :is_reviewed,
+                    NOW(),
+                    NOW()
+                )
+                RETURNING
+                    id,
+                    material_id,
+                    title,
+                    description,
+                    page_start,
+                    page_end,
+                    order_index,
+                    parent_topic_id,
+                    is_ai_generated,
+                    is_reviewed,
+                    created_at,
+                    updated_at
+            """),
+            {
+                "material_id": material_id,
+                "title": title,
+                "description": description,
+                "page_start": page_start,
+                "page_end": page_end,
+                "order_index": int(next_order_index),
+                "parent_topic_id": parent_topic_id,
+                "is_ai_generated": False,
+                "is_reviewed": True,
+            },
+        ).mappings().first()
+
+        if not topic_row:
+            db.rollback()
+            raise HTTPException(status_code=503, detail="Failed to create topic")
+
+        topic_id = int(topic_row["id"])
+
+        # =========================
+        # 9) Insert topic-learning_outcome relations (optional)
+        # =========================
+        if normalized_learning_outcome_ids:
+            for lo_id in normalized_learning_outcome_ids:
+                db.execute(
+                    text("""
+                        INSERT INTO topic_learning_outcomes (
+                            topic_id,
+                            learning_outcome_id,
+                            created_at
+                        )
+                        VALUES (
+                            :topic_id,
+                            :learning_outcome_id,
+                            NOW()
+                        )
+                    """),
+                    {
+                        "topic_id": topic_id,
+                        "learning_outcome_id": lo_id,
+                    },
+                )
+
+        db.commit()
+        return dict(topic_row)
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while creating topic") from e
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+    
+
+
+def list_material_topics(*, course_id: int, module_id: int, material_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authentication
+    # =========================
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    role = (current_user.get("system_role") or "").strip().lower()
+
+    try:
+        # =========================
+        # 2) Validate material -> module -> course
+        # =========================
+        material_row = db.execute(
+            text("""
+                SELECT
+                    m.id AS material_id,
+                    m.module_id,
+                    mo.course_id,
+                    c.created_by
+                FROM materials m
+                JOIN modules mo
+                  ON mo.id = m.module_id
+                JOIN courses c
+                  ON c.id = mo.course_id
+                WHERE m.id = :material_id
+                LIMIT 1
+            """),
+            {"material_id": material_id},
+        ).mappings().first()
+
+        if not material_row:
+            raise HTTPException(status_code=404, detail="Material not found")
+
+        if int(material_row["module_id"]) != int(module_id):
+            raise HTTPException(status_code=400, detail="Material does not belong to this module")
+
+        if int(material_row["course_id"]) != int(course_id):
+            raise HTTPException(status_code=400, detail="Material does not belong to this course")
+
+        # =========================
+        # 3) Authorization
+        # =========================
+        if role == "instructor":
+            if int(material_row["created_by"]) != int(user_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="You can only view topics for your own course"
+                )
+
+        elif role == "student":
+            enrollment_row = db.execute(
+                text("""
+                    SELECT 1
+                    FROM course_enrollments
+                    WHERE course_id = :course_id
+                      AND student_id = :student_id
+                      AND status IN ('active', 'completed')
+                    LIMIT 1
+                """),
+                {
+                    "course_id": course_id,
+                    "student_id": user_id,
+                },
+            ).first()
+
+            if not enrollment_row:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You are not allowed to access topics for this course"
+                )
+
+        else:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # =========================
+        # 4) Fetch all topics for this material
+        # =========================
+        topic_rows = db.execute(
+            text("""
+                SELECT
+                    id,
+                    material_id,
+                    title,
+                    description,
+                    order_index,
+                    parent_topic_id,
+                    is_ai_generated,
+                    is_reviewed,
+                    created_at,
+                    updated_at
+                FROM topics
+                WHERE material_id = :material_id
+                ORDER BY order_index ASC, id ASC
+            """),
+            {"material_id": material_id},
+        ).mappings().all()
+
+        return {
+            "course_id": course_id,
+            "module_id": module_id,
+            "material_id": material_id,
+            "topics": [dict(row) for row in topic_rows],
+        }
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def get_topic(*, course_id: int, module_id: int, material_id: int, topic_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authentication
+    # =========================
+    user_id = current_user.get("id")
+    if not user_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    if not topic_id or topic_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid topic_id")
+
+    role = (current_user.get("system_role") or "").strip().lower()
+
+    try:
+        # =========================
+        # 2) Validate topic -> material -> module -> course
+        # =========================
+        topic_row = db.execute(
+            text("""
+                SELECT
+                    t.id,
+                    t.material_id,
+                    t.title,
+                    t.description,
+                    t.page_start,
+                    t.page_end,
+                    t.order_index,
+                    t.parent_topic_id,
+                    t.is_ai_generated,
+                    t.is_reviewed,
+                    t.created_at,
+                    t.updated_at,
+                    m.module_id,
+                    mo.course_id,
+                    c.created_by
+                FROM topics t
+                JOIN materials m
+                  ON m.id = t.material_id
+                JOIN modules mo
+                  ON mo.id = m.module_id
+                JOIN courses c
+                  ON c.id = mo.course_id
+                WHERE t.id = :topic_id
+                LIMIT 1
+            """),
+            {"topic_id": topic_id},
+        ).mappings().first()
+
+        if not topic_row:
+            raise HTTPException(status_code=404, detail="Topic not found")
+
+        if int(topic_row["material_id"]) != int(material_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this material")
+
+        if int(topic_row["module_id"]) != int(module_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this module")
+
+        if int(topic_row["course_id"]) != int(course_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this course")
+
+        # =========================
+        # 3) Authorization
+        # =========================
+        if role == "instructor":
+            if int(topic_row["created_by"]) != int(user_id):
+                raise HTTPException(
+                    status_code=403,
+                    detail="You can only view topics for your own course"
+                )
+
+        elif role == "student":
+            enrollment_row = db.execute(
+                text("""
+                    SELECT 1
+                    FROM course_enrollments
+                    WHERE course_id = :course_id
+                      AND student_id = :student_id
+                      AND status IN ('active', 'completed')
+                    LIMIT 1
+                """),
+                {
+                    "course_id": course_id,
+                    "student_id": user_id,
+                },
+            ).first()
+
+            if not enrollment_row:
+                raise HTTPException(
+                    status_code=403,
+                    detail="You are not allowed to access topics for this course"
+                )
+
+        else:
+            raise HTTPException(status_code=403, detail="Access denied")
+
+        # =========================
+        # 4) Fetch related learning outcomes
+        # =========================
+        learning_outcome_rows = db.execute(
+            text("""
+                SELECT
+                    lo.id,
+                    lo.title
+                FROM topic_learning_outcomes tlo
+                JOIN learning_outcomes lo
+                  ON lo.id = tlo.learning_outcome_id
+                WHERE tlo.topic_id = :topic_id
+                  AND lo.course_id = :course_id
+                ORDER BY lo.created_at ASC, lo.id ASC
+            """),
+            {
+                "topic_id": topic_id,
+                "course_id": course_id,
+            },
+        ).mappings().all()
+
+        response = {
+            "id": topic_row["id"],
+            "material_id": topic_row["material_id"],
+            "title": topic_row["title"],
+            "description": topic_row["description"],
+            "page_start": topic_row["page_start"],
+            "page_end": topic_row["page_end"],
+            "order_index": topic_row["order_index"],
+            "parent_topic_id": topic_row["parent_topic_id"],
+            "is_ai_generated": topic_row["is_ai_generated"],
+            "is_reviewed": topic_row["is_reviewed"],
+            "created_at": topic_row["created_at"],
+            "updated_at": topic_row["updated_at"],
+            "learning_outcomes": [dict(row) for row in learning_outcome_rows],
+        }
+
+        return response
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def update_topic(*, course_id: int, module_id: int, material_id: int, topic_id: int, payload: TopicUpdateRequest, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can update topics")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    if not topic_id or topic_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid topic_id")
+
+    # =========================
+    # 2) Validate topic -> material -> module -> course + ownership
+    # =========================
+    topic_row = db.execute(
+        text("""
+            SELECT
+                t.id,
+                t.material_id,
+                t.parent_topic_id,
+                t.page_start,
+                t.page_end,
+                m.module_id,
+                mo.course_id,
+                c.created_by
+            FROM topics t
+            JOIN materials m
+              ON m.id = t.material_id
+            JOIN modules mo
+              ON mo.id = m.module_id
+            JOIN courses c
+              ON c.id = mo.course_id
+            WHERE t.id = :topic_id
+            LIMIT 1
+        """),
+        {"topic_id": topic_id},
+    ).mappings().first()
+
+    if not topic_row:
+        raise HTTPException(status_code=404, detail="Topic not found")
+
+    if int(topic_row["material_id"]) != int(material_id):
+        raise HTTPException(status_code=400, detail="Topic does not belong to this material")
+
+    if int(topic_row["module_id"]) != int(module_id):
+        raise HTTPException(status_code=400, detail="Topic does not belong to this module")
+
+    if int(topic_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Topic does not belong to this course")
+
+    if int(topic_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only update topics in your own course")
+
+    # =========================
+    # 3) Build dynamic update fields
+    # =========================
+    update_fields = {}
+    provided_fields = payload.model_fields_set
+
+    if "title" in provided_fields and payload.title is not None:
+        title = payload.title.strip()
+        if title == "":
+            raise HTTPException(status_code=422, detail="title cannot be empty")
+        update_fields["title"] = title
+
+    if "description" in provided_fields and payload.description is not None:
+        description = payload.description.strip()
+        update_fields["description"] = description or None
+
+    if "parent_topic_id" in provided_fields and payload.parent_topic_id is not None:
+        parent_topic_id = payload.parent_topic_id
+
+        if int(parent_topic_id) == int(topic_id):
+            raise HTTPException(status_code=400, detail="A topic cannot be its own parent")
+
+        parent_row = db.execute(
+            text("""
+                SELECT id, material_id, parent_topic_id
+                FROM topics
+                WHERE id = :parent_topic_id
+                LIMIT 1
+            """),
+            {"parent_topic_id": parent_topic_id},
+        ).mappings().first()
+
+        if not parent_row:
+            raise HTTPException(status_code=404, detail="Parent topic not found")
+
+        if int(parent_row["material_id"]) != int(material_id):
+            raise HTTPException(status_code=400, detail="Parent topic must belong to the same material")
+
+        # prevent simple cycle: parent cannot be one of this topic's descendants
+        ancestor_id = parent_row["parent_topic_id"]
+        current_parent_id = int(parent_topic_id)
+
+        while ancestor_id is not None:
+            if int(ancestor_id) == int(topic_id):
+                raise HTTPException(status_code=400, detail="Invalid parent_topic_id: cycle detected")
+
+            ancestor_row = db.execute(
+                text("""
+                    SELECT parent_topic_id
+                    FROM topics
+                    WHERE id = :topic_id
+                    LIMIT 1
+                """),
+                {"topic_id": current_parent_id},
+            ).mappings().first()
+
+            if not ancestor_row:
+                break
+
+            current_parent_id = ancestor_id
+            ancestor_id = ancestor_row["parent_topic_id"]
+
+        update_fields["parent_topic_id"] = parent_topic_id
+
+    page_start_provided = "page_start" in provided_fields
+    page_end_provided = "page_end" in provided_fields
+
+    if page_start_provided != page_end_provided:
+        raise HTTPException(422, "page_start and page_end must both be provided or both be null")
+
+    if page_start_provided and page_end_provided:
+        page_start = payload.page_start
+        page_end = payload.page_end
+
+        if (page_start is None) != (page_end is None):
+            raise HTTPException(422, "page_start and page_end must both be provided or both be null")
+
+        if page_start is None and page_end is None:
+            is_subtopic = (update_fields.get("parent_topic_id") or topic_row["parent_topic_id"]) is not None
+
+            if not is_subtopic:
+                has_subtopics = db.execute(
+                    text("""
+                        SELECT 1 FROM topics
+                        WHERE parent_topic_id = :topic_id
+                        AND page_start IS NOT NULL
+                        LIMIT 1
+                    """),
+                    {"topic_id": topic_id}
+                ).scalar()
+
+                if has_subtopics:
+                    raise HTTPException(422, "Cannot clear page range on topic that has subtopics with page ranges")
+
+        if page_start is not None and page_end is not None:
+            if page_start > page_end:
+                raise HTTPException(422, "page_start must be less than or equal to page_end")
+
+            subtopics_range = db.execute(
+                text("""
+                    SELECT MIN(page_start) AS min_start, MAX(page_end) AS max_end
+                    FROM topics
+                    WHERE parent_topic_id = :topic_id
+                    AND page_start IS NOT NULL
+                    AND page_end IS NOT NULL
+                """),
+                {"topic_id": topic_id}
+            ).mappings().first()
+
+            if subtopics_range and subtopics_range["min_start"] is not None:
+                if page_start > subtopics_range["min_start"] or page_end < subtopics_range["max_end"]:
+                    raise HTTPException(422, "Topic page range must cover all its subtopics ranges")
+
+            current_parent_id = update_fields.get("parent_topic_id") or topic_row["parent_topic_id"]
+
+            if current_parent_id is not None:
+                parent_range = db.execute(
+                    text("SELECT page_start, page_end FROM topics WHERE id = :id"),
+                    {"id": current_parent_id}
+                ).mappings().first()
+
+                if parent_range is None:
+                    raise HTTPException(404, "Parent topic not found")
+
+                if parent_range["page_start"] is None or parent_range["page_end"] is None:
+                    raise HTTPException(422, "Cannot set page range on subtopic when parent has no page range")
+
+                if page_start < parent_range["page_start"] or page_end > parent_range["page_end"]:
+                    raise HTTPException(422, "Subtopic page range must be within parent topic page range")
+
+        update_fields["page_start"] = page_start
+        update_fields["page_end"] = page_end
+
+    # =========================
+    # 4) Validate learning outcomes if provided
+    # =========================
+    replace_learning_outcomes = False
+    normalized_learning_outcome_ids = []
+
+    if "learning_outcome_ids" in provided_fields and payload.learning_outcome_ids is not None:
+        replace_learning_outcomes = True
+
+        seen = set()
+        for lo_id in payload.learning_outcome_ids:
+            if not isinstance(lo_id, int) or lo_id <= 0:
+                raise HTTPException(
+                    status_code=422,
+                    detail="learning_outcome_ids must contain valid positive integers"
+                )
+            if lo_id not in seen:
+                seen.add(lo_id)
+                normalized_learning_outcome_ids.append(lo_id)
+
+        if normalized_learning_outcome_ids:
+            lo_rows = db.execute(
+                text("""
+                    SELECT id, course_id, parent_learning_outcome_id
+                    FROM learning_outcomes
+                    WHERE id = ANY(:learning_outcome_ids)
+                """),
+                {"learning_outcome_ids": normalized_learning_outcome_ids},
+            ).mappings().all()
+
+            if len(lo_rows) != len(normalized_learning_outcome_ids):
+                raise HTTPException(status_code=404, detail="One or more learning outcomes were not found")
+
+            for row in lo_rows:
+                if int(row["course_id"]) != int(course_id):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="All learning outcomes must belong to the same course"
+                    )
+                topic_is_subtopic = (update_fields.get("parent_topic_id") or topic_row["parent_topic_id"]) is not None
+                lo_is_sub = row["parent_learning_outcome_id"] is not None
+
+                if topic_is_subtopic != lo_is_sub:
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Topics and learning outcomes must be of the same level (both parent or both sub)"
+                    )
+
+    if not update_fields and not replace_learning_outcomes:
+        raise HTTPException(status_code=400, detail="No updatable fields provided")
+
+    # =========================
+    # 5) Update topic + optional relations replacement
+    # =========================
+    try:
+        updated_topic = None
+
+        if update_fields:
+            set_clauses = []
+            params = {"topic_id": topic_id}
+
+            for col in ["title", "description", "parent_topic_id", "page_start", "page_end"]:
+                if col in update_fields:
+                    set_clauses.append(f"{col} = :{col}")
+                    params[col] = update_fields[col]
+
+            set_clauses.append("updated_at = NOW()")
+
+            updated_topic = db.execute(
+                text(f"""
+                    UPDATE topics
+                    SET {", ".join(set_clauses)}
+                    WHERE id = :topic_id
+                    RETURNING
+                        id,
+                        material_id,
+                        title,
+                        description,
+                        page_start,
+                        page_end,
+                        order_index,
+                        parent_topic_id,
+                        is_ai_generated,
+                        is_reviewed,
+                        created_at,
+                        updated_at
+                """),
+                params,
+            ).mappings().first()
+
+            if not updated_topic:
+                db.rollback()
+                raise HTTPException(status_code=404, detail="Topic not found")
+        else:
+            updated_topic = db.execute(
+                text("""
+                    SELECT
+                        id,
+                        material_id,
+                        title,
+                        description,
+                        page_start,
+                        page_end,
+                        order_index,
+                        parent_topic_id,
+                        is_ai_generated,
+                        is_reviewed,
+                        created_at,
+                        updated_at
+                    FROM topics
+                    WHERE id = :topic_id
+                    LIMIT 1
+                """),
+                {"topic_id": topic_id},
+            ).mappings().first()
+
+            if not updated_topic:
+                db.rollback()
+                raise HTTPException(status_code=404, detail="Topic not found")
+
+        if replace_learning_outcomes:
+            db.execute(
+                text("""
+                    DELETE FROM topic_learning_outcomes
+                    WHERE topic_id = :topic_id
+                """),
+                {"topic_id": topic_id},
+            )
+
+            for lo_id in normalized_learning_outcome_ids:
+                db.execute(
+                    text("""
+                        INSERT INTO topic_learning_outcomes (
+                            topic_id,
+                            learning_outcome_id,
+                            created_at
+                        )
+                        VALUES (
+                            :topic_id,
+                            :learning_outcome_id,
+                            NOW()
+                        )
+                    """),
+                    {
+                        "topic_id": topic_id,
+                        "learning_outcome_id": lo_id,
+                    },
+                )
+
+        db.commit()
+        return dict(updated_topic)
+
+    except IntegrityError as e:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Conflict while updating topic") from e
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+    
+
+
+def reorder_topics(*, course_id: int, module_id: int, material_id: int, payload, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can reorder topics")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    topic_ids = getattr(payload, "topic_ids", None)
+    if not isinstance(topic_ids, list) or not topic_ids:
+        raise HTTPException(status_code=400, detail="topic_ids must be a non-empty list")
+
+    try:
+        topic_ids = [int(tid) for tid in topic_ids]
+    except Exception:
+        raise HTTPException(status_code=400, detail="topic_ids must contain valid integers")
+
+    if any(tid <= 0 for tid in topic_ids):
+        raise HTTPException(status_code=400, detail="topic_ids must contain positive integers only")
+
+    if len(topic_ids) != len(set(topic_ids)):
+        raise HTTPException(status_code=400, detail="topic_ids must not contain duplicates")
+
+    # =========================
+    # 2) Validate material -> module -> course + ownership
+    # =========================
+    material_row = db.execute(
+        text("""
+            SELECT
+                m.id AS material_id,
+                m.module_id,
+                mo.course_id,
+                c.created_by
+            FROM materials m
+            JOIN modules mo
+              ON mo.id = m.module_id
+            JOIN courses c
+              ON c.id = mo.course_id
+            WHERE m.id = :material_id
+            LIMIT 1
+        """),
+        {"material_id": material_id},
+    ).mappings().first()
+
+    if not material_row:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    if int(material_row["module_id"]) != int(module_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this module")
+
+    if int(material_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this course")
+
+    if int(material_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only reorder topics for your own course")
+
+    # =========================
+    # 3) Fetch all material topics
+    # =========================
+    db_topic_rows = db.execute(
+        text("""
+            SELECT id
+            FROM topics
+            WHERE material_id = :material_id
+            ORDER BY order_index ASC, id ASC
+        """),
+        {"material_id": material_id},
+    ).mappings().all()
+
+    db_topic_ids = [int(row["id"]) for row in db_topic_rows]
+
+    if not db_topic_ids:
+        raise HTTPException(status_code=404, detail="No topics found for this material")
+
+    # request must include all material topics exactly once
+    if set(topic_ids) != set(db_topic_ids):
+        raise HTTPException(
+            status_code=400,
+            detail="topic_ids must include all material topics exactly once"
+        )
+
+    # =========================
+    # 4) Reorder with two-phase update
+    #    to avoid unique conflict on (material_id, order_index)
+    # =========================
+    try:
+        # phase 1: move to temporary negative order values
+        for idx, topic_id in enumerate(topic_ids):
+            db.execute(
+                text("""
+                    UPDATE topics
+                    SET order_index = :temp_order_index,
+                        updated_at = NOW()
+                    WHERE id = :topic_id
+                      AND material_id = :material_id
+                """),
+                {
+                    "temp_order_index": -(idx + 1),
+                    "topic_id": topic_id,
+                    "material_id": material_id,
+                },
+            )
+
+        # phase 2: assign final order values
+        for idx, topic_id in enumerate(topic_ids):
+            db.execute(
+                text("""
+                    UPDATE topics
+                    SET order_index = :final_order_index,
+                        updated_at = NOW()
+                    WHERE id = :topic_id
+                      AND material_id = :material_id
+                """),
+                {
+                    "final_order_index": idx,
+                    "topic_id": topic_id,
+                    "material_id": material_id,
+                },
+            )
+
+        db.commit()
+
+        return {
+            "course_id": course_id,
+            "module_id": module_id,
+            "material_id": material_id,
+            "topic_ids": topic_ids,
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def delete_topic(*, course_id: int, module_id: int, material_id: int, topic_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can delete topics")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not module_id or module_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid module_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    if not topic_id or topic_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid topic_id")
+
+    try:
+        # =========================
+        # 2) Validate topic -> material -> module -> course + ownership
+        # =========================
+        topic_row = db.execute(
+            text("""
+                SELECT
+                    t.id,
+                    t.material_id,
+                    m.module_id,
+                    mo.course_id,
+                    c.created_by
+                FROM topics t
+                JOIN materials m
+                  ON m.id = t.material_id
+                JOIN modules mo
+                  ON mo.id = m.module_id
+                JOIN courses c
+                  ON c.id = mo.course_id
+                WHERE t.id = :topic_id
+                LIMIT 1
+            """),
+            {"topic_id": topic_id},
+        ).mappings().first()
+
+        if not topic_row:
+            raise HTTPException(status_code=404, detail="Topic not found")
+
+        if int(topic_row["material_id"]) != int(material_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this material")
+
+        if int(topic_row["module_id"]) != int(module_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this module")
+
+        if int(topic_row["course_id"]) != int(course_id):
+            raise HTTPException(status_code=400, detail="Topic does not belong to this course")
+
+        if int(topic_row["created_by"]) != int(instructor_id):
+            raise HTTPException(status_code=403, detail="You can only delete topics from your own course")
+
+        # =========================
+        # 3) Delete topic relations first
+        # =========================
+        db.execute(
+            text("""
+                DELETE FROM topic_learning_outcomes
+                WHERE topic_id = :topic_id
+            """),
+            {"topic_id": topic_id},
+        )
+
+        # =========================
+        # 4) Delete topic
+        # =========================
+        deleted_row = db.execute(
+            text("""
+                DELETE FROM topics
+                WHERE id = :topic_id
+                RETURNING id
+            """),
+            {"topic_id": topic_id},
+        ).first()
+
+        if not deleted_row:
+            db.rollback()
+            raise HTTPException(status_code=404, detail="Topic not found")
+
+        db.commit()
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def confirm_topics(*, course_id: int, module_id: int, material_id: int, payload, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can confirm topics")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    # =========================
+    # 2) Validate hierarchy + ownership
+    # =========================
+    material_row = db.execute(
+        text("""
+            SELECT
+                m.id AS material_id,
+                m.module_id,
+                mo.course_id,
+                c.created_by
+            FROM materials m
+            JOIN modules mo ON mo.id = m.module_id
+            JOIN courses c ON c.id = mo.course_id
+            WHERE m.id = :material_id
+            LIMIT 1
+        """),
+        {"material_id": material_id},
+    ).mappings().first()
+
+    if not material_row:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    if int(material_row["module_id"]) != int(module_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this module")
+
+    if int(material_row["course_id"]) != int(course_id):
+        raise HTTPException(status_code=400, detail="Material does not belong to this course")
+
+    if int(material_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only confirm topics for your own course")
+
+    # =========================
+    # 3) Validate topic_ids
+    # =========================
+    topic_ids = payload.topic_ids
+
+    if len(topic_ids) != len(set(topic_ids)):
+        raise HTTPException(status_code=400, detail="topic_ids must not contain duplicates")
+
+    topic_rows = db.execute(
+        text("""
+            SELECT id, title
+            FROM topics
+            WHERE id = ANY(:topic_ids)
+              AND material_id = :material_id
+        """),
+        {"topic_ids": topic_ids, "material_id": material_id},
+    ).mappings().all()
+
+    if len(topic_rows) != len(topic_ids):
+        raise HTTPException(status_code=400, detail="One or more topic_ids are invalid or do not belong to this material")
+
+    # =========================
+    # 4) Mark topics as reviewed
+    # =========================
+    db.execute(
+        text("""
+            UPDATE topics
+            SET is_reviewed = TRUE,
+                updated_at = NOW()
+            WHERE id = ANY(:topic_ids)
+              AND material_id = :material_id
+        """),
+        {"topic_ids": topic_ids, "material_id": material_id},
+    )
+
+    # =========================
+    # 5) Build AI request body
+    # =========================
+    QUESTIONS_PER_TYPE_PER_DIFFICULTY = 5
+
+    QUESTION_TYPES = ["multiple_choice", "multi_select", "true_false", "short_answer"]
+    QUESTION_DIFFICULTIES = ["easy", "medium", "hard"]
+
+    question_configs = [
+        {"type": qtype, "difficulty": difficulty, "count": QUESTIONS_PER_TYPE_PER_DIFFICULTY}
+        for qtype in QUESTION_TYPES
+        for difficulty in QUESTION_DIFFICULTIES
+    ]
+
+    topic_titles = {int(row["id"]): row["title"] for row in topic_rows}
+
+    ai_topics = [
+        {
+            "topic_id": tid,
+            "topic_title": topic_titles[tid],
+            "question_configs": question_configs,
+        }
+        for tid in topic_ids
+    ]
+
+    ai_request_body = {
+        "destination": "pool",
+        "topics": ai_topics,
+    }
+
+    # =========================
+    # 6) Send AI request
+    # =========================
+    ai_pregeneration_started = False
+    try:
+        send_ai_request(
+            db,
+            operation_type="question_generation",
+            endpoint_path="api/v1/courses/questions/generate",
+            course_id=course_id,
+            primary_entity_type="material",
+            primary_entity_id=material_id,
+            body=ai_request_body,
+        )
+        ai_pregeneration_started = True
+
+    except Exception:
+        pass
+
+    # =========================
+    # 7) Commit
+    # =========================
+    try:
+        db.commit()
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+    return {
+        "material_id": material_id,
+        "confirmed_count": len(topic_ids),
+        "ai_pregeneration_started": ai_pregeneration_started,
+    }
+
+
