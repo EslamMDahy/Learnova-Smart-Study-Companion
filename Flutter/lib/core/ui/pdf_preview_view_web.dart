@@ -1,11 +1,11 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:convert';
-import 'dart:html' as html;
 // ignore: undefined_prefixed_name
 import 'dart:ui_web' as ui_web;
 
+import 'package:web/web.dart' as web;
+
 final _registeredPdfViews = <String>{};
-final _registeredPdfIframes = <String, html.IFrameElement>{};
+final _registeredPdfIframes = <String, web.HTMLIFrameElement>{};
 final _registeredPdfSourceKeys = <String, String>{};
 
 bool _isScopedPdfRange(int? pageStart, int? pageEnd) {
@@ -274,7 +274,7 @@ String _pdfSourceKey({
 }
 
 void _applyPdfPreviewSource({
-  required html.IFrameElement iframe,
+  required web.HTMLIFrameElement iframe,
   required String viewType,
   required String url,
   required bool interactive,
@@ -334,7 +334,7 @@ void registerPdfPreviewView({
   _registeredPdfViews.add(viewType);
 
   ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
-    final iframe = html.IFrameElement()
+    final iframe = web.document.createElement('iframe') as web.HTMLIFrameElement
       ..style.border = 'none'
       ..style.width = '100%'
       ..style.height = '100%'
@@ -393,9 +393,6 @@ void scrollPdfPreviewToPage({
 }) {
   final iframe = _registeredPdfIframes[viewType];
   if (iframe == null || iframe.contentWindow == null) return;
-  iframe.contentWindow!.postMessage({
-    'type': 'learnova_pdf_scroll_to_page',
-    'viewType': viewType,
-    'pdfPage': page,
-  }, '*');
+  // The native browser PDF viewer does not expose a stable cross-browser
+  // JavaScript API for page scrolling. Keep this as a safe no-op in WASM.
 }

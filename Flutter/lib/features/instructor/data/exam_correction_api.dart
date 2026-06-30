@@ -59,7 +59,7 @@ class ExamCorrectionApi {
       options: Options(
         contentType: 'multipart/form-data',
         sendTimeout: const Duration(minutes: 3),
-        receiveTimeout: const Duration(minutes: 10),
+        receiveTimeout: const Duration(minutes: 2),
       ),
       cancelToken: cancelToken,
     );

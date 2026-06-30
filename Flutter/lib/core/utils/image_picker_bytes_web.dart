@@ -1,7 +1,4 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:async';
-import 'dart:html' as html;
-import 'dart:typed_data';
+import 'browser_file_picker.dart' as browser_picker;
 
 class PickedBrowserFile {
   final List<int> bytes;
@@ -18,45 +15,16 @@ class PickedBrowserFile {
 Future<PickedBrowserFile?> pickSingleImageFile({
   List<String> accept = const ['image/*'],
 }) async {
-  final input = html.FileUploadInputElement()
-    ..accept = accept.join(',')
-    ..multiple = false
-    ..style.display = 'none';
+  final files = await browser_picker.pickBrowserFiles(
+    acceptedExtensions: accept,
+    multiple: false,
+  );
+  if (files.isEmpty) return null;
 
-  html.document.body?.append(input);
-
-  try {
-    input.click();
-
-    await input.onChange.first;
-
-    final file = input.files?.isNotEmpty ?? false ? input.files!.first : null;
-    if (file == null) return null;
-
-    final reader = html.FileReader();
-    final completer = Completer<PickedBrowserFile?>();
-
-    reader.onLoad.first.then((_) {
-      final result = reader.result;
-      final bytes = result is Uint8List ? result.toList() : <int>[];
-      if (!completer.isCompleted) {
-        completer.complete(
-          PickedBrowserFile(
-            bytes: bytes,
-            mimeType: file.type,
-            name: file.name,
-          ),
-        );
-      }
-    });
-
-    reader.onError.first.then((_) {
-      if (!completer.isCompleted) completer.complete(null);
-    });
-
-    reader.readAsArrayBuffer(file);
-    return completer.future;
-  } finally {
-    input.remove();
-  }
+  final file = files.first;
+  return PickedBrowserFile(
+    bytes: file.bytes,
+    mimeType: file.mimeType,
+    name: file.name,
+  );
 }

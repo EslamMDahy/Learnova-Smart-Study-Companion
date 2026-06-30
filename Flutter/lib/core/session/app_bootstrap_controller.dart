@@ -26,10 +26,10 @@ class AppBootstrapController extends Notifier<AppBootstrapState> {
       final hasToken = TokenStorage.hasToken;
       final isPersisted = TokenStorage.isPersisted;
 
-      if (!hasToken && !isPersisted) {
-        state = AppBootstrapState.done;
-        return;
-      }
+      // On Flutter Web/Wasm the refresh token is an HttpOnly cookie. Dart
+      // cannot read that cookie, so absence of a local access token does not
+      // mean the browser session is gone. Always allow one silent /auth/refresh
+      // attempt before deciding the user is a guest.
 
       final currentToken = TokenStorage.token?.trim();
       final needsRefresh = currentToken == null ||

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/utils/before_unload_stub.dart'
+    if (dart.library.js_interop) '../../../../core/utils/before_unload_web.dart'
     if (dart.library.html) '../../../../core/utils/before_unload_web.dart'
     as before_unload;
 
@@ -287,61 +288,80 @@ void _onNavSelect(int i) {
   // Avatar Upload
   // =========================
   Future<void> _pickAndUploadAvatar() async {
-    final picked = await pickSingleImageFile(
-      accept: ['image/png', 'image/jpeg'],
-    );
-    if (picked == null || picked.bytes.isEmpty) return;
-    if (!context.mounted) return;
+    try {
+      final picked = await pickSingleImageFile(
+        accept: ['image/png', 'image/jpeg'],
+      );
+      if (picked == null || picked.bytes.isEmpty) return;
+      if (!context.mounted) return;
 
-    final bytes = picked.bytes;
-    var contentType = (picked.mimeType ?? '').trim().toLowerCase();
-    final fileName = (picked.name ?? '').trim().toLowerCase();
+      final bytes = picked.bytes;
+      var contentType = (picked.mimeType ?? '').trim().toLowerCase();
+      final fileName = (picked.name ?? '').trim().toLowerCase();
 
-    if (contentType.isEmpty) {
-      if (fileName.endsWith('.png')) {
-        contentType = 'image/png';
-      } else if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
-        contentType = 'image/jpeg';
+      if (contentType.isEmpty) {
+        if (fileName.endsWith('.png')) {
+          contentType = 'image/png';
+        } else if (fileName.endsWith('.jpg') || fileName.endsWith('.jpeg')) {
+          contentType = 'image/jpeg';
+        }
       }
-    }
-    if (contentType == 'image/jpg') contentType = 'image/jpeg';
+      if (contentType == 'image/jpg') contentType = 'image/jpeg';
 
-    final isAllowedImage =
-        contentType == 'image/png' || contentType == 'image/jpeg';
-    if (!isAllowedImage) {
-      _toast(
-        context,
-        title: 'Invalid file',
-        message: 'Please choose a PNG or JPG image.',
-        type: AppToastType.warning,
-        icon: Icons.warning_amber_rounded,
-      );
-      return;
-    }
-
-    if (bytes.length > 5 * 1024 * 1024) {
-      _toast(
-        context,
-        title: 'Image too large',
-        message: 'Maximum avatar size is 5 MB.',
-        type: AppToastType.warning,
-        icon: Icons.warning_amber_rounded,
-      );
-      return;
-    }
-
-    final ok = await ref.read(settingsControllerProvider.notifier).uploadAvatar(
-          bytes: bytes,
-          contentType: contentType,
+      final isAllowedImage =
+          contentType == 'image/png' || contentType == 'image/jpeg';
+      if (!isAllowedImage) {
+        _toast(
+          context,
+          title: 'Invalid file',
+          message: 'Please choose a PNG or JPG image.',
+          type: AppToastType.warning,
+          icon: Icons.warning_amber_rounded,
         );
+        return;
+      }
 
-    if (!context.mounted) return;
-    if (ok) {
+      if (bytes.length > 5 * 1024 * 1024) {
+        _toast(
+          context,
+          title: 'Image too large',
+          message: 'Maximum avatar size is 5 MB.',
+          type: AppToastType.warning,
+          icon: Icons.warning_amber_rounded,
+        );
+        return;
+      }
+
+      final ok = await ref.read(settingsControllerProvider.notifier).uploadAvatar(
+            bytes: bytes,
+            contentType: contentType,
+          );
+
+      if (!context.mounted) return;
+      if (ok) {
+        _toast(
+          context,
+          title: 'Profile updated',
+          message: 'Your profile picture was updated successfully.',
+          icon: Icons.check_circle_outline,
+        );
+      } else {
+        _toast(
+          context,
+          title: 'Upload failed',
+          message: 'Could not upload your profile picture. Please try again.',
+          type: AppToastType.error,
+          icon: Icons.error_outline_rounded,
+        );
+      }
+    } catch (_) {
+      if (!context.mounted) return;
       _toast(
         context,
-        title: 'Profile updated',
-        message: 'Your profile picture was updated successfully.',
-        icon: Icons.check_circle_outline,
+        title: 'Upload unavailable',
+        message: 'Could not open the image picker in this browser.',
+        type: AppToastType.error,
+        icon: Icons.error_outline_rounded,
       );
     }
   }

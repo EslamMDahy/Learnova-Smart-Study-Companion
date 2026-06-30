@@ -1,19 +1,24 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
+import 'dart:js_interop';
+
 import 'package:flutter/foundation.dart';
+import 'package:web/web.dart' as web;
 
 typedef BeforeUnloadShouldBlock = bool Function();
 
-/// Web-only: Adds a beforeunload handler when there are unsaved changes.
-/// Returns a disposer to remove the listener.
 VoidCallback registerBeforeUnload(BeforeUnloadShouldBlock shouldBlock) {
-  final sub = html.window.onBeforeUnload.listen((event) {
+  late JSFunction listener;
+  listener = ((web.Event event) {
     if (!shouldBlock()) return;
 
-    final e = event as html.BeforeUnloadEvent;
-    e.preventDefault();
-    e.returnValue = '';
-  });
+    event.preventDefault();
+    if (event is web.BeforeUnloadEvent) {
+      event.returnValue = '';
+    }
+  }).toJS;
 
-  return sub.cancel;
+  web.window.addEventListener('beforeunload', listener);
+
+  return () {
+    web.window.removeEventListener('beforeunload', listener);
+  };
 }

@@ -1,6 +1,7 @@
 import 'package:dio/dio.dart';
 
 import 'dio_adapter_config_stub.dart'
+    if (dart.library.js_interop) 'dio_adapter_config_web.dart'
     if (dart.library.html) 'dio_adapter_config_web.dart';
 
 /// Applies platform-specific Dio adapter configuration.

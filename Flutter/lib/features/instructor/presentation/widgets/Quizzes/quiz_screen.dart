@@ -10,6 +10,7 @@ import 'package:learnova/core/storage/published_exams_cache.dart';
 import 'package:learnova/core/theme/app_theme.dart';
 import 'package:learnova/core/ui/toast.dart';
 import 'package:learnova/core/utils/file_download_stub.dart'
+    if (dart.library.js_interop) 'package:learnova/core/utils/file_download_web.dart'
     if (dart.library.html) 'package:learnova/core/utils/file_download_web.dart';
 import 'package:learnova/features/instructor/data/courses_models.dart';
 import 'package:learnova/features/instructor/data/courses_providers.dart';

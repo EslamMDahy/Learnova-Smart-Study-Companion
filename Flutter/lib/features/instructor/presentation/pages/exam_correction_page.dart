@@ -76,7 +76,7 @@ class _CorrectionHero extends StatelessWidget {
                     Text('Exam Correction', style: AppText.h1.copyWith(fontSize: 30, height: 1.15)),
                     const SizedBox(height: 8),
                     Text(
-                      'Upload one solved exam PDF. The backend extracts the student answers, grades objective questions, sends written answers to the exam grading service, and shows the instructor the final question-by-question result.',
+                      'Upload one solved exam PDF. The system reads the QR metadata, detects printed choice bubbles, grades objective questions immediately, and keeps written answers for instructor review.',
                       style: AppText.subtitle.copyWith(height: 1.45),
                     ),
                   ],
@@ -471,7 +471,7 @@ class _AnalyzingState extends StatelessWidget {
               const SizedBox(height: 8),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
-                child: Text('The backend is reading the QR metadata, detecting selected choices, extracting written answers, and grading the exam like a normal submitted attempt.', textAlign: TextAlign.center, style: AppText.sectionSubtitle),
+                child: Text('The backend is reading the QR metadata and detecting selected choice bubbles. Written answers will be listed for manual review instead of unreliable handwriting OCR.', textAlign: TextAlign.center, style: AppText.sectionSubtitle),
               ),
             ],
           ),
@@ -572,7 +572,7 @@ class _GradingSummaryPanel extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _Notice(
-            message: 'Instructor preview: the exam is graded from the uploaded PDF. Objective answers are shown immediately, while written answers can continue through the AI grading attempt until the backend returns the final result.',
+            message: 'Instructor preview: objective answers are detected from the printed bubbles and graded immediately. Written answers are intentionally marked for manual review to avoid unreliable handwriting OCR.',
             tone: _NoticeTone.info,
           ),
         ],
@@ -597,7 +597,7 @@ class _QuestionResultsPanel extends StatelessWidget {
           const _CardTitle(
             icon: Icons.assignment_turned_in_outlined,
             title: 'Question results',
-            subtitle: 'Each question with the detected student answer, correct answer, score, and feedback.',
+            subtitle: 'Objective questions show the detected bubble answer and score. Written questions are shown as manual-review items.',
           ),
           const SizedBox(height: 16),
           if (answers.isEmpty)
@@ -689,7 +689,7 @@ class _QuestionResultTile extends StatelessWidget {
           ],
           if (answer.shouldShowAiFeedback) ...[
             const SizedBox(height: 12),
-            _Notice(message: 'AI feedback: ${answer.aiFeedback!.trim()}', tone: _NoticeTone.info),
+            _Notice(message: '${answer.aiStatus == 'manual_review' ? 'Review note' : 'AI feedback'}: ${answer.aiFeedback!.trim()}', tone: _NoticeTone.info),
           ],
         ],
       ),

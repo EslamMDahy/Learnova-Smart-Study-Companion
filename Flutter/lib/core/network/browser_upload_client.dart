@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'browser_upload_client_stub.dart'
+    if (dart.library.js_interop) 'browser_upload_client_web.dart'
     if (dart.library.html) 'browser_upload_client_web.dart' as impl;
 
 Future<void> uploadBinaryToSignedUrl({

@@ -3,10 +3,13 @@ import 'dart:convert';
 import 'package:dio/dio.dart';
 
 import 'api_exceptions.dart';
+import 'dio_adapter_config.dart';
 import 'refresh_client.dart';
 
 class _DioRefreshClient implements RefreshClient {
-  _DioRefreshClient(this._dio);
+  _DioRefreshClient(this._dio) {
+    configureDioAdapter(_dio);
+  }
 
   final Dio _dio;
 

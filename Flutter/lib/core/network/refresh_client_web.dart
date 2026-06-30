@@ -1,88 +1,90 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:async';
 import 'dart:convert';
-import 'dart:html' as html;
+
+import 'package:dio/browser.dart';
+import 'package:dio/dio.dart';
 
 import 'api_exceptions.dart';
 import 'refresh_client.dart';
 
-class _XhrRefreshClient implements RefreshClient {
+class _WebRefreshClient implements RefreshClient {
+  _WebRefreshClient() {
+    final adapter = BrowserHttpClientAdapter();
+    adapter.withCredentials = true;
+    _dio.httpClientAdapter = adapter;
+  }
+
+  final Dio _dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 15),
+      sendTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 15),
+      headers: const <String, String>{
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'ngrok-skip-browser-warning': 'true',
+      },
+      responseType: ResponseType.json,
+    ),
+  );
+
   @override
-  Future<String> refresh({required String url}) {
-    final completer = Completer<String>();
-
-    final xhr = html.HttpRequest()
-      ..open('POST', url)
-      ..timeout = 15000
-      ..setRequestHeader('Content-Type', 'application/json')
-      ..setRequestHeader('Accept', 'application/json')
-      ..setRequestHeader('ngrok-skip-browser-warning', 'true')
-      ..withCredentials = true; // sends HttpOnly cookie cross-origin
-
-    xhr.onLoad.listen((_) {
-      if (completer.isCompleted) return;
-      try {
-        final status = xhr.status ?? 0;
-        if (status < 200 || status >= 400) {
-          completer.completeError(
-            ApiException(
-              'Refresh failed: HTTP $status',
-              statusCode: status,
-              code: _refreshErrorCode(status),
-            ),
-          );
-          return;
-        }
-
-        final body = xhr.responseText ?? '';
-        final decoded = _parseJsonBody(body);
-        final root = (decoded['data'] is Map)
-            ? (decoded['data'] as Map).cast<String, dynamic>()
-            : decoded;
-
-        final token =
-            (root['access_token'] ?? root['token'] ?? root['accessToken'])
-                ?.toString();
-
-        if (token == null || token.trim().isEmpty) {
-          completer.completeError(
-            ApiException(
-              'Invalid refresh response.',
-              statusCode: status,
-              code: 'REFRESH_INVALID',
-            ),
-          );
-          return;
-        }
-
-        completer.complete(token.trim());
-      } catch (e) {
-        completer.completeError(e);
+  Future<String> refresh({required String url}) async {
+    try {
+      final response = await _dio.post<dynamic>(url);
+      final status = response.statusCode ?? 0;
+      if (status < 200 || status >= 400) {
+        throw ApiException(
+          'Refresh failed: HTTP $status',
+          statusCode: status,
+          code: _refreshErrorCode(status),
+        );
       }
-    });
 
-    xhr.onError.listen((_) {
-      if (completer.isCompleted) return;
-      completer.completeError(
-        ApiException(
-          'Network error during token refresh.',
-          code: 'REFRESH_NETWORK',
-        ),
+      final root = _normalizeBody(response.data);
+      final token =
+          (root['access_token'] ?? root['token'] ?? root['accessToken'])
+              ?.toString()
+              .trim();
+
+      if (token == null || token.isEmpty) {
+        throw ApiException(
+          'Invalid refresh response.',
+          statusCode: status,
+          code: 'REFRESH_INVALID',
+        );
+      }
+
+      return token;
+    } on DioException catch (error) {
+      final status = error.response?.statusCode;
+      throw ApiException(
+        status == null
+            ? 'Network error during token refresh.'
+            : 'Refresh failed: HTTP $status',
+        statusCode: status,
+        code: status == null ? 'REFRESH_NETWORK' : _refreshErrorCode(status),
       );
-    });
+    }
+  }
 
-    xhr.onTimeout.listen((_) {
-      if (completer.isCompleted) return;
-      completer.completeError(
-        ApiException(
-          'Token refresh timed out.',
-          code: 'REFRESH_TIMEOUT',
-        ),
-      );
-    });
+  Map<String, dynamic> _normalizeBody(dynamic body) {
+    dynamic decoded = body;
+    if (decoded is String) {
+      try {
+        decoded = jsonDecode(decoded);
+      } catch (_) {
+        decoded = <String, dynamic>{};
+      }
+    }
 
-    xhr.send(); // no body needed — cookie is sent automatically
-    return completer.future;
+    if (decoded is Map) {
+      final map = decoded.cast<String, dynamic>();
+      final data = map['data'];
+      if (data is Map) return data.cast<String, dynamic>();
+      return map;
+    }
+
+    return <String, dynamic>{};
   }
 
   String _refreshErrorCode(int status) {
@@ -90,15 +92,6 @@ class _XhrRefreshClient implements RefreshClient {
     if (status >= 500) return 'REFRESH_SERVER';
     return 'REFRESH_FAILED';
   }
-
-  Map<String, dynamic> _parseJsonBody(String body) {
-    try {
-      return (jsonDecode(body) as Map).cast<String, dynamic>();
-    } catch (_) {
-      return <String, dynamic>{};
-    }
-  }
 }
 
-/// Used by conditional import factory.
-RefreshClient createRefreshClientImpl() => _XhrRefreshClient();
+RefreshClient createRefreshClientImpl() => _WebRefreshClient();

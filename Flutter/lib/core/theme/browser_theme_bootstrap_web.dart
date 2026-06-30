@@ -1,31 +1,34 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
-import 'dart:html' as html;
+import 'package:web/web.dart' as web;
 
 void applyBrowserThemeChromeImpl({required bool dark}) {
   final bg = dark ? '#0F172A' : '#F6F7F8';
   final surface = dark ? '#0F172A' : '#FFFFFF';
 
-  html.document.documentElement?.style.backgroundColor = bg;
-  html.document.body?.style.backgroundColor = bg;
+  // package:web exposes documentElement as Element, and Element does not have
+  // a typed `style` getter. Use attributes so this compiles under both dart2js
+  // and dart2wasm.
+  web.document.documentElement?.setAttribute('style', 'background-color: $bg;');
+  web.document.body?.setAttribute('style', 'background-color: $bg;');
 
-  final head = html.document.head;
+  final head = web.document.head;
   if (head == null) return;
 
-  html.MetaElement? themeColor;
-  for (final element in head.querySelectorAll('meta[name="theme-color"]')) {
-    if (element is html.MetaElement) {
+  web.HTMLMetaElement? themeColor;
+  final matches = head.querySelectorAll('meta[name="theme-color"]');
+  for (var i = 0; i < matches.length; i++) {
+    final element = matches.item(i);
+    if (element is web.HTMLMetaElement) {
       themeColor = element;
       break;
     }
   }
 
-  themeColor ??= html.MetaElement()
-    ..name = 'theme-color'
-    ..attributes['data-learnova-managed'] = 'true';
-
+  themeColor ??= web.document.createElement('meta') as web.HTMLMetaElement;
+  themeColor.name = 'theme-color';
+  themeColor.setAttribute('data-learnova-managed', 'true');
   themeColor.content = surface;
 
-  if (themeColor.parent == null) {
-    head.append(themeColor);
+  if (themeColor.parentNode == null) {
+    head.appendChild(themeColor);
   }
 }

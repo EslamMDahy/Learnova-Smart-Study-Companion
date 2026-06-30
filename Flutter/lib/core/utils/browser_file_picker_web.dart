@@ -1,7 +1,8 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:async';
-import 'dart:html' as html;
+import 'dart:js_interop';
 import 'dart:typed_data';
+
+import 'package:web/web.dart' as web;
 
 class PickedBrowserFile {
   final String name;
@@ -22,46 +23,71 @@ Future<List<PickedBrowserFile>> pickBrowserFiles({
   bool multiple = true,
 }) async {
   final completer = Completer<List<PickedBrowserFile>>();
-  final accepted = acceptedExtensions.join(',');
-  final input = html.FileUploadInputElement()
-    ..accept = accepted
-    ..multiple = multiple;
+  final input = web.document.createElement('input') as web.HTMLInputElement;
 
-  input.onChange.listen((_) async {
-    final selected = input.files;
-    if (selected == null || selected.isEmpty) {
-      completer.complete(const []);
-      return;
-    }
+  input.type = 'file';
+  input.accept = acceptedExtensions.join(',');
+  input.multiple = multiple;
+  input.style.display = 'none';
 
-    final files = <PickedBrowserFile>[];
-    for (final file in selected) {
-      files.add(await _readFile(file));
-    }
-    completer.complete(files);
-  });
+  late JSFunction changeListener;
+  late JSFunction cancelListener;
 
+  Future<void> cleanup() async {
+    input.removeEventListener('change', changeListener);
+    input.removeEventListener('cancel', cancelListener);
+    input.remove();
+  }
+
+  changeListener = ((web.Event _) {
+    () async {
+      try {
+        final selected = input.files;
+        if (selected == null || selected.length == 0) {
+          if (!completer.isCompleted) completer.complete(const []);
+          await cleanup();
+          return;
+        }
+
+        final files = <PickedBrowserFile>[];
+        for (var i = 0; i < selected.length; i++) {
+          final file = selected.item(i);
+          if (file == null) continue;
+          files.add(await _readFile(file));
+        }
+
+        if (!completer.isCompleted) completer.complete(files);
+      } catch (error, stackTrace) {
+        if (!completer.isCompleted) {
+          completer.completeError(error, stackTrace);
+        }
+      } finally {
+        await cleanup();
+      }
+    }();
+  }).toJS;
+
+  cancelListener = ((web.Event _) {
+    if (!completer.isCompleted) completer.complete(const []);
+    cleanup();
+  }).toJS;
+
+  input.addEventListener('change', changeListener);
+  input.addEventListener('cancel', cancelListener);
+  web.document.body?.appendChild(input);
   input.click();
+
   return completer.future;
 }
 
-Future<PickedBrowserFile> _readFile(html.File file) async {
-  final completer = Completer<PickedBrowserFile>();
-  final reader = html.FileReader();
+Future<PickedBrowserFile> _readFile(web.File file) async {
+  final buffer = await file.arrayBuffer().toDart;
+  final bytes = Uint8List.view(buffer.toDart);
 
-  reader.onLoad.listen((_) {
-    final result = reader.result;
-    final bytes = result is Uint8List
-        ? result
-        : Uint8List.view(result as ByteBuffer);
-    completer.complete(PickedBrowserFile(
-      name: file.name,
-      mimeType: file.type,
-      sizeBytes: bytes.length,
-      bytes: bytes,
-    ),);
-  });
-
-  reader.readAsArrayBuffer(file);
-  return completer.future;
+  return PickedBrowserFile(
+    name: file.name,
+    mimeType: file.type,
+    sizeBytes: bytes.length,
+    bytes: bytes,
+  );
 }

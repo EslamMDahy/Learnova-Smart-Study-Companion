@@ -1,7 +1,8 @@
-// ignore_for_file: avoid_web_libraries_in_flutter, deprecated_member_use
 import 'dart:async';
-import 'dart:html' as html;
+import 'dart:js_interop';
 import 'dart:typed_data';
+
+import 'package:web/web.dart' as web;
 
 import 'browser_file_picker.dart';
 
@@ -9,15 +10,25 @@ typedef DropZoneHitTest = bool Function(double clientX, double clientY);
 typedef BrowserFilesDropped = Future<void> Function(List<PickedBrowserFile> files);
 
 class BrowserFileDropSubscription {
-  final List<StreamSubscription<dynamic>> _subscriptions;
+  final List<_WebEventListener> _listeners;
 
-  BrowserFileDropSubscription._(this._subscriptions);
+  BrowserFileDropSubscription._(this._listeners);
 
   void dispose() {
-    for (final subscription in _subscriptions) {
-      subscription.cancel();
+    for (final listener in _listeners) {
+      listener.cancel();
     }
   }
+}
+
+class _WebEventListener {
+  _WebEventListener(this.target, this.type, this.listener);
+
+  final web.EventTarget target;
+  final String type;
+  final JSFunction listener;
+
+  void cancel() => target.removeEventListener(type, listener);
 }
 
 BrowserFileDropSubscription listenForBrowserFileDrops({
@@ -35,89 +46,88 @@ BrowserFileDropSubscription listenForBrowserFileDrops({
     onHoverChanged?.call(value);
   }
 
-  bool isFileDrag(html.MouseEvent event) {
-    final types = event.dataTransfer.types;
-    return types?.contains('Files') == true ||
-        types?.contains('application/x-moz-file') == true;
+  bool isInside(web.DragEvent event) {
+    return isInsideDropZone(event.clientX.toDouble(), event.clientY.toDouble());
   }
 
-  bool isInside(html.MouseEvent event) {
-    return isInsideDropZone(event.client.x.toDouble(), event.client.y.toDouble());
+  bool isAllowed(web.File file) {
+    if (acceptedExtensions.isEmpty) return true;
+    final lowerName = file.name.toLowerCase();
+    final lowerType = file.type.toLowerCase();
+    return acceptedExtensions.any((ext) {
+      final normalized = ext.trim().toLowerCase();
+      if (normalized.isEmpty) return false;
+      if (normalized == '*/*') return true;
+      if (normalized.endsWith('/*')) {
+        return lowerType.startsWith(normalized.substring(0, normalized.length - 1));
+      }
+      final dotExt = normalized.startsWith('.') ? normalized : '.$normalized';
+      return lowerName.endsWith(dotExt) || lowerType == normalized;
+    });
   }
 
-  final subscriptions = <StreamSubscription<dynamic>>[];
+  final listeners = <_WebEventListener>[];
 
-  subscriptions.add(html.window.onDragOver.listen((mouseEvent) {
-    if (!isFileDrag(mouseEvent)) return;
+  void add(String type, void Function(web.DragEvent event) handler) {
+    final listener = ((web.Event event) {
+      if (event is web.DragEvent) handler(event);
+    }).toJS;
+    web.window.addEventListener(type, listener);
+    listeners.add(_WebEventListener(web.window, type, listener));
+  }
 
-    final inside = isInside(mouseEvent);
+  add('dragover', (event) {
+    final inside = isInside(event);
     setHovering(inside);
 
     if (!inside) return;
-    mouseEvent.preventDefault();
-    mouseEvent.stopPropagation();
-    mouseEvent.dataTransfer.dropEffect = 'copy';
-  }));
+    event.preventDefault();
+    event.stopPropagation();
+    event.dataTransfer?.dropEffect = 'copy';
+  });
 
-  subscriptions.add(html.window.onDragLeave.listen((mouseEvent) {
-    if (!isFileDrag(mouseEvent)) return;
-    if (!isInside(mouseEvent)) setHovering(false);
-  }));
+  add('dragleave', (event) {
+    if (!isInside(event)) setHovering(false);
+  });
 
-  subscriptions.add(html.window.onDrop.listen((mouseEvent) async {
-    if (!isFileDrag(mouseEvent)) return;
-
-    final inside = isInside(mouseEvent);
+  add('drop', (event) async {
+    final inside = isInside(event);
     setHovering(false);
     if (!inside || dropping) return;
 
-    mouseEvent.preventDefault();
-    mouseEvent.stopPropagation();
+    event.preventDefault();
+    event.stopPropagation();
 
-    final files = mouseEvent.dataTransfer.files;
-    if (files == null || files.isEmpty) return;
+    final files = event.dataTransfer?.files;
+    if (files == null || files.length == 0) return;
 
     dropping = true;
     try {
       final droppedFiles = <PickedBrowserFile>[];
-      for (final file in files) {
+      for (var i = 0; i < files.length; i++) {
+        final file = files.item(i);
+        if (file == null || !isAllowed(file)) continue;
         droppedFiles.add(await _readDroppedFile(file));
       }
-      await onDrop(droppedFiles);
+      if (droppedFiles.isNotEmpty) await onDrop(droppedFiles);
     } finally {
       dropping = false;
     }
-  }));
+  });
 
-  subscriptions.add(html.window.onDragEnd.listen((_) => setHovering(false)));
+  add('dragend', (_) => setHovering(false));
 
-  return BrowserFileDropSubscription._(subscriptions);
+  return BrowserFileDropSubscription._(listeners);
 }
 
-Future<PickedBrowserFile> _readDroppedFile(html.File file) async {
-  final completer = Completer<PickedBrowserFile>();
-  final reader = html.FileReader();
+Future<PickedBrowserFile> _readDroppedFile(web.File file) async {
+  final buffer = await file.arrayBuffer().toDart;
+  final bytes = Uint8List.view(buffer.toDart);
 
-  reader.onError.listen((_) {
-    if (!completer.isCompleted) {
-      completer.completeError(reader.error ?? StateError('Could not read dropped file.'));
-    }
-  });
-
-  reader.onLoad.listen((_) {
-    if (completer.isCompleted) return;
-    final result = reader.result;
-    final bytes = result is Uint8List
-        ? result
-        : Uint8List.view(result as ByteBuffer);
-    completer.complete(PickedBrowserFile(
-      name: file.name,
-      mimeType: file.type,
-      sizeBytes: bytes.length,
-      bytes: bytes,
-    ));
-  });
-
-  reader.readAsArrayBuffer(file);
-  return completer.future;
+  return PickedBrowserFile(
+    name: file.name,
+    mimeType: file.type,
+    sizeBytes: bytes.length,
+    bytes: bytes,
+  );
 }
