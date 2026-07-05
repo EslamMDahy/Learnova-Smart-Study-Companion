@@ -1027,6 +1027,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
       onRenameTopic: () => _showRenameTopicDialog(c.module!, c.material!, activeTopic),
       onEditTopicSummary: () => _showTopicSummaryDialog(c.module!, c.material!, activeTopic),
       onEditTopicStatus: () => _showTopicStatusDialog(c.module!, c.material!, activeTopic),
+      onEditTopicPageRange: () => _showTopicPageRangeDialog(c.module!, c.material!, activeTopic),
       onMapTopicOutcomes: () => _showTopicOutcomeMappingDialog(c.module!, c.material!, activeTopic),
       onDeleteTopic: () => _confirmDeleteTopic(c.module!, c.material!, activeTopic),
       onOpenSubtopic: _drillTopic,
@@ -1218,6 +1219,220 @@ Future<void> _showTopicStatusDialog(ModuleItem m, MaterialItem mat, TopicItem to
       );
   if (!mounted) return;
   AppToast.success(context, title: 'State updated', message: 'Delivery state was saved.');
+}
+
+Future<void> _showTopicPageRangeDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
+  final startCtrl = TextEditingController(text: topic.pageStart?.toString() ?? '');
+  final endCtrl = TextEditingController(text: topic.pageEnd?.toString() ?? '');
+  final allTopics = ref.read(courseDetailsControllerProvider(widget.course.id)).topics[m.id] ?? const <TopicItem>[];
+  final materialTopics = allTopics.where((t) => t.materialId == mat.id).toList();
+  final childRanges = materialTopics
+      .where((t) => t.parentTopicId == topic.id)
+      .map((t) => _topicPdfPageRange(t, mat))
+      .whereType<_PdfPageRange>()
+      .toList();
+  final parentTopic = topic.parentTopicId == null
+      ? null
+      : materialTopics.cast<TopicItem?>().firstWhere(
+            (t) => t?.id == topic.parentTopicId,
+            orElse: () => null,
+          );
+  final parentRange = parentTopic == null ? null : _topicPdfPageRange(parentTopic, mat);
+  final maxPages = mat.pageCount;
+  final isSubtopic = topic.parentTopicId != null;
+
+  String? validatePageRange(String startText, String endText) {
+    final startRaw = startText.trim();
+    final endRaw = endText.trim();
+    if (startRaw.isEmpty && endRaw.isEmpty) {
+      if (childRanges.isNotEmpty) {
+        return 'This topic has subtopics with page ranges. Set a range that covers them instead of clearing it.';
+      }
+      return null;
+    }
+    if (startRaw.isEmpty || endRaw.isEmpty) {
+      return 'Start and end must both be filled, or both left empty to clear.';
+    }
+    final start = int.tryParse(startRaw);
+    final end = int.tryParse(endRaw);
+    if (start == null || end == null) return 'Start and end must be whole numbers.';
+    if (start <= 0 || end <= 0) return 'Start and end must be positive page numbers.';
+    if (start > end) return 'Start page must be less than or equal to end page.';
+    if (maxPages != null && maxPages > 0 && end > maxPages) {
+      return 'End page cannot be greater than the PDF page count ($maxPages).';
+    }
+    if (childRanges.isNotEmpty) {
+      final minChildStart = childRanges.map((range) => range.start).reduce((a, b) => a < b ? a : b);
+      final maxChildEnd = childRanges.map((range) => range.end).reduce((a, b) => a > b ? a : b);
+      if (start > minChildStart || end < maxChildEnd) {
+        return 'Parent topic range must cover its subtopics: $minChildStart–$maxChildEnd.';
+      }
+    }
+    if (parentRange != null && (start < parentRange.start || end > parentRange.end)) {
+      return 'Subtopic range must stay inside parent range ${parentRange.start}–${parentRange.end}.';
+    }
+    return null;
+  }
+
+  Widget pageField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    bool autofocus = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textMuted)),
+        const SizedBox(height: 8),
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          alignment: Alignment.centerLeft,
+          child: TextField(
+            controller: controller,
+            autofocus: autofocus,
+            keyboardType: TextInputType.number,
+            style: AppText.input,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: AppText.hint,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              isCollapsed: true,
+              contentPadding: EdgeInsets.zero,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  final result = await _showManagedDialog<Map<String, int?>>(
+    barrierColor: Colors.black.withValues(alpha: 0.38),
+    builder: (dialogContext) {
+      String? errorText;
+      return StatefulBuilder(
+        builder: (dialogContext, setDialogState) => _PreferencesDialogShell(
+          title: isSubtopic ? 'Edit subtopic pages' : 'Edit topic pages',
+          subtitle: [
+            'Set the PDF page range used by the document viewer.',
+            if (maxPages != null && maxPages > 0) 'PDF pages: 1–$maxPages.',
+            if (parentRange != null) 'Parent range: ${parentRange.start}–${parentRange.end}.',
+            if (childRanges.isNotEmpty)
+              'Must cover child ranges: ${childRanges.map((range) => range.label).join(', ')}.',
+          ].join(' '),
+          maxWidth: 620,
+          leading: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.menu_book_rounded, size: 18, color: AppColors.primary),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: pageField(
+                      label: 'Start page',
+                      hint: 'e.g. 1',
+                      controller: startCtrl,
+                      autofocus: true,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: pageField(
+                      label: 'End page',
+                      hint: 'e.g. 12',
+                      controller: endCtrl,
+                    ),
+                  ),
+                ],
+              ),
+              if (errorText != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.dangerBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.dangerBorder),
+                  ),
+                  child: Text(
+                    errorText!,
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.dangerText),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Text(
+                'Leave both fields empty only if you want to clear this topic range.',
+                style: TextStyle(fontSize: 12.2, height: 1.4, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 18),
+              _DialogActions(
+                onCancel: () => Navigator.pop(dialogContext),
+                onConfirm: () {
+                  final validation = validatePageRange(startCtrl.text, endCtrl.text);
+                  if (validation != null) {
+                    setDialogState(() => errorText = validation);
+                    return;
+                  }
+                  final startRaw = startCtrl.text.trim();
+                  final endRaw = endCtrl.text.trim();
+                  Navigator.pop<Map<String, int?>>(dialogContext, <String, int?>{
+                    'pageStart': startRaw.isEmpty ? null : int.parse(startRaw),
+                    'pageEnd': endRaw.isEmpty ? null : int.parse(endRaw),
+                  });
+                },
+                confirmLabel: 'Save pages',
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+
+  startCtrl.dispose();
+  endCtrl.dispose();
+  if (result == null || !mounted) return;
+
+  final pageStart = result['pageStart'];
+  final pageEnd = result['pageEnd'];
+  final updatedTopic = pageStart == null && pageEnd == null
+      ? topic.copyWith(
+          moduleId: m.id,
+          materialId: mat.id,
+          clearPageStart: true,
+          clearPageEnd: true,
+        )
+      : topic.copyWith(
+          moduleId: m.id,
+          materialId: mat.id,
+          pageStart: pageStart,
+          pageEnd: pageEnd,
+        );
+
+  await ref.read(courseDetailsControllerProvider(widget.course.id).notifier).updateTopic(
+        updatedTopic,
+        updatePageRange: true,
+      );
+  if (!mounted) return;
+  _topicDetailsLoaded.add(topic.id);
+  _topicDetailsFailed.remove(topic.id);
+  AppToast.success(context, title: 'Pages updated', message: 'The PDF start/end pages were saved.');
 }
 
 Future<void> _showTopicOutcomeMappingDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
@@ -1723,7 +1938,6 @@ Future<void> _showCreateModuleDialog() async {
   }) async {
     final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
     final materialsApi = ref.read(materialsApiProvider);
-    final questionsApi = ref.read(questionsApiProvider);
 
     update(const UploadSheetUploadUpdate(
       stage: UploadSheetProcessingStage.processing,
@@ -1785,92 +1999,130 @@ Future<void> _showCreateModuleDialog() async {
         .length;
 
     if (materialTopics.isEmpty) {
+      update(const UploadSheetUploadUpdate(
+        stage: UploadSheetProcessingStage.ready,
+        progress: 1,
+        message: 'Topic callback arrived. Closing uploader; refresh if the tree is still loading.',
+      ));
       return UploadSheetUploadResult.ready(
         materialId: materialId,
         message: 'Material saved. The backend callback arrived, but no topics were returned yet.',
       );
     }
 
+    final readyMessage = subtopicCount == 0
+        ? 'Topic tree saved. No subtopics were available for material question extraction yet.'
+        : 'Topic tree saved. Question extraction is running in the background.';
+
     update(UploadSheetUploadUpdate(
-      stage: UploadSheetProcessingStage.processing,
-      message: 'Topics received (${materialTopics.length}). Waiting for questions extracted from the material...',
+      stage: UploadSheetProcessingStage.ready,
+      progress: 1,
+      message: readyMessage,
     ));
 
-    if (subtopicCount == 0) {
-      return UploadSheetUploadResult.ready(
+    if (subtopicCount > 0) {
+      unawaited(_extractMaterialQuestionsInBackground(
+        moduleId: moduleId,
         materialId: materialId,
-        message: 'Topic tree saved. No subtopics were available for material question extraction yet.',
+        topicCount: materialTopics.length,
+        subtopicCount: subtopicCount,
+      ));
+    }
+
+    return UploadSheetUploadResult.ready(
+      materialId: materialId,
+      message: readyMessage,
+    );
+  }
+
+  Future<void> _extractMaterialQuestionsInBackground({
+    required int moduleId,
+    required int materialId,
+    required int topicCount,
+    required int subtopicCount,
+  }) async {
+    final courseId = widget.course.id;
+    final questionsApi = ref.read(questionsApiProvider);
+
+    if (mounted) {
+      AppToast.info(
+        context,
+        title: 'Question extraction started',
+        message: 'Topics are ready ($topicCount). Extracting questions in the background.',
       );
     }
 
     try {
       final extractResponse = await questionsApi.extractNativeQuestionsFromMaterial(
-        courseId: widget.course.id,
+        courseId: courseId,
         materialId: materialId,
       );
+
       if (!extractResponse.aiProcessingStarted) {
-        return UploadSheetUploadResult.ready(
-          materialId: materialId,
+        if (!mounted) return;
+        AppToast.warning(
+          context,
+          title: 'Question extraction not started',
           message: extractResponse.message.trim().isNotEmpty
               ? extractResponse.message
-              : 'Topic tree saved. Question extraction did not start yet.',
+              : 'Topic tree was saved, but the backend did not start question extraction.',
         );
+        return;
       }
+
+      var nativeQuestionsReady = false;
+      try {
+        final event = await questionsApi.waitForNativeQuestionExtraction(
+          courseId: courseId,
+          materialId: materialId,
+        );
+        nativeQuestionsReady = event.isReady;
+      } catch (_) {
+        nativeQuestionsReady = false;
+      }
+
+      if (!mounted) return;
+
+      if (!nativeQuestionsReady) {
+        ref.read(questionBankRefreshSignalProvider(courseId).notifier).state++;
+        AppToast.info(
+          context,
+          title: 'Question extraction still running',
+          message: 'The topic tree is ready. Refresh the question bank shortly.',
+        );
+        return;
+      }
+
+      var materialQuestionCount = 0;
+      try {
+        final questionResponse = await questionsApi.getMaterialQuestions(
+          courseId: courseId,
+          moduleId: moduleId,
+          materialId: materialId,
+        );
+        materialQuestionCount = questionResponse.questions.length;
+      } catch (_) {
+        materialQuestionCount = 0;
+      }
+
+      if (!mounted) return;
+      ref.read(questionBankRefreshSignalProvider(courseId).notifier).state++;
+      AppToast.success(
+        context,
+        title: 'Questions ready',
+        message: materialQuestionCount > 0
+            ? '$materialQuestionCount question(s) were extracted from $subtopicCount subtopic(s).'
+            : 'Question extraction finished. Open the question bank to review the latest result.',
+      );
     } catch (e) {
+      if (!mounted) return;
       final message = mapApiFailure(e).message;
-      return UploadSheetUploadResult.ready(
-        materialId: materialId,
-        message: 'Topic tree saved, but material question extraction could not start: $message',
+      AppToast.warning(
+        context,
+        title: 'Background extraction failed',
+        message: message,
       );
     }
-
-    update(const UploadSheetUploadUpdate(
-      stage: UploadSheetProcessingStage.processing,
-      message: 'Question extraction request accepted. Waiting for the backend callback...',
-    ));
-
-    var nativeQuestionsReady = false;
-    try {
-      final event = await questionsApi.waitForNativeQuestionExtraction(
-        courseId: widget.course.id,
-        materialId: materialId,
-      );
-      nativeQuestionsReady = event.isReady;
-    } catch (_) {
-      nativeQuestionsReady = false;
-    }
-
-    if (!nativeQuestionsReady) {
-      return UploadSheetUploadResult.ready(
-        materialId: materialId,
-        message: 'Topic tree saved. Question extraction is still running; refresh the question bank shortly.',
-      );
-    }
-
-    update(const UploadSheetUploadUpdate(
-      stage: UploadSheetProcessingStage.processing,
-      message: 'Questions received. Refreshing the material question list...',
-    ));
-
-    var materialQuestionCount = 0;
-    try {
-      final questionResponse = await questionsApi.getMaterialQuestions(
-        courseId: widget.course.id,
-        moduleId: moduleId,
-        materialId: materialId,
-      );
-      materialQuestionCount = questionResponse.questions.length;
-      ref.read(questionBankRefreshSignalProvider(widget.course.id).notifier).state++;
-    } catch (_) {
-      ref.read(questionBankRefreshSignalProvider(widget.course.id).notifier).state++;
-    }
-
-    return UploadSheetUploadResult.ready(
-      materialId: materialId,
-      message: materialQuestionCount > 0
-          ? 'Ready to save. Topics and $materialQuestionCount material question(s) were saved.'
-          : 'Ready to save. Topics were saved; no material questions were returned yet.',
-    );
   }
 
   Future<bool?> _waitForMaterialReady({

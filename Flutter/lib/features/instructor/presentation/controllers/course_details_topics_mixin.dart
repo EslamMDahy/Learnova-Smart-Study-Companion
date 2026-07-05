@@ -294,7 +294,10 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
     }
   }
 
-  Future<void> updateTopic(TopicItem topic) async {
+  Future<void> updateTopic(
+    TopicItem topic, {
+    bool updatePageRange = false,
+  }) async {
     try {
       final updated = await ref.read(topicsApiProvider).updateTopic(
             courseId:   courseId,
@@ -305,6 +308,9 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
               title:              topic.title,
               description:        topic.description,
               parentTopicId:      topic.parentTopicId,
+              pageStart:          updatePageRange ? topic.pageStart : null,
+              pageEnd:            updatePageRange ? topic.pageEnd : null,
+              includePageRange:   updatePageRange,
               learningOutcomeIds: topic.learningOutcomeIds.isNotEmpty
                   ? topic.learningOutcomeIds
                   : topic.linkedOutcomeIds
@@ -316,6 +322,10 @@ mixin _CourseDetailsTopicsMixin on StateNotifier<CourseDetailsState> {
       final mergedUpdated = updated.copyWith(
         moduleId: topic.moduleId,
         materialId: topic.materialId,
+        pageStart: updatePageRange ? topic.pageStart : updated.pageStart,
+        pageEnd: updatePageRange ? topic.pageEnd : updated.pageEnd,
+        clearPageStart: updatePageRange && topic.pageStart == null,
+        clearPageEnd: updatePageRange && topic.pageEnd == null,
         difficulty: topic.difficulty,
         readiness: topic.readiness,
         linkedOutcomeId: topic.linkedOutcomeId,

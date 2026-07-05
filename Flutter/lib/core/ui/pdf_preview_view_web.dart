@@ -39,6 +39,173 @@ String _resolvePdfUrlForEmbeddedViewer(String url) {
   return Uri.base.resolveUri(uri).toString();
 }
 
+String _buildNativeFullPdfViewerHtml({
+  required String url,
+  int? pageStart,
+}) {
+  final safePage = pageStart != null && pageStart > 0 ? pageStart : 1;
+  final resolvedUrl = _resolvePdfUrlForEmbeddedViewer(url);
+  final encodedUrl = jsonEncode(resolvedUrl);
+  final fallbackNativeUrl = jsonEncode(_buildNativePdfPreviewUrl(resolvedUrl, pageStart: safePage));
+
+  return '''<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    html, body {
+      margin: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #f8fafc;
+      font-family: Inter, Arial, sans-serif;
+    }
+    #viewerFrame {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: #ffffff;
+    }
+    #loading, #error {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      box-sizing: border-box;
+      color: #475569;
+      text-align: center;
+      font-weight: 800;
+      background: #f8fafc;
+      z-index: 2;
+    }
+    [hidden] { display: none !important; }
+    .panel {
+      width: min(520px, calc(100vw - 48px));
+      padding: 22px 24px;
+      border: 1px solid #d8e2ee;
+      border-radius: 18px;
+      background: white;
+      box-shadow: 0 14px 34px rgba(15, 23, 42, 0.10);
+    }
+    .spinner {
+      width: 26px;
+      height: 26px;
+      margin: 0 auto 14px;
+      border-radius: 999px;
+      border: 3px solid #dbeafe;
+      border-top-color: #0b83f6;
+      animation: spin 0.9s linear infinite;
+    }
+    .hint {
+      margin-top: 8px;
+      color: #64748b;
+      font-size: 12px;
+      line-height: 1.5;
+      font-weight: 700;
+    }
+    .open-native {
+      display: inline-block;
+      margin-top: 14px;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #0b83f6;
+      color: white;
+      text-decoration: none;
+      font-size: 12px;
+      font-weight: 900;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
+</head>
+<body>
+  <iframe id="viewerFrame" title="PDF viewer" allowfullscreen></iframe>
+  <div id="loading">
+    <div class="panel">
+      <div class="spinner"></div>
+      <div>Loading PDF preview</div>
+      <div class="hint">The file is loaded into an in-browser blob first so protected signed URLs can render inside Flutter Web.</div>
+    </div>
+  </div>
+  <div id="error" hidden></div>
+
+  <script>
+    const pdfUrl = $encodedUrl;
+    const startPage = $safePage;
+    const fallbackNativeUrl = $fallbackNativeUrl;
+    const viewerFrame = document.getElementById('viewerFrame');
+    const loading = document.getElementById('loading');
+    const errorBox = document.getElementById('error');
+    let objectUrl = null;
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#039;');
+    }
+
+    function clearObjectUrl() {
+      if (!objectUrl) return;
+      try { URL.revokeObjectURL(objectUrl); } catch (_) {}
+      objectUrl = null;
+    }
+
+    function showError(message) {
+      loading.hidden = true;
+      errorBox.hidden = false;
+      errorBox.innerHTML = '<div class="panel">' +
+        '<div>Could not render the PDF preview.</div>' +
+        '<div class="hint">' + escapeHtml(message) + '</div>' +
+        '<div class="hint">Use Open file if the browser blocks embedded previews for this signed URL.</div>' +
+        '<a class="open-native" href="' + escapeHtml(fallbackNativeUrl) + '" target="_blank" rel="noopener">Open original PDF</a>' +
+        '</div>';
+    }
+
+    async function fetchPdfBytes() {
+      const absolute = new URL(pdfUrl, window.location.href);
+      const sameOrigin = absolute.origin === window.location.origin;
+      const response = await fetch(absolute.href, {
+        method: 'GET',
+        credentials: sameOrigin ? 'include' : 'omit',
+        cache: 'no-store',
+      });
+      if (!response.ok) {
+        throw new Error('PDF download failed: HTTP ' + response.status);
+      }
+      return await response.arrayBuffer();
+    }
+
+    async function boot() {
+      try {
+        const bytes = await fetchPdfBytes();
+        clearObjectUrl();
+        objectUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
+        viewerFrame.src = objectUrl + '#toolbar=0&navpanes=0&scrollbar=1&view=FitH&page=' + startPage;
+        viewerFrame.onload = () => { loading.hidden = true; };
+        window.setTimeout(() => { loading.hidden = true; }, 1200);
+      } catch (error) {
+        const message = error && error.message ? error.message : String(error);
+        showError(message);
+      }
+    }
+
+    window.addEventListener('pagehide', clearObjectUrl);
+    window.addEventListener('unload', clearObjectUrl);
+    boot();
+  </script>
+</body>
+</html>''';
+}
+
+
 String _buildNativeRangePdfViewerHtml({
   required String url,
   required String viewType,
@@ -308,8 +475,14 @@ void _applyPdfPreviewSource({
       ),
     );
   } else {
-    iframe.removeAttribute('srcdoc');
-    iframe.src = _buildNativePdfPreviewUrl(url, pageStart: pageStart);
+    iframe.removeAttribute('src');
+    iframe.setAttribute(
+      'srcdoc',
+      _buildNativeFullPdfViewerHtml(
+        url: url,
+        pageStart: pageStart,
+      ),
+    );
   }
 }
 

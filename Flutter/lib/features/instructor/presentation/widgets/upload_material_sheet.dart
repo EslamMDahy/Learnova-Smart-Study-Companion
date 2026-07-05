@@ -345,7 +345,14 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
         }
       }
     } finally {
-      if (mounted) setState(() => _processing = false);
+      if (mounted) {
+        setState(() => _processing = false);
+        final allReady = _queue.isNotEmpty &&
+            _queue.every((file) => file.status == _FileStatus.ready);
+        if (allReady) {
+          Navigator.of(context).pop(true);
+        }
+      }
     }
   }
 

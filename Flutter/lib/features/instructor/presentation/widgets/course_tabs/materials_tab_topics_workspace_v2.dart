@@ -22,6 +22,7 @@ class _TopicPanelWidget extends StatelessWidget {
   final VoidCallback onRenameTopic;
   final VoidCallback onEditTopicSummary;
   final VoidCallback onEditTopicStatus;
+  final VoidCallback onEditTopicPageRange;
   final VoidCallback onMapTopicOutcomes;
   final VoidCallback onDeleteTopic;
   final VoidCallback onAddSubtopic;
@@ -44,6 +45,7 @@ class _TopicPanelWidget extends StatelessWidget {
     required this.onRenameTopic,
     required this.onEditTopicSummary,
     required this.onEditTopicStatus,
+    required this.onEditTopicPageRange,
     required this.onMapTopicOutcomes,
     required this.onDeleteTopic,
     required this.onAddSubtopic,
@@ -107,6 +109,7 @@ class _TopicPanelWidget extends StatelessWidget {
             onRename: onRenameTopic,
             onEditSummary: onEditTopicSummary,
             onEditStatus: onEditTopicStatus,
+            onEditPageRange: onEditTopicPageRange,
             onMapOutcomes: onMapTopicOutcomes,
             onDelete: onDeleteTopic,
           )
@@ -129,6 +132,7 @@ class _TopicPanelWidget extends StatelessWidget {
             onRename: onRenameTopic,
             onEditSummary: onEditTopicSummary,
             onEditStatus: onEditTopicStatus,
+            onEditPageRange: onEditTopicPageRange,
             onAddSubtopic: onAddSubtopic,
             onDelete: onDeleteTopic,
             onOpenSubtopic: onOpenSubtopic,
@@ -160,6 +164,7 @@ class _TopicWorkspacePage extends StatelessWidget {
   final VoidCallback onRename;
   final VoidCallback onEditSummary;
   final VoidCallback onEditStatus;
+  final VoidCallback onEditPageRange;
   final VoidCallback onAddSubtopic;
   final VoidCallback onDelete;
   final ValueChanged<TopicItem> onOpenSubtopic;
@@ -183,6 +188,7 @@ class _TopicWorkspacePage extends StatelessWidget {
     required this.onRename,
     required this.onEditSummary,
     required this.onEditStatus,
+    required this.onEditPageRange,
     required this.onAddSubtopic,
     required this.onDelete,
     required this.onOpenSubtopic,
@@ -224,6 +230,7 @@ class _TopicWorkspacePage extends StatelessWidget {
                 canPop: canPop,
                 onBack: onBack,
                 onRename: onRename,
+                onEditPageRange: onEditPageRange,
                 onAddSubtopic: onAddSubtopic,
                 onDelete: onDelete,
               ),
@@ -287,6 +294,7 @@ class _SubtopicWorkspacePage extends StatelessWidget {
   final VoidCallback onRename;
   final VoidCallback onEditSummary;
   final VoidCallback onEditStatus;
+  final VoidCallback onEditPageRange;
   final VoidCallback onMapOutcomes;
   final VoidCallback onDelete;
 
@@ -308,6 +316,7 @@ class _SubtopicWorkspacePage extends StatelessWidget {
     required this.onRename,
     required this.onEditSummary,
     required this.onEditStatus,
+    required this.onEditPageRange,
     required this.onMapOutcomes,
     required this.onDelete,
   });
@@ -343,6 +352,7 @@ class _SubtopicWorkspacePage extends StatelessWidget {
                 canPop: canPop,
                 onBack: onBack,
                 onRename: onRename,
+                onEditPageRange: onEditPageRange,
                 onMapOutcomes: onMapOutcomes,
                 onDelete: onDelete,
               ),
@@ -419,6 +429,7 @@ class _TopicHeroV2 extends StatelessWidget {
   final bool canPop;
   final VoidCallback onBack;
   final VoidCallback onRename;
+  final VoidCallback onEditPageRange;
   final VoidCallback onAddSubtopic;
   final VoidCallback onDelete;
 
@@ -432,6 +443,7 @@ class _TopicHeroV2 extends StatelessWidget {
     required this.canPop,
     required this.onBack,
     required this.onRename,
+    required this.onEditPageRange,
     required this.onAddSubtopic,
     required this.onDelete,
   });
@@ -492,6 +504,11 @@ class _TopicHeroV2 extends StatelessWidget {
                     onTap: onRename,
                   ),
                   _TopicHeaderActionButton(
+                    icon: Icons.menu_book_rounded,
+                    label: 'Edit pages',
+                    onTap: onEditPageRange,
+                  ),
+                  _TopicHeaderActionButton(
                     icon: Icons.delete_outline_rounded,
                     label: 'Delete topic',
                     onTap: onDelete,
@@ -535,6 +552,7 @@ class _SubtopicHeroV2 extends StatelessWidget {
   final bool canPop;
   final VoidCallback onBack;
   final VoidCallback onRename;
+  final VoidCallback onEditPageRange;
   final VoidCallback onMapOutcomes;
   final VoidCallback onDelete;
 
@@ -546,6 +564,7 @@ class _SubtopicHeroV2 extends StatelessWidget {
     required this.canPop,
     required this.onBack,
     required this.onRename,
+    required this.onEditPageRange,
     required this.onMapOutcomes,
     required this.onDelete,
   });
@@ -604,6 +623,11 @@ class _SubtopicHeroV2 extends StatelessWidget {
                     icon: Icons.drive_file_rename_outline_rounded,
                     label: 'Rename subtopic',
                     onTap: onRename,
+                  ),
+                  _TopicHeaderActionButton(
+                    icon: Icons.menu_book_rounded,
+                    label: 'Edit pages',
+                    onTap: onEditPageRange,
                   ),
                   _TopicHeaderActionButton(
                     icon: Icons.delete_outline_rounded,

@@ -154,6 +154,8 @@ class TopicItem {
     String? description,
     int? pageStart,
     int? pageEnd,
+    bool clearPageStart = false,
+    bool clearPageEnd = false,
     int? orderIndex,
     int? parentTopicId,
     DateTime? createdAt,
@@ -176,8 +178,8 @@ class TopicItem {
       materialId: materialId ?? this.materialId,
       title: title ?? this.title,
       description: description ?? this.description,
-      pageStart: pageStart ?? this.pageStart,
-      pageEnd: pageEnd ?? this.pageEnd,
+      pageStart: clearPageStart ? null : (pageStart ?? this.pageStart),
+      pageEnd: clearPageEnd ? null : (pageEnd ?? this.pageEnd),
       orderIndex: orderIndex ?? this.orderIndex,
       parentTopicId: parentTopicId ?? this.parentTopicId,
       createdAt: createdAt ?? this.createdAt,
@@ -404,6 +406,7 @@ class TopicUpdateRequest {
   final int? parentTopicId;
   final int? pageStart;
   final int? pageEnd;
+  final bool includePageRange;
   final List<int>? learningOutcomeIds;
 
   const TopicUpdateRequest({
@@ -412,6 +415,7 @@ class TopicUpdateRequest {
     this.parentTopicId,
     this.pageStart,
     this.pageEnd,
+    this.includePageRange = false,
     this.learningOutcomeIds,
   });
 
@@ -420,8 +424,10 @@ class TopicUpdateRequest {
     if (title != null) m['title'] = title;
     if (description != null) m['description'] = description;
     if (parentTopicId != null) m['parent_topic_id'] = parentTopicId;
-    if (pageStart != null) m['page_start'] = pageStart;
-    if (pageEnd != null) m['page_end'] = pageEnd;
+    if (includePageRange) {
+      m['page_start'] = pageStart;
+      m['page_end'] = pageEnd;
+    }
     if (learningOutcomeIds != null) {
       final normalizedIds = learningOutcomeIds!.toSet().toList()..sort();
       m['learning_outcome_ids'] = normalizedIds;
