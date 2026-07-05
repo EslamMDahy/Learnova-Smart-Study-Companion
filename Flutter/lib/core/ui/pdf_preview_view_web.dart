@@ -19,12 +19,11 @@ String _buildNativePdfPreviewUrl(String url, {int? pageStart}) {
   final page = pageStart != null && pageStart > 0 ? pageStart : null;
   final params = <String>[
     if (page != null) 'page=$page',
-    // Keep the native browser PDF renderer behavior. This is the same viewer
-    // used for the full document: desktop wheel scroll, native zoom, native
-    // scrollbar, and browser-level PDF rendering.
+    // Keep the native browser PDF renderer behavior without requesting extra
+    // scrollbars from the embedded PDF plugin.
     'toolbar=0',
     'navpanes=0',
-    'scrollbar=1',
+    'scrollbar=0',
     'view=FitH',
   ];
 
@@ -124,7 +123,7 @@ String _buildNativeFullPdfViewerHtml({
   </style>
 </head>
 <body>
-  <iframe id="viewerFrame" title="PDF viewer" allowfullscreen></iframe>
+  <iframe id="viewerFrame" title="PDF viewer" scrolling="no" allowfullscreen></iframe>
   <div id="loading">
     <div class="panel">
       <div class="spinner"></div>
@@ -188,7 +187,7 @@ String _buildNativeFullPdfViewerHtml({
         const bytes = await fetchPdfBytes();
         clearObjectUrl();
         objectUrl = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' }));
-        viewerFrame.src = objectUrl + '#toolbar=0&navpanes=0&scrollbar=1&view=FitH&page=' + startPage;
+        viewerFrame.src = objectUrl + '#toolbar=0&navpanes=0&scrollbar=0&view=Fit&page=' + startPage;
         viewerFrame.onload = () => { loading.hidden = true; };
         window.setTimeout(() => { loading.hidden = true; }, 1200);
       } catch (error) {
@@ -295,7 +294,7 @@ String _buildNativeRangePdfViewerHtml({
   </style>
 </head>
 <body>
-  <iframe id="viewerFrame" title="PDF range viewer" allowfullscreen></iframe>
+  <iframe id="viewerFrame" title="PDF range viewer" scrolling="no" allowfullscreen></iframe>
   <div id="loading">
     <div class="panel">
       <div class="spinner"></div>
@@ -404,7 +403,7 @@ String _buildNativeRangePdfViewerHtml({
         const rangeBytes = await rangePdf.save();
         clearObjectUrl();
         objectUrl = URL.createObjectURL(new Blob([rangeBytes], { type: 'application/pdf' }));
-        viewerFrame.src = objectUrl + '#toolbar=0&navpanes=0&scrollbar=1&view=FitH&page=1';
+        viewerFrame.src = objectUrl + '#toolbar=0&navpanes=0&scrollbar=0&view=Fit&page=1';
         viewerFrame.onload = () => { loading.hidden = true; };
         window.setTimeout(() => { loading.hidden = true; }, 1200);
 
@@ -509,8 +508,11 @@ void registerPdfPreviewView({
   ui_web.platformViewRegistry.registerViewFactory(viewType, (int _) {
     final iframe = web.document.createElement('iframe') as web.HTMLIFrameElement
       ..style.border = 'none'
+      ..style.display = 'block'
       ..style.width = '100%'
       ..style.height = '100%'
+      ..style.maxWidth = '100%'
+      ..style.maxHeight = '100%'
       ..style.overflow = 'hidden'
       ..style.backgroundColor = scopedPreviewBackground(pageStart, pageEnd);
     iframe.setAttribute('scrolling', 'no');

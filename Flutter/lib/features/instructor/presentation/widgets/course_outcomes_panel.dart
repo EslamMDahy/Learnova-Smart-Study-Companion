@@ -89,6 +89,9 @@ class _HierarchicalOutcomesContent extends ConsumerStatefulWidget {
 class _HierarchicalOutcomesContentState extends ConsumerState<_HierarchicalOutcomesContent> {
   final TextEditingController _searchCtrl = TextEditingController();
   int? _expandedParentId;
+  bool _savingParent = false;
+  bool _editorOpen = false;
+  final Set<String> _savingSubKeys = <String>{};
 
   @override
   void initState() {
@@ -112,16 +115,104 @@ class _HierarchicalOutcomesContentState extends ConsumerState<_HierarchicalOutco
         assignLearningOutcomeCodes(outcomes);
   }
 
+  String _norm(String value) =>
+      value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
+
+  Future<_OutcomeDraft?> _openOutcomeEditor({
+    required String title,
+    required String subtitle,
+    required bool parentMode,
+    LearningOutcome? initial,
+    OutcomeDifficulty? difficulty,
+  }) async {
+    if (_editorOpen) return null;
+    _editorOpen = true;
+    try {
+      return await _showOutcomeEditor(
+        context,
+        title: title,
+        subtitle: subtitle,
+        parentMode: parentMode,
+        initial: initial,
+        difficulty: difficulty,
+      );
+    } finally {
+      _editorOpen = false;
+    }
+  }
+
+  LearningOutcome? _findAnyOutcomeByTitle(List<LearningOutcome> outcomes, String title) {
+    final normalized = _norm(title);
+    for (final outcome in outcomes) {
+      if (_norm(outcome.title) == normalized) return outcome;
+    }
+    return null;
+  }
+
+  LearningOutcome? _findParentByTitle(List<LearningOutcome> outcomes, String title) {
+    final normalized = _norm(title);
+    for (final outcome in outcomes) {
+      if (outcome.isParentOutcome && _norm(outcome.title) == normalized) {
+        return outcome;
+      }
+    }
+    return null;
+  }
+
+  LearningOutcome? _findCriterionByTitle({
+    required List<LearningOutcome> outcomes,
+    required int parentId,
+    required OutcomeDifficulty difficulty,
+    required String title,
+  }) {
+    final normalized = _norm(title);
+    for (final outcome in outcomes) {
+      if (outcome.parentLearningOutcomeId == parentId &&
+          outcome.difficulty == difficulty &&
+          _norm(outcome.title) == normalized) {
+        return outcome;
+      }
+    }
+    return null;
+  }
+
   Future<void> _createParent() async {
-    final draft = await _showOutcomeEditor(
-      context,
+    if (_savingParent) return;
+
+    final draft = await _openOutcomeEditor(
       title: 'Create LO',
       subtitle: 'Create an LO group such as LO1 / LO2. Add Easy, Medium, and Hard criteria under it.',
       parentMode: true,
     );
     if (draft == null || !mounted) return;
 
+    setState(() => _savingParent = true);
     try {
+      // Always refresh before creating. The backend can return 409 when the
+      // same parent LO title already exists, so the frontend must not create it
+      // again from stale browser state.
+      await _load(force: true);
+      final currentBeforeCreate = ref.read(courseLOProvider(widget.courseId));
+      final existingTitle = _findAnyOutcomeByTitle(currentBeforeCreate, draft.title);
+      if (existingTitle != null) {
+        if (existingTitle.isParentOutcome) {
+          setState(() => _expandedParentId = existingTitle.id);
+          AppToast.warning(
+            context,
+            title: 'LO already exists',
+            message: existingTitle.title,
+          );
+        } else {
+          setState(() => _expandedParentId = existingTitle.parentLearningOutcomeId);
+          AppToast.warning(
+            context,
+            title: 'Title already exists',
+            message: 'This title is already used by a criterion in this course.',
+          );
+        }
+        return;
+      }
+
       final saved = await ref.read(learningOutcomesApiProvider).createOutcome(
             courseId: widget.courseId,
             outcome: LearningOutcome(
@@ -129,23 +220,40 @@ class _HierarchicalOutcomesContentState extends ConsumerState<_HierarchicalOutco
               title: draft.title,
               description: draft.description,
               parentLearningOutcomeId: null,
+              // FastAPI requires the `level` key to exist and be JSON null for
+              // parent learning outcomes.
               level: null,
             ),
           );
       final current = ref.read(courseLOProvider(widget.courseId));
-      _setOutcomes([...current, saved]);
+      final duplicate = current.any((item) => item.id == saved.id);
+      _setOutcomes(duplicate ? current : [...current, saved]);
       setState(() => _expandedParentId = saved.id);
       if (mounted) {
         AppToast.success(context, title: 'LO added', message: saved.title);
       }
+    } on LearningOutcomeTitleConflictException catch (e) {
+      if (mounted) {
+        final existing = e.existing;
+        setState(() => _expandedParentId = existing.parentLearningOutcomeId ?? existing.id);
+        AppToast.warning(
+          context,
+          title: 'Title already exists',
+          message: existing.title,
+        );
+      }
     } catch (e) {
       if (mounted) AppToast.error(context, title: 'Could not add LO', message: _friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _savingParent = false);
     }
   }
 
   Future<void> _createSub(LearningOutcome parent, OutcomeDifficulty difficulty) async {
-    final draft = await _showOutcomeEditor(
-      context,
+    final lockKey = '${parent.id}:${difficulty.backendLevel}';
+    if (_savingSubKeys.contains(lockKey)) return;
+
+    final draft = await _openOutcomeEditor(
       title: 'Add ${difficulty.label} criterion',
       subtitle: 'This criterion can be mapped to subtopics.',
       parentMode: false,
@@ -153,7 +261,27 @@ class _HierarchicalOutcomesContentState extends ConsumerState<_HierarchicalOutco
     );
     if (draft == null || !mounted) return;
 
+    setState(() => _savingSubKeys.add(lockKey));
     try {
+      await _load(force: true);
+      final currentBeforeCreate = ref.read(courseLOProvider(widget.courseId));
+      final existing = _findCriterionByTitle(
+        outcomes: currentBeforeCreate,
+        parentId: parent.id,
+        difficulty: difficulty,
+        title: draft.title,
+      );
+      final existingTitle = existing ?? _findAnyOutcomeByTitle(currentBeforeCreate, draft.title);
+      if (existingTitle != null) {
+        setState(() => _expandedParentId = existingTitle.parentLearningOutcomeId ?? parent.id);
+        AppToast.warning(
+          context,
+          title: existing == null ? 'Title already exists' : 'Criterion already exists',
+          message: existingTitle.title,
+        );
+        return;
+      }
+
       final saved = await ref.read(learningOutcomesApiProvider).createOutcome(
             courseId: widget.courseId,
             outcome: LearningOutcome(
@@ -166,19 +294,31 @@ class _HierarchicalOutcomesContentState extends ConsumerState<_HierarchicalOutco
             ),
           );
       final current = ref.read(courseLOProvider(widget.courseId));
-      _setOutcomes([...current, saved]);
+      final duplicate = current.any((item) => item.id == saved.id);
+      _setOutcomes(duplicate ? current : [...current, saved]);
       setState(() => _expandedParentId = parent.id);
       if (mounted) {
         AppToast.success(context, title: 'Criterion added', message: saved.title);
       }
+    } on LearningOutcomeTitleConflictException catch (e) {
+      if (mounted) {
+        final existing = e.existing;
+        setState(() => _expandedParentId = existing.parentLearningOutcomeId ?? parent.id);
+        AppToast.warning(
+          context,
+          title: 'Title already exists',
+          message: existing.title,
+        );
+      }
     } catch (e) {
       if (mounted) AppToast.error(context, title: 'Could not add criterion', message: _friendlyError(e));
+    } finally {
+      if (mounted) setState(() => _savingSubKeys.remove(lockKey));
     }
   }
 
   Future<void> _editOutcome(LearningOutcome outcome) async {
-    final draft = await _showOutcomeEditor(
-      context,
+    final draft = await _openOutcomeEditor(
       title: outcome.isParentOutcome ? 'Edit LO' : 'Edit criterion',
       subtitle: outcome.isParentOutcome
           ? 'Update the LO label.'
@@ -287,7 +427,7 @@ class _HierarchicalOutcomesContentState extends ConsumerState<_HierarchicalOutco
               subOutcomes: outcomes.where((o) => o.isSubOutcome).length,
               loading: loading,
               onRefresh: () => _load(force: true),
-              onCreateParent: _createParent,
+              onCreateParent: _savingParent ? null : _createParent,
             ),
             const SizedBox(height: 16),
             Row(
@@ -365,6 +505,7 @@ Future<_OutcomeDraft?> _showOutcomeEditor(
   final titleCtrl = TextEditingController(text: initial?.title ?? '');
   final descCtrl = TextEditingController(text: initial?.description ?? '');
   var selectedDifficulty = difficulty ?? initial?.difficulty ?? OutcomeDifficulty.beginner;
+  var submitted = false;
 
   final result = await showDialog<_OutcomeDraft>(
     context: context,
@@ -415,20 +556,26 @@ Future<_OutcomeDraft?> _showOutcomeEditor(
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('Cancel')),
+            TextButton(
+              onPressed: submitted ? null : () => Navigator.pop(dialogContext),
+              child: const Text('Cancel'),
+            ),
             FilledButton(
-              onPressed: () {
-                final cleanTitle = titleCtrl.text.trim();
-                if (cleanTitle.isEmpty) return;
-                Navigator.pop(
-                  dialogContext,
-                  _OutcomeDraft(
-                    title: cleanTitle,
-                    description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
-                    difficulty: parentMode ? null : selectedDifficulty,
-                  ),
-                );
-              },
+              onPressed: submitted
+                  ? null
+                  : () {
+                      final cleanTitle = titleCtrl.text.trim();
+                      if (cleanTitle.isEmpty) return;
+                      submitted = true;
+                      Navigator.pop(
+                        dialogContext,
+                        _OutcomeDraft(
+                          title: cleanTitle,
+                          description: descCtrl.text.trim().isEmpty ? null : descCtrl.text.trim(),
+                          difficulty: parentMode ? null : selectedDifficulty,
+                        ),
+                      );
+                    },
               child: const Text('Save'),
             ),
           ],
@@ -448,7 +595,7 @@ class _OutcomesHero extends StatelessWidget {
   final int subOutcomes;
   final bool loading;
   final VoidCallback onRefresh;
-  final VoidCallback onCreateParent;
+  final VoidCallback? onCreateParent;
 
   const _OutcomesHero({
     required this.total,

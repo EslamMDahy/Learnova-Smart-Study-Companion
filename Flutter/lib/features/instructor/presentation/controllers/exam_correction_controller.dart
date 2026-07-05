@@ -157,21 +157,95 @@ class ExamCorrectionController extends StateNotifier<ExamCorrectionState> {
     );
 
     try {
+      final templateFile = await _buildSelectedExamTemplateFile(cancelToken: _cancel);
       final response = await _ref.read(examCorrectionApiProvider).analyzeExamScan(
             files: state.files,
+            templateFiles: templateFile == null ? const [] : [templateFile],
             language: state.language,
             courseId: state.selectedCourseId,
             examId: state.selectedExamId,
             cancelToken: _cancel,
           );
       state = state.copyWith(loading: false, response: response, clearError: true);
-      _startPollingAttemptResult(response);
+      await _submitWrittenAnswersForAi(response);
+      _startPollingAttemptResult(state.response ?? response);
     } catch (e) {
       if (e is DioException && CancelToken.isCancel(e)) return;
       final failure = mapApiFailure(e);
       state = state.copyWith(
         loading: false,
         error: _friendlyOcrMessage(failure.message),
+      );
+    }
+  }
+
+  Future<ExamCorrectionUploadFile?> _buildSelectedExamTemplateFile({
+    required CancelToken? cancelToken,
+  }) async {
+    final courseId = state.selectedCourseId;
+    final examId = state.selectedExamId;
+    if (courseId == null || examId == null) return null;
+
+    final exported = await _ref.read(examsApiProvider).exportExamPdf(
+          courseId: courseId,
+          examId: examId,
+          includeLearnovaLogo: true,
+          includeCourseTitle: true,
+          includeCourseCode: false,
+          includeExamMetadata: true,
+          includeInstructions: true,
+          includeSectionDescriptions: true,
+          includePoints: true,
+          includeStudentInfoFields: true,
+          includeAnswerSpace: true,
+          includeOcrSupport: true,
+          shuffleQuestions: false,
+          shuffleOptions: false,
+          cancelToken: cancelToken,
+        );
+
+    return ExamCorrectionUploadFile(
+      name: exported.filename.isNotEmpty ? exported.filename : 'learnova-exam-$examId-template.pdf',
+      mimeType: 'application/pdf',
+      sizeBytes: exported.bytes.length,
+      bytes: exported.bytes,
+    );
+  }
+
+
+  Future<void> _submitWrittenAnswersForAi(ExamScanAnalyzeResponse response) async {
+    final examId = state.selectedExamId;
+    if (examId == null) return;
+
+    final hasWrittenText = response.answers.any(
+      (answer) => answer.isWritten && (answer.answerText ?? '').trim().isNotEmpty,
+    );
+    if (!hasWrittenText) return;
+
+    try {
+      final submit = await _ref.read(examCorrectionApiProvider).submitExamScan(
+            scan: response,
+            examId: examId,
+            cancelToken: _cancel,
+          );
+
+      final submittedResponse = response.copyWithAiSubmit(
+        attemptId: submit.attemptId,
+        attemptStatus: submit.status,
+        aiGradingRequested: submit.aiGradingRequested,
+        aiRequestId: submit.aiRequestId,
+        status: submit.aiGradingRequested ? 'ai_pending' : response.status,
+      );
+      state = state.copyWith(response: submittedResponse, clearError: true);
+
+      if (submit.aiError != null && submit.aiError!.trim().isNotEmpty) {
+        state = state.copyWith(error: 'AI grading request failed: ${submit.aiError}');
+      }
+    } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) return;
+      final failure = mapApiFailure(e);
+      state = state.copyWith(
+        error: 'The scan was analyzed, but written-answer AI grading could not start: ${failure.message}',
       );
     }
   }

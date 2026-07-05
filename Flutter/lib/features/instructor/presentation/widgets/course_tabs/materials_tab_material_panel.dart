@@ -150,69 +150,90 @@ class _PdfReviewerWorkspaceState extends State<_PdfReviewerWorkspace> {
   Widget build(BuildContext context) {
     final pdfPreviewActive = widget.previewInteractive && !_reviewerDialogOpen;
 
-    return Container(
-      color: const Color(0xFFF5F7FA),
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final compact = constraints.maxWidth < 760;
-          final narrow = constraints.maxWidth < 980;
-          final horizontalPadding = compact ? 16.0 : 24.0;
-          const topPadding = 22.0;
-          const bottomPadding = 104.0;
-          final viewportHeight = constraints.hasBoundedHeight ? constraints.maxHeight : MediaQuery.of(context).size.height;
-          final contentMinHeight = (viewportHeight - topPadding - bottomPadding).clamp(0.0, double.infinity).toDouble();
-          final stageHeight = compact
-              ? 620.0
-              : (viewportHeight * (narrow ? 0.82 : 0.88)).clamp(760.0, 1120.0).toDouble();
+    return ClipRect(
+      child: Container(
+        width: double.infinity,
+        color: const Color(0xFFF5F7FA),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final compact = constraints.maxWidth < 760;
+            final narrow = constraints.maxWidth < 980;
+            final horizontalPadding = compact ? 16.0 : 24.0;
+            const topPadding = 22.0;
+            const bottomPadding = 104.0;
+            final viewportHeight = constraints.hasBoundedHeight
+                ? constraints.maxHeight
+                : MediaQuery.of(context).size.height;
+            final contentMinHeight = (viewportHeight - topPadding - bottomPadding)
+                .clamp(0.0, double.infinity)
+                .toDouble();
+            final stageHeight = compact
+                ? 620.0
+                : (viewportHeight * (narrow ? 0.82 : 0.88))
+                    .clamp(760.0, 1120.0)
+                    .toDouble();
 
-          return SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(horizontalPadding, topPadding, horizontalPadding, bottomPadding),
-            child: Align(
-              alignment: Alignment.topCenter,
-              child: ConstrainedBox(
-                constraints: BoxConstraints(maxWidth: 1240, minHeight: contentMinHeight),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _ReviewerShellHeader(
-                      module: widget.module,
-                      material: widget.material,
-                      topics: widget.topics,
-                      readyTopics: widget.readyTopics,
-                      mappedOutcomeCount: widget.mappedOutcomeIds.length,
-                      totalOutcomeCount: widget.outcomes.length,
-                      downloadUrl: widget.downloadUrl,
-                      urlLoading: widget.urlLoading,
-                      onRefreshUrl: widget.onRefreshUrl,
-                      onDeleteMaterial: widget.onDeleteMaterial,
-                      onAddTopic: () => _openCaptureTopicDialog(context),
-                    ),
-                    const SizedBox(height: 18),
-                    _DocumentStage(
-                      material: widget.material,
-                      downloadUrl: widget.downloadUrl,
-                      urlLoading: widget.urlLoading,
-                      onRefreshUrl: widget.onRefreshUrl,
-                      previewInteractive: pdfPreviewActive,
-                      height: stageHeight,
-                    ),
-                    const SizedBox(height: 18),
-                    _FileTopicsSection(
-                      material: widget.material,
-                      topics: widget.topics,
-                      topicsLoading: widget.topicsLoading,
-                      outcomes: widget.outcomes,
-                      mappedOutcomeIds: widget.mappedOutcomeIds,
-                      readyTopics: widget.readyTopics,
-                      onTopicTap: widget.onTopicTap,
-                      onAddTopic: () => _openCaptureTopicDialog(context),
-                    ),
-                  ],
+            return SingleChildScrollView(
+              primary: false,
+              scrollDirection: Axis.vertical,
+              physics: const ClampingScrollPhysics(),
+              clipBehavior: Clip.hardEdge,
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                topPadding,
+                horizontalPadding,
+                bottomPadding,
+              ),
+              child: Align(
+                alignment: Alignment.topCenter,
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(
+                    maxWidth: 1240,
+                    minHeight: contentMinHeight,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _ReviewerShellHeader(
+                        module: widget.module,
+                        material: widget.material,
+                        topics: widget.topics,
+                        readyTopics: widget.readyTopics,
+                        mappedOutcomeCount: widget.mappedOutcomeIds.length,
+                        totalOutcomeCount: widget.outcomes.length,
+                        downloadUrl: widget.downloadUrl,
+                        urlLoading: widget.urlLoading,
+                        onRefreshUrl: widget.onRefreshUrl,
+                        onDeleteMaterial: widget.onDeleteMaterial,
+                        onAddTopic: () => _openCaptureTopicDialog(context),
+                      ),
+                      const SizedBox(height: 18),
+                      _DocumentStage(
+                        material: widget.material,
+                        downloadUrl: widget.downloadUrl,
+                        urlLoading: widget.urlLoading,
+                        onRefreshUrl: widget.onRefreshUrl,
+                        previewInteractive: pdfPreviewActive,
+                        height: stageHeight,
+                      ),
+                      const SizedBox(height: 18),
+                      _FileTopicsSection(
+                        material: widget.material,
+                        topics: widget.topics,
+                        topicsLoading: widget.topicsLoading,
+                        outcomes: widget.outcomes,
+                        mappedOutcomeIds: widget.mappedOutcomeIds,
+                        readyTopics: widget.readyTopics,
+                        onTopicTap: widget.onTopicTap,
+                        onAddTopic: () => _openCaptureTopicDialog(context),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

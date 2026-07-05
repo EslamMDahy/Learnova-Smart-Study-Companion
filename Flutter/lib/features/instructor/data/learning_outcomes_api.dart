@@ -9,17 +9,27 @@ import 'learning_outcomes_models.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 //  LearningOutcomesApi
 //
-//  Wires all 5 LO endpoints:
-//    GET    /courses/{course_id}/learning-outcomes              → list
-//    POST   /courses/{course_id}/learning-outcomes              → create
-//    GET    /courses/{course_id}/learning-outcomes/{id}         → get single
-//    PATCH  /courses/{course_id}/learning-outcomes/{id}/update  → update
-//    DELETE /courses/{course_id}/learning-outcomes/{id}/delete  → delete
+//  FastAPI contract from domains/learningOutcomes:
+//    GET    /courses/{course_id}/learning-outcomes
+//    POST   /courses/{course_id}/learning-outcomes
+//    GET    /courses/{course_id}/learning-outcomes/{id}
+//    PATCH  /courses/{course_id}/learning-outcomes/{id}/update
+//    DELETE /courses/{course_id}/learning-outcomes/{id}/delete
+//
+//  Important backend rules:
+//    Parent LO: title, description?, level: null, no parent_learning_outcome_id
+//    Sub LO:    title, description?, level: enum, parent_learning_outcome_id
+//
+//  The list endpoint omits parent_learning_outcome_id, so list items are
+//  hydrated through GET /{id} before the UI uses the hierarchy.
 // ─────────────────────────────────────────────────────────────────────────────
 
 class LearningOutcomesApi {
   final ApiClient _client;
   LearningOutcomesApi(this._client);
+
+  final Map<String, Future<LearningOutcome>> _inFlightCreates =
+      <String, Future<LearningOutcome>>{};
 
   // ─── LIST ─────────────────────────────────────────────────────────────────
   Future<LearningOutcomeListResponse> listOutcomes({
@@ -27,35 +37,22 @@ class LearningOutcomesApi {
     CancelToken? cancelToken,
   }) async {
     try {
-      final res = await _client.get<Map<String, dynamic>>(
-        Endpoints.learningOutcomes(courseId),
-        cancelToken: cancelToken,
-      );
-      final data = res.data;
-      if (data is! Map<String, dynamic>) {
-        throw const FormatException('Invalid response from GET learning-outcomes');
-      }
-
-      final parsed = LearningOutcomeListResponse.fromJson(data);
-      final hydrated = await _hydrateListItemsIfNeeded(
+      return await _fetchOutcomesFromNetwork(
         courseId: courseId,
-        parsed: parsed,
         cancelToken: cancelToken,
       );
-      LearningOutcomesCache.save(courseId: courseId, outcomes: hydrated.outcomes);
-      return hydrated;
     } catch (error) {
       if (_isCancelled(error)) rethrow;
 
       final cached = LearningOutcomesCache.load(courseId: courseId);
       if (cached.isNotEmpty) {
-        return LearningOutcomeListResponse(courseId: courseId, outcomes: cached);
+        return LearningOutcomeListResponse(
+          courseId: courseId,
+          outcomes: assignLearningOutcomeCodes(cached),
+        );
       }
 
-      // Backend-only inconsistency fallback:
-      // list can 500 because parent rows have level=null, but GET by id accepts
-      // Optional level and returns parent_learning_outcome_id. With no backend
-      // changes available, recover existing rows by probing individual ids.
+      // Last-resort fallback for old backend rows/list-shape mismatches.
       final recovered = await _recoverOutcomesByProbingIds(
         courseId: courseId,
         cancelToken: cancelToken,
@@ -72,19 +69,39 @@ class LearningOutcomesApi {
     }
   }
 
-  Future<LearningOutcomeListResponse> _hydrateListItemsIfNeeded({
+  Future<LearningOutcomeListResponse> _fetchOutcomesFromNetwork({
+    required int courseId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.get<Map<String, dynamic>>(
+      Endpoints.learningOutcomes(courseId),
+      cancelToken: cancelToken,
+    );
+    final data = res.data;
+    if (data is! Map<String, dynamic>) {
+      throw const FormatException('Invalid response from GET learning-outcomes');
+    }
+
+    final parsed = LearningOutcomeListResponse.fromJson(data);
+    final hydrated = await _hydrateListItems(
+      courseId: courseId,
+      parsed: parsed,
+      cancelToken: cancelToken,
+    );
+    LearningOutcomesCache.save(courseId: courseId, outcomes: hydrated.outcomes);
+    return hydrated;
+  }
+
+  Future<LearningOutcomeListResponse> _hydrateListItems({
     required int courseId,
     required LearningOutcomeListResponse parsed,
     CancelToken? cancelToken,
   }) async {
-    // The uploaded backend list query does not include
-    // parent_learning_outcome_id. When rows have level values, hydrate details
-    // best-effort so the UI can rebuild parent → difficulty → criterion lanes.
-    final needsHydration = parsed.outcomes.any(
-      (outcome) => outcome.level != null && outcome.parentLearningOutcomeId == null,
-    );
-    if (!needsHydration || parsed.outcomes.isEmpty) return parsed;
+    if (parsed.outcomes.isEmpty) return parsed;
 
+    // The backend list query does not return parent_learning_outcome_id. If the
+    // frontend trusts that list directly, criteria are mistaken for parent LOs
+    // and later creates can hit backend conflicts. Hydrate every item best-effort.
     final detailed = await Future.wait(
       parsed.outcomes.map(
         (outcome) => getOutcome(
@@ -142,8 +159,6 @@ class LearningOutcomesApi {
         highestRecoveredId = math.max(highestRecoveredId, outcome.id);
       }
 
-      // Once we found rows for this course, keep probing a little further for
-      // siblings/criteria, then stop to avoid hammering the backend.
       if (recovered.isNotEmpty && start > highestRecoveredId + 96) break;
     }
 
@@ -173,6 +188,10 @@ class LearningOutcomesApi {
     return error is DioException && error.type == DioExceptionType.cancel;
   }
 
+  bool _isConflict(Object error) {
+    return error is DioException && error.response?.statusCode == 409;
+  }
+
   // ─── CREATE ───────────────────────────────────────────────────────────────
   Future<LearningOutcome> createOutcome({
     required int courseId,
@@ -180,15 +199,172 @@ class LearningOutcomesApi {
     List<int>? topicIds,
     CancelToken? cancelToken,
   }) async {
-    final res = await _client.post<Map<String, dynamic>>(
-      Endpoints.learningOutcomes(courseId),
-      data: outcome.toCreateJson(topicIds: topicIds),
+    final normalized = _normalizeOutcomeForCreate(outcome);
+    final key = _createKey(courseId: courseId, outcome: normalized, topicIds: topicIds);
+
+    final existingFlight = _inFlightCreates[key];
+    if (existingFlight != null) return existingFlight;
+
+    final future = _createOutcomeOnce(
+      courseId: courseId,
+      outcome: normalized,
+      topicIds: topicIds,
       cancelToken: cancelToken,
     );
-    final data = res.data;
-    if (data is Map<String, dynamic>) return LearningOutcome.fromJson(data);
-    throw const FormatException('Invalid response from POST learning-outcomes');
+
+    _inFlightCreates[key] = future;
+    try {
+      return await future;
+    } finally {
+      _inFlightCreates.remove(key);
+    }
   }
+
+  Future<LearningOutcome> _createOutcomeOnce({
+    required int courseId,
+    required LearningOutcome outcome,
+    List<int>? topicIds,
+    CancelToken? cancelToken,
+  }) async {
+    final beforePost = await _findExistingTitleConflict(
+      courseId: courseId,
+      outcome: outcome,
+      forceNetwork: true,
+      cancelToken: cancelToken,
+    );
+    if (beforePost != null) {
+      if (_isSameBackendSlot(beforePost, outcome)) return beforePost;
+      throw LearningOutcomeTitleConflictException(
+        attemptedTitle: outcome.title,
+        existing: beforePost,
+      );
+    }
+
+    try {
+      final res = await _client.post<Map<String, dynamic>>(
+        Endpoints.learningOutcomes(courseId),
+        data: outcome.toCreateJson(topicIds: topicIds),
+        cancelToken: cancelToken,
+      );
+      final data = res.data;
+      if (data is Map<String, dynamic>) {
+        final saved = LearningOutcome.fromJson(data);
+        await _mergeSavedIntoCache(courseId: courseId, saved: saved);
+        return saved;
+      }
+      throw const FormatException('Invalid response from POST learning-outcomes');
+    } catch (error) {
+      if (_isCancelled(error)) rethrow;
+
+      // If the database rejects a duplicate title with 409, do not retry with a
+      // different invalid payload. Re-read the backend and convert duplicate
+      // creates into a deterministic frontend result.
+      if (_isConflict(error)) {
+        final afterConflict = await _findExistingTitleConflict(
+          courseId: courseId,
+          outcome: outcome,
+          forceNetwork: true,
+          cancelToken: cancelToken,
+        );
+        if (afterConflict != null) {
+          if (_isSameBackendSlot(afterConflict, outcome)) return afterConflict;
+          throw LearningOutcomeTitleConflictException(
+            attemptedTitle: outcome.title,
+            existing: afterConflict,
+          );
+        }
+      }
+
+      rethrow;
+    }
+  }
+
+  LearningOutcome _normalizeOutcomeForCreate(LearningOutcome outcome) {
+    final isSub = outcome.parentLearningOutcomeId != null;
+    if (!isSub) {
+      // Matches FastAPI: parent LO must include the required level key with a
+      // JSON null value. Sending any enum value causes 422.
+      return outcome.copyWith(level: null, parentLearningOutcomeId: null);
+    }
+
+    return outcome.copyWith(
+      level: outcome.backendSafeLevel,
+      parentLearningOutcomeId: outcome.parentLearningOutcomeId,
+    );
+  }
+
+  Future<LearningOutcome?> _findExistingTitleConflict({
+    required int courseId,
+    required LearningOutcome outcome,
+    bool forceNetwork = false,
+    CancelToken? cancelToken,
+  }) async {
+    final candidateTitle = _norm(outcome.title);
+    if (candidateTitle.isEmpty) return null;
+
+    var existing = <LearningOutcome>[];
+    if (!forceNetwork) {
+      existing = LearningOutcomesCache.load(courseId: courseId);
+    }
+
+    if (existing.isEmpty || forceNetwork) {
+      try {
+        existing = (await _fetchOutcomesFromNetwork(
+          courseId: courseId,
+          cancelToken: cancelToken,
+        ))
+            .outcomes;
+      } catch (error) {
+        if (_isCancelled(error)) rethrow;
+        if (existing.isEmpty) return null;
+      }
+    }
+
+    for (final item in existing) {
+      if (_norm(item.title) == candidateTitle) return item;
+    }
+
+    return null;
+  }
+
+  bool _isSameBackendSlot(LearningOutcome existing, LearningOutcome attempted) {
+    if (existing.parentLearningOutcomeId != attempted.parentLearningOutcomeId) {
+      return false;
+    }
+
+    if (attempted.parentLearningOutcomeId == null) return true;
+
+    return existing.backendSafeLevel == attempted.backendSafeLevel;
+  }
+
+  Future<void> _mergeSavedIntoCache({
+    required int courseId,
+    required LearningOutcome saved,
+  }) async {
+    final current = LearningOutcomesCache.load(courseId: courseId);
+    final withoutDuplicate = current.where((item) => item.id != saved.id).toList();
+    LearningOutcomesCache.save(
+      courseId: courseId,
+      outcomes: assignLearningOutcomeCodes([...withoutDuplicate, saved]),
+    );
+  }
+
+  String _createKey({
+    required int courseId,
+    required LearningOutcome outcome,
+    List<int>? topicIds,
+  }) {
+    final topics = [...?topicIds]..sort();
+    return [
+      courseId,
+      _norm(outcome.title),
+      outcome.parentLearningOutcomeId ?? 'parent',
+      outcome.parentLearningOutcomeId == null ? 'null' : outcome.backendSafeLevel,
+      topics.join(','),
+    ].join('|');
+  }
+
+  String _norm(String value) => value.trim().replaceAll(RegExp(r'\s+'), ' ').toLowerCase();
 
   // ─── GET SINGLE ───────────────────────────────────────────────────────────
   Future<LearningOutcome> getOutcome({
@@ -213,9 +389,13 @@ class LearningOutcomesApi {
     List<int>? topicIds,
     CancelToken? cancelToken,
   }) async {
+    final normalized = outcome.parentLearningOutcomeId == null
+        ? outcome.copyWith(level: null)
+        : outcome.copyWith(level: outcome.backendSafeLevel);
+
     final res = await _client.patch<Map<String, dynamic>>(
       Endpoints.updateLearningOutcome(courseId, outcomeId),
-      data: outcome.toUpdateJson(topicIds: topicIds),
+      data: normalized.toUpdateJson(topicIds: topicIds),
       cancelToken: cancelToken,
     );
     final data = res.data;

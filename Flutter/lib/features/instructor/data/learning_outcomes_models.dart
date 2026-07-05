@@ -187,7 +187,10 @@ class LearningOutcome {
         'course_id': courseId,
         'title': title,
         'description': description,
-        'level': backendSafeLevel,
+        // Keep parent LO level as null. The FastAPI create/update service
+        // distinguishes parent rows by parent_learning_outcome_id == null and
+        // requires level to be null for those rows.
+        'level': level,
         'parent_learning_outcome_id': parentLearningOutcomeId,
         'is_ai_generated': isAiGenerated,
         'is_reviewed': isReviewed,
@@ -206,9 +209,14 @@ class LearningOutcome {
     final rawId = json['id'];
     final id = intOrNull(rawId) ?? 0;
     final rawLevel = json['level']?.toString();
-    final difficulty = OutcomeDifficultyX.fromString(rawLevel);
-    final level = normalizeBackendLevel(rawLevel, fallback: difficulty);
     final parentId = intOrNull(json['parent_learning_outcome_id']);
+    final difficulty = OutcomeDifficultyX.fromString(rawLevel);
+    // Do not synthesize a backend level for parent LOs. The uploaded FastAPI
+    // service requires parent rows to keep level == null, while child criteria
+    // must carry one of the enum values.
+    final level = parentId == null && (rawLevel == null || rawLevel.trim().isEmpty)
+        ? null
+        : normalizeBackendLevel(rawLevel, fallback: difficulty);
 
     return LearningOutcome(
       id: id,
@@ -236,6 +244,20 @@ class LearningOutcome {
     // column header, so criterion chips do not repeat Easy / Medium / Hard.
     return '${idx + 1}';
   }
+}
+
+
+class LearningOutcomeTitleConflictException implements Exception {
+  final String attemptedTitle;
+  final LearningOutcome existing;
+
+  const LearningOutcomeTitleConflictException({
+    required this.attemptedTitle,
+    required this.existing,
+  });
+
+  @override
+  String toString() => 'Learning outcome title already exists: $attemptedTitle';
 }
 
 const Object _sentinel = Object();

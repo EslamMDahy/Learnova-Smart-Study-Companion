@@ -6,9 +6,23 @@ void applyBrowserThemeChromeImpl({required bool dark}) {
 
   // package:web exposes documentElement as Element, and Element does not have
   // a typed `style` getter. Use attributes so this compiles under both dart2js
-  // and dart2wasm.
-  web.document.documentElement?.setAttribute('style', 'background-color: $bg;');
-  web.document.body?.setAttribute('style', 'background-color: $bg;');
+  // and dart2wasm. Keep the browser page itself locked to the viewport;
+  // Flutter owns the scrolling internally. This prevents native scrollbars from
+  // appearing when HtmlElementView/PDF iframes are mounted inside long panels.
+  final pageStyle = <String>[
+    'margin: 0',
+    'padding: 0',
+    'width: 100%',
+    'height: 100%',
+    'max-width: 100vw',
+    'max-height: 100vh',
+    'overflow: hidden',
+    'overscroll-behavior: none',
+    'background-color: $bg',
+  ].join('; ');
+
+  web.document.documentElement?.setAttribute('style', pageStyle);
+  web.document.body?.setAttribute('style', pageStyle);
 
   final head = web.document.head;
   if (head == null) return;

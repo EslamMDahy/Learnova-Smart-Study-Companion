@@ -132,11 +132,13 @@ class _QueuedFile {
 class UploadMaterialSheet extends StatefulWidget {
   final String moduleTitle;
   final UploadSheetUploadHandler? onUpload;
+  final bool autoCloseOnReady;
 
   const UploadMaterialSheet({
     super.key,
     required this.moduleTitle,
     this.onUpload,
+    this.autoCloseOnReady = false,
   });
 
   @override
@@ -345,13 +347,10 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
         }
       }
     } finally {
-      if (mounted) {
-        setState(() => _processing = false);
-        final allReady = _queue.isNotEmpty &&
-            _queue.every((file) => file.status == _FileStatus.ready);
-        if (allReady) {
-          Navigator.of(context).pop(true);
-        }
+      if (!mounted) return;
+      setState(() => _processing = false);
+      if (widget.autoCloseOnReady && _queue.isNotEmpty && _queue.every((f) => f.status == _FileStatus.ready)) {
+        Navigator.of(context).pop(true);
       }
     }
   }

@@ -24,6 +24,7 @@ class ExamCorrectionApi {
 
   Future<ExamScanAnalyzeResponse> analyzeExamScan({
     required List<ExamCorrectionUploadFile> files,
+    List<ExamCorrectionUploadFile> templateFiles = const [],
     required String language,
     int? courseId,
     int? examId,
@@ -41,6 +42,17 @@ class ExamCorrectionApi {
           MultipartFile.fromBytes(
             file.bytes,
             filename: file.name.isNotEmpty ? file.name : 'exam.pdf',
+          ),
+        ),
+      );
+    }
+    for (final file in templateFiles) {
+      form.files.add(
+        MapEntry(
+          'template_files',
+          MultipartFile.fromBytes(
+            file.bytes,
+            filename: file.name.isNotEmpty ? file.name : 'exam-template.pdf',
           ),
         ),
       );
@@ -122,6 +134,7 @@ class ExamCorrectionApi {
         'total_score': totalScore,
         'percentage_score': percentage,
         'teacher_feedback': cleanFeedback == null || cleanFeedback.isEmpty ? null : cleanFeedback,
+        'request_ai_grading': true,
       }..removeWhere((key, value) => value == null),
       options: Options(
         sendTimeout: const Duration(minutes: 1),

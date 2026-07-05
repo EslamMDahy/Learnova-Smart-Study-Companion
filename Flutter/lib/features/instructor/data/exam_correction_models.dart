@@ -95,6 +95,31 @@ class ExamScanAnalyzeResponse {
     return version == 'ocr_only' || type == 'ocr_only' || gradePreview.totalScore <= 0;
   }
 
+  ExamScanAnalyzeResponse copyWithAiSubmit({
+    int? attemptId,
+    String? attemptStatus,
+    bool? aiGradingRequested,
+    String? aiRequestId,
+    String? status,
+  }) {
+    return ExamScanAnalyzeResponse(
+      scanId: scanId,
+      status: status ?? this.status,
+      language: language,
+      exam: exam,
+      student: student,
+      pages: pages,
+      answers: answers,
+      gradePreview: gradePreview,
+      processingTimeSeconds: processingTimeSeconds,
+      attemptId: attemptId ?? this.attemptId,
+      attemptStatus: attemptStatus ?? this.attemptStatus,
+      aiGradingRequested: aiGradingRequested ?? this.aiGradingRequested,
+      aiRequestId: aiRequestId ?? this.aiRequestId,
+      warnings: warnings,
+    );
+  }
+
   factory ExamScanAnalyzeResponse.fromJson(Map<String, dynamic> json) {
     return ExamScanAnalyzeResponse(
       scanId: (json['scan_id'] ?? '').toString(),
@@ -301,7 +326,7 @@ class ExamScanAnswer {
     if (fromSelection.isNotEmpty) return fromSelection;
     if (detectedAnswers.isNotEmpty) return detectedAnswers.join(', ');
     final direct = detectedAnswer?.trim();
-    return direct == null || direct.isEmpty ? 'Not detected' : direct;
+    return direct == null || direct.isEmpty ? 'Blank / not detected' : direct;
   }
 
   bool isOptionSelected(int index) => normalizedSelectedOptionIndices.contains(index);

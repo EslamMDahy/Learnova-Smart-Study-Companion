@@ -256,6 +256,13 @@ class QuestionsApi {
   final ApiClient _client;
   QuestionsApi(this._client);
 
+  // Native question extraction is intentionally disabled for the material
+  // upload flow. Uploaded materials should stop after topic extraction and
+  // must not call /questions/extract-native or its SSE stream automatically.
+  // Keep these API methods as safe no-ops so any older UI path or leftover
+  // caller cannot accidentally trigger backend AI extraction.
+  static const bool _nativeMaterialQuestionExtractionEnabled = false;
+
   Future<AiQuestionGenerationResponse> generateQuestions({
     required int courseId,
     required AiQuestionGenerationRequest payload,
@@ -289,6 +296,14 @@ class QuestionsApi {
     required int materialId,
     CancelToken? cancelToken,
   }) async {
+    if (!_nativeMaterialQuestionExtractionEnabled) {
+      return const ExtractNativeQuestionsResponse(
+        status: 'disabled',
+        aiProcessingStarted: false,
+        message: 'Native question extraction is disabled after material upload.',
+      );
+    }
+
     final res = await _client.post<Map<String, dynamic>>(
       Endpoints.extractNativeMaterialQuestions(courseId, materialId),
       data: const <String, dynamic>{},
@@ -304,6 +319,19 @@ class QuestionsApi {
     required int materialId,
     CancelToken? cancelToken,
   }) {
+    if (!_nativeMaterialQuestionExtractionEnabled) {
+      return Future<SseEvent>.value(
+        const SseEvent(
+          event: 'disabled',
+          data: 'Native question extraction is disabled after material upload.',
+          jsonData: <String, dynamic>{
+            'status': 'disabled',
+            'message': 'Native question extraction is disabled after material upload.',
+          },
+        ),
+      );
+    }
+
     return _client.waitForSseEvent(
       Endpoints.extractNativeMaterialQuestionsStream(courseId, materialId),
       cancelToken: cancelToken,

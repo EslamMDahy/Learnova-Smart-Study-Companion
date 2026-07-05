@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../../core/storage/key_value_store_factory.dart';
 import '../../../../../core/network/error_mapper.dart';
+import '../../../../../core/log/app_logger.dart';
 import '../../../../../core/utils/debounced_action.dart';
 import '../../../../../core/routing/routes.dart';
 import '../../../../../core/ui/pdf_preview_view.dart';
@@ -19,7 +20,6 @@ import '../../../data/materials_models.dart';
 import '../../../data/topics_models.dart';
 import '../../../data/learning_outcomes_models.dart';
 import '../../../data/modules_materials_providers.dart';
-import '../../../data/question_bank_refresh_signal.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../controllers/course_details_state.dart';
 import '../../course_route_identity.dart';
@@ -1864,6 +1864,7 @@ Future<void> _showCreateModuleDialog() async {
       barrierColor: Colors.black.withValues(alpha: 0.35),
       builder: (_) => UploadMaterialSheet(
         moduleTitle: module.title,
+        autoCloseOnReady: true,
         onUpload: (file, update) => _uploadAndWaitForMaterial(
           module: module,
           file: file,
@@ -1909,7 +1910,7 @@ Future<void> _showCreateModuleDialog() async {
           progress: progress,
           message: progress < 0.7
               ? 'Uploading PDF to storage...'
-              : 'Confirming upload and starting AI...',
+              : 'Confirming upload...',
         ));
       },
     );
@@ -1924,14 +1925,14 @@ Future<void> _showCreateModuleDialog() async {
       );
     }
 
-    return _waitForMaterialContentAndQuestions(
+    return _waitForMaterialTopicsOnly(
       moduleId: module.id,
       materialId: result.materialId,
       update: update,
     );
   }
 
-  Future<UploadSheetUploadResult> _waitForMaterialContentAndQuestions({
+  Future<UploadSheetUploadResult> _waitForMaterialTopicsOnly({
     required int moduleId,
     required int materialId,
     required void Function(UploadSheetUploadUpdate update) update,
@@ -1994,135 +1995,23 @@ Future<void> _showCreateModuleDialog() async {
     final materialTopics = (controllerState.topics[moduleId] ?? const <TopicItem>[])
         .where((TopicItem topic) => topic.materialId == materialId)
         .toList(growable: false);
-    final subtopicCount = materialTopics
-        .where((TopicItem topic) => topic.parentTopicId != null)
-        .length;
-
     if (materialTopics.isEmpty) {
-      update(const UploadSheetUploadUpdate(
-        stage: UploadSheetProcessingStage.ready,
-        progress: 1,
-        message: 'Topic callback arrived. Closing uploader; refresh if the tree is still loading.',
-      ));
       return UploadSheetUploadResult.ready(
         materialId: materialId,
         message: 'Material saved. The backend callback arrived, but no topics were returned yet.',
       );
     }
 
-    final readyMessage = subtopicCount == 0
-        ? 'Topic tree saved. No subtopics were available for material question extraction yet.'
-        : 'Topic tree saved. Question extraction is running in the background.';
-
     update(UploadSheetUploadUpdate(
       stage: UploadSheetProcessingStage.ready,
       progress: 1,
-      message: readyMessage,
+      message: 'Topics received (${materialTopics.length}). Material is ready.',
     ));
-
-    if (subtopicCount > 0) {
-      unawaited(_extractMaterialQuestionsInBackground(
-        moduleId: moduleId,
-        materialId: materialId,
-        topicCount: materialTopics.length,
-        subtopicCount: subtopicCount,
-      ));
-    }
 
     return UploadSheetUploadResult.ready(
       materialId: materialId,
-      message: readyMessage,
+      message: 'Material saved. Topic extraction completed.',
     );
-  }
-
-  Future<void> _extractMaterialQuestionsInBackground({
-    required int moduleId,
-    required int materialId,
-    required int topicCount,
-    required int subtopicCount,
-  }) async {
-    final courseId = widget.course.id;
-    final questionsApi = ref.read(questionsApiProvider);
-
-    if (mounted) {
-      AppToast.info(
-        context,
-        title: 'Question extraction started',
-        message: 'Topics are ready ($topicCount). Extracting questions in the background.',
-      );
-    }
-
-    try {
-      final extractResponse = await questionsApi.extractNativeQuestionsFromMaterial(
-        courseId: courseId,
-        materialId: materialId,
-      );
-
-      if (!extractResponse.aiProcessingStarted) {
-        if (!mounted) return;
-        AppToast.warning(
-          context,
-          title: 'Question extraction not started',
-          message: extractResponse.message.trim().isNotEmpty
-              ? extractResponse.message
-              : 'Topic tree was saved, but the backend did not start question extraction.',
-        );
-        return;
-      }
-
-      var nativeQuestionsReady = false;
-      try {
-        final event = await questionsApi.waitForNativeQuestionExtraction(
-          courseId: courseId,
-          materialId: materialId,
-        );
-        nativeQuestionsReady = event.isReady;
-      } catch (_) {
-        nativeQuestionsReady = false;
-      }
-
-      if (!mounted) return;
-
-      if (!nativeQuestionsReady) {
-        ref.read(questionBankRefreshSignalProvider(courseId).notifier).state++;
-        AppToast.info(
-          context,
-          title: 'Question extraction still running',
-          message: 'The topic tree is ready. Refresh the question bank shortly.',
-        );
-        return;
-      }
-
-      var materialQuestionCount = 0;
-      try {
-        final questionResponse = await questionsApi.getMaterialQuestions(
-          courseId: courseId,
-          moduleId: moduleId,
-          materialId: materialId,
-        );
-        materialQuestionCount = questionResponse.questions.length;
-      } catch (_) {
-        materialQuestionCount = 0;
-      }
-
-      if (!mounted) return;
-      ref.read(questionBankRefreshSignalProvider(courseId).notifier).state++;
-      AppToast.success(
-        context,
-        title: 'Questions ready',
-        message: materialQuestionCount > 0
-            ? '$materialQuestionCount question(s) were extracted from $subtopicCount subtopic(s).'
-            : 'Question extraction finished. Open the question bank to review the latest result.',
-      );
-    } catch (e) {
-      if (!mounted) return;
-      final message = mapApiFailure(e).message;
-      AppToast.warning(
-        context,
-        title: 'Background extraction failed',
-        message: message,
-      );
-    }
   }
 
   Future<bool?> _waitForMaterialReady({

@@ -143,8 +143,8 @@ class _UploadPdfPanelState extends ConsumerState<_UploadPdfPanel> {
         children: [
           const _CardTitle(
             icon: Icons.upload_file_rounded,
-            title: 'Upload exam PDF',
-            subtitle: 'Select the exact course and exam, then upload the solved PDF.',
+            title: 'Upload solved exam PDF',
+            subtitle: 'Select the course and exam. The original template PDF is attached automatically for accurate MCQ detection.',
           ),
           const SizedBox(height: 18),
           _ExamTargetPicker(
@@ -375,7 +375,7 @@ class _UploadDropZone extends StatelessWidget {
             const SizedBox(height: 12),
             Text(hasFile ? 'PDF ready' : 'Choose PDF', style: AppText.sectionTitle.copyWith(fontSize: 16)),
             const SizedBox(height: 5),
-            Text('One PDF file only', textAlign: TextAlign.center, style: AppText.mutedSmall),
+            Text('Solved PDF only — template is auto-attached', textAlign: TextAlign.center, style: AppText.mutedSmall),
           ],
         ),
       ),
@@ -471,7 +471,7 @@ class _AnalyzingState extends StatelessWidget {
               const SizedBox(height: 8),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxWidth: 520),
-                child: Text('The backend is reading the QR metadata and detecting selected choice bubbles. Written answers will be listed for manual review instead of unreliable handwriting OCR.', textAlign: TextAlign.center, style: AppText.sectionSubtitle),
+                child: Text('The backend is reading the QR metadata, detecting selected choice bubbles, and extracting handwritten text from the printed essay answer boxes.', textAlign: TextAlign.center, style: AppText.sectionSubtitle),
               ),
             ],
           ),
@@ -572,7 +572,7 @@ class _GradingSummaryPanel extends StatelessWidget {
           ),
           const SizedBox(height: 14),
           _Notice(
-            message: 'Instructor preview: objective answers are detected from the printed bubbles and graded immediately. Written answers are intentionally marked for manual review to avoid unreliable handwriting OCR.',
+            message: 'Instructor preview: MCQ answers are read from the original exam template and essay answers are cropped from their printed boxes. Blank or unread items stay as review rows without shifting following questions.',
             tone: _NoticeTone.info,
           ),
         ],
@@ -597,7 +597,7 @@ class _QuestionResultsPanel extends StatelessWidget {
           const _CardTitle(
             icon: Icons.assignment_turned_in_outlined,
             title: 'Question results',
-            subtitle: 'Objective questions show the detected bubble answer and score. Written questions are shown as manual-review items.',
+            subtitle: 'Objective questions show the detected bubble answer and score. Written questions show extracted box text and remain reviewable until graded.',
           ),
           const SizedBox(height: 16),
           if (answers.isEmpty)
@@ -661,6 +661,7 @@ class _QuestionResultTile extends StatelessWidget {
                       children: [
                         _SoftBadge(icon: answer.isWritten ? Icons.edit_note_rounded : Icons.radio_button_checked_rounded, label: answer.typeLabel),
                         _StatusBadge(status: status),
+                        if (answer.isObjective) _SoftBadge(icon: Icons.speed_rounded, label: '${answer.confidence.toStringAsFixed(0)}% confidence'),
                         if (points != null || maxScore != null) _SoftBadge(icon: Icons.score_outlined, label: '${_formatNumber(points ?? 0)} / ${_formatNumber(maxScore ?? 0)}'),
                       ],
                     ),
@@ -674,8 +675,8 @@ class _QuestionResultTile extends StatelessWidget {
             builder: (context, constraints) {
               final compact = constraints.maxWidth < 720;
               final answerCards = [
-                _AnswerValueCard(label: 'Student answer', value: answer.displayAnswer),
-                _AnswerValueCard(label: 'Correct answer', value: answer.displayCorrectAnswer),
+                _AnswerValueCard(label: answer.isWritten ? 'Extracted written answer' : 'Student answer', value: answer.displayAnswer),
+                _AnswerValueCard(label: answer.isWritten ? 'Reference answer / rubric' : 'Correct answer', value: answer.displayCorrectAnswer),
               ];
               if (compact) {
                 return Column(children: [answerCards[0], const SizedBox(height: 10), answerCards[1]]);
@@ -818,13 +819,51 @@ class _StatusBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = status.replaceAll('_', ' ').trim();
-    final lower = status.toLowerCase();
-    final icon = (lower == 'correct' || lower == 'ready' || lower == 'detected' || lower == 'ai_graded')
+    final lower = normalized.toLowerCase();
+    final success = lower == 'correct' || lower == 'ready' || lower == 'detected' || lower == 'ai graded';
+    final danger = lower == 'wrong' || lower == 'incorrect';
+    final review = lower.contains('review') || lower.contains('pending') || lower.contains('grading');
+    final icon = success
         ? Icons.check_circle_outline_rounded
-        : (lower == 'wrong' || lower == 'incorrect')
+        : danger
             ? Icons.cancel_outlined
-            : Icons.info_outline_rounded;
-    return _SoftBadge(icon: icon, label: normalized.isEmpty ? 'review' : normalized);
+            : review
+                ? Icons.rate_review_outlined
+                : Icons.info_outline_rounded;
+    final bg = success
+        ? AppColors.greenBg
+        : danger
+            ? AppColors.dangerBg
+            : review
+                ? AppColors.infoBg
+                : AppColors.surfaceBg;
+    final border = success
+        ? AppColors.greenBorder
+        : danger
+            ? AppColors.dangerBorder
+            : review
+                ? AppColors.infoBorder
+                : AppColors.borderSoft;
+    final fg = success
+        ? AppColors.greenText
+        : danger
+            ? AppColors.dangerText
+            : review
+                ? AppColors.infoText
+                : AppColors.textMuted;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999), border: Border.all(color: border)),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: fg, size: 15),
+          const SizedBox(width: 6),
+          Text(normalized.isEmpty ? 'needs review' : normalized, maxLines: 1, overflow: TextOverflow.ellipsis, style: AppText.mutedSmall.copyWith(color: fg, fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
   }
 }
 
@@ -833,6 +872,11 @@ String _answerStatus(ExamScanAnswer answer) {
   if (answer.isCorrect == false) return 'wrong';
   if (answer.isAiPending) return 'ai pending';
   if (answer.hasAiGrade) return 'ai graded';
+  if (answer.isWritten) {
+    final hasText = (answer.answerText ?? '').trim().isNotEmpty;
+    if (hasText && answer.pointsEarned == null) return 'needs grading';
+    if (!hasText) return 'needs review';
+  }
   return answer.status.isEmpty ? 'needs review' : answer.status;
 }
 

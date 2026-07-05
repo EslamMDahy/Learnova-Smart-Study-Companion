@@ -151,11 +151,15 @@ class _PdfPreviewWidgetState extends State<_PdfPreviewWidget> {
       );
     }
 
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(10),
-      child: HtmlElementView(
-        key: ValueKey<String>(_viewId),
-        viewType: _viewId,
+    return ClipRect(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(10),
+        child: SizedBox.expand(
+          child: HtmlElementView(
+            key: ValueKey<String>(_viewId),
+            viewType: _viewId,
+          ),
+        ),
       ),
     );
   }
