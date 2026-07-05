@@ -378,6 +378,11 @@ def handle_question_generation(*, db: Session, verified_callback: VerifiedAICall
 
     print("\n========== QUESTION GENERATION COMPLETED ==========\n")
 
+    publish_sync(
+        channel=f"question_generation_{course_id}",
+        payload="ready",
+    )
+
     # =========================
     # 4) Return summary
     # =========================

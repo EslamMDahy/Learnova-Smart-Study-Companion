@@ -9,7 +9,7 @@ from app.core.event_bus.connections import get_pool
 async def subscribe(
     *,
     channel: str,
-    timeout: float = 300.0,
+    timeout: float = 30.0,
 ):
     pool: asyncpg.Pool = get_pool()
     connection: asyncpg.pool.PoolConnectionProxy = await pool.acquire()
