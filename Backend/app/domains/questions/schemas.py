@@ -20,7 +20,7 @@ class QuestionCreateRequest(BaseModel):
 
     explanation: Optional[str] = None
     options: Optional[List[QuestionOptionItem]] = None
-    expected_answer: Optional[List[str] | str] = None
+    expected_answer: Optional[List[str] | str | dict] = None
     grading_rubric: Optional[dict] = None
 
     model_config = ConfigDict(extra="forbid")
@@ -36,7 +36,7 @@ class QuestionCreateResponse(BaseModel):
     difficulty: str
     source: str
     approval_status: str
-    expected_answer: Optional[List[str] | str] = None
+    expected_answer: Optional[List[str] | str | dict] = None
     grading_rubric: Optional[dict] = None
     max_score: int
     auto_gradable: bool
@@ -117,6 +117,7 @@ class QuestionGetResponse(BaseModel):
 
     question_text: str
     explanation: Optional[str] = None
+    image_url: Optional[str] = None
     options: Optional[list] = None
     type: str
     difficulty: str
@@ -144,7 +145,7 @@ class QuestionUpdateRequest(BaseModel):
 
     explanation: Optional[str] = None
     options: Optional[List[QuestionOptionItem]] = None
-    expected_answer: Optional[List[str] | str] = None
+    expected_answer: Optional[List[str] | str | dict] = None
     grading_rubric: Optional[dict] = None
     tags: Optional[list] = None
 

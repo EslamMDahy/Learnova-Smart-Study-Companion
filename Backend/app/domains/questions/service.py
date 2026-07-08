@@ -21,6 +21,8 @@ from .handlers import validate_and_normalize_question_payload
 from .schemas import (QuestionCreateRequest, 
                       QuestionGenerationRequest)
 
+SIGNED_URL_EXPIRES_SECONDS = 60 * 60  # 1 hour
+
 
 def create_question(*, course_id: int, payload: QuestionCreateRequest, db: Session, current_user: dict,):
     # =========================
@@ -737,6 +739,7 @@ def get_question(*, course_id: int, question_id: int, db: Session, current_user:
                     t.title AS topic_title,
                     q.question_text,
                     q.explanation,
+                    q.image_key,
                     q.options,
                     q.type,
                     q.difficulty,
@@ -796,7 +799,27 @@ def get_question(*, course_id: int, question_id: int, db: Session, current_user:
         ).mappings().all()
 
         # =========================
-        # 5) Build response
+        # 5) Generate signed image URL if image exists
+        # =========================
+        image_url = None
+        if question_row["image_key"]:
+            bucket = settings.supabase_private_bucket
+            try:
+                signed = supabase.storage.from_(bucket).create_signed_url(
+                    question_row["image_key"], SIGNED_URL_EXPIRES_SECONDS
+                )
+            except Exception:
+                signed = None
+
+            if isinstance(signed, dict):
+                image_url = signed.get("signedUrl") or signed.get("signed_url") or signed.get("url")
+            else:
+                data = getattr(signed, "data", None) if signed is not None else None
+                if isinstance(data, dict):
+                    image_url = data.get("signedUrl") or data.get("signed_url") or data.get("url")
+
+        # =========================
+        # 6) Build response
         # =========================
         return {
             "id": question_row["id"],
@@ -809,6 +832,7 @@ def get_question(*, course_id: int, question_id: int, db: Session, current_user:
             "learning_outcomes": [dict(row) for row in learning_outcome_rows],
             "question_text": question_row["question_text"],
             "explanation": question_row["explanation"],
+            "image_url": image_url,
             "options": question_row["options"],
             "type": question_row["type"],
             "difficulty": question_row["difficulty"],
@@ -2043,7 +2067,6 @@ def initiate_question_image_upload(*, course_id: int, question_id: int, payload,
 
 
 def confirm_question_image_upload(*, course_id: int, question_id: int, db: Session, current_user: dict):
-    SIGNED_URL_EXPIRES_SECONDS = 60 * 60  # 1 hour
     # =========================
     # 1) Authorization
     # =========================

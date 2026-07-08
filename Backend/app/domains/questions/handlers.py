@@ -15,6 +15,7 @@ def validate_and_normalize_question_payload(payload) -> dict[str, Any]:
         "true_false": validate_and_normalize_true_false,
         "short_answer": validate_and_normalize_short_answer,
         "essay": validate_and_normalize_essay,
+        "code": validate_and_normalize_code
     }
 
     handler = handlers.get(question_type)
@@ -401,6 +402,81 @@ def validate_and_normalize_essay(payload) -> dict[str, Any]:
             "explanation": explanation,
             "options": None,
             "expected_answer": expected_answer,
+            "grading_rubric": grading_rubric,
+            "max_score": 1,
+            "auto_gradable": False,
+            "source": "manual",
+            "approval_status": "approved",
+            "usage_count": 0,
+            "success_rate": None,
+            "average_time_seconds": None,
+            "tags": None,
+        }
+    }
+
+
+
+def validate_and_normalize_code(payload) -> dict[str, Any]:
+    question_text = (payload.question_text or "").strip()
+    if not question_text:
+        return {"ok": False, "status_code": 422, "detail": "question_text is required"}
+
+    difficulty = (payload.difficulty or "").strip().lower()
+    if not difficulty:
+        return {"ok": False, "status_code": 422, "detail": "difficulty is required"}
+
+    expected_answer = payload.expected_answer
+    if not isinstance(expected_answer, dict):
+        return {
+            "ok": False,
+            "status_code": 422,
+            "detail": "expected_answer is required for code questions and must be an object"
+        }
+
+    code = expected_answer.get("code")
+    if not isinstance(code, str) or not code.strip():
+        return {
+            "ok": False,
+            "status_code": 422,
+            "detail": "expected_answer.code is required and must be a non-empty string"
+        }
+
+    language = expected_answer.get("language")
+    if language is not None:
+        if not isinstance(language, str) or not language.strip():
+            return {
+                "ok": False,
+                "status_code": 422,
+                "detail": "expected_answer.language must be a non-empty string when provided"
+            }
+        language = language.strip().lower()
+
+    normalized_expected_answer = {
+        "code": code.strip(),
+        "language": language,
+    }
+
+    explanation = payload.explanation
+    if isinstance(explanation, str):
+        explanation = explanation.strip() or None
+
+    grading_rubric = getattr(payload, "grading_rubric", None)
+    if grading_rubric is not None and not isinstance(grading_rubric, dict):
+        return {
+            "ok": False,
+            "status_code": 422,
+            "detail": "grading_rubric must be an object when provided"
+        }
+
+    return {
+        "ok": True,
+        "data": {
+            "question_text": question_text,
+            "type": question_type_from_payload(payload),
+            "difficulty": difficulty,
+            "explanation": explanation,
+            "options": None,
+            "expected_answer": normalized_expected_answer,
             "grading_rubric": grading_rubric,
             "max_score": 1,
             "auto_gradable": False,
