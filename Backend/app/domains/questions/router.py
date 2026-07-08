@@ -17,7 +17,10 @@ from .schemas import (QuestionCreateRequest,
                       QuestionGenerationResponse,
                       ExtractNativeQuestionsResponse,
                       ApproveQuestionsRequest,
-                      ApproveQuestionsResponse)
+                      ApproveQuestionsResponse,
+                      QuestionImageInitiateRequest,
+                      QuestionImageInitiateResponse,
+                      QuestionImageConfirmResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}", tags=["Questions"],)
@@ -193,4 +196,31 @@ def approve_questions(
         payload=payload,
         db=db,
         current_user=current_user,)
+
+@router.post("/questions/{question_id}/image/initiate", response_model=QuestionImageInitiateResponse,)
+def initiate_question_image_upload_route(
+    course_id: int,
+    question_id: int,
+    payload: QuestionImageInitiateRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.initiate_question_image_upload(
+        course_id=course_id,
+        question_id=question_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,)
+
+@router.post("/questions/{question_id}/image/confirm", response_model=QuestionImageConfirmResponse,)
+def confirm_question_image_upload_route(
+    course_id: int,
+    question_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.confirm_question_image_upload(
+        course_id=course_id,
+        question_id=question_id,
+        db=db,
+        current_user=current_user,)
+
 

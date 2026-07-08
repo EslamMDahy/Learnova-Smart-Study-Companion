@@ -6,11 +6,16 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import text, bindparam
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from storage3.types import CreateSignedUploadUrlOptions
+
 
 import json
 
 from app.core.ai_service_integration.ai_transport import send_ai_request
 from app.core.event_bus.subscribe import subscribe
+from app.core.storage_utils import split_object_key
+from app.core.supabase_client import supabase 
+from app.core.config import settings
 from .handlers import validate_and_normalize_question_payload
 
 from .schemas import (QuestionCreateRequest, 
@@ -1899,6 +1904,283 @@ def approve_questions(*, course_id: int, module_id: int, material_id: int, topic
     except SQLAlchemyError as e:
         db.rollback()
         raise HTTPException(status_code=500, detail="Database error") from e
+
+
+
+def initiate_question_image_upload(*, course_id: int, question_id: int, payload, db: Session, current_user: dict):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can upload question images")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not question_id or question_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid question_id")
+
+    # =========================
+    # 2) Validate payload
+    # =========================
+    content_type = (getattr(payload, "content_type", None) or "").strip().lower()
+    file_size_bytes = getattr(payload, "file_size_bytes", None)
+
+    _ALLOWED_CONTENT_TYPES = {"image/png", "image/jpeg", "image/jpg"}
+    _IMAGE_MAX_BYTES = 5 * 1024 * 1024
+
+    if not content_type:
+        raise HTTPException(status_code=400, detail="content_type is required")
+
+    if content_type not in _ALLOWED_CONTENT_TYPES:
+        raise HTTPException(status_code=400, detail="Invalid content_type. Allowed: image/png, image/jpeg, image/jpg")
+
+    if file_size_bytes is None:
+        raise HTTPException(status_code=400, detail="file_size_bytes is required")
+
+    try:
+        file_size_bytes = int(file_size_bytes)
+    except Exception:
+        raise HTTPException(status_code=400, detail="file_size_bytes must be an integer")
+
+    if file_size_bytes <= 0:
+        raise HTTPException(status_code=400, detail="file_size_bytes must be greater than 0")
+
+    if file_size_bytes > _IMAGE_MAX_BYTES:
+        raise HTTPException(status_code=400, detail="Question image is too large (max 5MB)")
+
+    try:
+        # =========================
+        # 3) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(status_code=403, detail="You can only upload images for questions in your own course")
+
+        # =========================
+        # 4) Validate question exists within this course
+        # =========================
+        question_row = db.execute(
+            text("""
+                SELECT id, course_id
+                FROM questions
+                WHERE id = :question_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {"question_id": question_id, "course_id": course_id},
+        ).mappings().first()
+
+        if not question_row:
+            raise HTTPException(status_code=404, detail="Question not found")
+
+    except HTTPException:
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+    # =========================
+    # 5) Build storage key + create signed upload URL
+    # =========================
+    bucket = settings.supabase_private_bucket
+    storage_key = f"courses/{course_id}/questions/{question_id}/question_image.png"
+
+    options = CreateSignedUploadUrlOptions(upsert="true")
+    try:
+        signed = supabase.storage.from_(bucket).create_signed_upload_url(storage_key, options)
+    except TypeError:
+        signed = supabase.storage.from_(bucket).create_signed_upload_url(storage_key)
+
+    data = None
+    error = None
+
+    if isinstance(signed, dict):
+        error = signed.get("error")
+        if signed.get("signedUrl") or signed.get("signed_url") or signed.get("url"):
+            data = signed
+    else:
+        data = getattr(signed, "data", None)
+        error = getattr(signed, "error", None)
+
+    if error:
+        msg = error.get("message") if isinstance(error, dict) else str(error)
+        raise HTTPException(status_code=400, detail=f"Failed to create signed upload url: {msg}")
+
+    if not data:
+        raise HTTPException(status_code=400, detail="Failed to create signed upload url")
+
+    upload_url = data.get("signedUrl") or data.get("signed_url") or data.get("url")
+
+    if not upload_url:
+        raise HTTPException(status_code=400, detail="Signed upload URL is missing from response")
+
+    return {
+        "upload_url": upload_url,
+        "storage_key": storage_key,
+        "content_type": content_type,
+        "max_bytes": _IMAGE_MAX_BYTES,
+    }
+
+
+
+def confirm_question_image_upload(*, course_id: int, question_id: int, db: Session, current_user: dict):
+    SIGNED_URL_EXPIRES_SECONDS = 60 * 60  # 1 hour
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can confirm question image uploads")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not question_id or question_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid question_id")
+
+    try:
+        # =========================
+        # 2) Validate course exists + ownership
+        # =========================
+        course_row = db.execute(
+            text("""
+                SELECT id, created_by
+                FROM courses
+                WHERE id = :course_id
+                LIMIT 1
+            """),
+            {"course_id": course_id},
+        ).mappings().first()
+
+        if not course_row:
+            raise HTTPException(status_code=404, detail="Course not found")
+
+        if int(course_row["created_by"]) != int(instructor_id):
+            raise HTTPException(status_code=403, detail="You can only confirm image uploads for your own course")
+
+        # =========================
+        # 3) Validate question exists within this course
+        # =========================
+        question_row = db.execute(
+            text("""
+                SELECT id, course_id
+                FROM questions
+                WHERE id = :question_id
+                  AND course_id = :course_id
+                LIMIT 1
+            """),
+            {"question_id": question_id, "course_id": course_id},
+        ).mappings().first()
+
+        if not question_row:
+            raise HTTPException(status_code=404, detail="Question not found")
+
+        # =========================
+        # 4) Verify file exists in storage
+        # =========================
+        bucket = settings.supabase_private_bucket
+        storage_key = f"courses/{course_id}/questions/{question_id}/question_image.png"
+        folder, expected_filename = split_object_key(storage_key)
+
+        try:
+            items = supabase.storage.from_(bucket).list(path=folder)
+        except Exception:
+            items = None
+
+        exists = False
+        if isinstance(items, list):
+            for it in items:
+                if isinstance(it, dict) and it.get("name") == expected_filename:
+                    exists = True
+                    break
+
+        if not exists:
+            raise HTTPException(
+                status_code=400,
+                detail="Question image not found in storage. Upload the file first, then confirm.",
+            )
+
+        # =========================
+        # 5) Save key to DB
+        # =========================
+        updated_row = db.execute(
+            text("""
+                UPDATE questions
+                SET
+                    image_key = :storage_key,
+                    updated_at = NOW()
+                WHERE id = :question_id
+                  AND course_id = :course_id
+                RETURNING updated_at
+            """),
+            {"storage_key": storage_key, "question_id": question_id, "course_id": course_id},
+        ).first()
+
+        if not updated_row:
+            db.rollback()
+            raise HTTPException(status_code=409, detail="Question could not be updated")
+
+        db.commit()
+
+    except HTTPException:
+        db.rollback()
+        raise
+
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+    # =========================
+    # 6) Create signed download URL (private bucket)
+    # =========================
+    download_url = None
+    try:
+        signed = supabase.storage.from_(bucket).create_signed_url(storage_key, SIGNED_URL_EXPIRES_SECONDS)
+    except Exception:
+        signed = None
+
+    if isinstance(signed, dict):
+        download_url = signed.get("signedUrl") or signed.get("signed_url") or signed.get("url")
+    else:
+        data = getattr(signed, "data", None) if signed is not None else None
+        if isinstance(data, dict):
+            download_url = data.get("signedUrl") or data.get("signed_url") or data.get("url")
+
+    if not download_url:
+        raise HTTPException(status_code=400, detail="Failed to create signed download url")
+
+    updated_at = updated_row[0]
+    updated_at_iso = updated_at.isoformat() if hasattr(updated_at, "isoformat") else str(updated_at)
+
+    return {
+        "image_key": storage_key,
+        "download_url": download_url,
+        "expires_in_seconds": SIGNED_URL_EXPIRES_SECONDS,
+        "updated_at": updated_at_iso,
+    }
 
 
 

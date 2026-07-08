@@ -53,6 +53,11 @@ class Question(Base):
         nullable=True
     )
 
+    image_key: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
     # Used only for choice-based questions like:
     # multiple_choice / multi_select / true_false / matching / ordering
     options: Mapped[list | None] = mapped_column(
