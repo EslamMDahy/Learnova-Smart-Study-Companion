@@ -1283,6 +1283,8 @@ def generate_questions_for_topics(*, course_id: int, payload: QuestionGeneration
         SELECT
             t.id,
             t.title,
+            t.page_start,
+            t.page_end,
             mo.course_id
         FROM topics t
         JOIN materials m
@@ -1307,12 +1309,17 @@ def generate_questions_for_topics(*, course_id: int, payload: QuestionGeneration
         )
 
     topic_titles = {}
+    topic_pages = {}
 
     for topic_row in topic_rows:
         if int(topic_row["course_id"]) != int(course_id):
             raise HTTPException(status_code=400, detail="One or more topics do not belong to this course")
 
         topic_titles[int(topic_row["id"])] = topic_row["title"]
+        topic_pages[int(topic_row["id"])] = {
+            "page_start": topic_row["page_start"],
+            "page_end": topic_row["page_end"],
+        }
 
     # =========================
     # 5) Check question pool
@@ -1468,6 +1475,8 @@ def generate_questions_for_topics(*, course_id: int, payload: QuestionGeneration
             replenishment_topics.append({
                 "topic_id": topic_id,
                 "topic_title": topic_titles[topic_id],
+                "page_start": topic_pages[topic_id]["page_start"],
+                "page_end": topic_pages[topic_id]["page_end"],
                 "question_configs": normalized_topic_configs[topic_id],
             })
 
@@ -1513,6 +1522,8 @@ def generate_questions_for_topics(*, course_id: int, payload: QuestionGeneration
         ai_topics.append({
             "topic_id": topic_id,
             "topic_title": topic_titles[topic_id],
+            "page_start": topic_pages[topic_id]["page_start"],
+            "page_end": topic_pages[topic_id]["page_end"],
             "question_configs": normalized_topic_configs[topic_id],
         })
 
