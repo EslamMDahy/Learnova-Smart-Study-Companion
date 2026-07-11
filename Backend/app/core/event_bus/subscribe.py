@@ -1,5 +1,8 @@
 import asyncio
 import asyncpg
+
+from contextlib import asynccontextmanager
+
 from app.core.event_bus.connections import get_pool
 
 
@@ -42,3 +45,32 @@ async def subscribe(
             await connection.remove_listener(channel, listener)
         finally:
             await pool.release(connection)
+
+
+@asynccontextmanager
+async def register_listener(*, channel: str):
+    pool: asyncpg.Pool = get_pool()
+    connection: asyncpg.pool.PoolConnectionProxy = await pool.acquire()
+
+    queue: asyncio.Queue[str] = asyncio.Queue()
+
+    def listener(*args) -> None:
+        queue.put_nowait(args[3])
+
+    await connection.add_listener(channel, listener)
+
+    try:
+        yield queue 
+
+    finally:
+        try:
+            await connection.remove_listener(channel, listener)
+        finally:
+            await pool.release(connection)
+
+
+async def wait_for_payload(queue: asyncio.Queue, *, timeout: float = 30.0) -> str:
+    try:
+        return await asyncio.wait_for(queue.get(), timeout=timeout)
+    except asyncio.TimeoutError:
+        return ""
