@@ -3,7 +3,10 @@ from .ai_chat_sessions import AIChatSession
 from .ai_question_generation_log_questions import AIQuestionGenerationLogQuestion
 from .ai_question_generation_logs import AIQuestionGenerationLog
 from .ai_request_log import AIRequestLog
+
 from .analytics import AnalyticsDashboard
+
+from .background_jobs import BackgroundJobs
 
 from .course import Course
 from .course_invitations import CourseInvitation

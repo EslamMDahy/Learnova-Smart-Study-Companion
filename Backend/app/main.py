@@ -4,7 +4,9 @@ load_dotenv()
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import asyncio
 from app.core.event_bus.connections import init_event_bus, close_event_bus
+from app.core.background_jobs.worker import job_worker_loop
 
 from app.core.config import settings
 from app.domains.auth.router                    import router as auth_router
@@ -26,7 +28,11 @@ from fastapi.middleware.cors import CORSMiddleware
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_event_bus()
+    worker_task = asyncio.create_task(job_worker_loop())
+
     yield
+
+    worker_task.cancel()
     await close_event_bus()
 
 app = FastAPI(lifespan=lifespan)
