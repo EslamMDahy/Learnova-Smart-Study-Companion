@@ -3,9 +3,10 @@ class InstructorTabs {
   static const course = 1;
   static const questionBank = 2;
   static const examCorrection = 3;
-  static const quizzes = 4;
-  static const settings = 5;
-  static const help = 6;
+  static const presentation = 4;
+  static const quizzes = 5;
+  static const settings = 6;
+  static const help = 7;
 }
 
 class InstructorViews {

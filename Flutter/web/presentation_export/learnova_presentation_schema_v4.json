@@ -1,0 +1,1151 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://learnova.ai/schemas/presentation-v4.json",
+  "title": "Learnova Instructor Presentation Schema v4",
+  "description": "Semantic lecture JSON consumed by the Flutter preview and the editable PowerPoint exporter.",
+  "type": "object",
+  "required": [
+    "title",
+    "slides"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "const": 4
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 240
+    },
+    "design_tokens": {
+      "type": "object"
+    },
+    "slides": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 100,
+      "items": {
+        "$ref": "#/$defs/slide"
+      }
+    }
+  },
+  "additionalProperties": true,
+  "$defs": {
+    "nonEmptyString": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stringList": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "visual": {
+      "type": "object",
+      "required": [
+        "src"
+      ],
+      "properties": {
+        "src": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "caption": {
+          "type": "string",
+          "maxLength": 260
+        },
+        "alt": {
+          "type": "string",
+          "maxLength": 500
+        },
+        "fit": {
+          "enum": [
+            "cover",
+            "contain"
+          ]
+        },
+        "position": {
+          "enum": [
+            "left",
+            "right",
+            "center",
+            "background"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "equation": {
+      "oneOf": [
+        {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 900
+        },
+        {
+          "type": "object",
+          "properties": {
+            "label": {
+              "type": "string",
+              "maxLength": 120
+            },
+            "latex": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 900
+            },
+            "expression": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 900
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 900
+            },
+            "explanation": {
+              "type": "string",
+              "maxLength": 1600
+            },
+            "render_mode": {
+              "enum": [
+                "auto",
+                "text",
+                "svg"
+              ]
+            },
+            "steps": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 5,
+              "items": {
+                "type": "object",
+                "properties": {
+                  "latex": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 900
+                  },
+                  "expression": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 900
+                  },
+                  "explanation": {
+                    "type": "string",
+                    "maxLength": 800
+                  },
+                  "render_mode": {
+                    "enum": [
+                      "auto",
+                      "text",
+                      "svg"
+                    ]
+                  }
+                },
+                "anyOf": [
+                  {
+                    "required": [
+                      "latex"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "expression"
+                    ]
+                  }
+                ],
+                "additionalProperties": true
+              }
+            }
+          },
+          "anyOf": [
+            {
+              "required": [
+                "latex"
+              ]
+            },
+            {
+              "required": [
+                "expression"
+              ]
+            },
+            {
+              "required": [
+                "value"
+              ]
+            }
+          ],
+          "additionalProperties": true
+        }
+      ]
+    },
+    "problem": {
+      "type": "object",
+      "required": [
+        "statement"
+      ],
+      "properties": {
+        "statement": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1600
+        },
+        "choices": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 4,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "answer": {
+          "type": "string",
+          "maxLength": 800
+        },
+        "solution_steps": {
+          "type": "array",
+          "maxItems": 5,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 800
+          }
+        },
+        "hint": {
+          "type": "string",
+          "maxLength": 800
+        },
+        "given": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "formula": {
+          "type": "string",
+          "maxLength": 900
+        },
+        "final_answer": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "show_answer": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "card": {
+      "type": "object",
+      "required": [
+        "heading"
+      ],
+      "properties": {
+        "icon": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "heading": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "body": {
+          "type": "string",
+          "maxLength": 3000
+        },
+        "visual": {
+          "$ref": "#/$defs/visual"
+        },
+        "equation": {
+          "$ref": "#/$defs/equation"
+        }
+      },
+      "additionalProperties": true
+    },
+    "comparisonSide": {
+      "type": "object",
+      "required": [
+        "title",
+        "points"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "subtitle": {
+          "type": "string"
+        },
+        "points": {
+          "$ref": "#/$defs/comparisonPointList"
+        }
+      },
+      "additionalProperties": true
+    },
+    "processItem": {
+      "type": "object",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "title": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "body": {
+          "type": "string"
+        },
+        "icon": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "timelineItem": {
+      "type": "object",
+      "required": [
+        "title"
+      ],
+      "properties": {
+        "date": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "title": {
+          "$ref": "#/$defs/nonEmptyString"
+        },
+        "body": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": true
+    },
+    "diagram": {
+      "type": "object",
+      "required": [
+        "nodes"
+      ],
+      "properties": {
+        "nodes": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "title"
+            ],
+            "properties": {
+              "id": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "level": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 7
+              },
+              "title": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "body": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "edges": {
+          "type": "array",
+          "maxItems": 20,
+          "items": {
+            "type": "object",
+            "required": [
+              "from",
+              "to"
+            ],
+            "properties": {
+              "from": {
+                "$ref": "#/$defs/nonEmptyString"
+              },
+              "to": {
+                "$ref": "#/$defs/nonEmptyString"
+              }
+            },
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "table": {
+      "type": "object",
+      "required": [
+        "rows"
+      ],
+      "properties": {
+        "headers": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "rows": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 8,
+          "items": {
+            "oneOf": [
+              {
+                "type": "array",
+                "minItems": 1,
+                "maxItems": 6
+              },
+              {
+                "type": "object"
+              }
+            ]
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "slide": {
+      "type": "object",
+      "required": [
+        "slide_number",
+        "layout_type",
+        "title"
+      ],
+      "properties": {
+        "slide_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "layout_type": {
+          "enum": [
+            "title_slide",
+            "lecture_objectives",
+            "section_divider",
+            "concept_explanation",
+            "text_with_image",
+            "full_image",
+            "key_points",
+            "comparison",
+            "process_steps",
+            "timeline",
+            "diagram",
+            "table",
+            "equation_explanation",
+            "equation_derivation",
+            "worked_example",
+            "problem_solution",
+            "multiple_choice",
+            "practice_activity",
+            "case_study",
+            "quote",
+            "summary",
+            "references",
+            "adaptive_cards",
+            "single_card_center",
+            "two_card_horizontal",
+            "three_card_horizontal"
+          ]
+        },
+        "kicker": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 240
+        },
+        "subtitle": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "course": {
+          "type": "string"
+        },
+        "instructor": {
+          "type": "string"
+        },
+        "term": {
+          "type": "string"
+        },
+        "section_number": {
+          "type": [
+            "string",
+            "integer"
+          ]
+        },
+        "outcome": {
+          "type": "string"
+        },
+        "objectives": {
+          "$ref": "#/$defs/objectiveList"
+        },
+        "content": {
+          "type": "object"
+        },
+        "points": {
+          "$ref": "#/$defs/keyPointList"
+        },
+        "bullets": {
+          "$ref": "#/$defs/stringList"
+        },
+        "cards": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "$ref": "#/$defs/card"
+          }
+        },
+        "visual": {
+          "$ref": "#/$defs/visual"
+        },
+        "comparison": {
+          "type": "object",
+          "required": [
+            "left",
+            "right"
+          ],
+          "properties": {
+            "left": {
+              "$ref": "#/$defs/comparisonSide"
+            },
+            "right": {
+              "$ref": "#/$defs/comparisonSide"
+            }
+          },
+          "additionalProperties": true
+        },
+        "process": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/processItem"
+          }
+        },
+        "steps": {
+          "type": "array"
+        },
+        "timeline": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 6,
+          "items": {
+            "$ref": "#/$defs/timelineItem"
+          }
+        },
+        "diagram": {
+          "$ref": "#/$defs/diagram"
+        },
+        "table": {
+          "$ref": "#/$defs/table"
+        },
+        "equation": {
+          "$ref": "#/$defs/equation"
+        },
+        "derivation": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 5
+        },
+        "problem": {
+          "$ref": "#/$defs/problem"
+        },
+        "activity": {
+          "type": "object",
+          "required": [
+            "task",
+            "instructions"
+          ],
+          "properties": {
+            "task": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "duration": {
+              "type": "string"
+            },
+            "instructions": {
+              "$ref": "#/$defs/activityInstructionList"
+            },
+            "deliverable": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "case_study": {
+          "type": "object",
+          "properties": {
+            "context": {
+              "type": "string"
+            },
+            "challenge": {
+              "type": "string"
+            },
+            "evidence": {
+              "type": "string"
+            },
+            "questions": {
+              "$ref": "#/$defs/caseQuestionList"
+            }
+          },
+          "minProperties": 1,
+          "additionalProperties": true
+        },
+        "quote": {
+          "oneOf": [
+            {
+              "type": "string",
+              "minLength": 1
+            },
+            {
+              "type": "object",
+              "required": [
+                "text"
+              ],
+              "properties": {
+                "text": {
+                  "$ref": "#/$defs/nonEmptyString"
+                },
+                "author": {
+                  "type": "string"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": true
+            }
+          ]
+        },
+        "summary": {
+          "type": "object",
+          "required": [
+            "points",
+            "takeaway"
+          ],
+          "properties": {
+            "points": {
+              "$ref": "#/$defs/summaryPointList"
+            },
+            "takeaway": {
+              "$ref": "#/$defs/nonEmptyString"
+            },
+            "next": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": true
+        },
+        "references": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 12,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "lecture_objectives"
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "objectives"
+                ]
+              },
+              {
+                "required": [
+                  "cards"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "enum": [
+                  "text_with_image",
+                  "full_image"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "visual"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "comparison"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "comparison"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "process_steps"
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "process"
+                ]
+              },
+              {
+                "required": [
+                  "steps"
+                ]
+              },
+              {
+                "required": [
+                  "cards"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "timeline"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "timeline"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "diagram"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "diagram"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "table"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "table"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "enum": [
+                  "equation_explanation",
+                  "equation_derivation"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "equation"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "enum": [
+                  "worked_example",
+                  "problem_solution",
+                  "multiple_choice"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "problem"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "practice_activity"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "activity"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "case_study"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "case_study"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "quote"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "quote"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "summary"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "summary"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "references"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "references"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "enum": [
+                  "adaptive_cards",
+                  "single_card_center",
+                  "two_card_horizontal",
+                  "three_card_horizontal"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "cards"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "key_points"
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "cards"
+                ]
+              },
+              {
+                "required": [
+                  "points"
+                ]
+              },
+              {
+                "required": [
+                  "content"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "concept_explanation"
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "content"
+                ]
+              },
+              {
+                "required": [
+                  "bullets"
+                ]
+              },
+              {
+                "required": [
+                  "cards"
+                ]
+              },
+              {
+                "required": [
+                  "visual"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "equation_derivation"
+              }
+            }
+          },
+          "then": {
+            "anyOf": [
+              {
+                "required": [
+                  "equation"
+                ],
+                "properties": {
+                  "equation": {
+                    "type": "object",
+                    "required": [
+                      "steps"
+                    ],
+                    "properties": {
+                      "steps": {
+                        "type": "array",
+                        "minItems": 1,
+                        "maxItems": 5
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "required": [
+                  "derivation"
+                ]
+              },
+              {
+                "required": [
+                  "steps"
+                ]
+              }
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "worked_example"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "problem": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/problem"
+                  },
+                  {
+                    "properties": {
+                      "solution_steps": {
+                        "type": "array",
+                        "maxItems": 3
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "layout_type": {
+                "const": "multiple_choice"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "problem": {
+                "allOf": [
+                  {
+                    "$ref": "#/$defs/problem"
+                  },
+                  {
+                    "required": [
+                      "choices"
+                    ],
+                    "properties": {
+                      "choices": {
+                        "type": "array",
+                        "minItems": 2,
+                        "maxItems": 4
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        }
+      ],
+      "additionalProperties": true
+    },
+    "objectiveList": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "keyPointList": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "comparisonPointList": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    },
+    "activityInstructionList": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 800
+      }
+    },
+    "caseQuestionList": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 2,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 800
+      }
+    },
+    "summaryPointList": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 6,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 500
+      }
+    }
+  }
+}

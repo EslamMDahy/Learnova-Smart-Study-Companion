@@ -50,6 +50,7 @@ class Routes {
   static const instructorCourseQuizzes      = '/instructor/courses/:courseSlug/exams';
   static const instructorQuestionBank  = '/instructor/question-bank';
   static const instructorExamCorrection = '/instructor/exam-correction';
+  static const instructorPresentation = '/instructor/presentation';
   static const instructorQuizzesLegacy = '/instructor/quizzes';
   static const instructorQuizzes       = '/instructor/exams';
   static const instructorSettings      = '/instructor/settings';

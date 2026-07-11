@@ -22,6 +22,7 @@ import '../../features/instructor/presentation/pages/instructor_shell.dart';
 import '../../features/instructor/presentation/pages/instructor_route_pages.dart';
 import '../../features/instructor/presentation/pages/course_details/course_details_page.dart';
 import '../../features/instructor/presentation/pages/exam_correction_page.dart';
+import '../../features/instructor/presentation/pages/presentation/instructor_presentation_page.dart';
 import '../../features/instructor/presentation/widgets/Quizzes/quiz_screen.dart';
 import '../../features/instructor/presentation/controllers/selected_course_provider.dart';
 import '../../features/instructor/presentation/course_route_identity.dart';
@@ -418,6 +419,13 @@ final appRouterProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(
+            path: Routes.instructorPresentation,
+            name: RouteNames.instructorPresentation,
+            pageBuilder: (_, __) => const NoTransitionPage(
+              child: InstructorPresentationPage(),
+            ),
+          ),
+          GoRoute(
             path: Routes.instructorQuizzes,
             name: RouteNames.instructorQuizzes,
             pageBuilder: (_, __) => const NoTransitionPage(
@@ -607,6 +615,7 @@ class RouteNames {
   static const instructorCourseDetails = 'instructorCourseDetails';
   static const instructorQuestionBank  = 'instructorQuestionBank';
   static const instructorExamCorrection = 'instructorExamCorrection';
+  static const instructorPresentation  = 'instructorPresentation';
   static const instructorQuizzes       = 'instructorQuizzes';
   static const instructorSettings      = 'instructorSettings';
   static const instructorHelp          = 'instructorHelp';

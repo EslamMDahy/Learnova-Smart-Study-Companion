@@ -58,6 +58,7 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
     if (path.startsWith(Routes.instructorDashboard)) return InstructorTabs.dashboard;
     if (path.startsWith(Routes.instructorCourses)) return InstructorTabs.course;
     if (path.startsWith(Routes.instructorExamCorrection)) return InstructorTabs.examCorrection;
+    if (path.startsWith(Routes.instructorPresentation)) return InstructorTabs.presentation;
     if (path.startsWith(Routes.instructorQuizzes) ||
         path.startsWith(Routes.instructorQuizzesLegacy)) {
       return InstructorTabs.quizzes;
@@ -78,6 +79,9 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
         return;
       case InstructorTabs.examCorrection:
         context.go(Routes.instructorExamCorrection);
+        return;
+      case InstructorTabs.presentation:
+        context.go(Routes.instructorPresentation);
         return;
       case InstructorTabs.quizzes:
         context.go(Routes.instructorQuizzes);
