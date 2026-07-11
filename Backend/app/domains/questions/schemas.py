@@ -3,6 +3,8 @@ from __future__ import annotations
 from datetime import datetime
 from typing import List, Optional, Any
 
+import uuid
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
@@ -219,5 +221,12 @@ class QuestionImageConfirmResponse(BaseModel):
     updated_at: datetime
 
     model_config = ConfigDict(extra="forbid")
+
+
+class QuestionBankExportJobResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    job_id: uuid.UUID
+
 
 

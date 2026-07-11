@@ -7,6 +7,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
@@ -79,4 +80,8 @@ class BackgroundJobs(Base):
     __table_args__ = (
         Index("ix_background_jobs_status_created_at", "status", "created_at"),
         Index("ix_background_jobs_type_status", "job_type", "status"),
+        Index("ix_background_jobs_active_per_user", "job_type", "requested_by",
+            unique=True,
+            postgresql_where=text("status IN ('pending', 'processing')"),
+        ),
     )

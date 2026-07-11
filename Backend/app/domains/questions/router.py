@@ -1,3 +1,5 @@
+import uuid
+
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
 
@@ -20,7 +22,8 @@ from .schemas import (QuestionCreateRequest,
                       ApproveQuestionsResponse,
                       QuestionImageInitiateRequest,
                       QuestionImageInitiateResponse,
-                      QuestionImageConfirmResponse)
+                      QuestionImageConfirmResponse,
+                      QuestionBankExportJobResponse)
 
 
 router = APIRouter(prefix="/courses/{course_id}", tags=["Questions"],)
@@ -222,5 +225,41 @@ def confirm_question_image_upload_route(
         question_id=question_id,
         db=db,
         current_user=current_user,)
+
+@router.post("/questions/export", response_model=QuestionBankExportJobResponse, status_code=status.HTTP_202_ACCEPTED,)
+def request_question_bank_export(
+    course_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.request_question_bank_export(
+        course_id=course_id,
+        db=db,
+        current_user=current_user,)
+
+@router.get("/questions/export/{job_id}/stream")
+async def stream_question_bank_export(
+    course_id: int,
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return await service.stream_question_bank_export(
+        course_id=course_id,
+        job_id=job_id,
+        db=db,
+        current_user=current_user,)
+
+
+@router.get("/questions/export/{job_id}/download")
+def download_question_bank_export(
+    course_id: int,
+    job_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return service.download_question_bank_export(
+        course_id=course_id,
+        job_id=job_id,
+        db=db,
+        current_user=current_user,)
+
 
 

@@ -2,26 +2,37 @@ from __future__ import annotations
 
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
+from fastapi.responses import Response
 
 from sqlalchemy.orm import Session
 from sqlalchemy import text, bindparam
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+
+from starlette.background import BackgroundTask
 from storage3.types import CreateSignedUploadUrlOptions
 
-
+import uuid
 import json
 
 from app.core.ai_service_integration.ai_transport import send_ai_request
-from app.core.event_bus.subscribe import subscribe
+from app.core.background_jobs.repository import DuplicateActiveJobError, create_job, get_job_by_id
+from app.core.background_jobs.registry import register_handler
+from app.core.event_bus.subscribe import register_listener, subscribe, wait_for_payload
 from app.core.storage_utils import split_object_key
 from app.core.supabase_client import supabase 
 from app.core.config import settings
-from .handlers import validate_and_normalize_question_payload
+from app.db.session import SessionLocal
+from .handlers import (validate_and_normalize_question_payload,
+                       question_bank_xlsx_export_handler)
+
 
 from .schemas import (QuestionCreateRequest, 
                       QuestionGenerationRequest)
 
 SIGNED_URL_EXPIRES_SECONDS = 60 * 60  # 1 hour
+
+register_handler("question_bank_export", question_bank_xlsx_export_handler)
+
 
 
 def create_question(*, course_id: int, payload: QuestionCreateRequest, db: Session, current_user: dict,):
@@ -2204,6 +2215,244 @@ def confirm_question_image_upload(*, course_id: int, question_id: int, db: Sessi
         "expires_in_seconds": SIGNED_URL_EXPIRES_SECONDS,
         "updated_at": updated_at_iso,
     }
+
+
+
+def request_question_bank_export(*, course_id: int, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can export the question bank")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    # =========================
+    # 2) Validate course exists + ownership
+    # =========================
+    course_row = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if int(course_row["created_by"]) != int(instructor_id):
+        raise HTTPException(
+            status_code=403,
+            detail="You can only export the question bank for your own course"
+        )
+
+    # =========================
+    # 3) Create background job
+    # =========================
+    try:
+        job_id = create_job(
+            db=db,
+            job_type="question_bank_export",
+            payload={"course_id": course_id},
+            requested_by=instructor_id,
+        )
+    except DuplicateActiveJobError:
+        raise HTTPException(status_code=409, detail="An export is already in progress")
+    except SQLAlchemyError as e:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="Database error") from e
+    return {"job_id": job_id}
+
+
+
+async def stream_question_bank_export(*, course_id: int, job_id: uuid.UUID, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can access this export")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    # =========================
+    # 2) Validate job exists + ownership + belongs to this course
+    # =========================
+    job = get_job_by_id(db=db, job_id=job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Export job not found")
+
+    if job["requested_by"] is None or int(job["requested_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You do not own this export job")
+
+    if job["payload"].get("course_id") != course_id:
+        raise HTTPException(status_code=404, detail="Export job not found")
+
+    # =========================
+    # 3) Already finished — no need to open an SSE wait at all
+    # =========================
+    if job["status"] in ("completed", "failed"):
+        db.close()
+
+        async def immediate_generator():
+            data = json.dumps({
+                "job_id": str(job_id),
+                "status": job["status"],
+                "error_message": job["error_message"],
+            })
+            yield f"event: export_status\ndata: {data}\n\n"
+
+        return StreamingResponse(
+            immediate_generator(),
+            media_type="text/event-stream",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    # =========================
+    # 4) Not finished yet — register listener BEFORE re-checking status,
+    #    to close the race window between "checked DB" and "started listening"
+    # =========================
+    db.close()
+
+    async def event_generator():
+        async with register_listener(channel=f"job_{job_id}") as queue:
+            local_db = SessionLocal()
+            try:
+                current_job = get_job_by_id(db=local_db, job_id=job_id)
+            finally:
+                local_db.close()
+
+            if current_job is None:
+                yield "event: error\ndata: {\"detail\": \"Export job not found\"}\n\n"
+                return
+
+            if current_job["status"] in ("completed", "failed"):
+                data = json.dumps({
+                    "job_id": str(job_id),
+                    "status": current_job["status"],
+                    "error_message": current_job["error_message"],
+                })
+                yield f"event: export_status\ndata: {data}\n\n"
+                return
+
+            payload = await wait_for_payload(queue, timeout=30.0)
+
+            if not payload:
+                yield "event: timeout\ndata: {\"detail\": \"Export timed out\"}\n\n"
+                return
+
+            local_db = SessionLocal()
+            try:
+                current_job = get_job_by_id(db=local_db, job_id=job_id)
+            finally:
+                local_db.close()
+
+            if current_job is None:
+                yield "event: error\ndata: {\"detail\": \"Export job not found\"}\n\n"
+                return
+
+            data = json.dumps({
+                "job_id": str(job_id),
+                "status": current_job["status"],
+                "error_message": current_job["error_message"],
+            })
+            yield f"event: export_status\ndata: {data}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
+
+def download_question_bank_export(*, course_id: int, job_id: uuid.UUID, db: Session, current_user: dict,):
+    # =========================
+    # 1) Authorization
+    # =========================
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can access this export")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    # =========================
+    # 2) Validate job exists + ownership + belongs to this course
+    # =========================
+    try:
+        job = get_job_by_id(db=db, job_id=job_id)
+    except SQLAlchemyError as e:
+        raise HTTPException(status_code=500, detail="Database error") from e
+
+    if not job:
+        raise HTTPException(status_code=404, detail="Export job not found")
+
+    if job["requested_by"] is None or int(job["requested_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You do not own this export job")
+
+    if job["payload"].get("course_id") != course_id:
+        raise HTTPException(status_code=404, detail="Export job not found")
+
+    # =========================
+    # 3) Validate job status
+    # =========================
+    if job["status"] in ("pending", "processing"):
+        raise HTTPException(status_code=409, detail="Export is not ready yet")
+
+    if job["status"] == "failed":
+        raise HTTPException(status_code=422, detail=job["error_message"] or "Export failed")
+
+    result = job["result"] or {}
+    storage_key = result.get("storage_key")
+    if not storage_key:
+        raise HTTPException(status_code=500, detail="Export completed but no file was recorded")
+
+    # =========================
+    # 4) Fetch file bytes from storage
+    # =========================
+    bucket = settings.supabase_private_bucket
+    try:
+        file_bytes = supabase.storage.from_(bucket).download(storage_key)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Failed to retrieve export file") from e
+
+    db.close()
+
+    # =========================
+    # 5) Return file, deleting it from storage right after it's sent
+    # =========================
+    def _delete_export_file(*, bucket: str, storage_key: str) -> None:
+        try:
+            supabase.storage.from_(bucket).remove([storage_key])
+        except Exception:
+            pass  # best-effort; the periodic safety-net cleanup will catch it if this fails
+
+    return Response(
+        content=file_bytes,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="question_bank_export_{course_id}.xlsx"'},
+        background=BackgroundTask(_delete_export_file, bucket=bucket, storage_key=storage_key),
+    )
+
 
 
 

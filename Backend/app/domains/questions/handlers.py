@@ -1,6 +1,21 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Mapping
+
+import uuid
+
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
+from io import BytesIO
+from datetime import datetime
+from openpyxl import load_workbook
+from openpyxl.styles import Font
+from openpyxl.drawing.image import Image as XLImage
+
+from app.core.background_jobs.registry import register_handler
+from app.core.supabase_client import supabase
+from app.core.config import settings
 
 
 def validate_and_normalize_question_payload(payload) -> dict[str, Any]:
@@ -493,3 +508,148 @@ def validate_and_normalize_code(payload) -> dict[str, Any]:
 
 def question_type_from_payload(payload) -> str:
     return (payload.type or "").strip().lower()
+
+
+
+
+QUESTION_BANK_EXPORT_TEMPLATE_PATH = "assets/question_bank_export_template.xlsx"
+CODE_FONT = Font(name="Consolas", size=10)
+
+
+def _build_option_cells(question: Mapping) -> list[str]:
+    if question["type"] not in ("multiple_choice", "multi_select"):
+        return ["", "", "", ""]
+    options = question["options"] or []
+    cells = [opt.get("text", "") for opt in options[:4]]
+    while len(cells) < 4:
+        cells.append("")
+    return cells
+
+
+def _build_expected_answer_cell(question: Mapping) -> str:
+    q_type = question["type"]
+    expected = question["expected_answer"]
+    options = question["options"] or []
+    text_by_id = {opt.get("id"): opt.get("text", "") for opt in options}
+
+    if q_type == "multiple_choice":
+        return text_by_id.get(expected, str(expected))
+    if q_type == "multi_select":
+        return ", ".join(text_by_id.get(i, str(i)) for i in (expected or []))
+    if q_type == "true_false":
+        return "True" if str(expected).lower() == "true" else "False"
+    if q_type == "code" and isinstance(expected, dict):
+        language = expected.get("language")
+        code = expected.get("code", "")
+        return f"# {language}\n{code}" if language else code
+    return str(expected) if expected is not None else ""
+
+
+def question_bank_xlsx_export_handler(*, db: Session, payload: dict) -> dict:
+    course_id = payload["course_id"]
+
+    # =========================
+    # 1) Validate course still exists
+    # =========================
+    course_row = db.execute(
+        text("""
+            SELECT id, title, course_code
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise ValueError(f"Course {course_id} not found")
+
+    # =========================
+    # 2) Fetch approved questions with topic info
+    # =========================
+    rows = db.execute(
+        text("""
+            SELECT
+                q.id, q.type, q.difficulty, q.question_text, q.explanation,
+                q.options, q.expected_answer, q.image_key,
+                t.title AS topic_title, t.description AS topic_description
+            FROM questions q
+            JOIN topics t ON t.id = q.topic_id
+            WHERE q.course_id = :course_id
+              AND q.approval_status = 'approved'
+            ORDER BY t.id, q.id
+        """),
+        {"course_id": course_id},
+    ).mappings().all()
+
+    # =========================
+    # 3) Load template, fill metadata
+    # =========================
+    wb = load_workbook(QUESTION_BANK_EXPORT_TEMPLATE_PATH)
+    ws = wb["Question Bank"]
+
+    ws["D2"] = course_row["title"]
+    ws["G2"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    ws["D4"] = course_row["course_code"] or ""
+    ws["G4"] = len(rows)
+
+    # =========================
+    # 4) Write question rows
+    # =========================
+    bucket = settings.supabase_private_bucket
+    current_row = 8
+
+    for q in rows:
+        ws.cell(row=current_row, column=1, value=q["topic_title"])
+        ws.cell(row=current_row, column=2, value=q["topic_description"])
+        ws.cell(row=current_row, column=3, value=q["id"])
+        ws.cell(row=current_row, column=4, value=q["type"])
+        ws.cell(row=current_row, column=5, value=q["difficulty"])
+
+        question_text_cell = ws.cell(row=current_row, column=6, value=q["question_text"])
+        for i, val in enumerate(_build_option_cells(q)):
+            ws.cell(row=current_row, column=7 + i, value=val)
+
+        expected_answer_cell = ws.cell(row=current_row, column=11, value=_build_expected_answer_cell(q))
+        ws.cell(row=current_row, column=12, value=q["explanation"] or "")
+
+        # =========================
+        # 5) Monospace font on any code content
+        # =========================
+        if q["type"] == "code":
+            question_text_cell.font = CODE_FONT
+            expected_answer_cell.font = CODE_FONT
+
+        # =========================
+        # 6) Inject question image if present (best-effort)
+        # =========================
+        if q["image_key"]:
+            try:
+                image_bytes = supabase.storage.from_(bucket).download(q["image_key"])
+                img = XLImage(BytesIO(image_bytes))
+                img.width = 120
+                img.height = 120
+                ws.add_image(img, f"M{current_row}")
+                ws.row_dimensions[current_row].height = 90
+            except Exception:
+                pass
+
+        current_row += 1
+
+    # =========================
+    # 7) Save in-memory, upload to Supabase
+    # =========================
+    buffer = BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+
+    storage_key = f"courses/{course_id}/exports/{uuid.uuid4()}.xlsx"
+    supabase.storage.from_(bucket).upload(
+        storage_key,
+        buffer.getvalue(),
+        {"content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+    )
+
+    return {"storage_key": storage_key, "file_size_bytes": buffer.getbuffer().nbytes}
+
+

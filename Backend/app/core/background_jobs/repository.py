@@ -4,7 +4,12 @@ import uuid
 
 from sqlalchemy import text, bindparam
 from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+
+
+class DuplicateActiveJobError(Exception):
+    pass
 
 
 def create_job(
@@ -16,22 +21,27 @@ def create_job(
 ) -> uuid.UUID:
     job_id = uuid.uuid4()
 
-    db.execute(
-        text(
-            """
-            INSERT INTO background_jobs (id, job_type, status, payload, requested_by, created_at)
-            VALUES (:id, :job_type, 'pending', :payload, :requested_by, now())
-            """
-        ).bindparams(bindparam("payload", type_=JSONB)),
-        {
-            "id": job_id,
-            "job_type": job_type,
-            "payload": payload,
-            "requested_by": requested_by,
-        },
-    )
+    try:
+        db.execute(
+            text(
+                """
+                INSERT INTO background_jobs (id, job_type, status, payload, requested_by, created_at)
+                VALUES (:id, :job_type, 'pending', :payload, :requested_by, now())
+                """
+            ).bindparams(bindparam("payload", type_=JSONB)),
+            {
+                "id": job_id,
+                "job_type": job_type,
+                "payload": payload,
+                "requested_by": requested_by,
+            },
+        )
+        db.commit()
 
-    db.commit()
+    except IntegrityError as e:
+        db.rollback()
+        raise DuplicateActiveJobError() from e
+
     return job_id
 
 
