@@ -19,7 +19,8 @@ from .handlers import (handle_content_structure_generation,
                        handle_question_generation,
                        handle_exam_grading,
                        handle_rag_chat,
-                       handle_extract_native_questions,)
+                       handle_extract_native_questions,
+                       handle_presentation_generation,)
 
 
 _HANDLER_REGISTRY = {
@@ -28,6 +29,7 @@ _HANDLER_REGISTRY = {
     "exam_grading": handle_exam_grading,
     "rag_chat": handle_rag_chat,
     "extract_native_questions": handle_extract_native_questions,
+    "presentation_generation": handle_presentation_generation,
 }
 
 
