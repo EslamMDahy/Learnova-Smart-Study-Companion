@@ -765,6 +765,69 @@ def handle_extract_native_questions(*, db: Session, verified_callback: VerifiedA
 
 
 
+def handle_presentation_generation(*, verified_callback: VerifiedAICallbackRequest, request_log: dict,) -> dict:
+    payload = verified_callback.payload
+    body = _extract_callback_body(payload)
+
+    callback_status = _extract_required_str(
+        payload,
+        "status",
+        "Missing status in callback payload",
+    ).lower()
+
+    if callback_status != "completed":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="presentation_generation callback status must be 'completed'",
+        )
+
+    course_id = _extract_required_positive_int(
+        payload,
+        "course_id",
+        "Missing or invalid course_id in callback payload",
+    )
+
+    material_id = _extract_required_positive_int(
+        body,
+        "material_id",
+        "Missing or invalid material_id in callback body",
+    )
+
+    request_log_course_id = request_log.get("course_id")
+    request_log_primary_entity_type = (
+        request_log.get("primary_entity_type") or ""
+    ).strip().lower()
+    request_log_primary_entity_id = request_log.get("primary_entity_id")
+
+    if request_log_course_id is None or int(request_log_course_id) != int(course_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback course_id does not match AI request log",
+        )
+
+    if request_log_primary_entity_type != "material":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="AI request log primary_entity_type must be 'material'",
+        )
+
+    if request_log_primary_entity_id is None or int(request_log_primary_entity_id) != int(material_id):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Callback material_id does not match AI request log",
+        )
+
+    publish_sync(
+        channel=f"presentation_{material_id}",
+        payload="ready",
+    )
+
+    return {
+        "course_id": course_id,
+        "material_id": material_id,
+    }
+
+
 
 
 def _extract_callback_body(payload: dict) -> dict:

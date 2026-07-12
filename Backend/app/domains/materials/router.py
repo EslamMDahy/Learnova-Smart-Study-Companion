@@ -6,6 +6,8 @@ from app.core.deps import get_current_user
 
 from . import service
 from .schemas import (
+    GeneratePresentationRequest,
+    GeneratePresentationResponse,
     MaterialInitUploadRequest,
     MaterialInitUploadResponse,
     MaterialConfirmUploadResponse,
@@ -17,9 +19,6 @@ from .schemas import (
 router = APIRouter(tags=["Materials"])
 
 
-# =========================
-# Init upload (nested under course + module)
-# =========================
 @router.post("/courses/{course_id}/modules/{module_id}/materials/init-upload", response_model=MaterialInitUploadResponse,status_code=status.HTTP_201_CREATED,)
 def init_material_upload(
     course_id: int,
@@ -34,9 +33,6 @@ def init_material_upload(
         db=db,
         current_user=current_user,)
 
-# =========================
-# Confirm upload (by material id)
-# =========================
 @router.post("/materials/{material_id}/confirm-upload", response_model=MaterialConfirmUploadResponse, status_code=status.HTTP_200_OK,)
 def confirm_material_upload(
     material_id: int,
@@ -47,9 +43,6 @@ def confirm_material_upload(
         db=db,
         current_user=current_user,)
 
-# =========================
-# List material metadata
-# =========================
 @router.get("/courses/{course_id}/modules/{module_id}/materials", response_model=MaterialListResponse)
 def list_module_materials(
     course_id: int,
@@ -61,7 +54,6 @@ def list_module_materials(
         module_id=module_id,
         db=db,
         current_user=current_user,)
-
 
 @router.get("/courses/{course_id}/modules/{module_id}/materials/{material_id}/download-url", response_model=MaterialDownloadUrlResponse,)
 def get_material_download_url(
@@ -119,3 +111,45 @@ async def stream_content_structure_generation_endpoint(
         db=db,
         current_user=current_user,)
 
+
+
+
+
+
+
+
+# domains/materials/router.py (add)
+
+@router.post(
+    "/courses/{course_id}/materials/{material_id}/presentations/generate",
+    response_model=GeneratePresentationResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+def generate_presentation(
+    course_id: int,
+    material_id: int,
+    payload: GeneratePresentationRequest,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),
+):
+    return service.generate_presentation(
+        course_id=course_id,
+        material_id=material_id,
+        payload=payload,
+        db=db,
+        current_user=current_user,
+    )
+
+# domains/materials/router.py (add)
+
+@router.get("/courses/{course_id}/materials/{material_id}/presentations/stream", status_code=status.HTTP_200_OK,)
+async def stream_presentation_generation_endpoint(
+    course_id: int,
+    material_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user),):
+    return await service.stream_presentation_generation(
+        course_id=course_id,
+        material_id=material_id,
+        db=db,
+        current_user=current_user,)

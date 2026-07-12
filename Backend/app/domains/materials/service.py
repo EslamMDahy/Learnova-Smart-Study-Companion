@@ -11,7 +11,8 @@ from app.core.config import settings
 from app.core.ai_service_integration.ai_transport import send_ai_request
 from app.core.event_bus.subscribe import subscribe
 from app.core.storage_utils import split_object_key, sanitize_filename, delete_storage_object
-from app.core.supabase_client import supabase  # عدّل import حسب مكان supabase client عندك
+from app.core.supabase_client import supabase
+from app.domains.materials.schemas import GeneratePresentationRequest, GeneratePresentationResponse  # عدّل import حسب مكان supabase client عندك
 
 _PDF_MAX_BYTES = 50 * 1024 * 1024
 _ALLOWED_CONTENT_TYPES = {"application/pdf"}
@@ -1341,121 +1342,173 @@ async def stream_content_structure_generation(*, course_id: int, material_id: in
 
 
 
-# def delete_material(*, course_id: int, module_id: int, material_id: int, db: Session, current_user: dict):
-#     # =========================
-#     # 1) AuthZ
-#     # =========================
-#     role = (current_user.get("system_role") or "").strip().lower()
-#     if role != "instructor":
-#         raise HTTPException(status_code=403, detail="Only instructors can delete materials")
-
-#     instructor_id = current_user.get("id")
-#     if not instructor_id:
-#         raise HTTPException(status_code=401, detail="Unauthorized")
-
-#     if not course_id or course_id <= 0:
-#         raise HTTPException(status_code=422, detail="Invalid course_id")
-#     if not module_id or module_id <= 0:
-#         raise HTTPException(status_code=422, detail="Invalid module_id")
-#     if not material_id or material_id <= 0:
-#         raise HTTPException(status_code=422, detail="Invalid material_id")
-
-#     # =========================
-#     # 2) Validate ownership chain
-#     # =========================
-#     material_row = db.execute(
-#         text("""
-#             SELECT
-#                 mat.id,
-#                 mat.module_id,
-#                 mat.storage_key,
-#                 m.course_id,
-#                 c.created_by
-#             FROM materials mat
-#             JOIN modules m
-#               ON m.id = mat.module_id
-#             JOIN courses c
-#               ON c.id = m.course_id
-#             WHERE mat.id = :material_id
-#             LIMIT 1
-#         """),
-#         {"material_id": material_id},
-#     ).mappings().first()
-
-#     if not material_row:
-#         raise HTTPException(status_code=404, detail="Material not found")
-
-#     if int(material_row["module_id"]) != int(module_id):
-#         raise HTTPException(status_code=400, detail="Material does not belong to this module")
-
-#     if int(material_row["course_id"]) != int(course_id):
-#         raise HTTPException(status_code=400, detail="Module does not belong to this course")
-
-#     if int(material_row["created_by"]) != int(instructor_id):
-#         raise HTTPException(status_code=403, detail="You can only delete materials from your own course")
-
-#     storage_key = material_row["storage_key"]
-
-#     # =========================
-#     # 3) Delete material row
-#     # =========================
-#     try:
-#         deleted = db.execute(
-#             text("""
-#                 DELETE FROM materials
-#                 WHERE id = :material_id
-#                 RETURNING id
-#             """),
-#             {"material_id": material_id},
-#         ).mappings().first()
-
-#         if not deleted:
-#             db.rollback()
-#             raise HTTPException(status_code=404, detail="Material not found")
-
-#         # =========================
-#         # 4) Check remaining references to same storage_key
-#         # =========================
-#         remaining_refs = db.execute(
-#             text("""
-#                 SELECT COUNT(*) AS ref_count
-#                 FROM materials
-#                 WHERE storage_key = :storage_key
-#             """),
-#             {"storage_key": storage_key},
-#         ).scalar()
-
-#         if remaining_refs is None:
-#             remaining_refs = 0
-
-#         # =========================
-#         # 5) Delete physical object only if unreferenced
-#         # =========================
-#         if int(remaining_refs) == 0 and storage_key:
-#             delete_storage_object(
-#                 supabase_client=supabase,
-#                 bucket=settings.supabase_private_bucket,
-#                 storage_key=storage_key,
-#             )
-
-#         db.commit()
-#         return None
-
-#     except HTTPException:
-#         db.rollback()
-#         raise
-
-#     except IntegrityError as e:
-#         db.rollback()
-#         raise HTTPException(status_code=409, detail="Conflict while deleting material") from e
-
-#     except SQLAlchemyError as e:
-#         db.rollback()
-#         raise HTTPException(status_code=500, detail="Database error") from e
-
-#     except Exception as e:
-#         db.rollback()
-#         raise HTTPException(status_code=500, detail=str(e)) from e
     
 
 
+
+
+# domains/materials/service.py (add)
+
+def generate_presentation(
+    *,
+    course_id: int,
+    material_id: int,
+    payload: GeneratePresentationRequest,
+    db: Session,
+    current_user: dict,
+):
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can generate presentations")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    mat = db.execute(
+        text("""
+            SELECT mt.id AS material_id, c.id AS course_id, c.created_by
+            FROM materials mt
+            JOIN modules m ON m.id = mt.module_id
+            JOIN courses c ON c.id = m.course_id
+            WHERE mt.id = :mid AND c.id = :cid
+            LIMIT 1
+        """),
+        {"mid": material_id, "cid": course_id},
+    ).mappings().first()
+
+    if not mat:
+        raise HTTPException(status_code=404, detail="Material not found in this course")
+
+    if mat["created_by"] != instructor_id:
+        raise HTTPException(status_code=403, detail="You can only manage materials for your own course")
+
+    send_ai_request(
+        db,
+        operation_type="presentation_generation",
+        endpoint_path="api/v1/materials/presentations/generate",
+        course_id=course_id,
+        primary_entity_type="material",
+        primary_entity_id=material_id,
+        body={
+            "material_id": material_id,
+            "slide_count": payload.slide_count,
+            "target_sections": [s.model_dump() for s in payload.target_sections],
+        },
+    )
+
+    return GeneratePresentationResponse(
+        status="processing",
+    )
+
+# domains/materials/service.py (add)
+
+async def stream_presentation_generation(*, course_id: int, material_id: int, db: Session, current_user: dict,):
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can stream presentation generation")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    if not course_id or course_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid course_id")
+
+    if not material_id or material_id <= 0:
+        raise HTTPException(status_code=422, detail="Invalid material_id")
+
+    course_row = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if int(course_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only stream presentation generation for your own course")
+
+    material_row = db.execute(
+        text("""
+            SELECT mat.id
+            FROM materials mat
+            JOIN modules m
+              ON m.id = mat.module_id
+            WHERE mat.id = :material_id
+              AND m.course_id = :course_id
+            LIMIT 1
+        """),
+        {"material_id": material_id, "course_id": course_id},
+    ).mappings().first()
+
+    if not material_row:
+        raise HTTPException(status_code=404, detail="Material not found")
+
+    db.close()
+
+    async def event_generator():
+        async for payload in subscribe(channel=f"presentation_{material_id}"):
+            if not payload:
+                yield "event: timeout\ndata: {\"detail\": \"Presentation generation timed out\"}\n\n"
+                return
+
+            yield "event: ready\ndata: {\"detail\": \"Presentation generated successfully\"}\n\n"
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+# domains/materials/service.py (add)
+
+def get_presentation_result(*, course_id: int, material_id: int, db: Session, current_user: dict):
+    role = (current_user.get("system_role") or "").strip().lower()
+    if role != "instructor":
+        raise HTTPException(status_code=403, detail="Only instructors can access presentation results")
+
+    instructor_id = current_user.get("id")
+    if not instructor_id:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+    course_row = db.execute(
+        text("""
+            SELECT id, created_by
+            FROM courses
+            WHERE id = :course_id
+            LIMIT 1
+        """),
+        {"course_id": course_id},
+    ).mappings().first()
+
+    if not course_row:
+        raise HTTPException(status_code=404, detail="Course not found")
+
+    if int(course_row["created_by"]) != int(instructor_id):
+        raise HTTPException(status_code=403, detail="You can only access presentation results for your own course")
+
+    log_row = db.execute(
+        text("""
+            SELECT response_payload
+            FROM ai_request_logs
+            WHERE operation_type = :operation_type
+              AND primary_entity_id = :material_id
+            ORDER BY created_at DESC
+            LIMIT 1
+        """),
+        {"operation_type": "presentation_generation", "material_id": material_id},
+    ).mappings().first()
+
+    if not log_row or log_row["response_payload"] is None:
+        raise HTTPException(status_code=404, detail="Presentation result not found or not ready yet")
+
+    return log_row["response_payload"]

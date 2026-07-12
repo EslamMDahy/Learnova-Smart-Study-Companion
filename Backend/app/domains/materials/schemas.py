@@ -117,3 +117,25 @@ class MaterialReassignResponse(BaseModel):
     storage_key: str
 
     model_config = ConfigDict(extra="forbid")
+
+
+
+
+
+
+# domains/materials/schemas.py (add)
+
+class PresentationTargetSection(BaseModel, extra="forbid"):
+    topic_id: int
+    topic_title: str
+    page_start: int
+    page_end: int
+
+
+class GeneratePresentationRequest(BaseModel, extra="forbid"):
+    slide_count: int
+    target_sections: list[PresentationTargetSection]
+
+
+class GeneratePresentationResponse(BaseModel, extra="forbid"):
+    status: str
