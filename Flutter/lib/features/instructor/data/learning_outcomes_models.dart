@@ -6,7 +6,7 @@
 //    Criterion: title, description?, parent_learning_outcome_id=<LO id>,
 //               level in {foundational, intermediate, advanced}
 //
-//  UI wording uses LO + Easy / Medium / Hard criteria.
+//  UI wording uses LO + Pass / Merit / Distinction criteria.
 //  Backend enum values remain foundational / intermediate / advanced.
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -16,22 +16,33 @@ extension OutcomeDifficultyX on OutcomeDifficulty {
   String get label {
     switch (this) {
       case OutcomeDifficulty.beginner:
-        return 'Easy';
+        return 'Pass';
       case OutcomeDifficulty.intermediate:
-        return 'Medium';
+        return 'Merit';
       case OutcomeDifficulty.advanced:
-        return 'Hard';
+        return 'Distinction';
+    }
+  }
+
+  String get shortLabel {
+    switch (this) {
+      case OutcomeDifficulty.beginner:
+        return 'P';
+      case OutcomeDifficulty.intermediate:
+        return 'M';
+      case OutcomeDifficulty.advanced:
+        return 'D';
     }
   }
 
   String get arabicLabel {
     switch (this) {
       case OutcomeDifficulty.beginner:
-        return 'Easy';
+        return 'Pass';
       case OutcomeDifficulty.intermediate:
-        return 'Medium';
+        return 'Merit';
       case OutcomeDifficulty.advanced:
-        return 'Hard';
+        return 'Distinction';
     }
   }
 
@@ -240,8 +251,8 @@ class LearningOutcome {
 
   static String codeForIndex(int idx) => 'LO${idx + 1}';
   static String subCodeForIndex(String parentCode, OutcomeDifficulty difficulty, int idx) {
-    // The level is shown visually by the green/orange/red icon and by the
-    // column header, so criterion chips do not repeat Easy / Medium / Hard.
+    // The level is shown visually by its P / M / D badge and by the column
+    // header, so criterion chips do not repeat Pass / Merit / Distinction.
     return '${idx + 1}';
   }
 }

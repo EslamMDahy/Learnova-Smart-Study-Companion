@@ -496,7 +496,6 @@ class _TopicHeroV2 extends StatelessWidget {
                     icon: Icons.account_tree_outlined,
                     label: 'Add subtopic',
                     onTap: onAddSubtopic,
-                    primary: true,
                   ),
                   _TopicHeaderActionButton(
                     icon: Icons.drive_file_rename_outline_rounded,
@@ -512,7 +511,6 @@ class _TopicHeroV2 extends StatelessWidget {
                     icon: Icons.delete_outline_rounded,
                     label: 'Delete topic',
                     onTap: onDelete,
-                    danger: true,
                   ),
                 ],
               ),
@@ -617,7 +615,6 @@ class _SubtopicHeroV2 extends StatelessWidget {
                     icon: Icons.flag_outlined,
                     label: 'Map Sub LO',
                     onTap: onMapOutcomes,
-                    primary: true,
                   ),
                   _TopicHeaderActionButton(
                     icon: Icons.drive_file_rename_outline_rounded,
@@ -633,7 +630,6 @@ class _SubtopicHeroV2 extends StatelessWidget {
                     icon: Icons.delete_outline_rounded,
                     label: 'Delete subtopic',
                     onTap: onDelete,
-                    danger: true,
                   ),
                 ],
               ),
@@ -1178,15 +1174,11 @@ class _TopicHeaderActionButton extends StatefulWidget {
   final IconData icon;
   final String label;
   final VoidCallback? onTap;
-  final bool primary;
-  final bool danger;
 
   const _TopicHeaderActionButton({
     required this.icon,
     required this.label,
     required this.onTap,
-    this.primary = false,
-    this.danger = false,
   });
 
   @override
@@ -1199,20 +1191,12 @@ class _TopicHeaderActionButtonState extends State<_TopicHeaderActionButton> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null;
-    final Color background = widget.primary
-        ? Colors.white
-        : widget.danger
-            ? (_hovered ? Colors.white.withValues(alpha: 0.24) : Colors.white.withValues(alpha: 0.16))
-            : (_hovered ? Colors.white.withValues(alpha: 0.22) : Colors.white.withValues(alpha: 0.14));
-    final Color foreground = widget.primary
-        ? AppColors.primary
-        : widget.danger
-            ? const Color(0xFFFFD7D7)
-            : Colors.white;
+    final background = _hovered ? const Color(0xFFF1F7FF) : Colors.white;
 
     return MouseRegion(
-      onEnter: (_) => setState(() => _hovered = true),
-      onExit: (_) => setState(() => _hovered = false),
+      cursor: enabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+      onEnter: enabled ? (_) => setState(() => _hovered = true) : null,
+      onExit: enabled ? (_) => setState(() => _hovered = false) : null,
       child: SizedBox(
         height: 38,
         child: OutlinedButton.icon(
@@ -1221,11 +1205,11 @@ class _TopicHeaderActionButtonState extends State<_TopicHeaderActionButton> {
           label: Text(widget.label),
           style: OutlinedButton.styleFrom(
             elevation: 0,
-            foregroundColor: enabled ? foreground : Colors.white.withValues(alpha: 0.55),
-            backgroundColor: enabled ? background : Colors.white.withValues(alpha: 0.08),
-            disabledForegroundColor: Colors.white.withValues(alpha: 0.55),
-            disabledBackgroundColor: Colors.white.withValues(alpha: 0.08),
-            side: BorderSide(color: widget.primary ? Colors.white : Colors.white.withValues(alpha: 0.28)),
+            foregroundColor: AppColors.primary,
+            backgroundColor: enabled ? background : Colors.white.withValues(alpha: 0.68),
+            disabledForegroundColor: AppColors.primary.withValues(alpha: 0.48),
+            disabledBackgroundColor: Colors.white.withValues(alpha: 0.68),
+            side: BorderSide(color: Colors.white.withValues(alpha: 0.96)),
             padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 0),
             textStyle: const TextStyle(fontSize: 12.3, fontWeight: FontWeight.w900),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

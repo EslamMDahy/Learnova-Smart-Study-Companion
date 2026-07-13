@@ -84,6 +84,12 @@ class Endpoints {
       '$_courses/$courseId/modules/$moduleId/materials/$materialId/download-url';
   static String contentStructureGenerationStream(int courseId, int materialId) =>
       '$_courses/$courseId/materials/$materialId/content-structure/stream';
+  static String generatePresentation(int courseId, int materialId) =>
+      '$_courses/$courseId/materials/$materialId/presentations/generate';
+  static String presentationGenerationStream(int courseId, int materialId) =>
+      '$_courses/$courseId/materials/$materialId/presentations/stream';
+  static String presentationGenerationResult(int courseId, int materialId) =>
+      '$_courses/$courseId/materials/$materialId/presentations/result';
   static String deleteMaterial(int courseId, int moduleId, int materialId) =>
       '$_courses/$courseId/modules/$moduleId/materials/$materialId';
   static String reassignMaterial(int materialId) =>
@@ -127,6 +133,13 @@ class Endpoints {
       '$_courses/$courseId/modules/$moduleId/materials/$materialId/questions';
   static String topicQuestions(int courseId, int moduleId, int materialId, int topicId) =>
       '$_courses/$courseId/modules/$moduleId/materials/$materialId/topics/$topicId/questions';
+  static String approveTopicQuestions(
+    int courseId,
+    int moduleId,
+    int materialId,
+    int topicId,
+  ) =>
+      '$_courses/$courseId/modules/$moduleId/materials/$materialId/topics/$topicId/questions/approve';
   static String aiGenerateQuestions(int courseId) =>
       '$_courses/$courseId/questions/ai-generate';
   static String aiQuestionGenerationStream(int courseId) =>
@@ -135,6 +148,12 @@ class Endpoints {
       '$_courses/$courseId/materials/$materialId/questions/extract-native';
   static String extractNativeMaterialQuestionsStream(int courseId, int materialId) =>
       '$_courses/$courseId/materials/$materialId/questions/extract-native/stream';
+  static String requestQuestionBankExport(int courseId) =>
+      '$_courses/$courseId/questions/export';
+  static String questionBankExportStream(int courseId, String jobId) =>
+      '$_courses/$courseId/questions/export/$jobId/stream';
+  static String questionBankExportDownload(int courseId, String jobId) =>
+      '$_courses/$courseId/questions/export/$jobId/download';
 
   // ─── EXAMS ───────────────────────────────────────────────────────────────
   static String courseExams(int courseId) =>

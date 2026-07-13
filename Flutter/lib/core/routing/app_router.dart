@@ -365,6 +365,51 @@ final appRouterProvider = Provider<GoRouter>((ref) {
                 courseDetailsPage(state, CourseDetailsTab.students),
           ),
           GoRoute(
+            path: Routes.instructorCoursePresentation,
+            name: RouteNames.instructorCoursePresentation,
+            pageBuilder: (_, state) {
+              final slug = state.pathParameters['courseSlug']!;
+              final cached = SelectedCourseCache.value;
+              final routeCourseId = parseCourseIdFromSlug(slug);
+              final courseId = cached != null && slugMatchesCourse(slug, cached)
+                  ? cached.id
+                  : routeCourseId ?? SelectedCourseCache.cachedCourseId;
+              final moduleId = int.tryParse(
+                state.uri.queryParameters['moduleId'] ?? '',
+              );
+              final materialId = int.tryParse(
+                state.uri.queryParameters['materialId'] ?? '',
+              );
+              final materialPageCount = int.tryParse(
+                state.uri.queryParameters['pageCount'] ?? '',
+              );
+              final topicIds = (state.uri.queryParameters['topicIds'] ?? '')
+                  .split(',')
+                  .map((String value) => int.tryParse(value.trim()))
+                  .whereType<int>()
+                  .where((int id) => id > 0)
+                  .toSet();
+
+              return NoTransitionPage(
+                key: ValueKey<String>('course-presentation-${state.uri}'),
+                child: InstructorPresentationPage(
+                  courseId: courseId,
+                  courseSlug: slug,
+                  courseTitle: state.uri.queryParameters['courseTitle'] ??
+                      (cached != null && slugMatchesCourse(slug, cached)
+                          ? cached.safeTitle
+                          : null),
+                  moduleId: moduleId,
+                  materialId: materialId,
+                  materialTitle:
+                      state.uri.queryParameters['materialTitle'],
+                  materialPageCount: materialPageCount,
+                  selectedTopicIds: topicIds,
+                ),
+              );
+            },
+          ),
+          GoRoute(
             path: Routes.instructorCourseQuizzes,
             name: RouteNames.instructorCourseQuizzes,
             pageBuilder: (_, state) {
@@ -636,4 +681,5 @@ class RouteNames {
   static const instructorCourseQuestionBank = 'instructorCourseQuestionBank';
   static const instructorCourseTemplates    = 'instructorCourseTemplates';
   static const instructorCourseQuizzes      = 'instructorCourseQuizzes';
+  static const instructorCoursePresentation = 'instructorCoursePresentation';
 }

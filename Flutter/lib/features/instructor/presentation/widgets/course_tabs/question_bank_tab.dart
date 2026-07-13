@@ -5,6 +5,10 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../../core/network/error_mapper.dart';
+import '../../../../../core/ui/toast.dart';
+import '../../../../../core/utils/file_download_stub.dart'
+    if (dart.library.js_interop) '../../../../../core/utils/file_download_web.dart'
+    if (dart.library.html) '../../../../../core/utils/file_download_web.dart';
 import '../../../../../shared/widgets/app_ui_components.dart';
 import '../../../data/courses_models.dart';
 import '../../../data/exam_models.dart';
@@ -178,6 +182,7 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
   final TextEditingController _searchController = TextEditingController();
   Timer? _searchDebounce;
   CancelToken? _questionsCancelToken;
+  CancelToken? _exportCancelToken;
   int _questionsRequestSerial = 0;
   final Map<String, String> _questionSearchTextById = <String, String>{};
 
@@ -200,6 +205,8 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
 
   bool _loading = true;
   bool _creatingExam = false;
+  bool _exportingQuestionBank = false;
+  String? _activeQuestionBankExportJobId;
   bool _treeRequested = false;
   Future<void>? _treeLoadFuture;
   String? _error;
@@ -220,6 +227,7 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
   void dispose() {
     _searchDebounce?.cancel();
     _questionsCancelToken?.cancel('Question bank disposed');
+    _exportCancelToken?.cancel('Question bank export disposed');
     _searchController.dispose();
     super.dispose();
   }
@@ -414,6 +422,128 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
     );
   }
 
+  Future<void> _exportQuestionBank() async {
+    if (!mounted || _exportingQuestionBank) return;
+
+    _exportCancelToken?.cancel('A newer question bank export request started');
+    final cancelToken = CancelToken();
+    _exportCancelToken = cancelToken;
+
+    setState(() => _exportingQuestionBank = true);
+
+    final api = ref.read(questionsApiProvider);
+    var jobId = _activeQuestionBankExportJobId;
+
+    try {
+      if (jobId == null) {
+        final job = await api.requestQuestionBankExport(
+          courseId: widget.course.id,
+          cancelToken: cancelToken,
+        );
+        jobId = job.jobId;
+
+        if (!mounted || cancelToken.isCancelled) return;
+        setState(() => _activeQuestionBankExportJobId = jobId);
+        AppToast.info(
+          context,
+          title: 'Export started',
+          message: 'Your Excel file is being prepared in the background.',
+        );
+      }
+
+      final resolvedJobId = jobId;
+      if (resolvedJobId == null) {
+        throw const FormatException('Question bank export job id is missing');
+      }
+
+      final startedAt = DateTime.now();
+      var timeoutCount = 0;
+
+      while (!cancelToken.isCancelled) {
+        final status = await api.waitForQuestionBankExport(
+          courseId: widget.course.id,
+          jobId: resolvedJobId,
+          cancelToken: cancelToken,
+        );
+
+        if (status.isTimeout) {
+          timeoutCount += 1;
+          final exceededWaitLimit =
+              timeoutCount >= 16 || DateTime.now().difference(startedAt) >= const Duration(minutes: 8);
+          if (exceededWaitLimit) {
+            if (!mounted) return;
+            AppToast.info(
+              context,
+              title: 'Export still processing',
+              message: 'The job is still running. Use Resume Export to check it again.',
+              duration: const Duration(seconds: 5),
+            );
+            return;
+          }
+          continue;
+        }
+
+        if (status.isFailed) {
+          if (!mounted) return;
+          setState(() => _activeQuestionBankExportJobId = null);
+          AppToast.error(
+            context,
+            title: 'Export failed',
+            message: status.errorMessage ?? 'The question bank could not be exported.',
+          );
+          return;
+        }
+
+        final file = await api.downloadQuestionBankExport(
+          courseId: widget.course.id,
+          jobId: resolvedJobId,
+          cancelToken: cancelToken,
+        );
+        if (cancelToken.isCancelled) return;
+
+        downloadBytesFile(
+          filename: file.filename,
+          bytes: file.bytes,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+
+        if (!mounted) return;
+        setState(() => _activeQuestionBankExportJobId = null);
+        AppToast.success(
+          context,
+          title: 'Question bank exported',
+          message: 'The Excel file has been downloaded.',
+        );
+        return;
+      }
+    } catch (error) {
+      if (cancelToken.isCancelled || !mounted) return;
+
+      final failure = mapApiFailure(error);
+      final jobCanNoLongerBeResumed =
+          failure.statusCode == 403 || failure.statusCode == 404 || failure.statusCode == 422;
+      if (jobCanNoLongerBeResumed) {
+        setState(() => _activeQuestionBankExportJobId = null);
+      }
+
+      final canResume = jobId != null && !jobCanNoLongerBeResumed;
+      AppToast.error(
+        context,
+        title: canResume ? 'Export interrupted' : 'Export failed',
+        message: canResume
+            ? '${failure.message} Use Resume Export to try checking the same job again.'
+            : failure.message,
+      );
+    } finally {
+      if (identical(_exportCancelToken, cancelToken)) {
+        _exportCancelToken = null;
+      }
+      if (mounted) {
+        setState(() => _exportingQuestionBank = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     ref.listen<int>(questionBankRefreshSignalProvider(widget.course.id), (previous, next) {
@@ -490,11 +620,14 @@ class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
                 _QuestionBankHeader(
                   loading: _loading,
                   canCreateExam: _questions.isNotEmpty,
+                  exportingQuestionBank: _exportingQuestionBank,
+                  hasPendingQuestionBankExport: _activeQuestionBankExportJobId != null,
                   totalQuestionsCount: _questions.length,
                   visibleQuestionsCount: filtered.length,
                   examReadyCount: examReadyCount,
                   onRefresh: _loadQuestions,
                   onGenerateQuestions: _openGenerateQuestionsTopicPicker,
+                  onExportQuestionBank: _exportQuestionBank,
                   onCreateExam: _openCreateExamStart,
                 ),
                 const SizedBox(height: 16),

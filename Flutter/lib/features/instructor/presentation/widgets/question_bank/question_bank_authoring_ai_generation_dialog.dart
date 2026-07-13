@@ -39,65 +39,135 @@ class _AiGenerationRequest {
   Map<String, dynamic> toJson() => <String, dynamic>{'topics': topics};
 }
 
+class _AiTopicSelection {
+  final add_question_sheet.QuestionAuthoringTarget target;
+  bool selected;
+  final List<_AiQuestionConfig> configs;
+
+  _AiTopicSelection({
+    required this.target,
+    required this.selected,
+    required this.configs,
+  });
+
+  int get totalQuestions => configs.fold<int>(
+        0,
+        (int total, _AiQuestionConfig config) => total + config.count,
+      );
+
+  Map<String, dynamic> toRequestJson() => <String, dynamic>{
+        'topic_id': target.topicId,
+        'question_configs': configs
+            .map((_AiQuestionConfig config) => config.toJson())
+            .toList(),
+      };
+}
+
 class _AiGenerationDialog extends StatefulWidget {
   final List<add_question_sheet.QuestionAuthoringTarget> targets;
+  final int? initialTopicId;
 
-  const _AiGenerationDialog({required this.targets});
+  const _AiGenerationDialog({
+    required this.targets,
+    this.initialTopicId,
+  });
 
   @override
   State<_AiGenerationDialog> createState() => _AiGenerationDialogState();
 }
 
 class _AiGenerationDialogState extends State<_AiGenerationDialog> {
-  final List<_AiQuestionConfig> _configs = <_AiQuestionConfig>[
-    _AiQuestionConfig(
-      type: QuestionType.multipleChoice,
-      difficulty: QuestionDifficulty.medium,
-      count: 5,
-    ),
+  static const int _maxQuestionsPerRequest = 50;
+  static const List<QuestionType> _supportedTypes = <QuestionType>[
+    QuestionType.multipleChoice,
+    QuestionType.multiSelect,
+    QuestionType.trueFalse,
+    QuestionType.shortAnswer,
+    QuestionType.essay,
   ];
 
-  static const int _maxQuestionsPerRequest = 50;
-  late int _selectedTargetTopicId;
+  final TextEditingController _searchController = TextEditingController();
+  late final List<_AiTopicSelection> _selections;
+  String _searchQuery = '';
 
-  add_question_sheet.QuestionAuthoringTarget? get _selectedTarget {
-    if (widget.targets.isEmpty) return null;
-    return widget.targets.firstWhere(
-      (add_question_sheet.QuestionAuthoringTarget target) =>
-          target.topicId == _selectedTargetTopicId,
-      orElse: () => widget.targets.first,
-    );
+  List<_AiTopicSelection> get _selectedTopics => _selections
+      .where((_AiTopicSelection selection) => selection.selected)
+      .toList();
+
+  List<_AiTopicSelection> get _filteredTopics {
+    final String query = _searchQuery.trim().toLowerCase();
+    if (query.isEmpty) return _selections;
+    return _selections.where((_AiTopicSelection selection) {
+      final add_question_sheet.QuestionAuthoringTarget target = selection.target;
+      return target.topicName.toLowerCase().contains(query) ||
+          (target.parentTopicName ?? '').toLowerCase().contains(query) ||
+          (target.materialName ?? '').toLowerCase().contains(query) ||
+          (target.moduleName ?? '').toLowerCase().contains(query);
+    }).toList();
   }
 
-  int get _configuredTotal => _configs.fold<int>(
+  int get _totalQuestions => _selectedTopics.fold<int>(
         0,
-        (int total, _AiQuestionConfig config) => total + config.count,
+        (int total, _AiTopicSelection selection) =>
+            total + selection.totalQuestions,
+      );
+
+  int get _selectedRuleCount => _selectedTopics.fold<int>(
+        0,
+        (int total, _AiTopicSelection selection) =>
+            total + selection.configs.length,
       );
 
   @override
   void initState() {
     super.initState();
-    _selectedTargetTopicId =
-        widget.targets.isNotEmpty ? widget.targets.first.topicId : -1;
+    final bool hasInitialTopic = widget.initialTopicId != null &&
+        widget.targets.any(
+          (add_question_sheet.QuestionAuthoringTarget target) =>
+              target.topicId == widget.initialTopicId,
+        );
+    _selections = List<_AiTopicSelection>.generate(
+      widget.targets.length,
+      (int index) => _AiTopicSelection(
+        target: widget.targets[index],
+        selected: hasInitialTopic
+            ? widget.targets[index].topicId == widget.initialTopicId
+            : index == 0,
+        configs: <_AiQuestionConfig>[
+          _AiQuestionConfig(
+            type: QuestionType.multipleChoice,
+            difficulty: QuestionDifficulty.medium,
+            count: 5,
+          ),
+        ],
+      ),
+    );
+    _searchController.addListener(() {
+      if (!mounted) return;
+      setState(() => _searchQuery = _searchController.text);
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final add_question_sheet.QuestionAuthoringTarget? selectedTarget =
-        _selectedTarget;
-    final _AiGenerationRequest request = selectedTarget == null
-        ? const _AiGenerationRequest(topics: <Map<String, dynamic>>[])
-        : _buildRequest(selectedTarget);
+    final _AiGenerationRequest request = _buildRequest();
+    final int selectedCount = request.topicCount;
     final int totalQuestions = request.totalQuestions;
-    final bool canGenerate = selectedTarget != null &&
+    final bool canGenerate = selectedCount > 0 &&
         totalQuestions > 0 &&
         totalQuestions <= _maxQuestionsPerRequest;
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 22, vertical: 18),
       child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 920, maxHeight: 760),
+        constraints: const BoxConstraints(maxWidth: 1060, maxHeight: 790),
         child: Container(
           decoration: BoxDecoration(
             color: AppColors.cardBg,
@@ -115,7 +185,7 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
             borderRadius: BorderRadius.circular(16),
             child: LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
-                final bool compact = constraints.maxWidth < 780;
+                final bool compact = constraints.maxWidth < 820;
                 return Column(
                   children: <Widget>[
                     _dialogHeader(compact: compact),
@@ -127,13 +197,12 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.stretch,
                                 children: <Widget>[
-                                  _buildConfigPanel(compact: true),
-                                  const SizedBox(height: 16),
-                                  _buildSummaryPanel(
-                                    selectedTarget: selectedTarget,
-                                    totalQuestions: totalQuestions,
-                                    compact: true,
+                                  SizedBox(
+                                    height: 510,
+                                    child: _buildTopicsPanel(compact: true),
                                   ),
+                                  const SizedBox(height: 16),
+                                  _buildSummaryPanel(compact: true),
                                 ],
                               ),
                             )
@@ -141,23 +210,22 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
                               crossAxisAlignment: CrossAxisAlignment.stretch,
                               children: <Widget>[
                                 Expanded(
-                                  flex: 6,
-                                  child: SingleChildScrollView(
+                                  flex: 65,
+                                  child: Padding(
                                     padding: const EdgeInsets.all(22),
-                                    child: _buildConfigPanel(compact: false),
+                                    child: _buildTopicsPanel(compact: false),
                                   ),
                                 ),
-                                VerticalDivider(width: 1, color: AppColors.borderGray),
+                                VerticalDivider(
+                                  width: 1,
+                                  color: AppColors.borderGray,
+                                ),
                                 Expanded(
-                                  flex: 4,
+                                  flex: 35,
                                   child: Container(
                                     color: AppColors.surfaceBg,
                                     padding: const EdgeInsets.all(22),
-                                    child: _buildSummaryPanel(
-                                      selectedTarget: selectedTarget,
-                                      totalQuestions: totalQuestions,
-                                      compact: false,
-                                    ),
+                                    child: _buildSummaryPanel(compact: false),
                                   ),
                                 ),
                               ],
@@ -166,7 +234,6 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
                     _dialogFooter(
                       canGenerate: canGenerate,
                       request: request,
-                      totalQuestions: totalQuestions,
                     ),
                   ],
                 );
@@ -210,7 +277,7 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  'Pick one topic, choose a preset or customize the rules, then send one clean AI request.',
+                  'Select several topics, then add one or more question rules to every topic.',
                   maxLines: compact ? 2 : 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
@@ -232,128 +299,473 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
     );
   }
 
-  Widget _buildConfigPanel({required bool compact}) {
+  Widget _buildTopicsPanel({required bool compact}) {
+    final List<_AiTopicSelection> visibleTopics = _filteredTopics;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         _sectionTitle(
-          '1. Target topic',
-          widget.targets.length > 1 ? '${widget.targets.length} available' : 'locked',
+          '1. Select topics',
+          '${_selectedTopics.length} selected',
         ),
         const SizedBox(height: 10),
-        _targetSelector(),
-        const SizedBox(height: 18),
-        _sectionTitle('2. Quick presets', 'optional'),
+        TextField(
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: 'Search topics, materials, or modules...',
+            prefixIcon: const Icon(Icons.search_rounded, size: 20),
+            suffixIcon: _searchQuery.trim().isEmpty
+                ? null
+                : IconButton(
+                    tooltip: 'Clear search',
+                    onPressed: _searchController.clear,
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                  ),
+            filled: true,
+            fillColor: AppColors.surfaceBg,
+            contentPadding: const EdgeInsets.symmetric(
+              horizontal: 14,
+              vertical: 13,
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide(color: AppColors.borderGray),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primary),
+            ),
+          ),
+        ),
         const SizedBox(height: 10),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
+        Row(
           children: <Widget>[
-            _presetChip(
-              label: '5 MCQ • Medium',
-              icon: Icons.checklist_rounded,
-              configs: <_AiQuestionConfig>[
-                _AiQuestionConfig(
-                  type: QuestionType.multipleChoice,
-                  difficulty: QuestionDifficulty.medium,
-                  count: 5,
-                ),
-              ],
+            TextButton.icon(
+              onPressed: visibleTopics.isEmpty
+                  ? null
+                  : () => _setVisibleTopicsSelected(visibleTopics, true),
+              icon: const Icon(Icons.done_all_rounded, size: 17),
+              label: const Text('Select visible'),
             ),
-            _presetChip(
-              label: '3 True/False • Easy',
-              icon: Icons.rule_rounded,
-              configs: <_AiQuestionConfig>[
-                _AiQuestionConfig(
-                  type: QuestionType.trueFalse,
-                  difficulty: QuestionDifficulty.easy,
-                  count: 3,
-                ),
-              ],
+            const SizedBox(width: 4),
+            TextButton(
+              onPressed: _selectedTopics.isEmpty
+                  ? null
+                  : () => setState(() {
+                        for (final _AiTopicSelection selection in _selections) {
+                          selection.selected = false;
+                        }
+                      }),
+              child: const Text('Clear'),
             ),
-            _presetChip(
-              label: 'Mixed 10',
-              icon: Icons.auto_awesome_motion_rounded,
-              configs: <_AiQuestionConfig>[
-                _AiQuestionConfig(
-                  type: QuestionType.multipleChoice,
-                  difficulty: QuestionDifficulty.medium,
-                  count: 5,
-                ),
-                _AiQuestionConfig(
-                  type: QuestionType.trueFalse,
-                  difficulty: QuestionDifficulty.easy,
-                  count: 3,
-                ),
-                _AiQuestionConfig(
-                  type: QuestionType.shortAnswer,
-                  difficulty: QuestionDifficulty.medium,
-                  count: 2,
-                ),
-              ],
+            const Spacer(),
+            Text(
+              '${visibleTopics.length} available',
+              style: TextStyle(
+                color: AppColors.textMuted,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+              ),
             ),
           ],
         ),
-        const SizedBox(height: 18),
-        _sectionTitle(
-          '3. Question rules',
-          '${_configs.length} rule${_configs.length == 1 ? '' : 's'}',
+        const SizedBox(height: 8),
+        Expanded(
+          child: visibleTopics.isEmpty
+              ? _emptyTopicsState()
+              : ListView.separated(
+                  itemCount: visibleTopics.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 9),
+                  itemBuilder: (_, int index) =>
+                      _topicSelectionCard(visibleTopics[index], compact: compact),
+                ),
         ),
-        const SizedBox(height: 10),
-        ...List<Widget>.generate(_configs.length, (int index) {
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 10),
-            child: _configRow(index, compact: compact),
-          );
-        }),
-        OutlinedButton.icon(
-          onPressed: _configuredTotal >= _maxQuestionsPerRequest
-              ? null
-              : () {
-                  setState(() {
-                    _configs.add(
-                      _AiQuestionConfig(
-                        type: QuestionType.trueFalse,
-                        difficulty: QuestionDifficulty.medium,
-                        count: 3,
-                      ),
-                    );
-                  });
-                },
-          icon: const Icon(Icons.add_rounded),
-          label: const Text('Add rule'),
-          style: OutlinedButton.styleFrom(
-            foregroundColor: AppColors.primary,
-            disabledForegroundColor: AppColors.textMuted,
-            side: BorderSide(color: AppColors.borderSoft),
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10),
-            ),
-          ),
-        ),
-        if (_configuredTotal > _maxQuestionsPerRequest) ...<Widget>[
-          const SizedBox(height: 10),
-          _inlineNotice(
-            icon: Icons.warning_amber_rounded,
-            text: 'Maximum $_maxQuestionsPerRequest questions per AI request. Reduce the count before generating.',
-            danger: true,
-          ),
-        ],
       ],
     );
   }
 
-  Widget _buildSummaryPanel({
-    required add_question_sheet.QuestionAuthoringTarget? selectedTarget,
-    required int totalQuestions,
+  Widget _topicSelectionCard(
+    _AiTopicSelection selection, {
     required bool compact,
   }) {
-    final bool overLimit = totalQuestions > _maxQuestionsPerRequest;
+    final add_question_sheet.QuestionAuthoringTarget target = selection.target;
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 160),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: selection.selected
+            ? AppColors.primary.withValues(alpha: 0.055)
+            : AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(13),
+        border: Border.all(
+          color: selection.selected
+              ? AppColors.primary.withValues(alpha: 0.35)
+              : AppColors.borderGray,
+        ),
+      ),
+      child: Column(
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Checkbox(
+                value: selection.selected,
+                onChanged: (bool? value) => setState(() {
+                  selection.selected = value ?? false;
+                }),
+                visualDensity: VisualDensity.compact,
+              ),
+              const SizedBox(width: 4),
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Icon(
+                  target.isSubtopic
+                      ? Icons.subdirectory_arrow_right_rounded
+                      : Icons.topic_outlined,
+                  size: 18,
+                  color: AppColors.primary,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      _compactTargetLabel(target),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textTitle,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      target.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              if (!selection.selected)
+                TextButton(
+                  onPressed: () => setState(() => selection.selected = true),
+                  child: const Text('Add'),
+                ),
+            ],
+          ),
+          if (selection.selected) ...<Widget>[
+            const SizedBox(height: 11),
+            Divider(height: 1, color: AppColors.borderGray),
+            const SizedBox(height: 11),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    'Question rules',
+                    style: TextStyle(
+                      color: AppColors.textTitle,
+                      fontSize: 12.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '${selection.configs.length} ${selection.configs.length == 1 ? 'rule' : 'rules'}',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 9),
+            ...List<Widget>.generate(
+              selection.configs.length,
+              (int index) => Padding(
+                padding: EdgeInsets.only(
+                  bottom: index == selection.configs.length - 1 ? 0 : 8,
+                ),
+                child: _questionRuleCard(
+                  selection,
+                  selection.configs[index],
+                  index,
+                  compact: compact,
+                ),
+              ),
+            ),
+            const SizedBox(height: 9),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: OutlinedButton.icon(
+                onPressed: _totalQuestions >= _maxQuestionsPerRequest
+                    ? null
+                    : () => _addQuestionRule(selection),
+                icon: const Icon(Icons.add_rounded, size: 17),
+                label: const Text('Add question rule'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  side: BorderSide(
+                    color: AppColors.primary.withValues(alpha: 0.28),
+                  ),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  textStyle: const TextStyle(
+                    fontSize: 11.8,
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _questionRuleCard(
+    _AiTopicSelection selection,
+    _AiQuestionConfig config,
+    int index, {
+    required bool compact,
+  }) {
+    final Widget ruleLabel = Container(
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 10),
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: AppColors.primary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(
+        'Rule ${index + 1}',
+        style: TextStyle(
+          color: AppColors.primary,
+          fontSize: 10.8,
+          fontWeight: FontWeight.w900,
+        ),
+      ),
+    );
+
+    final Widget removeButton = IconButton(
+      tooltip: 'Remove this rule',
+      visualDensity: VisualDensity.compact,
+      onPressed: selection.configs.length <= 1
+          ? null
+          : () => setState(() => selection.configs.remove(config)),
+      icon: Icon(
+        Icons.delete_outline_rounded,
+        size: 18,
+        color: selection.configs.length <= 1
+            ? AppColors.textMuted.withValues(alpha: 0.45)
+            : AppColors.dangerText,
+      ),
+    );
+
+    return Container(
+      padding: const EdgeInsets.all(9),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(11),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: compact
+          ? Column(
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    ruleLabel,
+                    const Spacer(),
+                    if (selection.configs.length > 1) removeButton,
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: <Widget>[
+                    Expanded(child: _typeDropdown(config)),
+                    const SizedBox(width: 8),
+                    Expanded(child: _difficultyDropdown(config)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                _topicCountControl(config, width: double.infinity),
+              ],
+            )
+          : Row(
+              children: <Widget>[
+                ruleLabel,
+                const SizedBox(width: 8),
+                Expanded(flex: 4, child: _typeDropdown(config)),
+                const SizedBox(width: 8),
+                Expanded(flex: 3, child: _difficultyDropdown(config)),
+                const SizedBox(width: 8),
+                _topicCountControl(config),
+                if (selection.configs.length > 1) ...<Widget>[
+                  const SizedBox(width: 4),
+                  removeButton,
+                ],
+              ],
+            ),
+    );
+  }
+
+  Widget _typeDropdown(_AiQuestionConfig config) {
+    return _smallDropdown<QuestionType>(
+      value: config.type,
+      items: _supportedTypes,
+      label: (QuestionType value) => value.label,
+      onChanged: (QuestionType? value) {
+        if (value == null) return;
+        setState(() => config.type = value);
+      },
+    );
+  }
+
+  Widget _difficultyDropdown(_AiQuestionConfig config) {
+    return _smallDropdown<QuestionDifficulty>(
+      value: config.difficulty,
+      items: QuestionDifficulty.values,
+      label: (QuestionDifficulty value) => value.label,
+      onChanged: (QuestionDifficulty? value) {
+        if (value == null) return;
+        setState(() => config.difficulty = value);
+      },
+    );
+  }
+
+  Widget _topicCountControl(
+    _AiQuestionConfig config, {
+    double width = 142,
+  }) {
+    return Container(
+      width: width,
+      height: 40,
+      padding: const EdgeInsets.symmetric(horizontal: 7),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.borderSoft),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          _miniCountButton(Icons.remove_rounded, () {
+            setState(() {
+              config.count = (config.count - 1).clamp(1, 50).toInt();
+            });
+          }),
+          Expanded(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Text(
+                  '${config.count}',
+                  style: TextStyle(
+                    color: AppColors.textTitle,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w900,
+                    height: 1,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'questions',
+                  style: TextStyle(
+                    color: AppColors.textMuted,
+                    fontSize: 9.5,
+                    fontWeight: FontWeight.w700,
+                    height: 1,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          _miniCountButton(Icons.add_rounded, () {
+            if (_totalQuestions >= _maxQuestionsPerRequest) return;
+            setState(() {
+              config.count = (config.count + 1).clamp(1, 50).toInt();
+            });
+          }),
+        ],
+      ),
+    );
+  }
+
+  void _addQuestionRule(_AiTopicSelection selection) {
+    final int remaining = _maxQuestionsPerRequest - _totalQuestions;
+    if (remaining <= 0) return;
+
+    final Set<QuestionType> usedTypes = selection.configs
+        .map((_AiQuestionConfig config) => config.type)
+        .toSet();
+    final QuestionType nextType = _supportedTypes.firstWhere(
+      (QuestionType type) => !usedTypes.contains(type),
+      orElse: () => _supportedTypes.first,
+    );
+
+    setState(() {
+      selection.configs.add(
+        _AiQuestionConfig(
+          type: nextType,
+          difficulty: QuestionDifficulty.medium,
+          count: remaining >= 5 ? 5 : remaining,
+        ),
+      );
+    });
+  }
+
+
+  Widget _buildSummaryPanel({required bool compact}) {
+    final List<_AiTopicSelection> selected = _selectedTopics;
+    final int total = _totalQuestions;
+    final bool overLimit = total > _maxQuestionsPerRequest;
+
+    final Widget selectedList = selected.isEmpty
+        ? _inlineNotice(
+            icon: Icons.info_outline_rounded,
+            text: 'Select at least one topic to build the AI request.',
+          )
+        : ListView.separated(
+            shrinkWrap: compact,
+            physics: compact
+                ? const NeverScrollableScrollPhysics()
+                : const ClampingScrollPhysics(),
+            itemCount: selected.length,
+            separatorBuilder: (_, __) => const SizedBox(height: 8),
+            itemBuilder: (_, int index) => _summaryTopicCard(selected[index]),
+          );
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        _sectionTitle('Request summary', '$totalQuestions requested'),
+        _sectionTitle(
+          'Request summary',
+          '${selected.length} topics • $_selectedRuleCount rules',
+        ),
         const SizedBox(height: 12),
         Container(
           padding: const EdgeInsets.all(14),
@@ -366,24 +778,24 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               _summaryTile(
-                icon: Icons.topic_outlined,
-                title: 'Topic',
-                value: selectedTarget == null
-                    ? 'No topic selected'
-                    : _compactTargetLabel(selectedTarget),
+                icon: Icons.account_tree_outlined,
+                title: 'Selected topics',
+                value: '${selected.length} / ${widget.targets.length}',
               ),
               const SizedBox(height: 12),
               _summaryTile(
                 icon: Icons.format_list_numbered_rounded,
                 title: 'Total questions',
-                value: '$totalQuestions / $_maxQuestionsPerRequest',
+                value: '$total / $_maxQuestionsPerRequest',
               ),
               const SizedBox(height: 14),
               ClipRRect(
                 borderRadius: BorderRadius.circular(999),
                 child: LinearProgressIndicator(
                   minHeight: 8,
-                  value: (totalQuestions / _maxQuestionsPerRequest).clamp(0, 1).toDouble(),
+                  value: (total / _maxQuestionsPerRequest)
+                      .clamp(0, 1)
+                      .toDouble(),
                   backgroundColor: AppColors.borderSoft,
                   valueColor: AlwaysStoppedAnimation<Color>(
                     overLimit ? AppColors.dangerText : AppColors.primary,
@@ -395,50 +807,162 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
         ),
         const SizedBox(height: 14),
         Text(
-          'Rules',
+          'Topics in this request',
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w900,
             color: AppColors.textTitle,
           ),
         ),
-        const SizedBox(height: 10),
-        if (compact)
-          Column(
-            children: List<Widget>.generate(_configs.length, (int index) {
-              return Padding(
-                padding: EdgeInsets.only(bottom: index == _configs.length - 1 ? 0 : 8),
-                child: _ruleChip(_configs[index]),
-              );
-            }),
-          )
-        else
-          Expanded(
-            child: ListView.separated(
-              itemCount: _configs.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (_, int index) => _ruleChip(_configs[index]),
-            ),
-          ),
+        const SizedBox(height: 9),
+        if (compact) selectedList else Expanded(child: selectedList),
         const SizedBox(height: 12),
         _inlineNotice(
-          icon: Icons.info_outline_rounded,
-          text: 'Generated questions are saved directly to the question bank. This workspace only shows the new batch from this visit.',
+          icon: Icons.fact_check_outlined,
+          text:
+              'AI questions arrive as Pending review. Review them in the workspace, then mark them reviewed to include them in the Excel question bank export.',
         ),
+        if (overLimit) ...<Widget>[
+          const SizedBox(height: 10),
+          _inlineNotice(
+            icon: Icons.warning_amber_rounded,
+            text:
+                'Maximum $_maxQuestionsPerRequest questions per request. Reduce one or more topic counts.',
+            danger: true,
+          ),
+        ],
       ],
+    );
+  }
+
+  Widget _summaryTopicCard(_AiTopicSelection selection) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.borderGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Container(
+                constraints: const BoxConstraints(minWidth: 30),
+                height: 30,
+                padding: const EdgeInsets.symmetric(horizontal: 7),
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.09),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '${selection.totalQuestions}',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 9),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      _compactTargetLabel(selection.target),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textTitle,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 12.2,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${selection.configs.length} ${selection.configs.length == 1 ? 'question rule' : 'question rules'}',
+                      style: TextStyle(
+                        color: AppColors.textMuted,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 10.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              IconButton(
+                tooltip: 'Remove topic',
+                visualDensity: VisualDensity.compact,
+                onPressed: () => setState(() => selection.selected = false),
+                icon: Icon(
+                  Icons.close_rounded,
+                  size: 17,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 7),
+          Divider(height: 1, color: AppColors.borderSoft),
+          const SizedBox(height: 7),
+          ...selection.configs.map(
+            (_AiQuestionConfig config) => Padding(
+              padding: const EdgeInsets.only(bottom: 5),
+              child: Row(
+                children: <Widget>[
+                  Container(
+                    constraints: const BoxConstraints(minWidth: 30),
+                    height: 24,
+                    padding: const EdgeInsets.symmetric(horizontal: 6),
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceBg,
+                      borderRadius: BorderRadius.circular(7),
+                      border: Border.all(color: AppColors.borderSoft),
+                    ),
+                    child: Text(
+                      '${config.count}',
+                      style: TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 7),
+                  Expanded(
+                    child: Text(
+                      '${config.type.label} • ${config.difficulty.label}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: AppColors.textGray,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 10.8,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
   Widget _dialogFooter({
     required bool canGenerate,
     required _AiGenerationRequest request,
-    required int totalQuestions,
   }) {
-    final String helper = totalQuestions > _maxQuestionsPerRequest
-        ? 'Reduce the count to $_maxQuestionsPerRequest or less.'
-        : totalQuestions == 0
-            ? 'Add at least one question rule.'
-            : 'One request will be sent for the selected topic.';
+    final String helper = request.topicCount == 0
+        ? 'Select at least one topic.'
+        : request.totalQuestions > _maxQuestionsPerRequest
+            ? 'Reduce the total to $_maxQuestionsPerRequest questions or less.'
+            : 'One request will be sent with ${request.topicCount} topic${request.topicCount == 1 ? '' : 's'} and $_selectedRuleCount rule${_selectedRuleCount == 1 ? '' : 's'}.';
 
     return Container(
       padding: const EdgeInsets.fromLTRB(18, 14, 18, 18),
@@ -469,9 +993,11 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
           SizedBox(
             height: 44,
             child: ElevatedButton.icon(
-              onPressed: canGenerate ? () => Navigator.of(context).pop(request) : null,
+              onPressed: canGenerate
+                  ? () => Navigator.of(context).pop(request)
+                  : null,
               icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-              label: Text('Generate $totalQuestions'),
+              label: Text('Generate ${request.totalQuestions}'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.primary,
                 foregroundColor: Colors.white,
@@ -524,171 +1050,6 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
     );
   }
 
-  Widget _targetSelector() {
-    if (widget.targets.isEmpty) {
-      return _emptyTargetCard();
-    }
-
-    if (widget.targets.length == 1) {
-      return _targetCard(widget.targets.first, selected: true);
-    }
-
-    return DropdownButtonFormField<int>(
-      initialValue: _selectedTargetTopicId,
-      isExpanded: true,
-      decoration: InputDecoration(
-        labelText: 'Selected topic',
-        helperText: 'AI will generate questions for this topic only.',
-        helperStyle: TextStyle(
-          color: AppColors.textMuted,
-          fontWeight: FontWeight.w700,
-          fontSize: 11.5,
-        ),
-        labelStyle: TextStyle(
-          color: AppColors.textMuted,
-          fontWeight: FontWeight.w800,
-        ),
-        filled: true,
-        fillColor: AppColors.surfaceBg,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: AppColors.borderGray),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: AppColors.primary),
-        ),
-      ),
-      dropdownColor: AppColors.cardBg,
-      items: widget.targets
-          .map(
-            (add_question_sheet.QuestionAuthoringTarget target) =>
-                DropdownMenuItem<int>(
-              value: target.topicId,
-              child: Text(
-                _targetDropdownLabel(target),
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: AppColors.textGray,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 13,
-                ),
-              ),
-            ),
-          )
-          .toList(),
-      onChanged: (int? value) {
-        if (value == null) return;
-        setState(() => _selectedTargetTopicId = value);
-      },
-    );
-  }
-
-  String _targetDropdownLabel(add_question_sheet.QuestionAuthoringTarget target) {
-    final String parent = target.parentTopicName == null
-        ? ''
-        : '${_compactText(target.parentTopicName!, max: 28)} › ';
-    return '$parent${_compactText(target.topicName, max: 44)}  •  ${_compactText(target.materialName ?? target.moduleName ?? 'Course', max: 26)}';
-  }
-
-  Widget _emptyTargetCard() {
-    return _inlineNotice(
-      icon: Icons.info_outline_rounded,
-      text: 'No topic was selected. Close this dialog and choose a topic first.',
-    );
-  }
-
-  Widget _targetCard(
-    add_question_sheet.QuestionAuthoringTarget target, {
-    required bool selected,
-  }) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: selected ? AppColors.primary.withValues(alpha: 0.06) : AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: selected ? AppColors.primary.withValues(alpha: 0.35) : AppColors.borderGray,
-        ),
-      ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(9),
-            ),
-            child: Icon(
-              target.isSubtopic
-                  ? Icons.subdirectory_arrow_right_rounded
-                  : Icons.topic_outlined,
-              size: 17,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  _compactTargetLabel(target),
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.textGray,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 13,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  target.subtitle,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: AppColors.textMuted,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 11.5,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _presetChip({
-    required String label,
-    required IconData icon,
-    required List<_AiQuestionConfig> configs,
-  }) {
-    return ActionChip(
-      avatar: Icon(icon, size: 16, color: AppColors.primary),
-      label: Text(label),
-      labelStyle: TextStyle(
-        color: AppColors.textGray,
-        fontWeight: FontWeight.w900,
-        fontSize: 12.5,
-      ),
-      backgroundColor: AppColors.surfaceBg,
-      side: BorderSide(color: AppColors.borderSoft),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999)),
-      onPressed: () => setState(() {
-        _configs
-          ..clear()
-          ..addAll(configs.map((config) => _AiQuestionConfig(
-                type: config.type,
-                difficulty: config.difficulty,
-                count: config.count,
-              )));
-      }),
-    );
-  }
-
   Widget _summaryTile({
     required IconData icon,
     required String title,
@@ -737,153 +1098,6 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
     );
   }
 
-  Widget _ruleChip(_AiQuestionConfig config) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.cardBg,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: AppColors.borderGray),
-      ),
-      child: Row(
-        children: <Widget>[
-          Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.08),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              '${config.count}',
-              style: TextStyle(
-                color: AppColors.primary,
-                fontWeight: FontWeight.w900,
-                fontSize: 12,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Text(
-              '${config.type.label} • ${config.difficulty.label}',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(
-                color: AppColors.textGray,
-                fontWeight: FontWeight.w800,
-                fontSize: 12.5,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _configRow(int index, {required bool compact}) {
-    final _AiQuestionConfig config = _configs[index];
-    final Widget typeDropdown = _smallDropdown<QuestionType>(
-      value: config.type,
-      items: <QuestionType>[
-        QuestionType.multipleChoice,
-        QuestionType.multiSelect,
-        QuestionType.trueFalse,
-        QuestionType.shortAnswer,
-        QuestionType.essay,
-      ],
-      label: (QuestionType value) => value.label,
-      onChanged: (QuestionType? value) {
-        if (value != null) setState(() => config.type = value);
-      },
-    );
-    final Widget difficultyDropdown = _smallDropdown<QuestionDifficulty>(
-      value: config.difficulty,
-      items: QuestionDifficulty.values,
-      label: (QuestionDifficulty value) => value.label,
-      onChanged: (QuestionDifficulty? value) {
-        if (value != null) setState(() => config.difficulty = value);
-      },
-    );
-    final Widget countControl = _countControl(config);
-    final Widget removeButton = _configs.length > 1
-        ? IconButton(
-            tooltip: 'Remove rule',
-            onPressed: () => setState(() => _configs.removeAt(index)),
-            icon: Icon(Icons.delete_outline_rounded, size: 19, color: AppColors.dangerText),
-          )
-        : const SizedBox(width: 40);
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceBg,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.borderGray),
-      ),
-      child: compact
-          ? Column(
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    Expanded(child: typeDropdown),
-                    const SizedBox(width: 10),
-                    removeButton,
-                  ],
-                ),
-                const SizedBox(height: 10),
-                Row(
-                  children: <Widget>[
-                    Expanded(child: difficultyDropdown),
-                    const SizedBox(width: 10),
-                    countControl,
-                  ],
-                ),
-              ],
-            )
-          : Row(
-              children: <Widget>[
-                Expanded(flex: 3, child: typeDropdown),
-                const SizedBox(width: 10),
-                Expanded(flex: 2, child: difficultyDropdown),
-                const SizedBox(width: 10),
-                countControl,
-                removeButton,
-              ],
-            ),
-    );
-  }
-
-  Widget _countControl(_AiQuestionConfig config) {
-    return SizedBox(
-      width: 118,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.end,
-        children: <Widget>[
-          _miniCountButton(Icons.remove_rounded, () {
-            setState(() => config.count = (config.count - 1).clamp(1, 50).toInt());
-          }),
-          Expanded(
-            child: Text(
-              '${config.count}',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontWeight: FontWeight.w900,
-                color: AppColors.textTitle,
-                fontSize: 13.5,
-              ),
-            ),
-          ),
-          _miniCountButton(Icons.add_rounded, () {
-            setState(() => config.count = (config.count + 1).clamp(1, 50).toInt());
-          }),
-        ],
-      ),
-    );
-  }
-
   Widget _smallDropdown<T>({
     required T value,
     required List<T> items,
@@ -891,7 +1105,7 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
     required ValueChanged<T?> onChanged,
   }) {
     return Container(
-      height: 38,
+      height: 40,
       padding: const EdgeInsets.symmetric(horizontal: 10),
       decoration: BoxDecoration(
         color: AppColors.cardBg,
@@ -903,20 +1117,25 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
           value: value,
           isExpanded: true,
           dropdownColor: AppColors.cardBg,
-          icon: Icon(Icons.keyboard_arrow_down_rounded, color: AppColors.textMuted),
+          icon: Icon(
+            Icons.keyboard_arrow_down_rounded,
+            color: AppColors.textMuted,
+          ),
           items: items
-              .map((T item) => DropdownMenuItem<T>(
-                    value: item,
-                    child: Text(
-                      label(item),
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: AppColors.textGray,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 12.5,
-                      ),
+              .map(
+                (T item) => DropdownMenuItem<T>(
+                  value: item,
+                  child: Text(
+                    label(item),
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: AppColors.textGray,
+                      fontWeight: FontWeight.w800,
+                      fontSize: 12,
                     ),
-                  ),)
+                  ),
+                ),
+              )
               .toList(),
           onChanged: onChanged,
         ),
@@ -932,7 +1151,7 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
         width: 28,
         height: 28,
         decoration: BoxDecoration(
-          color: AppColors.cardBg,
+          color: AppColors.surfaceBg,
           borderRadius: BorderRadius.circular(8),
           border: Border.all(color: AppColors.borderSoft),
         ),
@@ -982,16 +1201,40 @@ class _AiGenerationDialogState extends State<_AiGenerationDialog> {
     );
   }
 
-  _AiGenerationRequest _buildRequest(
-    add_question_sheet.QuestionAuthoringTarget target,
+  Widget _emptyTopicsState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Text(
+          widget.targets.isEmpty
+              ? 'No topics are available in this workspace.'
+              : 'No topics match your search.',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.textMuted,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _setVisibleTopicsSelected(
+    List<_AiTopicSelection> visibleTopics,
+    bool selected,
   ) {
+    setState(() {
+      for (final _AiTopicSelection selection in visibleTopics) {
+        selection.selected = selected;
+      }
+    });
+  }
+
+  _AiGenerationRequest _buildRequest() {
     return _AiGenerationRequest(
-      topics: <Map<String, dynamic>>[
-        <String, dynamic>{
-          'topic_id': target.topicId,
-          'question_configs': _configs.map((config) => config.toJson()).toList(),
-        },
-      ],
+      topics: _selectedTopics
+          .map((_AiTopicSelection selection) => selection.toRequestJson())
+          .toList(),
     );
   }
 }

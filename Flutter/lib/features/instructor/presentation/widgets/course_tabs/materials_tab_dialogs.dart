@@ -393,12 +393,12 @@ class _Btn extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
-    final fg = disabled
-        ? AppColors.textHint
-        : (primary ? Colors.white : AppColors.textTitle);
-    final bg = disabled
-        ? AppColors.borderGray
-        : (primary ? AppColors.primary : Colors.transparent);
+    final fg = primary
+        ? Colors.white.withValues(alpha: disabled ? 0.82 : 1)
+        : (disabled ? AppColors.textHint : AppColors.textTitle);
+    final bg = primary
+        ? AppColors.primary.withValues(alpha: disabled ? 0.48 : 1)
+        : (disabled ? AppColors.borderGray : Colors.transparent);
 
     return Material(
       color: bg,

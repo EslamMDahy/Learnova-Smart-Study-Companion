@@ -1,15 +1,27 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math' as math;
 
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_math_fork/flutter_math.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../../core/network/api_client.dart';
+import '../../../../../core/network/error_mapper.dart';
+import '../../../../../core/routing/routes.dart';
 import '../../../../../shared/widgets/design_tokens.dart';
+import '../../../data/presentation_models.dart';
+import '../../../data/presentation_providers.dart';
+import '../../../data/topics_models.dart';
+import '../../../data/modules_materials_providers.dart';
 import 'presentation_design_tokens.dart';
 import 'presentation_download_stub.dart'
     if (dart.library.js_interop) 'presentation_download_web.dart';
 
+part 'presentation_workspace.dart';
 part 'slide_templates/slide_template_builder.dart';
 part 'slide_templates/slide_template_registry.dart';
 part 'slide_templates/title_slide.dart';
@@ -39,15 +51,47 @@ part 'slide_templates/single_card_center.dart';
 part 'slide_templates/two_card_horizontal.dart';
 part 'slide_templates/three_card_horizontal.dart';
 
-class InstructorPresentationPage extends StatefulWidget {
-  const InstructorPresentationPage({super.key});
+class InstructorPresentationPage extends ConsumerStatefulWidget {
+  final int? courseId;
+  final String? courseSlug;
+  final String? courseTitle;
+  final int? moduleId;
+  final int? materialId;
+  final String? materialTitle;
+  final int? materialPageCount;
+  final Set<int> selectedTopicIds;
+
+  const InstructorPresentationPage({
+    super.key,
+    this.courseId,
+    this.courseSlug,
+    this.courseTitle,
+    this.moduleId,
+    this.materialId,
+    this.materialTitle,
+    this.materialPageCount,
+    this.selectedTopicIds = const <int>{},
+  });
+
+  bool get hasWorkspaceRoute =>
+      courseSlug != null && courseSlug!.trim().isNotEmpty;
+
+  bool get hasWorkspaceContext =>
+      courseId != null &&
+      courseId! > 0 &&
+      hasWorkspaceRoute &&
+      moduleId != null &&
+      moduleId! > 0 &&
+      materialId != null &&
+      materialId! > 0;
 
   @override
-  State<InstructorPresentationPage> createState() =>
+  ConsumerState<InstructorPresentationPage> createState() =>
       _InstructorPresentationPageState();
 }
 
-class _InstructorPresentationPageState extends State<InstructorPresentationPage> {
+class _InstructorPresentationPageState
+    extends ConsumerState<InstructorPresentationPage> {
   late final TextEditingController _codeController;
   PresentationDeck? _deck;
   String? _error;
@@ -55,14 +99,32 @@ class _InstructorPresentationPageState extends State<InstructorPresentationPage>
   bool _showExtractedText = false;
   bool _isExportingPptx = false;
 
+  bool _workspaceLoading = false;
+  bool _isGenerating = false;
+  String? _workspaceError;
+  String _generationStatus = 'Ready to generate';
+  int _slideCount = 6;
+  int _generationBatchIndex = 0;
+  int _generationBatchCount = 0;
+  List<TopicItem> _workspaceTopics = const <TopicItem>[];
+  List<PresentationTargetSection> _workspaceSections =
+      const <PresentationTargetSection>[];
+  CancelToken? _generationCancelToken;
+  CancelToken? _streamCancelToken;
+
   @override
   void initState() {
     super.initState();
     _codeController = TextEditingController();
+    if (widget.hasWorkspaceRoute) {
+      unawaited(_loadWorkspaceContext());
+    }
   }
 
   @override
   void dispose() {
+    _generationCancelToken?.cancel('Presentation workspace disposed.');
+    _streamCancelToken?.cancel('Presentation workspace disposed.');
     _codeController.dispose();
     super.dispose();
   }
@@ -244,6 +306,10 @@ class _InstructorPresentationPageState extends State<InstructorPresentationPage>
 
   @override
   Widget build(BuildContext context) {
+    if (widget.hasWorkspaceRoute) {
+      return _buildPresentationWorkspace(context);
+    }
+
     final deck = _deck;
     final selectedSlide = deck == null || deck.slides.isEmpty
         ? null
@@ -483,6 +549,7 @@ class _DeckPreviewPanel extends StatelessWidget {
   final VoidCallback? onEditSlide;
   final VoidCallback? onDuplicateSlide;
   final VoidCallback? onDeleteSlide;
+  final Widget? emptyState;
 
   const _DeckPreviewPanel({
     required this.deck,
@@ -496,6 +563,7 @@ class _DeckPreviewPanel extends StatelessWidget {
     this.onEditSlide,
     this.onDuplicateSlide,
     this.onDeleteSlide,
+    this.emptyState,
   });
 
   @override
@@ -504,7 +572,7 @@ class _DeckPreviewPanel extends StatelessWidget {
 
     return _GlassCard(
       child: deck == null
-          ? const _EmptyPresentationPreview()
+          ? (emptyState ?? const _EmptyPresentationPreview())
           : Builder(
               builder: (context) {
                 final slide = deck.slides[selectedSlide];

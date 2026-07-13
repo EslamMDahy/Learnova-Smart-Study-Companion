@@ -3,21 +3,27 @@ part of 'question_bank_tab.dart';
 class _QuestionBankHeader extends StatelessWidget {
   final bool loading;
   final bool canCreateExam;
+  final bool exportingQuestionBank;
+  final bool hasPendingQuestionBankExport;
   final int totalQuestionsCount;
   final int visibleQuestionsCount;
   final int examReadyCount;
   final VoidCallback onRefresh;
   final VoidCallback onGenerateQuestions;
+  final VoidCallback onExportQuestionBank;
   final VoidCallback onCreateExam;
 
   const _QuestionBankHeader({
     required this.loading,
     required this.canCreateExam,
+    required this.exportingQuestionBank,
+    required this.hasPendingQuestionBankExport,
     required this.totalQuestionsCount,
     required this.visibleQuestionsCount,
     required this.examReadyCount,
     required this.onRefresh,
     required this.onGenerateQuestions,
+    required this.onExportQuestionBank,
     required this.onCreateExam,
   });
 
@@ -60,6 +66,34 @@ class _QuestionBankHeader extends StatelessWidget {
                 ),
                 icon: const Icon(Icons.auto_awesome_rounded, size: 18),
                 label: const Text('Generate Questions'),
+              ),
+              OutlinedButton.icon(
+                onPressed: loading || exportingQuestionBank ? null : onExportQuestionBank,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  disabledForegroundColor: Colors.white.withValues(alpha: 0.5),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                icon: exportingQuestionBank
+                    ? SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.white.withValues(alpha: 0.75),
+                        ),
+                      )
+                    : const Icon(Icons.file_download_outlined, size: 18),
+                label: Text(
+                  exportingQuestionBank
+                      ? 'Preparing Excel...'
+                      : hasPendingQuestionBankExport
+                          ? 'Resume Export'
+                          : 'Export Excel',
+                ),
               ),
               OutlinedButton.icon(
                 onPressed: loading ? null : onRefresh,

@@ -28,7 +28,6 @@ class InstructorSidebarWidget extends StatelessWidget {
         AppSidebarItem(icon: Icons.grid_view_rounded, title: 'Dashboard', index: InstructorTabs.dashboard),
         AppSidebarItem(icon: Icons.menu_book_rounded, title: 'My Courses', index: InstructorTabs.course),
         AppSidebarItem(icon: Icons.document_scanner_outlined, title: 'Exam Correction', index: InstructorTabs.examCorrection),
-        AppSidebarItem(icon: Icons.slideshow_rounded, title: 'AI Presentation', index: InstructorTabs.presentation),
         AppSidebarItem(icon: Icons.assignment_turned_in_outlined, title: 'Exams', index: InstructorTabs.quizzes),
       ],
       bottomItems: const [

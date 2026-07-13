@@ -363,13 +363,14 @@ class _ReviewerShellHeader extends StatelessWidget {
                 label: 'Add topic',
                 onTap: onAddTopic,
               ),
+              if (downloadUrl != null && downloadUrl!.isNotEmpty)
+                _BlueHeaderOpenAction(url: downloadUrl!),
               _BlueHeaderIconAction(
                 tooltip: 'Refresh preview URL',
                 icon: urlLoading ? null : Icons.refresh_rounded,
                 loading: urlLoading,
                 onTap: urlLoading ? null : onRefreshUrl,
               ),
-              if (downloadUrl != null && downloadUrl!.isNotEmpty) _BlueHeaderOpenAction(url: downloadUrl!),
               _BlueHeaderDangerButton(
                 icon: Icons.delete_outline_rounded,
                 label: 'Delete file',
@@ -526,9 +527,9 @@ class _BlueHeaderDangerButton extends StatelessWidget {
         icon: Icon(icon, size: 17),
         label: Text(label),
         style: OutlinedButton.styleFrom(
-          backgroundColor: Colors.white.withValues(alpha: 0.10),
-          foregroundColor: Colors.white,
-          side: BorderSide(color: Colors.white.withValues(alpha: 0.34)),
+          backgroundColor: Colors.white,
+          foregroundColor: AppColors.primary,
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.72)),
           padding: const EdgeInsets.symmetric(horizontal: 14),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           textStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900),
@@ -551,7 +552,7 @@ class _BlueHeaderIconAction extends StatelessWidget {
     return Tooltip(
       message: tooltip,
       child: Material(
-        color: Colors.white.withValues(alpha: 0.13),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         child: InkWell(
           onTap: onTap,
@@ -562,11 +563,20 @@ class _BlueHeaderIconAction extends StatelessWidget {
             alignment: Alignment.center,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.72),
+              ),
             ),
             child: loading
-                ? const SizedBox(width: 17, height: 17, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                : Icon(icon, size: 18, color: Colors.white),
+                ? const SizedBox(
+                    width: 17,
+                    height: 17,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.primary,
+                    ),
+                  )
+                : Icon(icon, size: 18, color: AppColors.primary),
           ),
         ),
       ),

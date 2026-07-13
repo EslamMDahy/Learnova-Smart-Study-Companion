@@ -202,7 +202,6 @@ class _ModuleHeroActionStrip extends StatelessWidget {
             label: 'Upload material',
             icon: Icons.upload_file_rounded,
             onTap: onUpload,
-            primary: true,
           ),
           _ModuleHeroActionButton(
             label: 'Rename',
@@ -232,13 +231,11 @@ class _ModuleHeroActionButton extends StatefulWidget {
   final String label;
   final IconData icon;
   final VoidCallback? onTap;
-  final bool primary;
 
   const _ModuleHeroActionButton({
     required this.label,
     required this.icon,
     required this.onTap,
-    this.primary = false,
   });
 
   @override
@@ -251,12 +248,8 @@ class _ModuleHeroActionButtonState extends State<_ModuleHeroActionButton> {
   @override
   Widget build(BuildContext context) {
     final enabled = widget.onTap != null;
-    final Color background = widget.primary
-        ? Colors.white
-        : _hovered
-            ? Colors.white.withValues(alpha: 0.22)
-            : Colors.white.withValues(alpha: 0.14);
-    final Color foreground = widget.primary ? AppColors.primary : Colors.white;
+    final background = _hovered ? const Color(0xFFF1F7FF) : Colors.white;
+    final foreground = AppColors.primary;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -269,11 +262,13 @@ class _ModuleHeroActionButtonState extends State<_ModuleHeroActionButton> {
           label: Text(widget.label),
           style: OutlinedButton.styleFrom(
             elevation: 0,
-            foregroundColor: enabled ? foreground : Colors.white.withValues(alpha: 0.55),
-            backgroundColor: enabled ? background : Colors.white.withValues(alpha: 0.08),
-            disabledForegroundColor: Colors.white.withValues(alpha: 0.55),
-            disabledBackgroundColor: Colors.white.withValues(alpha: 0.08),
-            side: BorderSide(color: widget.primary ? Colors.white : Colors.white.withValues(alpha: 0.28)),
+            foregroundColor: foreground,
+            backgroundColor: background,
+            disabledForegroundColor: foreground.withValues(alpha: 0.45),
+            disabledBackgroundColor: Colors.white.withValues(alpha: 0.72),
+            side: BorderSide(
+              color: Colors.white.withValues(alpha: enabled ? 1 : 0.55),
+            ),
             padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 0),
             textStyle: const TextStyle(fontSize: 12.3, fontWeight: FontWeight.w900),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),

@@ -8,6 +8,8 @@
 //  Response body → MaterialQuestionsBatchCreateResponse
 // ─────────────────────────────────────────────────────────────────────────────
 
+import 'dart:typed_data';
+
 import 'package:dio/dio.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/network/endpoints.dart';
@@ -217,18 +219,47 @@ class AiQuestionGenerationResponse {
   final bool aiProcessingStarted;
   final String? requestId;
   final String? message;
+  final List<QuestionModel> questions;
+
   const AiQuestionGenerationResponse({
     required this.status,
     required this.aiProcessingStarted,
     this.requestId,
     this.message,
+    this.questions = const <QuestionModel>[],
   });
-  factory AiQuestionGenerationResponse.fromJson(Map<String,dynamic> j)=>AiQuestionGenerationResponse(
-    status:(j['status']??'').toString(),
-    aiProcessingStarted:j['ai_processing_started']==true,
-    requestId:j['request_id']?.toString(),
-    message:j['message']?.toString(),
-  );
+
+  factory AiQuestionGenerationResponse.fromJson(Map<String, dynamic> json) {
+    final List<dynamic> rawQuestions =
+        (json['questions'] as List?) ?? const <dynamic>[];
+    return AiQuestionGenerationResponse(
+      status: (json['status'] ?? '').toString(),
+      aiProcessingStarted: json['ai_processing_started'] == true,
+      requestId: json['request_id']?.toString(),
+      message: json['message']?.toString(),
+      questions: rawQuestions
+          .whereType<Map>()
+          .map(
+            (Map question) => QuestionModel.fromJson(
+              Map<String, dynamic>.from(question),
+              includeDetails: false,
+            ),
+          )
+          .toList(),
+    );
+  }
+}
+
+class ApproveQuestionsResponse {
+  final int approvedCount;
+
+  const ApproveQuestionsResponse({required this.approvedCount});
+
+  factory ApproveQuestionsResponse.fromJson(Map<String, dynamic> json) {
+    return ApproveQuestionsResponse(
+      approvedCount: (json['approved_count'] as num?)?.toInt() ?? 0,
+    );
+  }
 }
 
 
@@ -250,6 +281,46 @@ class ExtractNativeQuestionsResponse {
       message: (json['message'] ?? '').toString(),
     );
   }
+}
+
+class QuestionBankExportJobResponse {
+  final String jobId;
+
+  const QuestionBankExportJobResponse({required this.jobId});
+
+  factory QuestionBankExportJobResponse.fromJson(Map<String, dynamic> json) {
+    final jobId = (json['job_id'] ?? '').toString().trim();
+    if (jobId.isEmpty) {
+      throw const FormatException('Question bank export response did not include a job id');
+    }
+    return QuestionBankExportJobResponse(jobId: jobId);
+  }
+}
+
+enum QuestionBankExportStatus { completed, failed, timeout }
+
+class QuestionBankExportStatusResult {
+  final QuestionBankExportStatus status;
+  final String? errorMessage;
+
+  const QuestionBankExportStatusResult({
+    required this.status,
+    this.errorMessage,
+  });
+
+  bool get isCompleted => status == QuestionBankExportStatus.completed;
+  bool get isFailed => status == QuestionBankExportStatus.failed;
+  bool get isTimeout => status == QuestionBankExportStatus.timeout;
+}
+
+class QuestionBankExportFile {
+  final Uint8List bytes;
+  final String filename;
+
+  const QuestionBankExportFile({
+    required this.bytes,
+    required this.filename,
+  });
 }
 
 class QuestionsApi {
@@ -278,6 +349,39 @@ class QuestionsApi {
     );
   }
 
+
+
+  Future<ApproveQuestionsResponse> approveTopicQuestions({
+    required int courseId,
+    required int moduleId,
+    required int materialId,
+    required int topicId,
+    required List<int> questionIds,
+    CancelToken? cancelToken,
+  }) async {
+    if (questionIds.isEmpty) {
+      return const ApproveQuestionsResponse(approvedCount: 0);
+    }
+
+    final res = await _client.patch<Map<String, dynamic>>(
+      Endpoints.approveTopicQuestions(
+        courseId,
+        moduleId,
+        materialId,
+        topicId,
+      ),
+      data: <String, dynamic>{'question_ids': questionIds},
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return ApproveQuestionsResponse.fromJson(data);
+    }
+    throw const FormatException(
+      'Invalid response from PATCH /courses/{id}/modules/{moduleId}/materials/{materialId}/topics/{topicId}/questions/approve',
+    );
+  }
 
 
   Future<SseEvent> waitForQuestionGeneration({
@@ -340,6 +444,129 @@ class QuestionsApi {
   }
 
 
+
+  Future<QuestionBankExportJobResponse> requestQuestionBankExport({
+    required int courseId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.post<Map<String, dynamic>>(
+      Endpoints.requestQuestionBankExport(courseId),
+      options: Options(
+        extra: const <String, dynamic>{'silent': true},
+      ),
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return QuestionBankExportJobResponse.fromJson(data);
+    }
+    throw const FormatException(
+      'Invalid response from POST /courses/{id}/questions/export',
+    );
+  }
+
+  Future<QuestionBankExportStatusResult> waitForQuestionBankExport({
+    required int courseId,
+    required String jobId,
+    CancelToken? cancelToken,
+  }) async {
+    final event = await _client.waitForSseEvent(
+      Endpoints.questionBankExportStream(courseId, jobId),
+      cancelToken: cancelToken,
+      receiveTimeout: const Duration(seconds: 45),
+      terminalEvents: const <String>{'export_status', 'timeout', 'error'},
+    );
+
+    if (event.event == 'timeout' || event.event == 'closed') {
+      return QuestionBankExportStatusResult(
+        status: QuestionBankExportStatus.timeout,
+        errorMessage: event.detail,
+      );
+    }
+
+    if (event.event == 'error') {
+      return QuestionBankExportStatusResult(
+        status: QuestionBankExportStatus.failed,
+        errorMessage: event.detail ?? 'Question bank export status stream failed',
+      );
+    }
+
+    if (event.event != 'export_status') {
+      throw FormatException(
+        'Unexpected question bank export SSE event: ${event.event}',
+      );
+    }
+
+    final status = (event.jsonData?['status'] ?? '').toString().trim().toLowerCase();
+    final errorMessage = event.jsonData?['error_message']?.toString().trim();
+
+    switch (status) {
+      case 'completed':
+        return const QuestionBankExportStatusResult(
+          status: QuestionBankExportStatus.completed,
+        );
+      case 'failed':
+        return QuestionBankExportStatusResult(
+          status: QuestionBankExportStatus.failed,
+          errorMessage: errorMessage == null || errorMessage.isEmpty
+              ? 'Question bank export failed'
+              : errorMessage,
+        );
+      case 'pending':
+      case 'processing':
+        return const QuestionBankExportStatusResult(
+          status: QuestionBankExportStatus.timeout,
+        );
+      default:
+        throw FormatException(
+          'Invalid question bank export status: $status',
+        );
+    }
+  }
+
+  Future<QuestionBankExportFile> downloadQuestionBankExport({
+    required int courseId,
+    required String jobId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.get<dynamic>(
+      Endpoints.questionBankExportDownload(courseId, jobId),
+      options: Options(
+        responseType: ResponseType.bytes,
+        receiveTimeout: const Duration(minutes: 2),
+        headers: const <String, dynamic>{
+          'Accept': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        },
+        extra: const <String, dynamic>{'silent': true},
+      ),
+      cancelToken: cancelToken,
+    );
+
+    final data = res.data;
+    final Uint8List bytes;
+    if (data is Uint8List) {
+      bytes = data;
+    } else if (data is List<int>) {
+      bytes = Uint8List.fromList(data);
+    } else {
+      throw const FormatException(
+        'Invalid response from GET /courses/{id}/questions/export/{jobId}/download',
+      );
+    }
+
+    if (bytes.isEmpty) {
+      throw const FormatException('Question bank export returned an empty Excel file');
+    }
+
+    return QuestionBankExportFile(
+      bytes: bytes,
+      filename: _filenameFromContentDisposition(
+            res.headers.value('content-disposition'),
+          ) ??
+          'question_bank_export_$courseId.xlsx',
+    );
+  }
 
   Future<CourseQuestionsResponse> getCourseQuestions({
     required int courseId,
@@ -615,3 +842,21 @@ class QuestionsApi {
       buildCreatePayloadFromQuestion(q);
 
 }
+
+String? _filenameFromContentDisposition(String? value) {
+  if (value == null || value.trim().isEmpty) return null;
+
+  final encoded = RegExp(r"filename\*=UTF-8''([^;]+)", caseSensitive: false)
+      .firstMatch(value)
+      ?.group(1);
+  if (encoded != null && encoded.trim().isNotEmpty) {
+    return Uri.decodeComponent(encoded.trim().replaceAll('"', ''));
+  }
+
+  final normal = RegExp(r'filename="?([^";]+)"?', caseSensitive: false)
+      .firstMatch(value)
+      ?.group(1);
+  final cleaned = normal?.trim().replaceAll('"', '');
+  return cleaned == null || cleaned.isEmpty ? null : cleaned;
+}
+

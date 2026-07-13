@@ -31,6 +31,18 @@ class _Ctx {
       _Ctx._(type: _CType.topic, module: m, material: mat, topic: t);
 }
 
+class _PresentationSelection {
+  final ModuleItem module;
+  final MaterialItem material;
+  final Set<int> topicIds;
+
+  const _PresentationSelection({
+    required this.module,
+    required this.material,
+    required this.topicIds,
+  });
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  CourseMaterialsTab
 // ─────────────────────────────────────────────────────────────────────────────

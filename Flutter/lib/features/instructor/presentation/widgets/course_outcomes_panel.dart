@@ -181,7 +181,7 @@ class _HierarchicalOutcomesContentState extends ConsumerState<_HierarchicalOutco
 
     final draft = await _openOutcomeEditor(
       title: 'Create LO',
-      subtitle: 'Create an LO group such as LO1 / LO2. Add Easy, Medium, and Hard criteria under it.',
+      subtitle: 'Create an LO group such as LO1 / LO2. Add Pass, Merit, and Distinction criteria under it.',
       parentMode: true,
     );
     if (draft == null || !mounted) return;
@@ -537,7 +537,7 @@ Future<_OutcomeDraft?> _showOutcomeEditor(
                 ),
                 if (!parentMode && difficulty == null) ...[
                   const SizedBox(height: 16),
-                  Text('Difficulty level', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textTitle)),
+                  Text('Criteria level', style: TextStyle(fontWeight: FontWeight.w800, color: AppColors.textTitle)),
                   const SizedBox(height: 8),
                   Wrap(
                     spacing: 8,
@@ -712,7 +712,7 @@ class _OutcomesHero extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               Text(
-                'Create course LOs and add Easy, Medium, and Hard criteria that can be mapped to subtopics.',
+                'Create course LOs and add Pass, Merit, and Distinction criteria that can be mapped to subtopics.',
                 style: TextStyle(
                   fontSize: 13.5,
                   height: 1.55,
@@ -1010,17 +1010,6 @@ Color _difficultyColor(OutcomeDifficulty level) {
   }
 }
 
-IconData _difficultyIcon(OutcomeDifficulty level) {
-  switch (level) {
-    case OutcomeDifficulty.beginner:
-      return Icons.eco_rounded;
-    case OutcomeDifficulty.intermediate:
-      return Icons.bolt_rounded;
-    case OutcomeDifficulty.advanced:
-      return Icons.local_fire_department_rounded;
-  }
-}
-
 class _DifficultyDot extends StatelessWidget {
   final OutcomeDifficulty level;
   final bool compact;
@@ -1039,7 +1028,17 @@ class _DifficultyDot extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: color.withValues(alpha: 0.32)),
       ),
-      child: Icon(_difficultyIcon(level), size: compact ? 12 : 15, color: color),
+      child: Center(
+        child: Text(
+          level.shortLabel,
+          style: TextStyle(
+            color: color,
+            fontSize: compact ? 10 : 12,
+            fontWeight: FontWeight.w900,
+            height: 1,
+          ),
+        ),
+      ),
     );
   }
 }
@@ -1117,7 +1116,7 @@ class _EmptyOutcomes extends StatelessWidget {
             const SizedBox(height: 12),
             Text('No learning outcomes yet', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
             const SizedBox(height: 6),
-            Text('Create an LO first, then add Easy, Medium, and Hard criteria under it.', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, height: 1.5, color: AppColors.textMuted)),
+            Text('Create an LO first, then add Pass, Merit, and Distinction criteria under it.', textAlign: TextAlign.center, style: TextStyle(fontSize: 13.5, height: 1.5, color: AppColors.textMuted)),
             const SizedBox(height: 16),
             FilledButton.icon(onPressed: onCreate, icon: const Icon(Icons.add_rounded), label: const Text('Create LO')),
           ],

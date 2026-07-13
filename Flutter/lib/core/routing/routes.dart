@@ -48,6 +48,7 @@ class Routes {
   static const instructorCourseQuestionBank = '/instructor/courses/:courseSlug/question-bank';
   static const instructorCourseTemplates    = '/instructor/courses/:courseSlug/templates';
   static const instructorCourseQuizzes      = '/instructor/courses/:courseSlug/exams';
+  static const instructorCoursePresentation = '/instructor/courses/:courseSlug/presentation';
   static const instructorQuestionBank  = '/instructor/question-bank';
   static const instructorExamCorrection = '/instructor/exam-correction';
   static const instructorPresentation = '/instructor/presentation';
@@ -74,6 +75,31 @@ class Routes {
   static String courseQuestionBank(String slug) => '/instructor/courses/$slug/question-bank';
   static String courseTemplates(String slug)    => '/instructor/courses/$slug/templates';
   static String courseQuizzes(String slug)      => '/instructor/courses/$slug/exams';
+  static String coursePresentation(
+    String slug, {
+    required int moduleId,
+    required int materialId,
+    required Iterable<int> topicIds,
+    String? courseTitle,
+    String? materialTitle,
+    int? materialPageCount,
+  }) {
+    final query = <String, String>{
+      'moduleId': moduleId.toString(),
+      'materialId': materialId.toString(),
+      'topicIds': topicIds.join(','),
+      if (courseTitle != null && courseTitle.trim().isNotEmpty)
+        'courseTitle': courseTitle.trim(),
+      if (materialTitle != null && materialTitle.trim().isNotEmpty)
+        'materialTitle': materialTitle.trim(),
+      if (materialPageCount != null && materialPageCount > 0)
+        'pageCount': materialPageCount.toString(),
+    };
+    return Uri(
+      path: '/instructor/courses/$slug/presentation',
+      queryParameters: query,
+    ).toString();
+  }
 
   static String courseInviteFor(String token) =>
       '$courseInvite?token=${Uri.encodeQueryComponent(token)}';

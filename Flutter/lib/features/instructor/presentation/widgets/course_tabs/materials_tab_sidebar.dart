@@ -1289,72 +1289,160 @@ class _SidebarTopicNode extends StatelessWidget {
 //  FOOTER
 // ─────────────────────────────────────────────────────────────────────────────
 class _FooterWidget extends StatelessWidget {
-  final _Ctx ctx; final bool uploading; final bool canGenerate;
+  final _Ctx ctx;
+  final bool uploading;
+  final bool canGenerate;
+  final bool canCreatePresentation;
   final int? selectionCount;
-  final VoidCallback onUpload, onGenerate, onClose;
+  final VoidCallback onUpload;
+  final VoidCallback onGenerate;
+  final VoidCallback onCreatePresentation;
+  final VoidCallback onClose;
   final VoidCallback? onAskAi;
   final bool assistantBusy;
 
-  const _FooterWidget({required this.ctx, required this.uploading, required this.canGenerate,
-      this.selectionCount,
-      required this.onUpload, required this.onGenerate, this.onAskAi,
-      this.assistantBusy = false, required this.onClose,});
+  const _FooterWidget({
+    required this.ctx,
+    required this.uploading,
+    required this.canGenerate,
+    required this.canCreatePresentation,
+    this.selectionCount,
+    required this.onUpload,
+    required this.onGenerate,
+    required this.onCreatePresentation,
+    this.onAskAi,
+    this.assistantBusy = false,
+    required this.onClose,
+  });
 
   bool get _showSelectionLabel => (selectionCount ?? 0) > 0;
   String get _label => _showSelectionLabel
       ? '${selectionCount!} selected'
       : switch (ctx.type) {
-          _CType.module   => ctx.module?.title ?? 'Module',
+          _CType.module => ctx.module?.title ?? 'Module',
           _CType.material => ctx.material?.displayTitle ?? 'Material',
-          _CType.topic    => ctx.topic?.title ?? 'Topic',
+          _CType.topic => ctx.topic?.title ?? 'Topic',
         };
   IconData get _icon => _showSelectionLabel
       ? Icons.checklist_rounded
       : switch (ctx.type) {
-          _CType.module   => Icons.folder_rounded,
+          _CType.module => Icons.folder_rounded,
           _CType.material => ctx.material?.type == 'video'
-              ? Icons.play_circle_filled_rounded : Icons.picture_as_pdf_rounded,
-          _CType.topic    => Icons.tag_rounded,
+              ? Icons.play_circle_filled_rounded
+              : Icons.picture_as_pdf_rounded,
+          _CType.topic => Icons.tag_rounded,
         };
 
   @override
   Widget build(BuildContext context) {
     return Container(
       height: 56,
-      decoration: BoxDecoration(color: Colors.white,
-          border: const Border(top: BorderSide(color: _K.div)),
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.05),
-              blurRadius: 16, offset: const Offset(0, -4),),],),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: const Border(top: BorderSide(color: _K.div)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
       padding: const EdgeInsets.symmetric(horizontal: 18),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(7)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(_icon, size: 13, color: AppColors.primary), const SizedBox(width: 6),
-            ConstrainedBox(constraints: const BoxConstraints(maxWidth: 200),
-                child: Text(_label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700,
-                        color: AppColors.primary,),),),
-          ],),),
-        const Spacer(),
-        if (onAskAi != null) ...[
-          _Btn(
-            icon: assistantBusy ? Icons.hourglass_top_rounded : Icons.auto_awesome_rounded,
-            label: assistantBusy ? 'Course AI…' : 'Chat with AI',
-            primary: false,
-            disabled: assistantBusy,
-            onTap: assistantBusy ? null : onAskAi,
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              color: _K.blueSoft,
+              borderRadius: BorderRadius.circular(7),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(_icon, size: 13, color: AppColors.primary),
+                const SizedBox(width: 6),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 200),
+                  child: Text(
+                    _label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                reverse: true,
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (onAskAi != null) ...[
+                      _Btn(
+                        icon: assistantBusy
+                            ? Icons.hourglass_top_rounded
+                            : Icons.auto_awesome_rounded,
+                        label: assistantBusy ? 'Course AI…' : 'Chat with AI',
+                        primary: true,
+                        disabled: assistantBusy,
+                        onTap: assistantBusy ? null : onAskAi,
+                      ),
+                      const SizedBox(width: 8),
+                    ],
+                    _Btn(
+                      icon: Icons.slideshow_rounded,
+                      label: 'AI Presentation',
+                      primary: true,
+                      disabled: !canCreatePresentation,
+                      onTap: canCreatePresentation
+                          ? onCreatePresentation
+                          : null,
+                    ),
+                    const SizedBox(width: 8),
+                    _Btn(
+                      icon: Icons.quiz_outlined,
+                      label: canGenerate
+                          ? 'Generate Questions'
+                          : 'No content yet',
+                      primary: true,
+                      disabled: !canGenerate,
+                      onTap: canGenerate ? onGenerate : null,
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
           const SizedBox(width: 8),
+          InkWell(
+            hoverColor: Colors.transparent,
+            splashColor: Colors.transparent,
+            highlightColor: Colors.transparent,
+            overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+            onTap: onClose,
+            borderRadius: BorderRadius.circular(6),
+            child: Padding(
+              padding: const EdgeInsets.all(7),
+              child: Icon(
+                Icons.close_rounded,
+                size: 15,
+                color: AppColors.textHint,
+              ),
+            ),
+          ),
         ],
-        _Btn(icon: Icons.auto_awesome_rounded, label: canGenerate ? 'Generate Questions' : 'No content yet',
-            primary: true, disabled: !canGenerate, onTap: canGenerate ? onGenerate : null,),
-        const SizedBox(width: 8),
-        InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), onTap: onClose, borderRadius: BorderRadius.circular(6),
-            child: Padding(padding: const EdgeInsets.all(7),
-                child: Icon(Icons.close_rounded, size: 15, color: AppColors.textHint),),),
-      ],),
+      ),
     );
   }
 }

@@ -604,6 +604,94 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
     }
   }
 
+  _PresentationSelection? _resolvePresentationSelection(
+    _Ctx ctx,
+    CourseDetailsState st,
+  ) {
+    if (_selectionMode && !_treeSelection.isEmpty) {
+      final selectedTopics = <TopicItem>[];
+      for (final topics in st.topics.values) {
+        for (final topic in topics) {
+          if (_treeSelection.topicIds.contains(topic.id)) {
+            selectedTopics.add(topic);
+          }
+        }
+      }
+
+      final materialIds = selectedTopics
+          .map((TopicItem topic) => topic.materialId)
+          .toSet();
+      if (selectedTopics.isEmpty || materialIds.length != 1) return null;
+
+      final material = _findMaterialById(st, materialIds.first);
+      if (material == null) return null;
+      final module = _findModuleById(st, material.moduleId);
+      if (module == null) return null;
+
+      return _PresentationSelection(
+        module: module,
+        material: material,
+        topicIds: selectedTopics.map((TopicItem topic) => topic.id).toSet(),
+      );
+    }
+
+    final module = ctx.module;
+    final material = ctx.material;
+    if (ctx.type == _CType.module || module == null || material == null) {
+      return null;
+    }
+
+    final Set<int> topicIds;
+    if (ctx.type == _CType.topic && ctx.topic != null) {
+      topicIds = _selectableTopicIdsForTopic(
+        _topicsForMaterial(st, module.id, material.id),
+        ctx.topic!,
+      );
+    } else {
+      topicIds = _selectableTopicIdsForMaterial(st, module.id, material.id);
+    }
+
+    if (topicIds.isEmpty) return null;
+    return _PresentationSelection(
+      module: module,
+      material: material,
+      topicIds: topicIds,
+    );
+  }
+
+  bool _canGeneratePresentation(_Ctx ctx, CourseDetailsState st) {
+    return _resolvePresentationSelection(ctx, st) != null;
+  }
+
+  void _openPresentationWorkspace(_Ctx ctx) {
+    final state = ref.read(
+      courseDetailsControllerProvider(widget.course.id),
+    );
+    final selection = _resolvePresentationSelection(ctx, state);
+    if (selection == null) {
+      AppToast.warning(
+        context,
+        title: 'Choose one material',
+        message:
+            'Select a material or topics from the same material before creating a presentation.',
+      );
+      return;
+    }
+
+    SelectedCourseCache.set(widget.course);
+    context.go(
+      Routes.coursePresentation(
+        buildCourseRouteSlug(widget.course),
+        moduleId: selection.module.id,
+        materialId: selection.material.id,
+        topicIds: selection.topicIds,
+        courseTitle: widget.course.safeTitle,
+        materialTitle: selection.material.displayTitle,
+        materialPageCount: selection.material.pageCount,
+      ),
+    );
+  }
+
 
   void _toggleSelectionMode() {
     setState(() {
@@ -2692,14 +2780,14 @@ Color _criteriaDifficultyColor(OutcomeDifficulty level) {
   }
 }
 
-IconData _criteriaDifficultyIcon(OutcomeDifficulty level) {
+String _criteriaDifficultyShortLabel(OutcomeDifficulty level) {
   switch (level) {
     case OutcomeDifficulty.beginner:
-      return Icons.eco_rounded;
+      return 'P';
     case OutcomeDifficulty.intermediate:
-      return Icons.bolt_rounded;
+      return 'M';
     case OutcomeDifficulty.advanced:
-      return Icons.local_fire_department_rounded;
+      return 'D';
   }
 }
 
@@ -2718,7 +2806,16 @@ class _CriteriaIconDot extends StatelessWidget {
         shape: BoxShape.circle,
         border: Border.all(color: color.withValues(alpha: 0.30)),
       ),
-      child: Icon(_criteriaDifficultyIcon(difficulty), size: 14, color: color),
+      alignment: Alignment.center,
+      child: Text(
+        _criteriaDifficultyShortLabel(difficulty),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+          color: color,
+          height: 1,
+        ),
+      ),
     );
   }
 }
@@ -2840,7 +2937,7 @@ class _CriteriaMappingLoGroup extends StatelessWidget {
 
 String _criterionShortCode(String code) {
   final trimmed = code.trim();
-  final withoutWordPrefix = trimmed.replaceFirst(RegExp(r'^(Easy|Medium|Hard)', caseSensitive: false), '').trim();
+  final withoutWordPrefix = trimmed.replaceFirst(RegExp(r'^(Easy|Medium|Hard|Pass|Merit|Distinction)', caseSensitive: false), '').trim();
   final withoutLetterPrefix = withoutWordPrefix.replaceFirst(RegExp(r'^[PMD](?=\d)', caseSensitive: false), '').trim();
   return withoutLetterPrefix.isEmpty ? trimmed : withoutLetterPrefix;
 }

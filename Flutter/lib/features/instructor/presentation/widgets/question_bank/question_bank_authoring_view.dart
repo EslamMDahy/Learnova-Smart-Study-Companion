@@ -59,7 +59,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
   }
 
   Widget _buildHeader({required bool compact}) {
-    final int selectedCount = _selectedDraftQuestions().length;
+    final int pendingReviewCount = _pendingReviewQuestions().length;
     final Widget left = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -118,7 +118,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
             children: <Widget>[
               _headerStat('${_draftQuestions.length}', 'Questions'),
               _headerStat('${_aiDrafts().length}', 'AI'),
-              _headerStat('$selectedCount', 'Review'),
+              _headerStat('$pendingReviewCount', 'Review'),
             ],
           ),
           SizedBox(height: compact ? 18 : 54),
@@ -430,6 +430,168 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
     required int totalVisible,
     bool reviewMode = false,
   }) {
+    final List<QuestionModel> pendingVisible = _pendingReviewQuestions(questions);
+    final int selectedVisiblePendingCount = pendingVisible
+        .where((QuestionModel question) =>
+            _selectedQuestionIds.contains(question.id))
+        .length;
+    final int selectedPendingCount = _pendingReviewQuestions()
+        .where((QuestionModel question) =>
+            _selectedQuestionIds.contains(question.id))
+        .length;
+    final bool allPendingSelected = pendingVisible.isNotEmpty &&
+        selectedVisiblePendingCount == pendingVisible.length;
+
+    final Widget heading = Row(
+      children: <Widget>[
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.infoBg,
+            borderRadius: BorderRadius.circular(11),
+          ),
+          child: Icon(
+            reviewMode
+                ? Icons.fact_check_outlined
+                : Icons.view_agenda_outlined,
+            color: AppColors.primary,
+            size: 18,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w900,
+                  color: AppColors.textTitle,
+                  height: 1.1,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                pendingVisible.isEmpty
+                    ? subtitle
+                    : '${pendingVisible.length} AI question${pendingVisible.length == 1 ? '' : 's'} waiting for instructor review. Reviewed questions are included in Excel export.',
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  fontSize: 12.2,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textMuted,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+
+    final Widget actions = Wrap(
+      alignment: WrapAlignment.end,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: 8,
+      runSpacing: 8,
+      children: <Widget>[
+        if (pendingVisible.isNotEmpty)
+          OutlinedButton.icon(
+            onPressed: _reviewingQuestions
+                ? null
+                : () => _selectPendingForReview(pendingVisible),
+            icon: Icon(
+              allPendingSelected
+                  ? Icons.remove_done_rounded
+                  : Icons.done_all_rounded,
+              size: 16,
+            ),
+            label: Text(
+              allPendingSelected ? 'Clear selection' : 'Select pending',
+            ),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              disabledForegroundColor: AppColors.textMuted,
+              side: BorderSide(color: AppColors.primary.withValues(alpha: 0.3)),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        if (selectedPendingCount > 0)
+          ElevatedButton.icon(
+            onPressed:
+                _reviewingQuestions ? null : _markSelectedQuestionsReviewed,
+            icon: _reviewingQuestions
+                ? const SizedBox(
+                    width: 15,
+                    height: 15,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.white,
+                    ),
+                  )
+                : const Icon(Icons.fact_check_outlined, size: 16),
+            label: Text(
+              _reviewingQuestions
+                  ? 'Saving...'
+                  : 'Mark reviewed ($selectedPendingCount)',
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.55),
+              disabledForegroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 10),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        if (_draftQuestions.isNotEmpty && !reviewMode)
+          OutlinedButton.icon(
+            onPressed: _aiPolling || _reviewingQuestions
+                ? null
+                : _clearQuestionTable,
+            icon: const Icon(Icons.clear_all_rounded, size: 16),
+            label: const Text('Clear table'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.textTitle,
+              disabledForegroundColor: AppColors.textMuted,
+              side: BorderSide(color: AppColors.borderGray),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              minimumSize: const Size(0, 36),
+              tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              textStyle: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+          ),
+        _countPill('$totalVisible total'),
+        _countPill('${questions.length} shown'),
+      ],
+    );
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardBg,
@@ -448,70 +610,26 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
         children: <Widget>[
           Padding(
             padding: const EdgeInsets.fromLTRB(18, 16, 18, 14),
-            child: Row(
-              children: <Widget>[
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.infoBg,
-                    borderRadius: BorderRadius.circular(11),
-                  ),
-                  child: Icon(
-                    reviewMode ? Icons.fact_check_outlined : Icons.view_agenda_outlined,
-                    color: AppColors.primary,
-                    size: 18,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            child: LayoutBuilder(
+              builder: (BuildContext context, BoxConstraints constraints) {
+                if (constraints.maxWidth < 1080) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: AppColors.textTitle,
-                          height: 1.1,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 12.2,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textMuted,
-                        ),
-                      ),
+                      heading,
+                      const SizedBox(height: 12),
+                      Align(alignment: Alignment.centerLeft, child: actions),
                     ],
-                  ),
-                ),
-                if (_draftQuestions.isNotEmpty && !reviewMode) ...<Widget>[
-                  OutlinedButton.icon(
-                    onPressed: _aiPolling ? null : _clearQuestionTable,
-                    icon: const Icon(Icons.clear_all_rounded, size: 16),
-                    label: const Text('Clear table'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: AppColors.textTitle,
-                      disabledForegroundColor: AppColors.textMuted,
-                      side: BorderSide(color: AppColors.borderGray),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      minimumSize: const Size(0, 36),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      textStyle: const TextStyle(fontSize: 12, fontWeight: FontWeight.w900),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                _countPill('$totalVisible total'),
-                const SizedBox(width: 8),
-                _countPill('${questions.length} shown'),
-              ],
+                  );
+                }
+                return Row(
+                  children: <Widget>[
+                    Expanded(child: heading),
+                    const SizedBox(width: 16),
+                    actions,
+                  ],
+                );
+              },
             ),
           ),
           Divider(height: 1, color: AppColors.borderGray),
@@ -538,7 +656,7 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Waiting for the AI callback. The selected topic questions are checked every 10 seconds.',
+                        'Waiting for the AI callback. Questions from the selected topics are checked every 10 seconds.',
                         style: TextStyle(
                           fontSize: 12.5,
                           fontWeight: FontWeight.w800,
@@ -554,7 +672,10 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
                       ),
                       child: Text(
                         'Stop watching',
-                        style: TextStyle(fontSize: 12, color: AppColors.primary),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.primary,
+                        ),
                       ),
                     ),
                   ],
@@ -619,59 +740,110 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
     required List<QuestionModel> questions,
     required bool reviewMode,
   }) {
+    final List<QuestionModel> pending = _pendingReviewQuestions(questions);
+    final int selectedPendingCount = pending
+        .where((QuestionModel question) =>
+            _selectedQuestionIds.contains(question.id))
+        .length;
+    final bool? selectAllValue = pending.isEmpty
+        ? false
+        : selectedPendingCount == 0
+            ? false
+            : selectedPendingCount == pending.length
+                ? true
+                : null;
+
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
-      child: SizedBox(
-        width: double.infinity,
-        child: Column(
-          children: <Widget>[
-            Container(
-              height: 42,
-              padding: const EdgeInsets.symmetric(horizontal: 14),
-              color: AppColors.surfaceBg,
-              child: Row(
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          final double tableWidth =
+              constraints.maxWidth < 1360 ? 1360 : constraints.maxWidth;
+          return SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: SizedBox(
+              width: tableWidth,
+              child: Column(
                 children: <Widget>[
-                  _tableHeader('#', width: 50),
-                  _tableHeader('Question', flex: 5),
-                  _tableHeader('Topic', flex: 3),
-                  _tableHeader('Answer', flex: 3),
-                  _tableHeader('Type', width: 116),
-                  _tableHeader('Difficulty', width: 104),
-                  _tableHeader('Source', width: 88),
-                  SizedBox(
-                    width: 82,
-                    child: Align(
-                      alignment: Alignment.centerRight,
-                      child: Text('Actions', style: _tableHeaderStyle()),
+                  Container(
+                    height: 44,
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    color: AppColors.surfaceBg,
+                    child: Row(
+                      children: <Widget>[
+                        SizedBox(
+                          width: 78,
+                          child: Row(
+                            children: <Widget>[
+                              SizedBox(
+                                width: 34,
+                                child: Checkbox(
+                                  value: selectAllValue,
+                                  tristate: true,
+                                  onChanged: pending.isEmpty || _reviewingQuestions
+                                      ? null
+                                      : (_) => _selectPendingForReview(questions),
+                                  visualDensity: VisualDensity.compact,
+                                ),
+                              ),
+                              Text('#', style: _tableHeaderStyle()),
+                            ],
+                          ),
+                        ),
+                        _tableHeader('Question', flex: 5),
+                        _tableHeader('Topic', flex: 3),
+                        _tableHeader('Answer', flex: 3),
+                        _tableHeader('Type', width: 116),
+                        _tableHeader('Difficulty', width: 104),
+                        _tableHeader('Source', width: 88),
+                        _tableHeader('Review status', width: 118),
+                        SizedBox(
+                          width: 118,
+                          child: Align(
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              'Actions',
+                              style: _tableHeaderStyle(),
+                            ),
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  Divider(height: 1, color: AppColors.borderGray),
+                  ...List<Widget>.generate(questions.length, (int index) {
+                    final QuestionModel question = questions[index];
+                    return Column(
+                      children: <Widget>[
+                        _buildQuestionTableRow(
+                          question,
+                          index: index + 1,
+                          selected: _selectedQuestionIds.contains(question.id),
+                          reviewMode: reviewMode,
+                        ),
+                        if (index != questions.length - 1)
+                          Divider(
+                            height: 1,
+                            color: AppColors.borderGray.withValues(alpha: 0.75),
+                          ),
+                      ],
+                    );
+                  }),
                 ],
               ),
             ),
-            Divider(height: 1, color: AppColors.borderGray),
-            ...List<Widget>.generate(questions.length, (int index) {
-              final QuestionModel question = questions[index];
-              return Column(
-                children: <Widget>[
-                  _buildQuestionTableRow(
-                    question,
-                    index: index + 1,
-                    selected: _selectedQuestionIds.contains(question.id),
-                    reviewMode: reviewMode,
-                  ),
-                  if (index != questions.length - 1)
-                    Divider(height: 1, color: AppColors.borderGray.withValues(alpha: 0.75)),
-                ],
-              );
-            }),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
 
   Widget _tableHeader(String label, {int? flex, double? width}) {
-    final Widget child = Text(label, overflow: TextOverflow.ellipsis, style: _tableHeaderStyle());
+    final Widget child = Text(
+      label,
+      overflow: TextOverflow.ellipsis,
+      style: _tableHeaderStyle(),
+    );
     if (width != null) return SizedBox(width: width, child: child);
     return Expanded(flex: flex ?? 1, child: child);
   }
@@ -691,10 +863,14 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
       height: 30,
       alignment: Alignment.center,
       decoration: BoxDecoration(
-        color: selected ? AppColors.primary.withValues(alpha: 0.12) : AppColors.surfaceBg,
+        color: selected
+            ? AppColors.primary.withValues(alpha: 0.12)
+            : AppColors.surfaceBg,
         borderRadius: BorderRadius.circular(9),
         border: Border.all(
-          color: selected ? AppColors.primary.withValues(alpha: 0.35) : AppColors.borderGray,
+          color: selected
+              ? AppColors.primary.withValues(alpha: 0.35)
+              : AppColors.borderGray,
         ),
       ),
       child: Text(
@@ -708,27 +884,110 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
     );
   }
 
+  Widget _approvalStatusPill(QuestionModel question) {
+    final QuestionApprovalStatus status = question.approvalStatus;
+    final String label;
+    final IconData icon;
+    final Color background;
+    final Color foreground;
+    final Color border;
+
+    switch (status) {
+      case QuestionApprovalStatus.pending:
+        label = 'Pending review';
+        icon = Icons.schedule_rounded;
+        background = AppColors.warningSoftBg;
+        foreground = AppColors.warningText;
+        border = AppColors.warningBorder;
+        break;
+      case QuestionApprovalStatus.rejected:
+        label = 'Rejected';
+        icon = Icons.cancel_outlined;
+        background = AppColors.dangerBg;
+        foreground = AppColors.dangerText;
+        border = AppColors.dangerText.withValues(alpha: 0.25);
+        break;
+      case QuestionApprovalStatus.approved:
+        label = question.source == QuestionSource.aiGenerated
+            ? 'Reviewed'
+            : 'Ready';
+        icon = Icons.verified_rounded;
+        background = AppColors.successBg;
+        foreground = AppColors.successText;
+        border = AppColors.successText.withValues(alpha: 0.24);
+        break;
+    }
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: background,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: border),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          Icon(icon, size: 13, color: foreground),
+          const SizedBox(width: 5),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: foreground,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildQuestionTableRow(
     QuestionModel question, {
     required int index,
     required bool selected,
     required bool reviewMode,
   }) {
-    final bool isDraft = _draftQuestions.any((QuestionModel item) => item.id == question.id);
+    final bool isDraft = _draftQuestions.any(
+      (QuestionModel item) => item.id == question.id,
+    );
+    final bool pendingReview = _isPendingAiReview(question);
+
     return Material(
-      color: selected ? AppColors.selectedBg.withValues(alpha: 0.55) : AppColors.cardBg,
+      color: selected
+          ? AppColors.selectedBg.withValues(alpha: 0.55)
+          : AppColors.cardBg,
       child: InkWell(
         onTap: isDraft ? () => _openEditDraftQuestion(question) : null,
         child: Container(
-          constraints: const BoxConstraints(minHeight: 64),
+          constraints: const BoxConstraints(minHeight: 68),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           child: Row(
             children: <Widget>[
               SizedBox(
-                width: 50,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: _questionIndexBadge(index, selected: selected),
+                width: 78,
+                child: Row(
+                  children: <Widget>[
+                    SizedBox(
+                      width: 34,
+                      child: pendingReview
+                          ? Checkbox(
+                              value: selected,
+                              onChanged: _reviewingQuestions
+                                  ? null
+                                  : (_) =>
+                                      _toggleReviewSelection(question),
+                              visualDensity: VisualDensity.compact,
+                            )
+                          : const SizedBox.shrink(),
+                    ),
+                    _questionIndexBadge(index, selected: selected),
+                  ],
                 ),
               ),
               Expanded(
@@ -780,15 +1039,51 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
                   ),
                 ),
               ),
-              SizedBox(width: 116, child: Align(alignment: Alignment.centerLeft, child: _tablePill(question.typeLabel))),
-              SizedBox(width: 104, child: Align(alignment: Alignment.centerLeft, child: _difficultyPill(question.difficultyLabel))),
-              SizedBox(width: 88, child: Align(alignment: Alignment.centerLeft, child: _sourcePill(question.source))),
               SizedBox(
-                width: 82,
+                width: 116,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _tablePill(question.typeLabel),
+                ),
+              ),
+              SizedBox(
+                width: 104,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _difficultyPill(question.difficultyLabel),
+                ),
+              ),
+              SizedBox(
+                width: 88,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _sourcePill(question.source),
+                ),
+              ),
+              SizedBox(
+                width: 118,
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: _approvalStatusPill(question),
+                ),
+              ),
+              SizedBox(
+                width: 118,
                 child: isDraft
                     ? Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: <Widget>[
+                          if (pendingReview) ...<Widget>[
+                            _iconAction(
+                              icon: Icons.fact_check_outlined,
+                              tooltip: 'Mark reviewed for export',
+                              compact: true,
+                              onTap: _reviewingQuestions
+                                  ? null
+                                  : () => _markQuestionReviewed(question),
+                            ),
+                            const SizedBox(width: 6),
+                          ],
                           _iconAction(
                             icon: Icons.visibility_outlined,
                             tooltip: 'View and edit',
@@ -801,7 +1096,9 @@ extension _QuestionBankAuthoringFlowView on _QuestionBankAuthoringFlowState {
                             tooltip: 'Remove from workspace',
                             danger: true,
                             compact: true,
-                            onTap: () => _deleteDraftQuestion(question),
+                            onTap: _reviewingQuestions
+                                ? null
+                                : () => _deleteDraftQuestion(question),
                           ),
                         ],
                       )

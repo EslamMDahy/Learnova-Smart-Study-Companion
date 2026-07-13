@@ -124,6 +124,7 @@ class _QuestionBankAuthoringFlowState
   DateTime? _pendingAiStartedAt;
   bool _aiPollInFlight = false;
   bool _aiStreamInFlight = false;
+  bool _reviewingQuestions = false;
   final Set<int> _detailHydrationInFlightIds = <int>{};
   final Set<int> _hydratedRemoteDetailIds = <int>{};
 
@@ -801,8 +802,11 @@ class _QuestionBankAuthoringFlowState
         (_pendingAiRequestId?.isNotEmpty ?? false) ||
         _pendingAiRequestTopicIds.isNotEmpty ||
         _receivedAiQuestionIds.isNotEmpty;
-    final bool shouldPersistQuestionRows = _aiPolling;
-    final bool hasQuestionWork = shouldPersistQuestionRows && _draftQuestions.isNotEmpty;
+    final bool hasPendingAiReview =
+        _draftQuestions.any(_isPendingAiReview);
+    final bool shouldPersistQuestionRows = _aiPolling || hasPendingAiReview;
+    final bool hasQuestionWork =
+        shouldPersistQuestionRows && _draftQuestions.isNotEmpty;
     final List<String> selectedIdsForPersist = shouldPersistQuestionRows
         ? _selectedQuestionIds.toList()
         : const <String>[];
@@ -1211,10 +1215,239 @@ class _QuestionBankAuthoringFlowState
     _persistDraftState();
   }
 
+  bool _isPendingAiReview(QuestionModel question) {
+    return question.source == QuestionSource.aiGenerated &&
+        question.approvalStatus == QuestionApprovalStatus.pending &&
+        (question.remoteId ?? int.tryParse(question.id)) != null;
+  }
+
+  List<QuestionModel> _pendingReviewQuestions([
+    Iterable<QuestionModel>? questions,
+  ]) {
+    return (questions ?? _draftQuestions)
+        .where(_isPendingAiReview)
+        .toList();
+  }
+
+  void _toggleReviewSelection(QuestionModel question) {
+    if (!_isPendingAiReview(question) || _reviewingQuestions) return;
+    setState(() {
+      if (!_selectedQuestionIds.add(question.id)) {
+        _selectedQuestionIds.remove(question.id);
+      }
+    });
+    _persistDraftState();
+  }
+
+  void _selectPendingForReview(Iterable<QuestionModel> questions) {
+    if (_reviewingQuestions) return;
+    final List<QuestionModel> pending = _pendingReviewQuestions(questions);
+    setState(() {
+      final bool allSelected = pending.isNotEmpty && pending.every(
+        (QuestionModel question) => _selectedQuestionIds.contains(question.id),
+      );
+      if (allSelected) {
+        _selectedQuestionIds.removeAll(
+          pending.map((QuestionModel question) => question.id),
+        );
+      } else {
+        _selectedQuestionIds.addAll(
+          pending.map((QuestionModel question) => question.id),
+        );
+      }
+    });
+    _persistDraftState();
+  }
+
+  Future<void> _markSelectedQuestionsReviewed() async {
+    final List<QuestionModel> selected = _pendingReviewQuestions().where(
+      (QuestionModel question) => _selectedQuestionIds.contains(question.id),
+    ).toList();
+    await _approveQuestionsAsReviewed(selected);
+  }
+
+  Future<void> _markQuestionReviewed(QuestionModel question) async {
+    await _approveQuestionsAsReviewed(<QuestionModel>[question]);
+  }
+
+  Future<void> _approveQuestionsAsReviewed(
+    List<QuestionModel> questions,
+  ) async {
+    if (_reviewingQuestions) return;
+    final List<QuestionModel> pending = questions.where(_isPendingAiReview).toList();
+    if (pending.isEmpty) {
+      AppToast.info(
+        context,
+        title: 'Nothing to review',
+        message: 'Select one or more pending AI questions first.',
+      );
+      return;
+    }
+
+    final Map<int, List<QuestionModel>> questionsByTopic =
+        <int, List<QuestionModel>>{};
+    for (final QuestionModel question in pending) {
+      final int? topicId = question.topicId;
+      if (topicId == null) continue;
+      questionsByTopic.putIfAbsent(topicId, () => <QuestionModel>[]).add(question);
+    }
+
+    if (questionsByTopic.isEmpty) {
+      AppToast.error(
+        context,
+        title: 'Could not mark reviewed',
+        message: 'The selected questions do not have a valid topic.',
+      );
+      return;
+    }
+
+    setState(() => _reviewingQuestions = true);
+
+    final Set<int> approvedRemoteIds = <int>{};
+    var failedTopics = 0;
+    Object? lastError;
+
+    for (final MapEntry<int, List<QuestionModel>> entry
+        in questionsByTopic.entries) {
+      final int topicId = entry.key;
+      final add_question_sheet.QuestionAuthoringTarget? target =
+          _findTarget(_targets, topicId);
+      final QuestionModel first = entry.value.first;
+      final int? moduleId = target?.moduleId ?? first.moduleId;
+      final int? materialId = target?.materialId ?? first.materialId;
+      final List<int> questionIds = entry.value
+          .map((QuestionModel question) =>
+              question.remoteId ?? int.tryParse(question.id))
+          .whereType<int>()
+          .toSet()
+          .toList();
+
+      if (moduleId == null || materialId == null || questionIds.isEmpty) {
+        failedTopics++;
+        continue;
+      }
+
+      try {
+        final ApproveQuestionsResponse response =
+            await ref.read(questionsApiProvider).approveTopicQuestions(
+                  courseId: widget.course.id,
+                  moduleId: moduleId,
+                  materialId: materialId,
+                  topicId: topicId,
+                  questionIds: questionIds,
+                );
+        if (response.approvedCount > 0) {
+          approvedRemoteIds.addAll(questionIds);
+        } else {
+          failedTopics++;
+        }
+      } catch (error) {
+        failedTopics++;
+        lastError = error;
+      }
+    }
+
+    if (!mounted) return;
+
+    if (approvedRemoteIds.isNotEmpty) {
+      setState(() {
+        for (var index = 0; index < _draftQuestions.length; index++) {
+          final QuestionModel question = _draftQuestions[index];
+          final int? remoteId =
+              question.remoteId ?? int.tryParse(question.id);
+          if (remoteId != null && approvedRemoteIds.contains(remoteId)) {
+            _draftQuestions[index] = _copyQuestionWithApprovalStatus(
+              question,
+              QuestionApprovalStatus.approved,
+            );
+            _selectedQuestionIds.remove(question.id);
+          }
+        }
+      });
+      _persistDraftState();
+      ref
+          .read(questionBankRefreshSignalProvider(widget.course.id).notifier)
+          .state++;
+    }
+
+    if (mounted) {
+      setState(() => _reviewingQuestions = false);
+    }
+
+    if (approvedRemoteIds.isNotEmpty && failedTopics == 0) {
+      AppToast.success(
+        context,
+        title: 'Marked as reviewed',
+        message:
+            '${approvedRemoteIds.length} question${approvedRemoteIds.length == 1 ? '' : 's'} will now be included in the question bank export.',
+      );
+      return;
+    }
+
+    if (approvedRemoteIds.isNotEmpty) {
+      AppToast.warning(
+        context,
+        title: 'Partially reviewed',
+        message:
+            '${approvedRemoteIds.length} question(s) were marked reviewed. Some topic groups could not be updated.',
+        duration: const Duration(seconds: 6),
+      );
+      return;
+    }
+
+    AppToast.error(
+      context,
+      title: 'Could not mark reviewed',
+      message: lastError == null
+          ? 'The selected questions are missing their material or module context.'
+          : 'The backend did not approve the selected pending questions. Refresh the workspace and try again.',
+      duration: const Duration(seconds: 6),
+    );
+  }
+
+  QuestionModel _copyQuestionWithApprovalStatus(
+    QuestionModel question,
+    QuestionApprovalStatus approvalStatus,
+  ) {
+    return QuestionModel(
+      id: question.id,
+      remoteId: question.remoteId,
+      text: question.text,
+      type: question.type,
+      difficulty: question.difficulty,
+      source: question.source,
+      approvalStatus: approvalStatus,
+      options: question.options,
+      correctOptionId: question.correctOptionId,
+      correctBool: question.correctBool,
+      sampleAnswer: question.sampleAnswer,
+      explanation: question.explanation,
+      expectedAnswer: question.expectedAnswer,
+      gradingRubric: question.gradingRubric,
+      tags: question.tags,
+      usageCount: question.usageCount,
+      successRate: question.successRate,
+      averageTimeSeconds: question.averageTimeSeconds,
+      maxScore: question.maxScore,
+      autoGradable: question.autoGradable,
+      courseId: question.courseId,
+      moduleId: question.moduleId,
+      moduleName: question.moduleName,
+      materialId: question.materialId,
+      materialName: question.materialName,
+      topicId: question.topicId,
+      topicName: question.topicName,
+      learningOutcomes: question.learningOutcomes,
+      createdBy: question.createdBy,
+      createdAt: question.createdAt,
+      updatedAt: DateTime.now(),
+    );
+  }
+
 
   Future<void> _handleGeneratePressed() async {
     final List<add_question_sheet.QuestionAuthoringTarget> generationTargets =
-        _targetsForCurrentTopicFilter();
+        _targets;
     if (generationTargets.isEmpty) {
       AppToast.error(
         context,
@@ -1227,7 +1460,10 @@ class _QuestionBankAuthoringFlowState
     final _AiGenerationRequest? request = await showDialog<_AiGenerationRequest>(
       context: context,
       barrierColor: Colors.black.withValues(alpha: 0.34),
-      builder: (_) => _AiGenerationDialog(targets: generationTargets),
+      builder: (_) => _AiGenerationDialog(
+        targets: generationTargets,
+        initialTopicId: _selectedTopicFilterId,
+      ),
     );
 
     if (request == null || !mounted) return;
@@ -1276,6 +1512,35 @@ class _QuestionBankAuthoringFlowState
 
       if (!mounted) return;
 
+      final List<QuestionModel> immediateQuestions =
+          await _hydrateImmediateGeneratedQuestions(api, resp.questions);
+      if (!mounted) return;
+
+      if (immediateQuestions.isNotEmpty) {
+        for (final QuestionModel question in immediateQuestions) {
+          final int? remoteId = question.remoteId ?? int.tryParse(question.id);
+          if (remoteId != null) {
+            _knownRemoteIds.add(remoteId);
+            _receivedAiQuestionIds.add(remoteId);
+          }
+        }
+        setState(() {
+          _upsertDraftQuestions(immediateQuestions);
+          _selectedQuestionIds
+            ..clear()
+            ..addAll(
+              immediateQuestions
+                  .where(_isPendingAiReview)
+                  .map((QuestionModel question) => question.id),
+            );
+          _mode = _WorkspaceMode.ai;
+        });
+        _persistDraftState();
+        ref
+            .read(questionBankRefreshSignalProvider(widget.course.id).notifier)
+            .state++;
+      }
+
       if (resp.aiProcessingStarted) {
         final String? responseRequestId = resp.requestId?.trim();
         _pendingAiRequestId = responseRequestId == null || responseRequestId.isEmpty
@@ -1284,13 +1549,29 @@ class _QuestionBankAuthoringFlowState
         AppToast.info(
           context,
           title: 'AI request sent',
-          message: 'Requested ${request.totalQuestions} question(s). I will keep a live stream open for the backend callback, with light polling as a fallback.',
+          message:
+              'Requested ${request.totalQuestions} question(s) across ${request.topicCount} topic${request.topicCount == 1 ? '' : 's'}. The workspace will keep watching for the generated questions.',
           duration: const Duration(seconds: 5),
         );
         setState(() => _mode = _WorkspaceMode.ai);
         _persistDraftState();
         _startAiPolling(firstDelay: _kFirstAiPollDelay);
         unawaited(_watchAiGenerationStream());
+      } else if (immediateQuestions.isNotEmpty) {
+        _pendingAiRequestId = null;
+        _pendingAiExpectedCount = 0;
+        _pendingAiRequestTopicIds.clear();
+        _receivedAiQuestionIds.clear();
+        _pendingAiStartedAt = null;
+        _aiPolling = false;
+        _persistDraftState();
+        AppToast.success(
+          context,
+          title: '${immediateQuestions.length} questions ready',
+          message:
+              'The questions were loaded immediately and are waiting for instructor review.',
+          duration: const Duration(seconds: 5),
+        );
       } else {
         AppToast.warning(
           context,
@@ -1319,6 +1600,36 @@ class _QuestionBankAuthoringFlowState
       );
     }
   }
+
+  Future<List<QuestionModel>> _hydrateImmediateGeneratedQuestions(
+    QuestionsApi api,
+    List<QuestionModel> summaries,
+  ) async {
+    final List<QuestionModel> hydrated = <QuestionModel>[];
+    for (final QuestionModel summary in summaries) {
+      final int? questionId = summary.remoteId ?? int.tryParse(summary.id);
+      if (questionId == null || questionId <= 0) {
+        hydrated.add(_decorateQuestionWithTargetContext(summary));
+        continue;
+      }
+      try {
+        final QuestionModel details = await api.getQuestion(
+          courseId: widget.course.id,
+          questionId: questionId,
+        );
+        _hydratedRemoteDetailIds.add(questionId);
+        hydrated.add(
+          _decorateQuestionWithTargetContext(
+            _mergeQuestionContext(details, summary),
+          ),
+        );
+      } catch (_) {
+        hydrated.add(_decorateQuestionWithTargetContext(summary));
+      }
+    }
+    return hydrated;
+  }
+
 
   // ── AI Polling ────────────────────────────────────────────────────────────
   /// The AI endpoint returns as soon as the request is accepted. The actual
@@ -1360,11 +1671,17 @@ class _QuestionBankAuthoringFlowState
     return _kLateAiPollDelay;
   }
 
-  void _stopAiPolling() {
+  void _stopAiPolling({bool clearCompletedRequest = false}) {
     _aiPollTimer?.cancel();
     _aiPollTimer = null;
     _aiPolling = false;
     _pendingAiRequestId = null;
+    if (clearCompletedRequest) {
+      _pendingAiRequestTopicIds.clear();
+      _receivedAiQuestionIds.clear();
+      _pendingAiExpectedCount = 0;
+      _pendingAiStartedAt = null;
+    }
     _persistDraftState();
     if (mounted) setState(() {});
   }
@@ -1529,7 +1846,13 @@ class _QuestionBankAuthoringFlowState
 
         setState(() {
           _upsertDraftQuestions(hydrated);
-          _selectedQuestionIds.clear();
+          _selectedQuestionIds
+            ..clear()
+            ..addAll(
+              hydrated
+                  .where(_isPendingAiReview)
+                  .map((QuestionModel question) => question.id),
+            );
           _mode = _WorkspaceMode.ai;
         });
         _persistDraftState();
@@ -1546,7 +1869,7 @@ class _QuestionBankAuthoringFlowState
 
         if (_pendingAiExpectedCount > 0 &&
             _receivedAiQuestionIds.length >= _pendingAiExpectedCount) {
-          _stopAiPolling();
+          _stopAiPolling(clearCompletedRequest: true);
         }
       }
     } catch (_) {
@@ -1918,10 +2241,11 @@ class _QuestionBankAuthoringFlowState
   Widget _iconAction({
     required IconData icon,
     required String tooltip,
-    required VoidCallback onTap,
+    required VoidCallback? onTap,
     bool danger = false,
     bool compact = false,
   }) {
+    final bool enabled = onTap != null;
     return Tooltip(
       message: tooltip,
       child: InkWell(
@@ -1931,14 +2255,28 @@ class _QuestionBankAuthoringFlowState
           width: compact ? 30 : 36,
           height: compact ? 30 : 36,
           decoration: BoxDecoration(
-            color: danger ? AppColors.dangerBg : AppColors.cardBg,
+            color: !enabled
+                ? AppColors.fieldDisabledBg
+                : danger
+                    ? AppColors.dangerBg
+                    : AppColors.cardBg,
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: danger ? AppColors.dangerBorder : AppColors.borderSoft),
+            border: Border.all(
+              color: !enabled
+                  ? AppColors.borderSoft
+                  : danger
+                      ? AppColors.dangerBorder
+                      : AppColors.borderSoft,
+            ),
           ),
           child: Icon(
             icon,
             size: compact ? 16 : 18,
-            color: danger ? AppColors.dangerText : AppColors.textGray,
+            color: !enabled
+                ? AppColors.textMuted.withValues(alpha: 0.55)
+                : danger
+                    ? AppColors.dangerText
+                    : AppColors.textGray,
           ),
         ),
       ),

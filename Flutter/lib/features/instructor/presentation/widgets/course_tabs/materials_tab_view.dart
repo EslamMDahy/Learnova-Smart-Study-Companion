@@ -165,9 +165,11 @@ extension _CourseMaterialsTabView on _CourseMaterialsTabState {
               ctx: footerCtx,
               uploading: st.uploading,
               canGenerate: _canGenerate(footerCtx, st),
+              canCreatePresentation: _canGeneratePresentation(footerCtx, st),
               selectionCount: hasTreeSelection ? _treeSelection.totalCount : null,
               onUpload: () { final m = footerCtx.module; if (m != null) _showUploadSheet(m); },
               onGenerate: () => _openQuestionAuthoringFromSelection(footerCtx),
+              onCreatePresentation: () => _openPresentationWorkspace(footerCtx),
               onAskAi: widget.onOpenCourseAssistant,
               assistantBusy: widget.courseAssistantBusy,
               onClose: () => _runStateUpdate(() {
