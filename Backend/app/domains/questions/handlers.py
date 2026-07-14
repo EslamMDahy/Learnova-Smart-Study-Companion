@@ -515,36 +515,320 @@ def question_type_from_payload(payload) -> str:
 QUESTION_BANK_EXPORT_TEMPLATE_PATH = "assets/question_bank_export_template.xlsx"
 CODE_FONT = Font(name="Consolas", size=10)
 
-
-def _build_option_cells(question: Mapping) -> list[str]:
-    if question["type"] not in ("multiple_choice", "multi_select"):
-        return ["", "", "", ""]
-    options = question["options"] or []
-    cells = [opt.get("text", "") for opt in options[:4]]
-    while len(cells) < 4:
-        cells.append("")
-    return cells
-
-
-def _build_expected_answer_cell(question: Mapping) -> str:
-    q_type = question["type"]
-    expected = question["expected_answer"]
-    options = question["options"] or []
-    text_by_id = {opt.get("id"): opt.get("text", "") for opt in options}
-
-    if q_type == "multiple_choice":
-        return text_by_id.get(expected, str(expected))
-    if q_type == "multi_select":
-        return ", ".join(text_by_id.get(i, str(i)) for i in (expected or []))
-    if q_type == "true_false":
-        return "True" if str(expected).lower() == "true" else "False"
-    if q_type == "code" and isinstance(expected, dict):
-        language = expected.get("language")
-        code = expected.get("code", "")
-        return f"# {language}\n{code}" if language else code
-    return str(expected) if expected is not None else ""
+# =========================
+# Metadata helper — called once per sheet by the orchestrator
+# =========================
+def _fill_course_metadata(*, ws, course_row: Mapping, total_questions: int) -> None:
+    ws["D2"] = course_row["title"]
+    ws["G2"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
+    ws["D4"] = course_row["course_code"] or ""
+    ws["G4"] = total_questions
 
 
+# =========================
+# Multiple Choice sheet handler
+# =========================
+def _handle_multiple_choice_questions(*, db: Session, ws, course_id: int, bucket: str) -> None:
+    rows = db.execute(
+        text("""
+            SELECT q.id, q.difficulty, q.question_text, q.explanation,
+                   q.options, q.expected_answer, q.image_key,
+                   t.title AS topic_title, t.description AS topic_description
+            FROM questions q
+            JOIN topics t ON t.id = q.topic_id
+            WHERE q.course_id = :course_id
+              AND q.approval_status = 'approved'
+              AND q.type = 'multiple_choice'
+            ORDER BY t.id, q.id
+        """),
+        {"course_id": course_id},
+    ).mappings().all()
+
+    current_row = 8
+    for q in rows:
+        options = q["options"] or []
+        text_by_id = {opt.get("id"): opt.get("text", "") for opt in options}
+
+        ws.cell(row=current_row, column=1, value=q["topic_title"])
+        ws.cell(row=current_row, column=2, value=q["topic_description"])
+        ws.cell(row=current_row, column=3, value=q["id"])
+        ws.cell(row=current_row, column=4, value="multiple_choice")
+        ws.cell(row=current_row, column=5, value=q["difficulty"])
+        ws.cell(row=current_row, column=6, value=q["question_text"])
+
+        option_cells = [opt.get("text", "") for opt in options[:4]]
+        while len(option_cells) < 4:
+            option_cells.append("")
+        for i, val in enumerate(option_cells):
+            ws.cell(row=current_row, column=7 + i, value=val)
+
+        ws.cell(row=current_row, column=11, value=text_by_id.get(q["expected_answer"], str(q["expected_answer"])))
+        ws.cell(row=current_row, column=12, value=q["explanation"] or "")
+
+        if q["image_key"]:
+            try:
+                image_bytes = supabase.storage.from_(bucket).download(q["image_key"])
+                img = XLImage(BytesIO(image_bytes))
+                img.width = 120
+                img.height = 120
+                ws.add_image(img, f"M{current_row}")
+                ws.row_dimensions[current_row].height = 90
+            except Exception:
+                pass
+
+        current_row += 1
+
+
+# =========================
+# Multi Select sheet handler
+# =========================
+def _handle_multi_select_questions(*, db: Session, ws, course_id: int, bucket: str) -> None:
+    rows = db.execute(
+        text("""
+            SELECT q.id, q.difficulty, q.question_text, q.explanation,
+                   q.options, q.expected_answer, q.image_key,
+                   t.title AS topic_title, t.description AS topic_description
+            FROM questions q
+            JOIN topics t ON t.id = q.topic_id
+            WHERE q.course_id = :course_id
+              AND q.approval_status = 'approved'
+              AND q.type = 'multi_select'
+            ORDER BY t.id, q.id
+        """),
+        {"course_id": course_id},
+    ).mappings().all()
+
+    current_row = 8
+    for q in rows:
+        options = q["options"] or []
+        text_by_id = {opt.get("id"): opt.get("text", "") for opt in options}
+
+        ws.cell(row=current_row, column=1, value=q["topic_title"])
+        ws.cell(row=current_row, column=2, value=q["topic_description"])
+        ws.cell(row=current_row, column=3, value=q["id"])
+        ws.cell(row=current_row, column=4, value="multi_select")
+        ws.cell(row=current_row, column=5, value=q["difficulty"])
+        ws.cell(row=current_row, column=6, value=q["question_text"])
+
+        option_cells = [opt.get("text", "") for opt in options[:4]]
+        while len(option_cells) < 4:
+            option_cells.append("")
+        for i, val in enumerate(option_cells):
+            ws.cell(row=current_row, column=7 + i, value=val)
+
+        expected = q["expected_answer"] or []
+        ws.cell(row=current_row, column=11, value=", ".join(text_by_id.get(i, str(i)) for i in expected))
+        ws.cell(row=current_row, column=12, value=q["explanation"] or "")
+
+        if q["image_key"]:
+            try:
+                image_bytes = supabase.storage.from_(bucket).download(q["image_key"])
+                img = XLImage(BytesIO(image_bytes))
+                img.width = 120
+                img.height = 120
+                ws.add_image(img, f"M{current_row}")
+                ws.row_dimensions[current_row].height = 90
+            except Exception:
+                pass
+
+        current_row += 1
+
+
+# =========================
+# True/False sheet handler (no option columns)
+# =========================
+def _handle_true_false_questions(*, db: Session, ws, course_id: int, bucket: str) -> None:
+    rows = db.execute(
+        text("""
+            SELECT q.id, q.difficulty, q.question_text, q.explanation,
+                   q.expected_answer, q.image_key,
+                   t.title AS topic_title, t.description AS topic_description
+            FROM questions q
+            JOIN topics t ON t.id = q.topic_id
+            WHERE q.course_id = :course_id
+              AND q.approval_status = 'approved'
+              AND q.type = 'true_false'
+            ORDER BY t.id, q.id
+        """),
+        {"course_id": course_id},
+    ).mappings().all()
+
+    current_row = 8
+    for q in rows:
+        ws.cell(row=current_row, column=1, value=q["topic_title"])
+        ws.cell(row=current_row, column=2, value=q["topic_description"])
+        ws.cell(row=current_row, column=3, value=q["id"])
+        ws.cell(row=current_row, column=4, value="true_false")
+        ws.cell(row=current_row, column=5, value=q["difficulty"])
+        ws.cell(row=current_row, column=6, value=q["question_text"])
+
+        ws.cell(row=current_row, column=7, value="True" if str(q["expected_answer"]).lower() == "true" else "False")
+        ws.cell(row=current_row, column=8, value=q["explanation"] or "")
+
+        if q["image_key"]:
+            try:
+                image_bytes = supabase.storage.from_(bucket).download(q["image_key"])
+                img = XLImage(BytesIO(image_bytes))
+                img.width = 120
+                img.height = 120
+                ws.add_image(img, f"I{current_row}")
+                ws.row_dimensions[current_row].height = 90
+            except Exception:
+                pass
+
+        current_row += 1
+
+
+# =========================
+# Essay sheet handler (no option columns; grading_rubric is not exported)
+# =========================
+def _handle_essay_questions(*, db: Session, ws, course_id: int, bucket: str) -> None:
+    rows = db.execute(
+        text("""
+            SELECT q.id, q.difficulty, q.question_text, q.explanation,
+                   q.expected_answer, q.image_key,
+                   t.title AS topic_title, t.description AS topic_description
+            FROM questions q
+            JOIN topics t ON t.id = q.topic_id
+            WHERE q.course_id = :course_id
+              AND q.approval_status = 'approved'
+              AND q.type = 'essay'
+            ORDER BY t.id, q.id
+        """),
+        {"course_id": course_id},
+    ).mappings().all()
+
+    current_row = 8
+    for q in rows:
+        ws.cell(row=current_row, column=1, value=q["topic_title"])
+        ws.cell(row=current_row, column=2, value=q["topic_description"])
+        ws.cell(row=current_row, column=3, value=q["id"])
+        ws.cell(row=current_row, column=4, value="essay")
+        ws.cell(row=current_row, column=5, value=q["difficulty"])
+        ws.cell(row=current_row, column=6, value=q["question_text"])
+
+        ws.cell(row=current_row, column=7, value=q["expected_answer"] or "")
+        ws.cell(row=current_row, column=8, value=q["explanation"] or "")
+
+        if q["image_key"]:
+            try:
+                image_bytes = supabase.storage.from_(bucket).download(q["image_key"])
+                img = XLImage(BytesIO(image_bytes))
+                img.width = 120
+                img.height = 120
+                ws.add_image(img, f"I{current_row}")
+                ws.row_dimensions[current_row].height = 90
+            except Exception:
+                pass
+
+        current_row += 1
+
+
+# =========================
+# Short Answer sheet handler (no option columns)
+# =========================
+def _handle_short_answer_questions(*, db: Session, ws, course_id: int, bucket: str) -> None:
+    rows = db.execute(
+        text("""
+            SELECT q.id, q.difficulty, q.question_text, q.explanation,
+                   q.expected_answer, q.image_key,
+                   t.title AS topic_title, t.description AS topic_description
+            FROM questions q
+            JOIN topics t ON t.id = q.topic_id
+            WHERE q.course_id = :course_id
+              AND q.approval_status = 'approved'
+              AND q.type = 'short_answer'
+            ORDER BY t.id, q.id
+        """),
+        {"course_id": course_id},
+    ).mappings().all()
+
+    current_row = 8
+    for q in rows:
+        ws.cell(row=current_row, column=1, value=q["topic_title"])
+        ws.cell(row=current_row, column=2, value=q["topic_description"])
+        ws.cell(row=current_row, column=3, value=q["id"])
+        ws.cell(row=current_row, column=4, value="short_answer")
+        ws.cell(row=current_row, column=5, value=q["difficulty"])
+        ws.cell(row=current_row, column=6, value=q["question_text"])
+
+        ws.cell(row=current_row, column=7, value=q["expected_answer"] or "")
+        ws.cell(row=current_row, column=8, value=q["explanation"] or "")
+
+        if q["image_key"]:
+            try:
+                image_bytes = supabase.storage.from_(bucket).download(q["image_key"])
+                img = XLImage(BytesIO(image_bytes))
+                img.width = 120
+                img.height = 120
+                ws.add_image(img, f"I{current_row}")
+                ws.row_dimensions[current_row].height = 90
+            except Exception:
+                pass
+
+        current_row += 1
+
+
+# =========================
+# Code sheet handler (no option columns; monospace font on code content)
+# =========================
+def _handle_code_questions(*, db: Session, ws, course_id: int, bucket: str) -> None:
+    rows = db.execute(
+        text("""
+            SELECT q.id, q.difficulty, q.question_text, q.explanation,
+                   q.expected_answer, q.image_key,
+                   t.title AS topic_title, t.description AS topic_description
+            FROM questions q
+            JOIN topics t ON t.id = q.topic_id
+            WHERE q.course_id = :course_id
+              AND q.approval_status = 'approved'
+              AND q.type = 'code'
+            ORDER BY t.id, q.id
+        """),
+        {"course_id": course_id},
+    ).mappings().all()
+
+    current_row = 8
+    for q in rows:
+        ws.cell(row=current_row, column=1, value=q["topic_title"])
+        ws.cell(row=current_row, column=2, value=q["topic_description"])
+        ws.cell(row=current_row, column=3, value=q["id"])
+        ws.cell(row=current_row, column=4, value="code")
+        ws.cell(row=current_row, column=5, value=q["difficulty"])
+
+        question_text_cell = ws.cell(row=current_row, column=6, value=q["question_text"])
+
+        expected = q["expected_answer"]
+        if isinstance(expected, dict):
+            language = expected.get("language")
+            code = expected.get("code", "")
+            expected_value = f"# {language}\n{code}" if language else code
+        else:
+            expected_value = str(expected) if expected is not None else ""
+
+        expected_answer_cell = ws.cell(row=current_row, column=7, value=expected_value)
+        ws.cell(row=current_row, column=8, value=q["explanation"] or "")
+
+        question_text_cell.font = CODE_FONT
+        expected_answer_cell.font = CODE_FONT
+
+        if q["image_key"]:
+            try:
+                image_bytes = supabase.storage.from_(bucket).download(q["image_key"])
+                img = XLImage(BytesIO(image_bytes))
+                img.width = 120
+                img.height = 120
+                ws.add_image(img, f"I{current_row}")
+                ws.row_dimensions[current_row].height = 90
+            except Exception:
+                pass
+
+        current_row += 1
+
+
+# =========================
+# Orchestrator — registered as the "question_bank_export" job handler
+# =========================
 def question_bank_xlsx_export_handler(*, db: Session, payload: dict) -> dict:
     course_id = payload["course_id"]
 
@@ -565,79 +849,40 @@ def question_bank_xlsx_export_handler(*, db: Session, payload: dict) -> dict:
         raise ValueError(f"Course {course_id} not found")
 
     # =========================
-    # 2) Fetch approved questions with topic info
+    # 2) Total approved question count (shown in every sheet's metadata)
     # =========================
-    rows = db.execute(
+    total_row = db.execute(
         text("""
-            SELECT
-                q.id, q.type, q.difficulty, q.question_text, q.explanation,
-                q.options, q.expected_answer, q.image_key,
-                t.title AS topic_title, t.description AS topic_description
-            FROM questions q
-            JOIN topics t ON t.id = q.topic_id
-            WHERE q.course_id = :course_id
-              AND q.approval_status = 'approved'
-            ORDER BY t.id, q.id
+            SELECT COUNT(*) AS total
+            FROM questions
+            WHERE course_id = :course_id
+              AND approval_status = 'approved'
         """),
         {"course_id": course_id},
-    ).mappings().all()
+    ).mappings().first()
+    total_questions = total_row["total"] if total_row else 0
 
     # =========================
-    # 3) Load template, fill metadata
+    # 3) Load template, fill metadata on every sheet
     # =========================
     wb = load_workbook(QUESTION_BANK_EXPORT_TEMPLATE_PATH)
-    ws = wb["Question Bank"]
-
-    ws["D2"] = course_row["title"]
-    ws["G2"] = datetime.utcnow().strftime("%Y-%m-%d %H:%M UTC")
-    ws["D4"] = course_row["course_code"] or ""
-    ws["G4"] = len(rows)
-
-    # =========================
-    # 4) Write question rows
-    # =========================
     bucket = settings.supabase_private_bucket
-    current_row = 8
 
-    for q in rows:
-        ws.cell(row=current_row, column=1, value=q["topic_title"])
-        ws.cell(row=current_row, column=2, value=q["topic_description"])
-        ws.cell(row=current_row, column=3, value=q["id"])
-        ws.cell(row=current_row, column=4, value=q["type"])
-        ws.cell(row=current_row, column=5, value=q["difficulty"])
-
-        question_text_cell = ws.cell(row=current_row, column=6, value=q["question_text"])
-        for i, val in enumerate(_build_option_cells(q)):
-            ws.cell(row=current_row, column=7 + i, value=val)
-
-        expected_answer_cell = ws.cell(row=current_row, column=11, value=_build_expected_answer_cell(q))
-        ws.cell(row=current_row, column=12, value=q["explanation"] or "")
-
-        # =========================
-        # 5) Monospace font on any code content
-        # =========================
-        if q["type"] == "code":
-            question_text_cell.font = CODE_FONT
-            expected_answer_cell.font = CODE_FONT
-
-        # =========================
-        # 6) Inject question image if present (best-effort)
-        # =========================
-        if q["image_key"]:
-            try:
-                image_bytes = supabase.storage.from_(bucket).download(q["image_key"])
-                img = XLImage(BytesIO(image_bytes))
-                img.width = 120
-                img.height = 120
-                ws.add_image(img, f"M{current_row}")
-                ws.row_dimensions[current_row].height = 90
-            except Exception:
-                pass
-
-        current_row += 1
+    for sheet_name in wb.sheetnames:
+        _fill_course_metadata(ws=wb[sheet_name], course_row=course_row, total_questions=total_questions)
 
     # =========================
-    # 7) Save in-memory, upload to Supabase
+    # 4) Dispatch each question type to its own sheet handler
+    # =========================
+    _handle_multiple_choice_questions(db=db, ws=wb["Multiple Choice"], course_id=course_id, bucket=bucket)
+    _handle_multi_select_questions(db=db, ws=wb["Multi Select"], course_id=course_id, bucket=bucket)
+    _handle_true_false_questions(db=db, ws=wb["True False"], course_id=course_id, bucket=bucket)
+    _handle_essay_questions(db=db, ws=wb["Essay"], course_id=course_id, bucket=bucket)
+    _handle_short_answer_questions(db=db, ws=wb["Short Answer"], course_id=course_id, bucket=bucket)
+    _handle_code_questions(db=db, ws=wb["Code"], course_id=course_id, bucket=bucket)
+
+    # =========================
+    # 5) Save in-memory, upload to Supabase
     # =========================
     buffer = BytesIO()
     wb.save(buffer)
@@ -651,5 +896,3 @@ def question_bank_xlsx_export_handler(*, db: Session, payload: dict) -> dict:
     )
 
     return {"storage_key": storage_key, "file_size_bytes": buffer.getbuffer().nbytes}
-
-
