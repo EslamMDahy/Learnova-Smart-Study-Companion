@@ -4,6 +4,8 @@ import re
 from typing import Iterable, Optional
 from typing import Any
 
+from app.core.supabase_client import supabase 
+
 _SAFE_DEFAULT_NAME = "file"
 
 def split_object_key(key: str) -> tuple[str, str]:
@@ -166,3 +168,20 @@ def delete_storage_object(*, supabase_client: Any, bucket: str, storage_key: str
     if error:
         msg = error.get("message") if isinstance(error, dict) else str(error)
         raise RuntimeError(f"Failed to delete storage object: {msg}")
+
+
+
+def generate_signed_url(*, bucket: str, storage_key: str, expires_in_seconds: int) -> str | None:
+    try:
+        signed = supabase.storage.from_(bucket).create_signed_url(storage_key, expires_in_seconds)
+    except Exception:
+        return None
+
+    if isinstance(signed, dict):
+        return signed.get("signedUrl") or signed.get("signed_url") or signed.get("url")
+
+    data = getattr(signed, "data", None) if signed is not None else None
+    if isinstance(data, dict):
+        return data.get("signedUrl") or data.get("signed_url") or data.get("url")
+
+    return None

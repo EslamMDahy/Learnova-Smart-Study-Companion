@@ -8,6 +8,7 @@ from sqlalchemy import (
     JSON,
     Index
 )
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 from datetime import datetime
 
@@ -47,8 +48,8 @@ class StudentAnswer(Base):
         nullable=True
     )
 
-    answer_text: Mapped[str | None] = mapped_column(
-        Text,
+    answer_text: Mapped[dict | str | None] = mapped_column(
+        JSONB,
         nullable=True
     )
 

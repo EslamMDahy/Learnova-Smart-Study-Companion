@@ -138,6 +138,7 @@ class ExamQuestionDetailResponse(BaseModel):
     max_score: float
     auto_gradable: bool
     tags: Optional[Any]
+    image_url: Optional[str]
 
     model_config = ConfigDict(extra="forbid")
 
@@ -526,6 +527,7 @@ class StudentExamQuestionResponse(BaseModel):
     difficulty: str
     options: Optional[List[StudentExamQuestionOptionResponse]]
     auto_gradable: bool
+    image_url: Optional[str]
 
     model_config = ConfigDict(extra="forbid")
 
@@ -571,11 +573,18 @@ class StudentAttemptExamResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+class CodeAnswerText(BaseModel):
+    code: str
+    language: Optional[str] = None
+
+    model_config = ConfigDict(extra="forbid")
+
+
 class StudentSubmitAnswerRequest(BaseModel):
     exam_question_id: int
     selected_option_index: Optional[str] = None
     selected_option_indices: Optional[List[str]] = None
-    answer_text: Optional[str] = None
+    answer_text: Optional[Union[str, CodeAnswerText]] = None
     time_taken_seconds: Optional[int] = None
 
     model_config = ConfigDict(extra="forbid")
@@ -658,6 +667,7 @@ class StudentExamResultQuestionResponse(BaseModel):
     is_correct: Optional[bool]
     points_earned: Optional[float]
     teacher_feedback: Optional[str]
+    image_url: Optional[str]
 
     model_config = ConfigDict(extra="forbid")
 

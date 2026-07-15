@@ -76,6 +76,11 @@ class ExamQuestion(Base):
         nullable=True
     )
 
+    snapshot_image_key: Mapped[str | None] = mapped_column(
+        Text,
+        nullable=True
+    )
+
     snapshot_options: Mapped[dict | None] = mapped_column(
         JSONB,
         nullable=True

@@ -18,7 +18,7 @@ from app.core.ai_service_integration.ai_transport import send_ai_request
 from app.core.background_jobs.repository import DuplicateActiveJobError, create_job, get_job_by_id
 from app.core.background_jobs.registry import register_handler
 from app.core.event_bus.subscribe import register_listener, subscribe, wait_for_payload
-from app.core.storage_utils import split_object_key
+from app.core.storage_utils import generate_signed_url, split_object_key
 from app.core.supabase_client import supabase 
 from app.core.config import settings
 from app.db.session import SessionLocal
@@ -2201,18 +2201,14 @@ def confirm_question_image_upload(*, course_id: int, question_id: int, db: Sessi
     # =========================
     # 6) Create signed download URL (private bucket)
     # =========================
-    download_url = None
-    try:
-        signed = supabase.storage.from_(bucket).create_signed_url(storage_key, SIGNED_URL_EXPIRES_SECONDS)
-    except Exception:
-        signed = None
+    download_url = generate_signed_url(
+        bucket=bucket,
+        storage_key=storage_key,
+        expires_in_seconds=SIGNED_URL_EXPIRES_SECONDS,
+    )
 
-    if isinstance(signed, dict):
-        download_url = signed.get("signedUrl") or signed.get("signed_url") or signed.get("url")
-    else:
-        data = getattr(signed, "data", None) if signed is not None else None
-        if isinstance(data, dict):
-            download_url = data.get("signedUrl") or data.get("signed_url") or data.get("url")
+    if not download_url:
+        raise HTTPException(status_code=400, detail="Failed to create signed download url")
 
     if not download_url:
         raise HTTPException(status_code=400, detail="Failed to create signed download url")

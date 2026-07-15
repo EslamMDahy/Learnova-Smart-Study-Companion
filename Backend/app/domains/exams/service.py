@@ -12,6 +12,10 @@ import logging
 import random
 import json as _json
 
+from app.core.ai_service_integration.ai_transport import send_ai_request
+from app.core.storage_utils import generate_signed_url
+from app.core.config import settings
+
 from .schemas import (ExamCreateRequest,
                       ExamUpdateRequest,
                       ExamSectionCreateRequest,
@@ -24,9 +28,10 @@ from .schemas import (ExamCreateRequest,
                       ExamTemplateSectionUpdateRequest,
                       GenerateExamFromTemplateRequest,
                       StudentSubmitAnswerRequest,
-                      StudentSubmitExamRequest)
+                      StudentSubmitExamRequest,
+                      CodeAnswerText,)
 
-from app.core.ai_service_integration.ai_transport import send_ai_request
+
 from .helpers import (build_exam_export_context,
                       render_exam_pdf_html,
                       convert_html_to_pdf)
@@ -36,6 +41,7 @@ from .helpers import (build_exam_export_context,
 logger = logging.getLogger(__name__)
 
 ALLOWED_EXAM_TYPES = {"quiz", "midterm", "final", "practice"}
+SIGNED_URL_EXPIRES_SECONDS = 60 * 60  # 1 hour
 
 
 def create_exam(*, course_id: int, payload: ExamCreateRequest, db: Session, current_user: dict,):
@@ -495,6 +501,7 @@ def add_section_to_exam(*, course_id: int, exam_id: int, payload: ExamSectionCre
         "true_false",
         "short_answer",
         "essay",
+        "code",
     }:
         raise HTTPException(status_code=422, detail="Invalid question_type")
 
@@ -936,6 +943,7 @@ def update_exam_section(*, course_id: int, exam_id: int, section_id: int, payloa
                 "true_false",
                 "short_answer",
                 "essay",
+                "code",
             }:
                 raise HTTPException(status_code=422, detail="Invalid question_type")
 
@@ -2183,18 +2191,15 @@ def publish_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
                     snapshot_topic_id = q.topic_id,
                     snapshot_question_text = q.question_text,
                     snapshot_explanation = q.explanation,
-                    -- The live DB currently stores snapshot_* JSON columns as json,
-                    -- while questions.* are JSONB in the SQLAlchemy model.
-                    -- Cast explicitly to avoid PostgreSQL jsonb -> json assignment errors
-                    -- during publish.
-                    snapshot_options = q.options::json,
+                    snapshot_options = q.options,
                     snapshot_type = q.type::text,
                     snapshot_difficulty = q.difficulty::text,
-                    snapshot_expected_answer = q.expected_answer::json,
-                    snapshot_grading_rubric = q.grading_rubric::json,
+                    snapshot_expected_answer = q.expected_answer,
+                    snapshot_grading_rubric = q.grading_rubric,
                     snapshot_max_score = q.max_score,
                     snapshot_auto_gradable = q.auto_gradable,
-                    snapshot_tags = q.tags::json,
+                    snapshot_tags = q.tags,
+                    snapshot_image_key = q.image_key,
                     snapshot_source_question_updated_at = q.updated_at,
                     snapshot_created_at = NOW()
                 FROM questions q
@@ -2214,7 +2219,7 @@ def publish_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
                 status_code=500,
                 detail="Failed to create question snapshots",
             )
-
+        
         # =========================
         # 7) Recalculate section totals
         # =========================
@@ -2565,7 +2570,8 @@ def get_exam(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
                         eq.snapshot_grading_rubric AS grading_rubric,
                         eq.snapshot_max_score AS max_score,
                         eq.snapshot_auto_gradable AS auto_gradable,
-                        eq.snapshot_tags AS tags
+                        eq.snapshot_tags AS tags,
+                        eq.snapshot_image_key AS image_key
                     FROM exam_questions eq
                     WHERE eq.exam_id = :exam_id
                     ORDER BY eq.section_id ASC, eq.order_index ASC, eq.id ASC
@@ -2597,7 +2603,8 @@ def get_exam(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
                         q.grading_rubric,
                         q.max_score,
                         q.auto_gradable,
-                        q.tags
+                        q.tags,
+                        q.image_key
                     FROM exam_questions eq
                     JOIN questions q
                       ON q.id = eq.question_id
@@ -2611,10 +2618,24 @@ def get_exam(*, course_id: int, exam_id: int, db: Session, current_user: dict,):
                 },
             ).mappings().all()
 
+        bucket = settings.supabase_private_bucket
+
         questions_by_section_id = {}
 
         for row in question_rows:
             question = dict(row)
+
+            image_key = question.pop("image_key", None)
+            question["image_url"] = (
+                generate_signed_url(
+                    bucket=bucket,
+                    storage_key=image_key,
+                    expires_in_seconds=SIGNED_URL_EXPIRES_SECONDS,
+                )
+                if image_key
+                else None
+            )
+
             current_section_id = int(question["section_id"])
             questions_by_section_id.setdefault(current_section_id, [])
             questions_by_section_id[current_section_id].append(question)
@@ -4828,6 +4849,8 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
             {"exam_id": exam_id, "student_id": student_id},
         ).mappings().first()
 
+        bucket = settings.supabase_private_bucket
+
         if in_progress_attempt:
             attempt_id = int(in_progress_attempt["id"])
             attempt_number = int(in_progress_attempt["attempt_number"])
@@ -4884,7 +4907,8 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
                         eq.snapshot_options AS options,
                         eq.snapshot_type AS type,
                         eq.snapshot_difficulty AS difficulty,
-                        eq.snapshot_auto_gradable AS auto_gradable
+                        eq.snapshot_auto_gradable AS auto_gradable,
+                        eq.snapshot_image_key AS image_key
                     FROM exam_questions eq
                     WHERE eq.exam_id = :exam_id
                     ORDER BY eq.section_id ASC, eq.order_index ASC, eq.id ASC
@@ -4895,6 +4919,16 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
             questions_by_section_map: dict[int, dict] = {}
             for row in question_rows:
                 q = dict(row)
+                image_key = q.pop("image_key", None)
+                q["image_url"] = (
+                    generate_signed_url(
+                        bucket=bucket,
+                        storage_key=image_key,
+                        expires_in_seconds=SIGNED_URL_EXPIRES_SECONDS,
+                    )
+                    if image_key
+                    else None
+                )
                 sid = int(q["section_id"])
                 questions_by_section_map.setdefault(sid, {})
                 questions_by_section_map[sid][q["exam_question_id"]] = q
@@ -5002,7 +5036,8 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
                     eq.snapshot_options AS options,
                     eq.snapshot_type AS type,
                     eq.snapshot_difficulty AS difficulty,
-                    eq.snapshot_auto_gradable AS auto_gradable
+                    eq.snapshot_auto_gradable AS auto_gradable,
+                    eq.snapshot_image_key AS image_key
                 FROM exam_questions eq
                 WHERE eq.exam_id = :exam_id
                 ORDER BY eq.section_id ASC, eq.order_index ASC, eq.id ASC
@@ -5021,6 +5056,17 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
         for row in question_rows:
             sid = int(row["section_id"])
 
+            image_key = row["image_key"]
+            image_url = (
+                generate_signed_url(
+                    bucket=bucket,
+                    storage_key=image_key,
+                    expires_in_seconds=SIGNED_URL_EXPIRES_SECONDS,
+                )
+                if image_key
+                else None
+            )
+
             q = {
                 "exam_question_id": row["exam_question_id"],
                 "question_id": row["question_id"],
@@ -5031,6 +5077,7 @@ def attempt_exam(*, course_id: int, exam_id: int, db: Session, current_user: dic
                 "type": row["type"],
                 "difficulty": row["difficulty"],
                 "auto_gradable": row["auto_gradable"],
+                "image_url": image_url,
             }
 
             questions_by_section.setdefault(sid, [])
@@ -5240,6 +5287,13 @@ def submit_answer(*, course_id: int, exam_id: int, attempt_id: int, payload: Stu
         # =========================
         # 5) Upsert student answer
         # =========================
+        if payload.answer_text is None:
+            answer_text_value = None
+        elif isinstance(payload.answer_text, CodeAnswerText):
+            answer_text_value = _json.dumps(payload.answer_text.model_dump())
+        else:
+            answer_text_value = _json.dumps(payload.answer_text)
+
         db.execute(
             text("""
                 INSERT INTO student_answers (
@@ -5267,7 +5321,7 @@ def submit_answer(*, course_id: int, exam_id: int, attempt_id: int, payload: Stu
                 "exam_question_id": payload.exam_question_id,
                 "selected_option_index": payload.selected_option_index,
                 "selected_option_indices": _json.dumps(payload.selected_option_indices) if payload.selected_option_indices else None,
-                "answer_text": payload.answer_text,
+                "answer_text": answer_text_value,
                 "time_taken_seconds": payload.time_taken_seconds,
             },
         )
@@ -5382,6 +5436,13 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                 if not exam_question_row:
                     continue
 
+                if answer.answer_text is None:
+                    answer_text_value = None
+                elif isinstance(answer.answer_text, CodeAnswerText):
+                    answer_text_value = _json.dumps(answer.answer_text.model_dump())
+                else:
+                    answer_text_value = _json.dumps(answer.answer_text)
+
                 db.execute(
                     text("""
                         INSERT INTO student_answers (
@@ -5409,7 +5470,7 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                         "exam_question_id": answer.exam_question_id,
                         "selected_option_index": answer.selected_option_index,
                         "selected_option_indices": _json.dumps(answer.selected_option_indices) if answer.selected_option_indices else None,
-                        "answer_text": answer.answer_text,
+                        "answer_text": answer_text_value,
                         "time_taken_seconds": answer.time_taken_seconds,
                     },
                 )
@@ -5485,6 +5546,46 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
 
             if q_type in {"essay", "short_answer"}:
                 needs_manual_grading = True
+                continue
+
+            if q_type == "code":
+                expected_data = expected
+                if isinstance(expected_data, str):
+                    expected_data = _json.loads(expected_data)
+
+                student_data = student_answer.get("answer_text")
+                if isinstance(student_data, str):
+                    try:
+                        student_data = _json.loads(student_data)
+                    except (TypeError, ValueError):
+                        student_data = None
+
+                expected_language = expected_data.get("language") if isinstance(expected_data, dict) else None
+                student_language = student_data.get("language") if isinstance(student_data, dict) else None
+
+                language_mismatch = bool(
+                    expected_language
+                    and student_language
+                    and str(student_language).strip().lower() != str(expected_language).strip().lower()
+                )
+
+                if not language_mismatch:
+                    needs_manual_grading = True
+                    continue
+
+                incorrect_count += 1
+                db.execute(
+                    text("""
+                        UPDATE student_answers
+                        SET is_correct = FALSE,
+                            points_earned = 0,
+                            auto_graded = TRUE,
+                            updated_at = NOW()
+                        WHERE attempt_id = :attempt_id
+                          AND exam_question_id = :exam_question_id
+                    """),
+                    {"attempt_id": attempt_id, "exam_question_id": qid},
+                )
                 continue
 
             is_correct = False
@@ -5686,7 +5787,7 @@ def submit_exam(*, course_id: int, exam_id: int, attempt_id: int, payload: Stude
                       ON sa.exam_question_id = eq.id
                      AND sa.attempt_id = :attempt_id
                     WHERE eq.exam_id = :exam_id
-                      AND eq.snapshot_type IN ('essay', 'short_answer')
+                      AND eq.snapshot_type IN ('essay', 'short_answer', 'code')
                       AND eq.snapshot_auto_gradable = FALSE
                 """),
                 {
@@ -5973,7 +6074,8 @@ def get_exam_attempt_result(*, course_id: int, exam_id: int, attempt_id: int, db
                     eq.snapshot_difficulty AS difficulty,
                     eq.snapshot_explanation AS explanation,
                     eq.snapshot_expected_answer AS expected_answer,
-                    eq.snapshot_auto_gradable AS auto_gradable
+                    eq.snapshot_auto_gradable AS auto_gradable,
+                    eq.snapshot_image_key AS image_key
                 FROM exam_questions eq
                 WHERE eq.exam_id = :exam_id
             """),
@@ -6080,6 +6182,19 @@ def get_exam_attempt_result(*, course_id: int, exam_id: int, attempt_id: int, db
                     else:
                         correct_answer = None
 
+                bucket = settings.supabase_private_bucket
+
+                image_key = question["image_key"]
+                image_url = (
+                    generate_signed_url(
+                        bucket=bucket,
+                        storage_key=image_key,
+                        expires_in_seconds=SIGNED_URL_EXPIRES_SECONDS,
+                    )
+                    if image_key
+                    else None
+                )
+
                 section_questions.append({
                     "exam_question_id": int(question["exam_question_id"]),
                     "question_id": int(question["question_id"]),
@@ -6095,6 +6210,7 @@ def get_exam_attempt_result(*, course_id: int, exam_id: int, attempt_id: int, db
                     "is_correct": is_correct,
                     "points_earned": points_earned,
                     "teacher_feedback": teacher_feedback,
+                    "image_url": image_url,
                 })
 
             sections.append({
