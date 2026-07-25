@@ -3,6 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:learnova/core/theme/app_theme.dart';
 
 enum AppToastType { success, info, warning, error }
 
@@ -20,7 +21,7 @@ class AppToast {
     String? actionLabel, VoidCallback? onAction,
   }) => _show(context, type: AppToastType.success, title: title,
         message: message, duration: duration,
-        actionLabel: actionLabel, onAction: onAction);
+        actionLabel: actionLabel, onAction: onAction,);
 
   static void info(BuildContext context, {
     String title = 'Info',
@@ -29,7 +30,7 @@ class AppToast {
     String? actionLabel, VoidCallback? onAction,
   }) => _show(context, type: AppToastType.info, title: title,
         message: message, duration: duration,
-        actionLabel: actionLabel, onAction: onAction);
+        actionLabel: actionLabel, onAction: onAction,);
 
   static void warning(BuildContext context, {
     String title = 'Warning',
@@ -38,7 +39,7 @@ class AppToast {
     String? actionLabel, VoidCallback? onAction,
   }) => _show(context, type: AppToastType.warning, title: title,
         message: message, duration: duration,
-        actionLabel: actionLabel, onAction: onAction);
+        actionLabel: actionLabel, onAction: onAction,);
 
   static void error(BuildContext context, {
     String title = 'Error',
@@ -47,7 +48,7 @@ class AppToast {
     String? actionLabel, VoidCallback? onAction,
   }) => _show(context, type: AppToastType.error, title: title,
         message: message, duration: duration,
-        actionLabel: actionLabel, onAction: onAction);
+        actionLabel: actionLabel, onAction: onAction,);
 
   static void show(BuildContext context, {
     required String title,
@@ -58,7 +59,7 @@ class AppToast {
   }) => _show(context, type: AppToastType.info, title: title,
         message: message, duration: duration,
         actionLabel: actionLabel, onAction: onAction,
-        overrideIcon: icon);
+        overrideIcon: icon,);
 
   static void _show(BuildContext context, {
     required AppToastType type,
@@ -107,7 +108,7 @@ class AppToast {
           ),
         ),
       );
-    });
+    },);
 
     _current = entry;
     overlay.insert(entry);
@@ -141,42 +142,42 @@ class _Tokens {
     switch (t) {
       case AppToastType.success:
         return _Tokens(
-          glow: const Color(0xFF22C55E),
+          glow: AppColors.successDot,
           iconGrad: [const Color(0xFF15803D), const Color(0xFF4ADE80)],
-          bar: const Color(0xFF16A34A),
-          titleColor: const Color(0xFF14532D),
-          messageColor: const Color(0xFF166534),
-          borderColor: const Color(0xFFBBF7D0),
+          bar: AppColors.successText,
+          titleColor: AppColors.successText,
+          messageColor: AppColors.successText,
+          borderColor: AppColors.successDot,
           icon: override ?? Icons.check_rounded,
         );
       case AppToastType.warning:
         return _Tokens(
-          glow: const Color(0xFFF59E0B),
-          iconGrad: [const Color(0xFFB45309), const Color(0xFFFCD34D)],
-          bar: const Color(0xFFD97706),
-          titleColor: const Color(0xFF451A03),
-          messageColor: const Color(0xFF78350F),
-          borderColor: const Color(0xFFFDE68A),
+          glow: AppColors.warningText,
+          iconGrad: [AppColors.warningText, const Color(0xFFFCD34D)],
+          bar: AppColors.warningText,
+          titleColor: AppColors.warningText,
+          messageColor: AppColors.warningText,
+          borderColor: AppColors.warningBorder,
           icon: override ?? Icons.warning_rounded,
         );
       case AppToastType.error:
         return _Tokens(
-          glow: const Color(0xFFEF4444),
-          iconGrad: [const Color(0xFFB91C1C), const Color(0xFFFCA5A5)],
-          bar: const Color(0xFFDC2626),
-          titleColor: const Color(0xFF450A0A),
-          messageColor: const Color(0xFF7F1D1D),
-          borderColor: const Color(0xFFFECACA),
+          glow: AppColors.errorDot,
+          iconGrad: [AppColors.dangerTitle, const Color(0xFFFCA5A5)],
+          bar: AppColors.dangerText,
+          titleColor: AppColors.dangerTitle,
+          messageColor: AppColors.dangerText,
+          borderColor: AppColors.dangerBorder,
           icon: override ?? Icons.close_rounded,
         );
       case AppToastType.info:
         return _Tokens(
-          glow: const Color(0xFF137FEC),
-          iconGrad: [const Color(0xFF1558A8), const Color(0xFF60AFFE)],
-          bar: const Color(0xFF137FEC),
+          glow: AppColors.primary,
+          iconGrad: [const Color(0xFF1558A8), AppColors.infoText],
+          bar: AppColors.primary,
           titleColor: const Color(0xFF0C2D5A),
           messageColor: const Color(0xFF1E4A8A),
-          borderColor: const Color(0xFFBFDBFE),
+          borderColor: AppColors.badgeBlueBorder,
           icon: override ?? Icons.info_rounded,
         );
     }
@@ -207,7 +208,7 @@ class _ToastRoot extends StatefulWidget {
 class _ToastRootState extends State<_ToastRoot>
     with SingleTickerProviderStateMixin {
   late final AnimationController _c = AnimationController(
-      vsync: this, duration: const Duration(milliseconds: 440))..forward();
+      vsync: this, duration: const Duration(milliseconds: 440),)..forward();
 
   late final Animation<Offset> _slide = Tween<Offset>(
     begin: const Offset(0.6, 0), end: Offset.zero,
@@ -264,7 +265,7 @@ class _ToastCard extends StatefulWidget {
 class _ToastCardState extends State<_ToastCard>
     with SingleTickerProviderStateMixin {
   late final AnimationController _prog = AnimationController(
-      vsync: this, duration: widget.duration)..forward();
+      vsync: this, duration: widget.duration,)..forward();
 
   bool _hovered = false;
 
@@ -278,6 +279,7 @@ class _ToastCardState extends State<_ToastCard>
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final t = widget.tokens;
     final hasAction = (widget.actionLabel?.trim().isNotEmpty ?? false)
         && widget.onAction != null;
@@ -289,21 +291,21 @@ class _ToastCardState extends State<_ToastCard>
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           // ── Light white with faint blue tint ──────────────────────
-          color: const Color(0xFFFAFCFF),
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: _hovered ? t.borderColor : t.borderColor.withOpacity(0.6),
+            color: _hovered ? t.borderColor : t.borderColor.withValues(alpha: 0.6),
             width: 1.2,
           ),
           boxShadow: [
             BoxShadow(
-              color: t.glow.withOpacity(_hovered ? 0.18 : 0.10),
+              color: t.glow.withValues(alpha: _hovered ? 0.18 : 0.10),
               blurRadius: _hovered ? 40 : 24,
               spreadRadius: -4,
               offset: const Offset(0, 8),
             ),
             BoxShadow(
-              color: Colors.black.withOpacity(kIsWeb ? 0.06 : 0.09),
+              color: Colors.black.withValues(alpha: kIsWeb ? 0.06 : 0.09),
               blurRadius: 20,
               offset: const Offset(0, 4),
             ),
@@ -331,7 +333,7 @@ class _ToastCardState extends State<_ToastCard>
                     borderRadius: BorderRadius.circular(11),
                     boxShadow: [
                       BoxShadow(
-                        color: t.glow.withOpacity(0.35),
+                        color: t.glow.withValues(alpha: 0.35),
                         blurRadius: 10,
                         offset: const Offset(0, 3),
                       ),
@@ -362,7 +364,7 @@ class _ToastCardState extends State<_ToastCard>
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w400,
-                        color: t.messageColor.withOpacity(0.85),
+                        color: t.messageColor.withValues(alpha: 0.85),
                         height: 1.45,
                       ),
                     ),
@@ -381,12 +383,12 @@ class _ToastCardState extends State<_ToastCard>
                           ),
                           const SizedBox(width: 3),
                           Icon(Icons.arrow_forward_rounded,
-                              size: 13, color: t.bar),
-                        ]),
+                              size: 13, color: t.bar,),
+                        ],),
                       ),
                     ],
                   ],
-                )),
+                ),),
 
                 const SizedBox(width: 6),
 
@@ -398,15 +400,15 @@ class _ToastCardState extends State<_ToastCard>
                     width: 28, height: 28,
                     decoration: BoxDecoration(
                       color: _hovered
-                          ? t.glow.withOpacity(0.08)
+                          ? t.glow.withValues(alpha: 0.08)
                           : Colors.transparent,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Icon(Icons.close_rounded, size: 15,
-                        color: t.titleColor.withOpacity(0.4)),
+                        color: t.titleColor.withValues(alpha: 0.4),),
                   ),
                 ),
-              ]),
+              ],),
             ),
 
             // ── Progress bar ────────────────────────────────────────
@@ -415,7 +417,7 @@ class _ToastCardState extends State<_ToastCard>
               builder: (_, __) => Stack(children: [
                 // track
                 Container(height: 2.5,
-                    color: t.borderColor.withOpacity(0.4)),
+                    color: t.borderColor.withValues(alpha: 0.4),),
                 // fill
                 FractionallySizedBox(
                   widthFactor: 1.0 - _prog.value,
@@ -423,21 +425,21 @@ class _ToastCardState extends State<_ToastCard>
                     height: 2.5,
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
-                        colors: [t.bar.withOpacity(0.5), t.bar],
+                        colors: [t.bar.withValues(alpha: 0.5), t.bar],
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: t.glow.withOpacity(0.6),
+                          color: t.glow.withValues(alpha: 0.6),
                           blurRadius: 5,
                         ),
                       ],
                     ),
                   ),
                 ),
-              ]),
+              ],),
             ),
 
-          ]),
+          ],),
         ),
       ),
     );

@@ -1,122 +1,595 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:go_router/go_router.dart';
 
-import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/storage/key_value_store_factory.dart';
+import '../../../../../core/network/error_mapper.dart';
+import '../../../../../core/log/app_logger.dart';
+import '../../../../../core/utils/debounced_action.dart';
+import '../../../../../core/routing/routes.dart';
+import '../../../../../core/ui/pdf_preview_view.dart';
 import '../../../../../core/ui/toast.dart';
+import '../../../../../shared/widgets/app_ui_components.dart';
 import '../../../data/courses_models.dart';
+import '../../../data/courses_providers.dart';
 import '../../../data/modules_models.dart';
 import '../../../data/materials_models.dart';
 import '../../../data/topics_models.dart';
 import '../../../data/learning_outcomes_models.dart';
+import '../../../data/modules_materials_providers.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../controllers/course_details_state.dart';
+import '../../course_route_identity.dart';
+import '../../controllers/selected_course_provider.dart';
 import '../add_question_sheet.dart';
 import '../course_outcomes_panel.dart';
 import '../upload_material_sheet.dart';
+
 import '../generate_questions_dialog.dart';
+import '../question_bank/question_bank_authoring_flow.dart';
 import '../module_selector_sheet.dart';
+
+part 'materials_tab_sidebar.dart';
+part 'materials_tab_sidebar_module_panel.dart';
+part 'materials_tab_sidebar_module_hero.dart';
+part 'materials_tab_sidebar_canvas.dart';
+part 'materials_tab_material_panel.dart';
+part 'materials_tab_material_document_stage.dart';
+part 'materials_tab_material_side_deck.dart';
+part 'materials_tab_material_capture_topics.dart';
+part 'materials_tab_material_previews.dart';
+part 'materials_tab_topics.dart';
+part 'materials_tab_topics_dialogs.dart';
+part 'materials_tab_topics_workspace_v2.dart';
+part 'materials_tab_topics_studio.dart';
+part 'materials_tab_topics_details.dart';
+part 'materials_tab_dialogs.dart';
+part 'materials_tab_types.dart';
+part 'materials_tab_question_draft_banner.dart';
+part 'materials_tab_view.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  Color palette
 // ─────────────────────────────────────────────────────────────────────────────
-class _K {
-  _K._();
-  static const purple     = Color(0xFF7C3AED);
-  static const purpleSoft = Color(0xFFF5F3FF);
-  static const purpleBd   = Color(0xFFDDD6FE);
-  static const amber      = Color(0xFFD97706);
-  static const amberSoft  = Color(0xFFFFFBEB);
-  static const green      = Color(0xFF16A34A);
-  static const greenSoft  = Color(0xFFF0FDF4);
-  static const red        = Color(0xFFDC2626);
-  static const redSoft    = Color(0xFFFFF1F2);
-  static const blue       = Color(0xFF2563EB);
-  static const blueSoft   = Color(0xFFEFF6FF);
-  static const blueMid    = Color(0xFFDBEAFE);
-  static const div        = Color(0xFFEEEEEE);
-  static const bg         = Color(0xFFF6F7F9);
-  static const sidebar    = Color(0xFFFAFAFA);
-}
+// Core types live in materials_tab_types.dart.
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  Context types
-// ─────────────────────────────────────────────────────────────────────────────
-enum _CType { module, material, topic }
-
-class _Ctx {
-  final _CType       type;
-  final ModuleItem?  module;
-  final MaterialItem? material;
-  final TopicItem?   topic;
-  const _Ctx._({required this.type, this.module, this.material, this.topic});
-  factory _Ctx.module(ModuleItem m)                     => _Ctx._(type: _CType.module, module: m);
-  factory _Ctx.material(ModuleItem m, MaterialItem mat) => _Ctx._(type: _CType.material, module: m, material: mat);
-  factory _Ctx.topic(ModuleItem m, MaterialItem mat, TopicItem t) =>
-      _Ctx._(type: _CType.topic, module: m, material: mat, topic: t);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  CourseMaterialsTab
-// ─────────────────────────────────────────────────────────────────────────────
 class CourseMaterialsTab extends ConsumerStatefulWidget {
   final MyCourseItem course;
-  const CourseMaterialsTab({super.key, required this.course});
+  final VoidCallback? onOpenCourseAssistant;
+  final bool courseAssistantBusy;
+
+  const CourseMaterialsTab({
+    super.key,
+    required this.course,
+    this.onOpenCourseAssistant,
+    this.courseAssistantBusy = false,
+  });
+
   @override
   ConsumerState<CourseMaterialsTab> createState() => _CourseMaterialsTabState();
 }
 
-class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
+class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab>
+    with AutomaticKeepAliveClientMixin {
   final Set<int>    _expanded = {};
+  final Set<int>    _expandedMaterialIds = {};
+  final Set<int>    _expandedTopicIds = {};
   _Ctx?             _sel;
   final List<_Ctx>  _stack   = [];
   final ScrollController _scroll = ScrollController();
+  final DebouncedAction _uiStatePersistDebouncer =
+      DebouncedAction(const Duration(milliseconds: 350));
+  late final _session = createSessionStore();
+  late final _questionDraftStore = createLocalStore();
+  bool _restored = false;
+  bool _dialogOpen = false;
+  int? _draggingModuleId;
+  bool _selectionMode = false;
+  _TreeSelectionState _treeSelection = _TreeSelectionState.empty;
+  bool _hideFooterForActive = false;
+  bool _showQuestionAuthoring = false;
+  Set<int> _authoringModuleIds = const <int>{};
+  Set<int> _authoringMaterialIds = const <int>{};
+  Set<int> _authoringTopicIds = const <int>{};
+  QuestionAuthoringLaunchContext? _authoringLaunchContext;
+  String? _cachedQuestionDraftRaw;
+  _QuestionDraftInfo? _cachedQuestionDraftInfo;
+
+  static const double _sidebarDefaultWidth = 286.0;
+  static const double _sidebarCompactWidth = 252.0;
+  static const double _sidebarMinWidth = 220.0;
+  static const double _sidebarMaxWidth = 440.0;
+  double? _sidebarWidth;
+  bool _sidebarCollapsed = false;
+  bool _sidebarResizing = false;
+  bool _treeRefreshing = false;
+  final Set<int> _topicDetailsRequested = <int>{};
+  final Set<int> _topicDetailsLoaded = <int>{};
+  final Set<int> _topicDetailsFailed = <int>{};
 
   @override
-  void dispose() { _scroll.dispose(); super.dispose(); }
+  bool get wantKeepAlive => true;
+
+  String get _uiStateKey => 'course:${widget.course.id}:materials_ui';
+  String get _questionDraftKey => 'learnova:qauthor:${widget.course.id}:last';
+
+  void _runStateUpdate(VoidCallback update) {
+    if (!mounted) return;
+    setState(update);
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _scroll.addListener(_persistUiState);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ref
+          .read(courseDetailsControllerProvider(widget.course.id).notifier)
+          .loadModules();
+    });
+  }
+
+  @override
+  void dispose() {
+    _uiStatePersistDebouncer.cancel();
+    _persistUiStateNow();
+    _scroll.dispose();
+    super.dispose();
+  }
 
   _Ctx? get _active => _stack.isNotEmpty ? _stack.last : _sel;
 
+  Future<T?> _showManagedDialog<T>({
+    required WidgetBuilder builder,
+    Color? barrierColor,
+    bool barrierDismissible = true,
+  }) async {
+    if (mounted) setState(() => _dialogOpen = true);
+    try {
+      return await showDialog<T>(
+        context: context,
+        barrierColor: barrierColor,
+        barrierDismissible: barrierDismissible,
+        builder: builder,
+      );
+    } finally {
+      if (mounted) setState(() => _dialogOpen = false);
+    }
+  }
+
+  Set<int> _intSetFromJson(Object? value) {
+    return ((value as List?) ?? const <dynamic>[])
+        .whereType<num>()
+        .map((num item) => item.toInt())
+        .toSet();
+  }
+
+  Map<String, dynamic> _authoringTargetToJson(QuestionAuthoringTarget target) {
+    return <String, dynamic>{
+      'moduleId': target.moduleId,
+      'moduleName': target.moduleName,
+      'materialId': target.materialId,
+      'materialName': target.materialName,
+      'topicId': target.topicId,
+      'topicName': target.topicName,
+      'isSubtopic': target.isSubtopic,
+      'parentTopicName': target.parentTopicName,
+    };
+  }
+
+  QuestionAuthoringTarget? _authoringTargetFromJson(Object? value) {
+    if (value is! Map) return null;
+    final Map<String, dynamic> map = Map<String, dynamic>.from(value);
+    final int? topicId = (map['topicId'] as num?)?.toInt();
+    final String topicName = (map['topicName']?.toString() ?? '').trim();
+    if (topicId == null || topicName.isEmpty) return null;
+    return QuestionAuthoringTarget(
+      moduleId: (map['moduleId'] as num?)?.toInt(),
+      moduleName: map['moduleName']?.toString(),
+      materialId: (map['materialId'] as num?)?.toInt(),
+      materialName: map['materialName']?.toString(),
+      topicId: topicId,
+      topicName: topicName,
+      isSubtopic: map['isSubtopic'] == true,
+      parentTopicName: map['parentTopicName']?.toString(),
+    );
+  }
+
+  List<QuestionAuthoringTarget> _authoringTargetsFromJson(Object? value) {
+    return ((value as List?) ?? const <dynamic>[])
+        .map(_authoringTargetFromJson)
+        .whereType<QuestionAuthoringTarget>()
+        .toList();
+  }
+
+  QuestionAuthoringScopeKind? _authoringKindFromName(Object? value) {
+    final String? name = value?.toString();
+    if (name == null) return null;
+    for (final QuestionAuthoringScopeKind kind in QuestionAuthoringScopeKind.values) {
+      if (kind.name == name) return kind;
+    }
+    return null;
+  }
+
+  Map<String, dynamic>? _authoringLaunchContextToJson(
+    QuestionAuthoringLaunchContext? launchContext,
+  ) {
+    if (launchContext == null) return null;
+    return <String, dynamic>{
+      'kind': launchContext.kind.name,
+      'title': launchContext.title,
+      'subtitle': launchContext.subtitle,
+      'selectedModuleId': launchContext.selectedModuleId,
+      'selectedMaterialId': launchContext.selectedMaterialId,
+      'selectedTopicId': launchContext.selectedTopicId,
+      'selectedModuleIds': launchContext.selectedModuleIds.toList(),
+      'selectedMaterialIds': launchContext.selectedMaterialIds.toList(),
+      'selectedTopicIds': launchContext.selectedTopicIds.toList(),
+      'targetSnapshots': launchContext.targetSnapshots
+          .map(_authoringTargetToJson)
+          .toList(),
+    };
+  }
+
+  QuestionAuthoringLaunchContext? _authoringLaunchContextFromJson(Object? value) {
+    if (value is! Map) return null;
+    final QuestionAuthoringScopeKind? kind = _authoringKindFromName(value['kind']);
+    if (kind == null) return null;
+    final String title = (value['title']?.toString() ?? '').trim();
+    final String subtitle = (value['subtitle']?.toString() ?? '').trim();
+    return QuestionAuthoringLaunchContext(
+      kind: kind,
+      title: title.isEmpty ? 'Selected content' : title,
+      subtitle: subtitle.isEmpty ? 'Question workspace restored from materials.' : subtitle,
+      selectedModuleId: (value['selectedModuleId'] as num?)?.toInt(),
+      selectedMaterialId: (value['selectedMaterialId'] as num?)?.toInt(),
+      selectedTopicId: (value['selectedTopicId'] as num?)?.toInt(),
+      selectedModuleIds: _intSetFromJson(value['selectedModuleIds']),
+      selectedMaterialIds: _intSetFromJson(value['selectedMaterialIds']),
+      selectedTopicIds: _intSetFromJson(value['selectedTopicIds']),
+      targetSnapshots: _authoringTargetsFromJson(value['targetSnapshots']),
+    );
+  }
+
+
+  void _persistUiState() {
+    _uiStatePersistDebouncer.run(_persistUiStateNow);
+  }
+
+  void _persistUiStateNow() {
+    final sel = _sel;
+    final active = _active;
+    final payload = <String, dynamic>{
+      'expanded': _expanded.toList(),
+      'expandedMaterials': _expandedMaterialIds.toList(),
+      'expandedTopics': _expandedTopicIds.toList(),
+      'scrollOffset': _scroll.hasClients ? _scroll.offset : 0.0,
+      'selectedType': sel?.type.name,
+      'selectedModuleId': sel?.module?.id,
+      'selectedMaterialId': sel?.material?.id,
+      'selectedTopicId': sel?.topic?.id,
+      'activeTopicId': active?.type == _CType.topic ? active?.topic?.id : null,
+      'selectionMode': _selectionMode,
+      'treeSelectionModuleIds': _treeSelection.moduleIds.toList(),
+      'treeSelectionMaterialIds': _treeSelection.materialIds.toList(),
+      'treeSelectionTopicIds': _treeSelection.topicIds.toList(),
+      'questionAuthoringOpen': _showQuestionAuthoring,
+      'authoringModuleIds': _authoringModuleIds.toList(),
+      'authoringMaterialIds': _authoringMaterialIds.toList(),
+      'authoringTopicIds': _authoringTopicIds.toList(),
+      'authoringLaunchContext': _authoringLaunchContextToJson(_authoringLaunchContext),
+      'sidebarWidth': _sidebarWidth,
+      'sidebarCollapsed': _sidebarCollapsed,
+    };
+    _session.setString(_uiStateKey, jsonEncode(payload));
+  }
+
+  void _maybeRestoreUiState(CourseDetailsState st) {
+    if (_restored) return;
+    final raw = _session.getString(_uiStateKey);
+    if (raw == null || raw.isEmpty) {
+      _restored = true;
+      return;
+    }
+    try {
+      final map = jsonDecode(raw) as Map<String, dynamic>;
+      final expanded = ((map['expanded'] as List?) ?? [])
+          .map((e) => (e as num).toInt())
+          .toSet();
+      final expandedMaterials = ((map['expandedMaterials'] as List?) ?? [])
+          .map((e) => (e as num).toInt())
+          .toSet();
+      final expandedTopics = ((map['expandedTopics'] as List?) ?? [])
+          .map((e) => (e as num).toInt())
+          .toSet();
+      final selectedType = map['selectedType']?.toString();
+      final selectedModuleId = (map['selectedModuleId'] as num?)?.toInt();
+      final selectedMaterialId = (map['selectedMaterialId'] as num?)?.toInt();
+      final selectedTopicId = (map['selectedTopicId'] as num?)?.toInt();
+      final activeTopicId = (map['activeTopicId'] as num?)?.toInt();
+      final storedOffset = (map['scrollOffset'] as num?)?.toDouble() ?? 0.0;
+      final bool restoreSelectionMode = map['selectionMode'] == true;
+      final _TreeSelectionState restoredTreeSelection = _TreeSelectionState(
+        moduleIds: _intSetFromJson(map['treeSelectionModuleIds']),
+        materialIds: _intSetFromJson(map['treeSelectionMaterialIds']),
+        topicIds: _intSetFromJson(map['treeSelectionTopicIds']),
+      );
+      final bool restoreAuthoring = map['questionAuthoringOpen'] == true;
+      final Set<int> authoringModuleIds = _intSetFromJson(map['authoringModuleIds']);
+      final Set<int> authoringMaterialIds = _intSetFromJson(map['authoringMaterialIds']);
+      final Set<int> authoringTopicIds = _intSetFromJson(map['authoringTopicIds']);
+      final QuestionAuthoringLaunchContext? restoredLaunchContext =
+          _authoringLaunchContextFromJson(map['authoringLaunchContext']);
+      final double? restoredSidebarWidth = (map['sidebarWidth'] as num?)?.toDouble();
+      if (restoredSidebarWidth != null && restoredSidebarWidth.isFinite) {
+        _sidebarWidth = restoredSidebarWidth
+            .clamp(_sidebarMinWidth, _sidebarMaxWidth)
+            .toDouble();
+      }
+      _sidebarCollapsed = map['sidebarCollapsed'] == true;
+
+      _selectionMode = restoreSelectionMode || !restoredTreeSelection.isEmpty;
+      _treeSelection = restoredTreeSelection;
+
+      if (restoreAuthoring) {
+        _showQuestionAuthoring = true;
+        _hideFooterForActive = true;
+        _authoringModuleIds = authoringModuleIds.isNotEmpty
+            ? authoringModuleIds
+            : restoredTreeSelection.moduleIds;
+        _authoringMaterialIds = authoringMaterialIds.isNotEmpty
+            ? authoringMaterialIds
+            : restoredTreeSelection.materialIds;
+        _authoringTopicIds = authoringTopicIds.isNotEmpty
+            ? authoringTopicIds
+            : restoredTreeSelection.topicIds;
+        _authoringLaunchContext = restoredLaunchContext;
+      }
+
+      ModuleItem? findModule(int? id) {
+        if (id == null) return null;
+        for (final m in st.modules) {
+          if (m.id == id) return m;
+        }
+        return null;
+      }
+
+      MaterialItem? findMaterial(int moduleId, int? materialId) {
+        if (materialId == null) return null;
+        final materials = st.materials[moduleId] ?? const <MaterialItem>[];
+        for (final mat in materials) {
+          if (mat.id == materialId) return mat;
+        }
+        return null;
+      }
+
+      TopicItem? findTopic(int moduleId, int materialId, int? topicId) {
+        if (topicId == null) return null;
+        final topics = st.topics[moduleId] ?? const <TopicItem>[];
+        for (final t in topics) {
+          if (t.id == topicId && t.materialId == materialId) return t;
+        }
+        return null;
+      }
+
+      final module = findModule(selectedModuleId);
+      if (selectedModuleId != null && module == null && st.modules.isNotEmpty) {
+        return;
+      }
+
+      _expanded
+        ..clear()
+        ..addAll(expanded.where((id) => st.modules.any((m) => m.id == id)));
+      _expandedMaterialIds
+        ..clear()
+        ..addAll(expandedMaterials);
+      _expandedTopicIds
+        ..clear()
+        ..addAll(expandedTopics);
+
+      if (module != null && !st.materials.containsKey(module.id)) {
+        ref.read(courseDetailsControllerProvider(widget.course.id).notifier).loadMaterials(module.id);
+        return;
+      }
+
+      if (module != null && selectedMaterialId != null &&
+          (selectedTopicId != null || !st.topicsLoadedMaterialIds.contains(selectedMaterialId))) {
+        ref
+            .read(courseDetailsControllerProvider(widget.course.id).notifier)
+            .loadTopicsForMaterial(
+              moduleId: module.id,
+              materialId: selectedMaterialId,
+            );
+      }
+
+      _sel = null;
+      _stack.clear();
+
+      if (module != null) {
+        if (selectedType == _CType.module.name) {
+          _sel = _Ctx.module(module);
+        } else {
+          final material = findMaterial(module.id, selectedMaterialId);
+          if (material != null) {
+            if (selectedType == _CType.material.name) {
+              _sel = _Ctx.material(module, material);
+            } else {
+              final topic = findTopic(module.id, material.id, selectedTopicId);
+              _sel = _Ctx.material(module, material);
+              if (topic != null) {
+                _stack.add(_Ctx.topic(module, material, topic));
+                if (activeTopicId != null && activeTopicId != selectedTopicId) {
+                  final activeTopic = findTopic(module.id, material.id, activeTopicId);
+                  if (activeTopic != null) {
+                    _stack
+                      ..clear()
+                      ..add(_Ctx.topic(module, material, activeTopic));
+                  }
+                }
+              }
+              ref.read(courseDetailsControllerProvider(widget.course.id).notifier).fetchDownloadUrl(moduleId: module.id, materialId: material.id);
+              ensureCourseLearningOutcomesLoaded(ref, widget.course.id);
+            }
+          }
+        }
+      }
+
+      _restored = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted || !_scroll.hasClients) return;
+        final max = _scroll.position.maxScrollExtent;
+        final target = storedOffset.clamp(0.0, max);
+        _scroll.jumpTo(target);
+      });
+      if (mounted) setState(() {});
+    } catch (_) {
+      _restored = true;
+    }
+  }
+
+
+  Future<void> _refreshStructureTree(CourseDetailsState snapshot) async {
+    if (_treeRefreshing) return;
+
+    final activeModuleId = (_active ?? _sel)?.module?.id;
+    final moduleIdsToReload = <int>{
+      ..._expanded,
+      ...snapshot.materials.keys,
+      ...snapshot.topics.keys,
+      if (activeModuleId != null) activeModuleId,
+    };
+
+    setState(() => _treeRefreshing = true);
+    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+
+    try {
+      await notifier.loadModules(force: true);
+      if (!mounted) return;
+
+      final refreshed = ref.read(courseDetailsControllerProvider(widget.course.id));
+      final existingModuleIds = refreshed.modules.map((module) => module.id).toSet();
+      final visibleModuleIds = moduleIdsToReload
+          .where(existingModuleIds.contains)
+          .toList()
+        ..sort();
+
+      if (visibleModuleIds.isEmpty && activeModuleId == null) {
+        setState(() {
+          _expanded.removeWhere((id) => !existingModuleIds.contains(id));
+          _expandedMaterialIds.clear();
+          _expandedTopicIds.clear();
+          _treeSelection = _treeSelection.clear();
+          _hideFooterForActive = false;
+          _persistUiState();
+        });
+        return;
+      }
+
+      final materialIdsToReload = <int>{
+        ..._expandedMaterialIds,
+        ..._treeSelection.materialIds,
+        if ((_active ?? _sel)?.material != null) (_active ?? _sel)!.material!.id,
+      };
+
+      for (final moduleId in visibleModuleIds) {
+        await notifier.loadMaterials(moduleId, force: true);
+        if (!mounted) return;
+
+        final moduleMaterials = ref
+                .read(courseDetailsControllerProvider(widget.course.id))
+                .materials[moduleId] ??
+            const <MaterialItem>[];
+        final matchingMaterialIds = moduleMaterials
+            .map((MaterialItem material) => material.id)
+            .where(materialIdsToReload.contains)
+            .toList();
+        for (final materialId in matchingMaterialIds) {
+          await notifier.loadTopicsForMaterial(
+            moduleId: moduleId,
+            materialId: materialId,
+            force: true,
+          );
+          if (!mounted) return;
+        }
+      }
+
+      final afterTreeReload = ref.read(courseDetailsControllerProvider(widget.course.id));
+      final validMaterialIds = <int>{
+        for (final materials in afterTreeReload.materials.values)
+          for (final material in materials) material.id,
+      };
+      final validTopicIds = <int>{
+        for (final topics in afterTreeReload.topics.values)
+          for (final topic in topics) topic.id,
+      };
+
+      if (!mounted) return;
+      setState(() {
+        _expanded.removeWhere((id) => !existingModuleIds.contains(id));
+        _expandedMaterialIds.removeWhere((id) => !validMaterialIds.contains(id));
+        _expandedTopicIds.removeWhere((id) => !validTopicIds.contains(id));
+        _treeSelection = _treeSelection.copyWith(
+          moduleIds: _treeSelection.moduleIds.where(existingModuleIds.contains).toSet(),
+          materialIds: _treeSelection.materialIds.where(validMaterialIds.contains).toSet(),
+          topicIds: _treeSelection.topicIds.where(validTopicIds.contains).toSet(),
+        );
+        if (_treeSelection.isEmpty) {
+          _hideFooterForActive = false;
+        }
+        _persistUiState();
+      });
+    } finally {
+      if (mounted) setState(() => _treeRefreshing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final st = ref.watch(courseDetailsControllerProvider(widget.course.id));
-    final active = _active ?? _sel;
-    return Column(children: [
-      Expanded(
-        child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          _SidebarWidget(
-            state: st,
-            expanded: _expanded,
-            active: _active,
-            scroll: _scroll,
-            onModuleTap: (m) => _tapModule(m, st),
-            onMaterialTap: _tapMaterial,
-            onTopicTap: _tapTopic,
-            onAddMaterial: _showUploadSheet,
-            onAddModule: _showCreateModuleDialog,
-            onRefresh: () => ref
-                .read(courseDetailsControllerProvider(widget.course.id).notifier)
-                .loadModulesAndAllMaterials(force: true),
-          ),
-          Expanded(child: _buildPanel(st)),
-        ]),
-      ),
-      if (_sel != null && active != null)
-        _FooterWidget(
-          ctx: active,
-          uploading: st.uploading,
-          canGenerate: _canGenerate(active, st),
-          onUpload: () { final m = _sel?.module; if (m != null) _showUploadSheet(m); },
-          onGenerate: () => _openGenerateDialog(
-            moduleId: active.module?.id,
-            materialId: active.material?.id,
-            topicId: active.topic?.id,
-          ),
-          onClose: () => setState(() { _sel = null; _stack.clear(); }),
-        ),
-    ]);
+    super.build(context);
+    return _buildMaterialsScaffold(context);
+  }
+
+  _Ctx? _footerCtxFromSelection(CourseDetailsState st) {
+    if (_treeSelection.moduleIds.isNotEmpty) {
+      for (final module in st.modules) {
+        if (_treeSelection.moduleIds.contains(module.id)) {
+          return _Ctx.module(module);
+        }
+      }
+    }
+
+    if (_treeSelection.materialIds.isNotEmpty) {
+      for (final module in st.modules) {
+        final materials = st.materials[module.id] ?? const <MaterialItem>[];
+        for (final material in materials) {
+          if (_treeSelection.materialIds.contains(material.id)) {
+            return _Ctx.material(module, material);
+          }
+        }
+      }
+    }
+
+    if (_treeSelection.topicIds.isNotEmpty) {
+      for (final module in st.modules) {
+        final topics = st.topics[module.id] ?? const <TopicItem>[];
+        for (final topic in topics) {
+          if (_treeSelection.topicIds.contains(topic.id)) {
+            final materials = st.materials[module.id] ?? const <MaterialItem>[];
+            for (final material in materials) {
+              if (material.id == topic.materialId) {
+                return _Ctx.topic(module, material, topic);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    return null;
   }
 
   bool _canGenerate(_Ctx ctx, CourseDetailsState st) {
@@ -131,38 +604,438 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
     }
   }
 
+  _PresentationSelection? _resolvePresentationSelection(
+    _Ctx ctx,
+    CourseDetailsState st,
+  ) {
+    if (_selectionMode && !_treeSelection.isEmpty) {
+      final selectedTopics = <TopicItem>[];
+      for (final topics in st.topics.values) {
+        for (final topic in topics) {
+          if (_treeSelection.topicIds.contains(topic.id)) {
+            selectedTopics.add(topic);
+          }
+        }
+      }
+
+      final materialIds = selectedTopics
+          .map((TopicItem topic) => topic.materialId)
+          .toSet();
+      if (selectedTopics.isEmpty || materialIds.length != 1) return null;
+
+      final material = _findMaterialById(st, materialIds.first);
+      if (material == null) return null;
+      final module = _findModuleById(st, material.moduleId);
+      if (module == null) return null;
+
+      return _PresentationSelection(
+        module: module,
+        material: material,
+        topicIds: selectedTopics.map((TopicItem topic) => topic.id).toSet(),
+      );
+    }
+
+    final module = ctx.module;
+    final material = ctx.material;
+    if (ctx.type == _CType.module || module == null || material == null) {
+      return null;
+    }
+
+    final Set<int> topicIds;
+    if (ctx.type == _CType.topic && ctx.topic != null) {
+      topicIds = _selectableTopicIdsForTopic(
+        _topicsForMaterial(st, module.id, material.id),
+        ctx.topic!,
+      );
+    } else {
+      topicIds = _selectableTopicIdsForMaterial(st, module.id, material.id);
+    }
+
+    if (topicIds.isEmpty) return null;
+    return _PresentationSelection(
+      module: module,
+      material: material,
+      topicIds: topicIds,
+    );
+  }
+
+  bool _canGeneratePresentation(_Ctx ctx, CourseDetailsState st) {
+    return _resolvePresentationSelection(ctx, st) != null;
+  }
+
+  void _openPresentationWorkspace(_Ctx ctx) {
+    final state = ref.read(
+      courseDetailsControllerProvider(widget.course.id),
+    );
+    final selection = _resolvePresentationSelection(ctx, state);
+    if (selection == null) {
+      AppToast.warning(
+        context,
+        title: 'Choose one material',
+        message:
+            'Select a material or topics from the same material before creating a presentation.',
+      );
+      return;
+    }
+
+    SelectedCourseCache.set(widget.course);
+    context.go(
+      Routes.coursePresentation(
+        buildCourseRouteSlug(widget.course),
+        moduleId: selection.module.id,
+        materialId: selection.material.id,
+        topicIds: selection.topicIds,
+        courseTitle: widget.course.safeTitle,
+        materialTitle: selection.material.displayTitle,
+        materialPageCount: selection.material.pageCount,
+      ),
+    );
+  }
+
+
+  void _toggleSelectionMode() {
+    setState(() {
+      _selectionMode = !_selectionMode;
+      _hideFooterForActive = false;
+      if (!_selectionMode) {
+        _treeSelection = _treeSelection.clear();
+      }
+    });
+    _persistUiState();
+  }
+
+  void _clearTreeSelection() {
+    if (_treeSelection.isEmpty) return;
+    setState(() {
+      _treeSelection = _treeSelection.clear();
+      _selectionMode = false;
+      _hideFooterForActive = false;
+    });
+    _persistUiState();
+  }
+
+  List<MaterialItem> _materialsForModule(CourseDetailsState st, int moduleId) {
+    return st.materials[moduleId] ?? const <MaterialItem>[];
+  }
+
+  List<TopicItem> _topicsForMaterial(CourseDetailsState st, int moduleId, int materialId) {
+    final items = st.topics[moduleId] ?? const <TopicItem>[];
+    return items.where((t) => t.materialId == materialId).toList();
+  }
+
+  List<TopicItem> _childTopics(List<TopicItem> topics, int parentTopicId) {
+    final items = topics.where((t) => t.parentTopicId == parentTopicId).toList()
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    return items;
+  }
+
+
+  Set<int> _selectableTopicIdsForTopic(List<TopicItem> materialTopics, TopicItem topic) {
+    final children = _childTopics(materialTopics, topic.id);
+    if (children.isEmpty) {
+      return <int>{topic.id};
+    }
+
+    final ids = <int>{};
+    for (final child in children) {
+      ids.addAll(_selectableTopicIdsForTopic(materialTopics, child));
+    }
+    return ids;
+  }
+
+  Set<int> _selectableTopicIdsForMaterial(
+    CourseDetailsState st,
+    int moduleId,
+    int materialId,
+  ) {
+    final materialTopics = _topicsForMaterial(st, moduleId, materialId);
+    final roots = materialTopics.where((topic) => topic.parentTopicId == null).toList()
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+
+    final ids = <int>{};
+    for (final root in roots) {
+      ids.addAll(_selectableTopicIdsForTopic(materialTopics, root));
+    }
+    return ids;
+  }
+
+  Set<int> _selectableTopicIdsForModule(CourseDetailsState st, int moduleId) {
+    final ids = <int>{};
+    for (final material in _materialsForModule(st, moduleId)) {
+      ids.addAll(_selectableTopicIdsForMaterial(st, moduleId, material.id));
+    }
+    return ids;
+  }
+
+  Set<int> _allSelectableTopicIds(CourseDetailsState st) {
+    final ids = <int>{};
+    for (final module in st.modules) {
+      ids.addAll(_selectableTopicIdsForModule(st, module.id));
+    }
+    return ids;
+  }
+
+  _TreeSelectionState _normalizeTreeSelection(
+    CourseDetailsState st, {
+    required Set<int> moduleIds,
+    required Set<int> materialIds,
+    required Set<int> topicIds,
+  }) {
+    final nextTopics = topicIds.intersection(_allSelectableTopicIds(st));
+    final nextMaterials = <int>{};
+    final nextModules = <int>{};
+
+    for (final module in st.modules) {
+      final materials = _materialsForModule(st, module.id);
+      var selectableMaterialsCount = 0;
+      var selectedMaterialsCount = 0;
+
+      for (final material in materials) {
+        final selectableTopicIds = _selectableTopicIdsForMaterial(st, module.id, material.id);
+        if (selectableTopicIds.isEmpty) continue;
+        selectableMaterialsCount++;
+
+        if (nextTopics.containsAll(selectableTopicIds)) {
+          nextMaterials.add(material.id);
+          selectedMaterialsCount++;
+        }
+      }
+
+      if (selectableMaterialsCount > 0 && selectedMaterialsCount == selectableMaterialsCount) {
+        nextModules.add(module.id);
+      }
+    }
+
+    return _TreeSelectionState(
+      moduleIds: nextModules,
+      materialIds: nextMaterials,
+      topicIds: nextTopics,
+    );
+  }
+
+  void _toggleMaterialExpanded(MaterialItem material) {
+    setState(() {
+      if (!_expandedMaterialIds.add(material.id)) {
+        _expandedMaterialIds.remove(material.id);
+      }
+      _persistUiState();
+    });
+  }
+
+  void _toggleTopicExpanded(TopicItem topic) {
+    setState(() {
+      if (!_expandedTopicIds.add(topic.id)) {
+        _expandedTopicIds.remove(topic.id);
+      }
+      _persistUiState();
+    });
+  }
+
+  void _setModuleChecked(ModuleItem module, CourseDetailsState st, bool checked) {
+    final selectableTopicIds = _selectableTopicIdsForModule(st, module.id);
+    if (selectableTopicIds.isEmpty) return;
+
+    setState(() {
+      final nextTopics = {..._treeSelection.topicIds};
+      if (checked) {
+        nextTopics.addAll(selectableTopicIds);
+      } else {
+        nextTopics.removeAll(selectableTopicIds);
+      }
+
+      _treeSelection = _normalizeTreeSelection(
+        st,
+        moduleIds: const <int>{},
+        materialIds: const <int>{},
+        topicIds: nextTopics,
+      );
+    });
+    _persistUiState();
+  }
+
+  void _setMaterialChecked(ModuleItem module, MaterialItem material, CourseDetailsState st, bool checked) {
+    final selectableTopicIds = _selectableTopicIdsForMaterial(st, module.id, material.id);
+    if (selectableTopicIds.isEmpty) return;
+
+    setState(() {
+      final nextTopics = {..._treeSelection.topicIds};
+      if (checked) {
+        nextTopics.addAll(selectableTopicIds);
+      } else {
+        nextTopics.removeAll(selectableTopicIds);
+      }
+
+      _treeSelection = _normalizeTreeSelection(
+        st,
+        moduleIds: const <int>{},
+        materialIds: const <int>{},
+        topicIds: nextTopics,
+      );
+    });
+    _persistUiState();
+  }
+
+  void _setTopicChecked(
+    ModuleItem module,
+    MaterialItem material,
+    TopicItem topic,
+    CourseDetailsState st,
+    bool checked,
+  ) {
+    final allTopics = _topicsForMaterial(st, module.id, material.id);
+    final selectableTopicIds = _selectableTopicIdsForTopic(allTopics, topic);
+    if (selectableTopicIds.isEmpty) return;
+
+    setState(() {
+      final nextTopics = {..._treeSelection.topicIds};
+      if (checked) {
+        nextTopics.addAll(selectableTopicIds);
+      } else {
+        nextTopics.removeAll(selectableTopicIds);
+      }
+
+      _treeSelection = _normalizeTreeSelection(
+        st,
+        moduleIds: const <int>{},
+        materialIds: const <int>{},
+        topicIds: nextTopics,
+      );
+    });
+    _persistUiState();
+  }
+
+  void _ensureTopicDetailsLoaded(ModuleItem module, MaterialItem material, TopicItem topic) {
+    if (topic.pageStart != null && topic.pageEnd != null) {
+      _topicDetailsLoaded.add(topic.id);
+      return;
+    }
+    if (_topicDetailsRequested.contains(topic.id)) return;
+    _topicDetailsRequested.add(topic.id);
+    _topicDetailsFailed.remove(topic.id);
+
+    unawaited(
+      ref
+          .read(courseDetailsControllerProvider(widget.course.id).notifier)
+          .loadTopicDetails(
+            moduleId: module.id,
+            materialId: material.id,
+            topicId: topic.id,
+          )
+          .then((loaded) {
+        if (!mounted) return;
+        if (loaded == null) {
+          setState(() => _topicDetailsFailed.add(topic.id));
+          return;
+        }
+        _topicDetailsLoaded.add(loaded.id);
+        setState(() {
+          for (var i = 0; i < _stack.length; i++) {
+            final ctx = _stack[i];
+            if (ctx.type == _CType.topic && ctx.topic?.id == loaded.id) {
+              _stack[i] = _Ctx.topic(module, material, loaded);
+            }
+          }
+        });
+        _persistUiState();
+      }),
+    );
+  }
+
   // ── Tap handlers ────────────────────────────────────────────────────────
   void _tapModule(ModuleItem m, CourseDetailsState st) {
     setState(() {
       final alreadySel = _active?.type == _CType.module && _active?.module?.id == m.id;
       if (_expanded.contains(m.id) && alreadySel) {
         _expanded.remove(m.id); _sel = null; _stack.clear();
+        _hideFooterForActive = false;
+        _persistUiState();
       } else {
         _expanded.add(m.id); _sel = _Ctx.module(m); _stack.clear();
+        _hideFooterForActive = false;
         if (!st.materials.containsKey(m.id)) {
           ref.read(courseDetailsControllerProvider(widget.course.id).notifier).loadMaterials(m.id);
         }
+        _persistUiState();
       }
     });
   }
 
   void _tapMaterial(ModuleItem m, MaterialItem mat) {
-    setState(() { _sel = _Ctx.material(m, mat); _stack.clear(); });
-    ref.read(courseDetailsControllerProvider(widget.course.id).notifier).loadTopics(m.id);
+    setState(() {
+      _expanded.add(m.id);
+      _expandedMaterialIds.add(mat.id);
+      _sel = _Ctx.material(m, mat);
+      _stack.clear();
+      _hideFooterForActive = false;
+    });
+    _persistUiState();
+    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+    notifier.loadTopicsForMaterial(moduleId: m.id, materialId: mat.id);
+    notifier.fetchDownloadUrl(moduleId: m.id, materialId: mat.id);
+    ensureCourseLearningOutcomesLoaded(ref, widget.course.id);
+  }
+
+  void _tapTopic(ModuleItem m, MaterialItem mat, TopicItem t) {
+    setState(() {
+      _expanded.add(m.id);
+      _expandedMaterialIds.add(mat.id);
+      if (t.parentTopicId == null) {
+        _expandedTopicIds.add(t.id);
+      }
+      _sel = _Ctx.material(m, mat);
+      _stack..clear()..add(_Ctx.topic(m, mat, t));
+      _hideFooterForActive = false;
+    });
+    _persistUiState();
+    _ensureTopicDetailsLoaded(m, mat, t);
     ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
         .fetchDownloadUrl(moduleId: m.id, materialId: mat.id);
   }
 
-  void _tapTopic(ModuleItem m, MaterialItem mat, TopicItem t) {
-    setState(() { _sel = _Ctx.material(m, mat); _stack..clear()..add(_Ctx.topic(m, mat, t)); });
+  Future<void> _handleModuleReorder(int oldIndex, int newIndex) async {
+    final orderedModules = [...ref.read(courseDetailsControllerProvider(widget.course.id)).modules]
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    if (orderedModules.length < 2) return;
+
+    var targetIndex = newIndex;
+    if (targetIndex > oldIndex) targetIndex -= 1;
+    if (targetIndex < 0 || targetIndex >= orderedModules.length) return;
+
+    final movedModule = orderedModules[oldIndex];
+    final movedTitle = movedModule.title;
+    final success = await ref
+        .read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .reorderModule(moduleId: movedModule.id, newPosition: targetIndex);
+
+    if (!mounted) return;
+    setState(() => _draggingModuleId = null);
+    if (success) {
+      AppToast.success(
+        context,
+        title: 'Module reordered',
+        message: '"$movedTitle" moved to position ${targetIndex + 1}.',
+      );
+      _persistUiState();
+    } else {
+      AppToast.error(
+        context,
+        title: 'Reorder failed',
+        message: 'Could not update the module order. Please try again.',
+      );
+    }
   }
 
   void _drillTopic(TopicItem t) {
     final c = _sel; if (c?.module == null || c?.material == null) return;
-    setState(() { _stack.add(_Ctx.topic(c!.module!, c.material!, t)); });
+    setState(() {
+      _stack.add(_Ctx.topic(c!.module!, c.material!, t));
+      _hideFooterForActive = false;
+    });
+    _persistUiState();
+    _ensureTopicDetailsLoaded(c!.module!, c.material!, t);
   }
 
-  void _pop() => setState(() { if (_stack.isNotEmpty) _stack.removeLast(); });
+  void _pop() => setState(() { if (_stack.isNotEmpty) _stack.removeLast(); _hideFooterForActive = false; _persistUiState(); });
 
   // ── Right panel routing ──────────────────────────────────────────────────
   Widget _buildPanel(CourseDetailsState st) {
@@ -176,7 +1049,9 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
         onUpload: () => _showUploadSheet(c.module!),
         onMaterialTap: (mat) => _tapMaterial(c.module!, mat),
         onRename: () => _showRenameDialog(c.module!),
+        onEditDescription: () => _showEditDescriptionDialog(c.module!),
         onTogglePublish: () => _togglePublish(c.module!),
+        onChangePosition: () => _showChangePositionDialog(c.module!),
         onDelete: () => _confirmDelete(c.module!),
         onShare: () => _showShareModuleDialog(c.module!),
       );
@@ -186,7 +1061,7 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
       final mid = c.module!.id;
       final matId = c.material!.id;
       final materialTopics = (st.topics[mid] ?? const <TopicItem>[])
-          .where((t) => t.materialId == null || t.materialId == matId)
+          .where((t) => t.materialId == matId)
           .toList();
       final outcomes = ref.watch(courseLOProvider(widget.course.id));
       return _MaterialPanelWidget(
@@ -196,1955 +1071,1945 @@ class _CourseMaterialsTabState extends ConsumerState<CourseMaterialsTab> {
         downloadUrl: st.downloadUrls[matId] ?? c.material!.downloadUrl,
         urlLoading: st.downloadUrlLoading[matId] ?? false,
         onTopicTap: _drillTopic,
-        onAddTopicManual: () => _showAddTopicDialog(c.module!, c.material!),
-        onGenerateTopicsAI: () => _openGenerateDialog(moduleId: mid, materialId: matId),
+        onCreateTopicManual: (title, description, learningOutcomeIds) =>
+            _createManualTopicInline(
+          module: c.module!,
+          material: c.material!,
+          title: title,
+          description: description,
+          learningOutcomeIds: learningOutcomeIds,
+        ),
         onRefreshUrl: () => ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
             .fetchDownloadUrl(moduleId: mid, materialId: matId, force: true),
+        onDeleteMaterial: () => _confirmDeleteMaterial(c.module!, c.material!),
+        previewInteractive: !_dialogOpen,
       );
     }
 
     final outcomes = ref.watch(courseLOProvider(widget.course.id));
+    final mid = c.module!.id;
+    final matId = c.material!.id;
+    final materialTopics = (st.topics[mid] ?? const <TopicItem>[])
+        .where((t) => t.materialId == matId)
+        .toList();
+    final activeTopic = materialTopics.firstWhere(
+      (t) => t.id == c.topic!.id,
+      orElse: () => c.topic!,
+    );
+    _ensureTopicDetailsLoaded(c.module!, c.material!, activeTopic);
     return _TopicPanelWidget(
       module: c.module!,
       material: c.material!,
-      topic: c.topic!,
+      topic: activeTopic,
+      topicDetailsLoaded: _topicDetailsLoaded.contains(activeTopic.id),
+      topicDetailsFailed: _topicDetailsFailed.contains(activeTopic.id),
+      allMaterialTopics: materialTopics,
       outcomes: outcomes,
+      downloadUrl: st.downloadUrls[matId] ?? c.material!.downloadUrl,
+      urlLoading: st.downloadUrlLoading[matId] ?? false,
+      onRefreshUrl: () => ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+          .fetchDownloadUrl(moduleId: mid, materialId: matId, force: true),
+      previewInteractive: !_dialogOpen,
       canPop: _stack.isNotEmpty,
       onBack: _pop,
-      onGenerate: () => _openGenerateDialog(
-        moduleId: c.module!.id,
-        materialId: c.material!.id,
-        topicId: c.topic!.id,
-      ),
-      onAddManualQuestion: () => _showAddQuestionSheet(c.module!, c.material!, c.topic!),
-      onEditTopic: () => _showEditTopicDialog(c.module!, c.material!, c.topic!),
+      onRenameTopic: () => _showRenameTopicDialog(c.module!, c.material!, activeTopic),
+      onEditTopicSummary: () => _showTopicSummaryDialog(c.module!, c.material!, activeTopic),
+      onEditTopicStatus: () => _showTopicStatusDialog(c.module!, c.material!, activeTopic),
+      onEditTopicPageRange: () => _showTopicPageRangeDialog(c.module!, c.material!, activeTopic),
+      onMapTopicOutcomes: () => _showTopicOutcomeMappingDialog(c.module!, c.material!, activeTopic),
+      onDeleteTopic: () => _confirmDeleteTopic(c.module!, c.material!, activeTopic),
+      onOpenSubtopic: _drillTopic,
+      onAddSubtopic: () => _showAddSubtopicDialog(c.module!, c.material!, activeTopic),
     );
   }
 
   // ── Dialogs ──────────────────────────────────────────────────────────────
-  Future<void> _showCreateModuleDialog() async {
-    final result = await showModuleSelectorSheet(context, widget.course.id);
-    if (result == null || !mounted) return;
+Future<void> _showRenameTopicDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
+  final ctrl = TextEditingController(text: topic.title);
+  final result = await _showManagedDialog<bool>(
+    barrierColor: Colors.black.withValues(alpha: 0.38),
+    builder: (_) => _PreferencesDialogShell(
+      title: topic.parentTopicId == null ? 'Rename topic' : 'Rename subtopic',
+      subtitle: 'This popup changes the title only.',
+      leading: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
+        child: const Icon(Icons.drive_file_rename_outline_rounded, size: 18, color: AppColors.primary),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _DialogTextField(
+            controller: ctrl,
+            hintText: 'Write a clear title',
+            autofocus: true,
+          ),
+          const SizedBox(height: 16),
+          _DialogActions(
+            onCancel: () => Navigator.pop(context, false),
+            onConfirm: () => Navigator.pop(context, true),
+            confirmLabel: 'Save title',
+          ),
+        ],
+      ),
+    ),
+  );
 
-    if (result.isNew) {
-      final m = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
-          .createModule(result.newTitle!, description: result.newDescription);
-      if (m != null && mounted) {
-        AppToast.success(context, title: 'Module created', message: '"${m.title}" added.');
-        setState(() { _expanded.add(m.id); _sel = _Ctx.module(m); _stack.clear(); });
-      }
-    } else if (result.existing != null) {
-      // Share an existing module with this course — for now show info toast
-      // (backend endpoint for sharing to be wired when available)
-      AppToast.info(context, title: 'Module linked',
-          message: '"${result.existing!.title}" will be shared with this course.');
-    }
+  if (result != true || !mounted) return;
+  final title = ctrl.text.trim();
+  ctrl.dispose();
+  if (title.isEmpty) {
+    AppToast.error(context, title: 'Title required', message: 'Topic title cannot be empty.');
+    return;
   }
+  await ref.read(courseDetailsControllerProvider(widget.course.id).notifier).updateTopic(
+        topic.copyWith(moduleId: m.id, materialId: mat.id, title: title),
+      );
+  if (!mounted) return;
+  AppToast.success(context, title: 'Title updated', message: 'The topic title was saved.');
+}
 
-  Future<void> _showUploadSheet(ModuleItem module) async {
-    final results = await showDialog<List<UploadSheetResult>>(context: context,
-        barrierColor: Colors.black.withOpacity(0.35),
-        builder: (_) => UploadMaterialSheet(moduleTitle: module.title));
-    if (results == null || results.isEmpty || !mounted) return;
-    int ok = 0;
-    for (final r in results) {
-      if (!mounted) break;
-      final success = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
-          .uploadMaterial(moduleId: module.id, bytes: r.bytes,
-              filename: r.filename, contentType: r.contentType, title: r.title);
-      if (success) ok++;
-    }
-    if (mounted && ok > 0) {
-      AppToast.success(context, title: 'Uploaded',
-          message: ok == 1 ? '"${results.first.title}" is ready.' : '$ok files uploaded.');
-    }
-  }
+Future<void> _showTopicSummaryDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
+  final descriptionCtrl = TextEditingController(text: topic.description ?? '');
+  final notesCtrl = TextEditingController(text: topic.instructorNotes ?? '');
+  final result = await _showManagedDialog<bool>(
+    barrierColor: Colors.black.withValues(alpha: 0.38),
+    builder: (_) => _PreferencesDialogShell(
+      title: 'Edit summary',
+      subtitle: 'This popup only updates the scope and instructor notes.',
+      maxWidth: 680,
+      leading: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
+        child: const Icon(Icons.notes_rounded, size: 18, color: AppColors.primary),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Scope / description', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textMuted)),
+          const SizedBox(height: 8),
+          _DialogTextField(
+            controller: descriptionCtrl,
+            hintText: 'What exactly does this topic cover?',
+            multiline: true,
+            autofocus: true,
+          ),
+          const SizedBox(height: 14),
+          Text('Instructor notes', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textMuted)),
+          const SizedBox(height: 8),
+          _DialogTextField(
+            controller: notesCtrl,
+            hintText: 'Examples, warnings, pacing notes, or delivery hints',
+            multiline: true,
+          ),
+          const SizedBox(height: 16),
+          _DialogActions(
+            onCancel: () => Navigator.pop(context, false),
+            onConfirm: () => Navigator.pop(context, true),
+            confirmLabel: 'Save summary',
+          ),
+        ],
+      ),
+    ),
+  );
 
-  Future<void> _showShareModuleDialog(ModuleItem m) async {
-    AppToast.info(context, title: 'Share Module',
-        message: 'Module sharing across courses will be available once the backend endpoint is wired.');
-  }
-
-  Future<void> _showRenameDialog(ModuleItem m) async {
-    final c = TextEditingController(text: m.title);
-    final ok = await showDialog<bool>(context: context,
-        barrierColor: Colors.black.withOpacity(0.35),
-        builder: (_) => _SimpleDialog(title: 'Rename Module', ctrl: c,
-            confirm: 'Rename', confirmColor: AppColors.primary));
-    if (ok != true || !mounted || c.text.trim().isEmpty || c.text.trim() == m.title) return;
-    AppToast.info(context, title: 'Coming soon', message: 'Rename coming soon.');
-  }
-
-  Future<void> _togglePublish(ModuleItem m) async =>
-      AppToast.info(context, title: 'Coming soon',
-          message: '${m.isPublished ? 'Unpublish' : 'Publish'} coming soon.');
-
-  Future<void> _confirmDelete(ModuleItem m) async {
-    final ok = await showDialog<bool>(context: context,
-        barrierColor: Colors.black.withOpacity(0.35),
-        builder: (_) => _ConfirmDialogWidget(title: 'Delete Module',
-            body: 'Delete "${m.title}"? This will also remove all its materials.',
-            confirm: 'Delete', confirmColor: const Color(0xFFEF4444)));
-    if (ok != true || !mounted) return;
-    AppToast.info(context, title: 'Coming soon', message: 'Deletion coming soon.');
-  }
-
-  Future<void> _showAddTopicDialog(ModuleItem m, MaterialItem mat) async {
-    final tc = TextEditingController(), dc = TextEditingController();
-    TopicDifficulty selectedDiff = TopicDifficulty.beginner;
-    final result = await showDialog<Map<String, dynamic>>(context: context,
-        builder: (_) => _AddTopicDialogWidget(
-            moduleTitle: m.title, titleCtrl: tc, descCtrl: dc,
-            onDifficultyChanged: (d) => selectedDiff = d));
-    if (result == null || !mounted) return;
-    final difficulty = result['difficulty'] as TopicDifficulty? ?? selectedDiff;
-    final linkedOutcomeId = result['linkedOutcomeId'] as String?;
-    final topic = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
-        .createTopic(
+  if (result != true || !mounted) return;
+  final description = descriptionCtrl.text.trim();
+  final notes = notesCtrl.text.trim();
+  descriptionCtrl.dispose();
+  notesCtrl.dispose();
+  await ref.read(courseDetailsControllerProvider(widget.course.id).notifier).updateTopic(
+        topic.copyWith(
           moduleId: m.id,
           materialId: mat.id,
-          payload: TopicCreateRequest(
-            title: tc.text.trim(),
-            description: dc.text.trim().isEmpty ? null : dc.text.trim(),
-            source: TopicSource.manual,
-            difficulty: difficulty,
-            linkedOutcomeId: linkedOutcomeId,
-            linkedOutcomeIds: linkedOutcomeId == null ? const [] : [linkedOutcomeId],
-          ),
-        );
-    if (topic != null && mounted) {
-      AppToast.success(context, title: 'Topic added', message: '"${topic.title}" created under ${mat.displayTitle}.');
+          description: description.isEmpty ? null : description,
+          instructorNotes: notes.isEmpty ? null : notes,
+        ),
+      );
+  if (!mounted) return;
+  AppToast.success(context, title: 'Summary updated', message: 'The topic summary was saved.');
+}
+
+Future<void> _showTopicStatusDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
+  TopicDifficulty difficulty = topic.difficulty;
+  TopicReadiness readiness = topic.readiness;
+
+  final result = await _showManagedDialog<bool>(
+    barrierColor: Colors.black.withValues(alpha: 0.38),
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setDialogState) => _PreferencesDialogShell(
+        title: 'Set delivery state',
+        subtitle: 'This popup only changes difficulty and readiness.',
+        maxWidth: 600,
+        leading: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
+          child: const Icon(Icons.speed_rounded, size: 18, color: AppColors.primary),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Difficulty', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textMuted)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final value in TopicDifficulty.values)
+                  ChoiceChip(
+                    label: Text(value.label),
+                    selected: difficulty == value,
+                    onSelected: (_) => setDialogState(() => difficulty = value),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text('Readiness', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textMuted)),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final value in TopicReadiness.values)
+                  ChoiceChip(
+                    label: Text(value.label),
+                    selected: readiness == value,
+                    onSelected: (_) => setDialogState(() => readiness = value),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            _DialogActions(
+              onCancel: () => Navigator.pop(dialogContext, false),
+              onConfirm: () => Navigator.pop(dialogContext, true),
+              confirmLabel: 'Save state',
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+
+  if (result != true || !mounted) return;
+  await ref.read(courseDetailsControllerProvider(widget.course.id).notifier).updateTopic(
+        topic.copyWith(
+          moduleId: m.id,
+          materialId: mat.id,
+          difficulty: difficulty,
+          readiness: readiness,
+        ),
+      );
+  if (!mounted) return;
+  AppToast.success(context, title: 'State updated', message: 'Delivery state was saved.');
+}
+
+Future<void> _showTopicPageRangeDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
+  final startCtrl = TextEditingController(text: topic.pageStart?.toString() ?? '');
+  final endCtrl = TextEditingController(text: topic.pageEnd?.toString() ?? '');
+  final allTopics = ref.read(courseDetailsControllerProvider(widget.course.id)).topics[m.id] ?? const <TopicItem>[];
+  final materialTopics = allTopics.where((t) => t.materialId == mat.id).toList();
+  final childRanges = materialTopics
+      .where((t) => t.parentTopicId == topic.id)
+      .map((t) => _topicPdfPageRange(t, mat))
+      .whereType<_PdfPageRange>()
+      .toList();
+  final parentTopic = topic.parentTopicId == null
+      ? null
+      : materialTopics.cast<TopicItem?>().firstWhere(
+            (t) => t?.id == topic.parentTopicId,
+            orElse: () => null,
+          );
+  final parentRange = parentTopic == null ? null : _topicPdfPageRange(parentTopic, mat);
+  final maxPages = mat.pageCount;
+  final isSubtopic = topic.parentTopicId != null;
+
+  String? validatePageRange(String startText, String endText) {
+    final startRaw = startText.trim();
+    final endRaw = endText.trim();
+    if (startRaw.isEmpty && endRaw.isEmpty) {
+      if (childRanges.isNotEmpty) {
+        return 'This topic has subtopics with page ranges. Set a range that covers them instead of clearing it.';
+      }
+      return null;
     }
+    if (startRaw.isEmpty || endRaw.isEmpty) {
+      return 'Start and end must both be filled, or both left empty to clear.';
+    }
+    final start = int.tryParse(startRaw);
+    final end = int.tryParse(endRaw);
+    if (start == null || end == null) return 'Start and end must be whole numbers.';
+    if (start <= 0 || end <= 0) return 'Start and end must be positive page numbers.';
+    if (start > end) return 'Start page must be less than or equal to end page.';
+    if (maxPages != null && maxPages > 0 && end > maxPages) {
+      return 'End page cannot be greater than the PDF page count ($maxPages).';
+    }
+    if (childRanges.isNotEmpty) {
+      final minChildStart = childRanges.map((range) => range.start).reduce((a, b) => a < b ? a : b);
+      final maxChildEnd = childRanges.map((range) => range.end).reduce((a, b) => a > b ? a : b);
+      if (start > minChildStart || end < maxChildEnd) {
+        return 'Parent topic range must cover its subtopics: $minChildStart–$maxChildEnd.';
+      }
+    }
+    if (parentRange != null && (start < parentRange.start || end > parentRange.end)) {
+      return 'Subtopic range must stay inside parent range ${parentRange.start}–${parentRange.end}.';
+    }
+    return null;
   }
 
-  Future<void> _showEditTopicDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
-    final outcomes = ref.read(courseLOProvider(widget.course.id));
-    final notesCtrl = TextEditingController(text: topic.instructorNotes ?? '');
-    TopicReadiness readiness = topic.readiness;
-    final selectedOutcomeIds = <String>{...topic.linkedOutcomeIds};
-    final result = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Manage Topic', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-          content: SizedBox(
-            width: 460,
-            child: SingleChildScrollView(
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(topic.title, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
-                const SizedBox(height: 12),
-                const Text('Readiness', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-                const SizedBox(height: 6),
-                Wrap(
-                  spacing: 8,
-                  children: TopicReadiness.values.map((r) => ChoiceChip(
-                    label: Text(r.label),
-                    selected: readiness == r,
-                    onSelected: (_) => setDialogState(() => readiness = r),
-                  )).toList(),
-                ),
-                const SizedBox(height: 14),
-                const Text('Learning outcomes', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-                const SizedBox(height: 6),
-                if (outcomes.isEmpty)
-                  const Text('No course outcomes yet. Add them in the Outcomes tab.', style: TextStyle(fontSize: 12, color: AppColors.textHint))
-                else
-                  ...outcomes.map((lo) => CheckboxListTile(
-                    value: selectedOutcomeIds.contains(lo.id),
-                    dense: true,
-                    contentPadding: EdgeInsets.zero,
-                    title: Text('${lo.code} • ${lo.description}', style: const TextStyle(fontSize: 12.5)),
-                    onChanged: (v) => setDialogState(() {
-                      if (v ?? false) {
-                        selectedOutcomeIds.add(lo.id);
-                      } else {
-                        selectedOutcomeIds.remove(lo.id);
-                      }
-                    }),
-                  )),
-                const SizedBox(height: 14),
-                TextField(
-                  controller: notesCtrl,
-                  maxLines: 4,
-                  decoration: InputDecoration(
-                    labelText: 'Instructor notes',
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-                  ),
-                ),
-              ]),
+  Widget pageField({
+    required String label,
+    required String hint,
+    required TextEditingController controller,
+    bool autofocus = false,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.textMuted)),
+        const SizedBox(height: 8),
+        Container(
+          height: 48,
+          decoration: BoxDecoration(
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppColors.borderSoft),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          alignment: Alignment.centerLeft,
+          child: TextField(
+            controller: controller,
+            autofocus: autofocus,
+            keyboardType: TextInputType.number,
+            style: AppText.input,
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: AppText.hint,
+              border: InputBorder.none,
+              enabledBorder: InputBorder.none,
+              focusedBorder: InputBorder.none,
+              isCollapsed: true,
+              contentPadding: EdgeInsets.zero,
             ),
           ),
-          actions: [
-            TextButton(
-              onPressed: () async {
-                await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
-                    .deleteTopic(moduleId: m.id, topicId: topic.id);
-                if (mounted) Navigator.pop(dialogContext, true);
-              },
-              child: const Text('Delete', style: TextStyle(color: Color(0xFFDC2626))),
-            ),
-            TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () async {
-                await ref.read(courseDetailsControllerProvider(widget.course.id).notifier).updateTopic(
-                  topic.copyWith(
-                    materialId: mat.id,
-                    linkedOutcomeIds: selectedOutcomeIds.toList(),
-                    linkedOutcomeId: selectedOutcomeIds.isEmpty ? null : selectedOutcomeIds.first,
-                    instructorNotes: notesCtrl.text.trim().isEmpty ? null : notesCtrl.text.trim(),
-                    readiness: readiness,
+        ),
+      ],
+    );
+  }
+
+  final result = await _showManagedDialog<Map<String, int?>>(
+    barrierColor: Colors.black.withValues(alpha: 0.38),
+    builder: (dialogContext) {
+      String? errorText;
+      return StatefulBuilder(
+        builder: (dialogContext, setDialogState) => _PreferencesDialogShell(
+          title: isSubtopic ? 'Edit subtopic pages' : 'Edit topic pages',
+          subtitle: [
+            'Set the PDF page range used by the document viewer.',
+            if (maxPages != null && maxPages > 0) 'PDF pages: 1–$maxPages.',
+            if (parentRange != null) 'Parent range: ${parentRange.start}–${parentRange.end}.',
+            if (childRanges.isNotEmpty)
+              'Must cover child ranges: ${childRanges.map((range) => range.label).join(', ')}.',
+          ].join(' '),
+          maxWidth: 620,
+          leading: Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
+            child: const Icon(Icons.menu_book_rounded, size: 18, color: AppColors.primary),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: pageField(
+                      label: 'Start page',
+                      hint: 'e.g. 1',
+                      controller: startCtrl,
+                      autofocus: true,
+                    ),
                   ),
-                );
-                if (mounted) Navigator.pop(dialogContext, true);
-              },
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white),
-              child: const Text('Save'),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: pageField(
+                      label: 'End page',
+                      hint: 'e.g. 12',
+                      controller: endCtrl,
+                    ),
+                  ),
+                ],
+              ),
+              if (errorText != null) ...[
+                const SizedBox(height: 12),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.dangerBg,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppColors.dangerBorder),
+                  ),
+                  child: Text(
+                    errorText!,
+                    style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w800, color: AppColors.dangerText),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 12),
+              Text(
+                'Leave both fields empty only if you want to clear this topic range.',
+                style: TextStyle(fontSize: 12.2, height: 1.4, fontWeight: FontWeight.w700, color: AppColors.textMuted),
+              ),
+              const SizedBox(height: 18),
+              _DialogActions(
+                onCancel: () => Navigator.pop(dialogContext),
+                onConfirm: () {
+                  final validation = validatePageRange(startCtrl.text, endCtrl.text);
+                  if (validation != null) {
+                    setDialogState(() => errorText = validation);
+                    return;
+                  }
+                  final startRaw = startCtrl.text.trim();
+                  final endRaw = endCtrl.text.trim();
+                  Navigator.pop<Map<String, int?>>(dialogContext, <String, int?>{
+                    'pageStart': startRaw.isEmpty ? null : int.parse(startRaw),
+                    'pageEnd': endRaw.isEmpty ? null : int.parse(endRaw),
+                  });
+                },
+                confirmLabel: 'Save pages',
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+
+  startCtrl.dispose();
+  endCtrl.dispose();
+  if (result == null || !mounted) return;
+
+  final pageStart = result['pageStart'];
+  final pageEnd = result['pageEnd'];
+  final updatedTopic = pageStart == null && pageEnd == null
+      ? topic.copyWith(
+          moduleId: m.id,
+          materialId: mat.id,
+          clearPageStart: true,
+          clearPageEnd: true,
+        )
+      : topic.copyWith(
+          moduleId: m.id,
+          materialId: mat.id,
+          pageStart: pageStart,
+          pageEnd: pageEnd,
+        );
+
+  await ref.read(courseDetailsControllerProvider(widget.course.id).notifier).updateTopic(
+        updatedTopic,
+        updatePageRange: true,
+      );
+  if (!mounted) return;
+  _topicDetailsLoaded.add(topic.id);
+  _topicDetailsFailed.remove(topic.id);
+  AppToast.success(context, title: 'Pages updated', message: 'The PDF start/end pages were saved.');
+}
+
+Future<void> _showTopicOutcomeMappingDialog(ModuleItem m, MaterialItem mat, TopicItem topic) async {
+  final outcomes = ref.read(courseLOProvider(widget.course.id));
+
+  if (topic.parentTopicId == null) {
+    final allTopics = ref.read(courseDetailsControllerProvider(widget.course.id)).topics[m.id] ?? const <TopicItem>[];
+    final subtopics = allTopics.where((t) => t.parentTopicId == topic.id).toList();
+    final childMappedIds = <int>{};
+    for (final subtopic in subtopics) {
+      childMappedIds.addAll(subtopic.learningOutcomeIds);
+      for (final raw in subtopic.linkedOutcomeIds) {
+        final parsed = int.tryParse(raw);
+        if (parsed != null) childMappedIds.add(parsed);
+      }
+      final legacy = int.tryParse(subtopic.linkedOutcomeId ?? '');
+      if (legacy != null) childMappedIds.add(legacy);
+    }
+    final parentIds = <int>{};
+    for (final outcome in outcomes) {
+      if (childMappedIds.contains(outcome.id)) {
+        if (outcome.parentLearningOutcomeId != null) {
+          parentIds.add(outcome.parentLearningOutcomeId!);
+        } else {
+          parentIds.add(outcome.id);
+        }
+      }
+    }
+    final parentLabels = outcomes
+        .where((outcome) => parentIds.contains(outcome.id))
+        .toList();
+
+    await _showManagedDialog<void>(
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => _PreferencesDialogShell(
+        title: 'LO labels come from subtopics',
+        subtitle: 'Sub LOs are mapped on subtopics. This topic shows the parent LO labels automatically.',
+        maxWidth: 620,
+        leading: Container(
+          width: 38,
+          height: 38,
+          decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(12)),
+          child: const Icon(Icons.account_tree_outlined, size: 18, color: AppColors.primary),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.surfaceBg,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Text(
+                subtopics.isEmpty
+                    ? 'Create subtopics first, then map each subtopic to one Sub LO only.'
+                    : 'Visible labels are calculated from each subtopic’s single Sub LO mapping.',
+                style: TextStyle(fontSize: 13, height: 1.5, color: AppColors.textGray, fontWeight: FontWeight.w700),
+              ),
+            ),
+            if (parentLabels.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text('Visible on this topic', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w900, color: AppColors.textMuted)),
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: [
+                  for (final outcome in parentLabels)
+                    Chip(label: Text('${outcome.code} • ${outcome.title}')),
+                ],
+              ),
+            ],
+            const SizedBox(height: 16),
+            AppButton(
+              label: 'Got it',
+              onTap: () => Navigator.pop(context),
+              fullWidth: true,
+              height: 40,
             ),
           ],
         ),
       ),
     );
-    if (result == true && mounted) {
+    return;
+  }
+
+  final subOutcomes = outcomes.where((outcome) => outcome.isSubOutcome).toList();
+  final parents = outcomes.where((outcome) => outcome.isParentOutcome).toList();
+  final childrenByParent = groupSubOutcomesByParent(outcomes);
+  final outcomesById = <int, LearningOutcome>{
+    for (final outcome in outcomes) outcome.id: outcome,
+  };
+
+  int? parentIdForOutcomeId(int id) {
+    final outcome = outcomesById[id];
+    if (outcome == null) return null;
+    return outcome.parentLearningOutcomeId ?? (outcome.isParentOutcome ? outcome.id : null);
+  }
+
+  final selectedOutcomeIds = <int>{..._mappedOutcomeIdsForTopic(topic)}
+    ..removeWhere((id) => outcomesById[id]?.isSubOutcome != true);
+  if (selectedOutcomeIds.length > 1) {
+    final firstSelectedId = (selectedOutcomeIds.toList()..sort()).first;
+    selectedOutcomeIds
+      ..clear()
+      ..add(firstSelectedId);
+  }
+  int? selectedParentId = selectedOutcomeIds.isEmpty
+      ? null
+      : parentIdForOutcomeId(selectedOutcomeIds.first);
+
+  final result = await _showManagedDialog<bool>(
+    barrierColor: Colors.black.withValues(alpha: 0.42),
+    builder: (dialogContext) => StatefulBuilder(
+      builder: (dialogContext, setDialogState) {
+        final selectedCount = selectedOutcomeIds.length;
+        return _PreferencesDialogShell(
+          title: 'Map Sub LO to subtopic',
+          subtitle: 'Choose one Sub LO only. Selecting another Sub LO replaces the current mapping.',
+          maxWidth: 860,
+          leading: Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: AppColors.primarySoft,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.badgeBlueBorder),
+            ),
+            child: const Icon(Icons.route_outlined, size: 19, color: AppColors.primary),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceBg,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(color: AppColors.cardBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+                      child: const Icon(Icons.subdirectory_arrow_right_rounded, size: 17, color: AppColors.primary),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(topic.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+                          const SizedBox(height: 2),
+                          Text('Subtopic Sub LO mapping', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: selectedCount == 0 ? AppColors.cardBg : AppColors.primarySoft,
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(color: selectedCount == 0 ? AppColors.border : AppColors.badgeBlueBorder),
+                      ),
+                      child: Text(
+                        selectedCount == 0
+                            ? 'No Sub LO selected'
+                            : outcomesById[selectedOutcomeIds.first]?.title ?? '1 Sub LO selected',
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w900, color: selectedCount == 0 ? AppColors.textMuted : AppColors.primary),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 14),
+              if (subOutcomes.isEmpty)
+                const _CriteriaMappingEmptyState()
+              else
+                Container(
+                  constraints: const BoxConstraints(maxHeight: 470),
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceBg,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(18),
+                    child: Scrollbar(
+                      child: ListView.separated(
+                        shrinkWrap: true,
+                        padding: const EdgeInsets.all(12),
+                        itemCount: parents.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 10),
+                        itemBuilder: (_, i) {
+                          final parent = parents[i];
+                          final children = [...(childrenByParent[parent.id] ?? const <LearningOutcome>[])]
+                            ..sort((a, b) {
+                              final difficultyOrder = a.difficulty.index.compareTo(b.difficulty.index);
+                              if (difficultyOrder != 0) return difficultyOrder;
+                              return a.code.compareTo(b.code);
+                            });
+
+                          return _CriteriaMappingLoGroup(
+                            parent: parent,
+                            criteria: children,
+                            selectedIds: selectedOutcomeIds,
+                            activeParentId: selectedParentId,
+                            onToggle: (criterion) => setDialogState(() {
+                              final criterionParentId = parentIdForOutcomeId(criterion.id);
+                              if (selectedOutcomeIds.contains(criterion.id)) {
+                                selectedOutcomeIds.clear();
+                                selectedParentId = null;
+                                return;
+                              }
+
+                              selectedOutcomeIds
+                                ..clear()
+                                ..add(criterion.id);
+                              selectedParentId = criterionParentId;
+                            }),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(dialogContext, false),
+                    child: const Text('Cancel'),
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    height: 42,
+                    child: FilledButton.icon(
+                      onPressed: subOutcomes.isEmpty ? null : () => Navigator.pop(dialogContext, true),
+                      icon: const Icon(Icons.check_rounded, size: 18),
+                      label: const Text('Save mapping'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    ),
+  );
+
+  if (result != true || !mounted) return;
+  final mappedIds = selectedOutcomeIds.toList()..sort();
+  await ref.read(courseDetailsControllerProvider(widget.course.id).notifier).updateTopic(
+        topic.copyWith(
+          moduleId: m.id,
+          materialId: mat.id,
+          learningOutcomeIds: mappedIds,
+          linkedOutcomeId: mappedIds.isEmpty ? null : mappedIds.first.toString(),
+          linkedOutcomeIds: mappedIds.map((id) => id.toString()).toList(),
+        ),
+      );
+  if (!mounted) return;
+  AppToast.success(context, title: 'Sub LO mapping updated', message: 'The subtopic mapping was saved.');
+}
+
+Future<void> _confirmDeleteTopic(ModuleItem m, MaterialItem mat, TopicItem topic) async {
+  final ok = await _showManagedDialog<bool>(
+        barrierColor: Colors.black.withValues(alpha: 0.38),
+        builder: (_) => _ConfirmDialogWidget(
+          title: topic.parentTopicId == null ? 'Delete Topic' : 'Delete Subtopic',
+          body: 'Delete "${topic.title}"? This action cannot be undone.',
+          confirm: 'Delete',
+          confirmColor: AppColors.dangerText,
+        ),
+      ) ??
+      false;
+  if (!ok || !mounted) return;
+
+  await ref.read(courseDetailsControllerProvider(widget.course.id).notifier).deleteTopic(
+        moduleId: m.id,
+        materialId: mat.id,
+        topicId: topic.id,
+      );
+  if (!mounted) return;
+  setState(() {
+    _sel = _Ctx.material(m, mat);
+    _stack.clear();
+    _persistUiState();
+  });
+  AppToast.success(context, title: 'Deleted', message: 'The item was removed from this material.');
+}
+
+Future<void> _showAddSubtopicDialog(
+  ModuleItem m,
+  MaterialItem mat,
+  TopicItem parent,
+) async {
+  final outcomes = ref.read(courseLOProvider(widget.course.id));
+
+  final result = await _showManagedDialog<_TopicDialogResult>(
+    barrierColor: Colors.black.withValues(alpha: 0.42),
+    builder: (_) => _AddTopicDialogV2(outcomes: outcomes, isSubtopic: true),
+  );
+
+  if (result == null || !mounted) return;
+
+  final title = result.title.trim();
+  if (title.isEmpty) return;
+
+  final notifier =
+      ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+
+  final topic = await notifier.createTopic(
+    moduleId: m.id,
+    materialId: mat.id,
+    payload: TopicCreateRequest(
+      title: title,
+      parentTopicId: parent.id,
+      learningOutcomeIds: result.learningOutcomeIds,
+    ),
+  );
+
+  if (!mounted) return;
+
+  if (topic != null) {
+    AppToast.success(context,
+        title: 'Subtopic added', message: '"${topic.title}" created.',);
+  }
+}
+
+Future<void> _showCreateModuleDialog() async {
+  final currentModules =
+      ref.read(courseDetailsControllerProvider(widget.course.id)).modules;
+
+  if (mounted) setState(() => _dialogOpen = true);
+
+  final result = await showModuleSelectorSheet(
+    context,
+    widget.course.id,
+    currentModules: currentModules,
+  );
+
+  if (mounted) setState(() => _dialogOpen = false);
+
+  if (result == null || !mounted) return;
+
+  final notifier =
+      ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+
+  if (result.isNew) {
+    final m = await notifier.createModule(
+      result.newTitle!,
+      description: result.newDescription,
+    );
+
+    if (m != null && mounted) {
+      AppToast.success(context,
+          title: 'Module created', message: '"${m.title}" added.',);
+    }
+    return;
+  }
+
+  final sourceModule = result.existing;
+  final sourceCourseId = result.sourceCourseId;
+  if (sourceModule == null || sourceCourseId == null) {
+    AppToast.error(
+      context,
+      title: 'Copy failed',
+      message: 'Could not determine which module to copy.',
+    );
+    return;
+  }
+
+  final copied = await notifier.copyModule(
+    sourceCourseId: sourceCourseId,
+    moduleId: sourceModule.id,
+    targetCourseId: widget.course.id,
+  );
+
+  if (!mounted) return;
+
+  if (copied != null) {
+    final refreshedModule = ref
+        .read(courseDetailsControllerProvider(widget.course.id))
+        .modules
+        .where((m) => m.id == copied.id)
+        .cast<ModuleItem?>()
+        .firstWhere((m) => m != null, orElse: () => copied);
+
+    setState(() {
+      _expanded.add(refreshedModule!.id);
+      _sel = _Ctx.module(refreshedModule);
+      _stack.clear();
+      _persistUiState();
+    });
+    if (refreshedModule != null) {
+      await ref
+          .read(courseDetailsControllerProvider(widget.course.id).notifier)
+          .loadMaterials(refreshedModule.id);
+    }
+
+    if (!mounted) return;
+
+    AppToast.success(
+      context,
+      title: 'Module copied',
+      message: '"${sourceModule.title}" added.',
+    );
+  } else {
+    AppToast.error(
+      context,
+      title: 'Copy failed',
+      message: 'Could not copy module. Please try again.',
+    );
+  }
+}
+
+  Future<void> _showUploadSheet(ModuleItem module) async {
+    final saved = await _showManagedDialog<bool>(
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => UploadMaterialSheet(
+        moduleTitle: module.title,
+        autoCloseOnReady: true,
+        onUpload: (file, update) => _uploadAndWaitForMaterial(
+          module: module,
+          file: file,
+          update: update,
+        ),
+      ),
+    );
+
+    await ref
+        .read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .loadMaterials(module.id, force: true);
+
+    if (!mounted || saved != true) return;
+    AppToast.success(
+      context,
+      title: 'Materials ready',
+      message: 'Uploaded files were processed and saved to the course.',
+    );
+  }
+
+  Future<UploadSheetUploadResult> _uploadAndWaitForMaterial({
+    required ModuleItem module,
+    required UploadSheetResult file,
+    required void Function(UploadSheetUploadUpdate update) update,
+  }) async {
+    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+
+    update(const UploadSheetUploadUpdate(
+      stage: UploadSheetProcessingStage.uploading,
+      progress: 0,
+      message: 'Creating upload slot...',
+    ));
+
+    final result = await notifier.uploadMaterialFlow(
+      moduleId: module.id,
+      bytes: file.bytes,
+      filename: file.filename,
+      contentType: file.contentType,
+      title: file.title,
+      onUploadProgress: (progress) {
+        update(UploadSheetUploadUpdate(
+          stage: UploadSheetProcessingStage.uploading,
+          progress: progress,
+          message: progress < 0.7
+              ? 'Uploading PDF to storage...'
+              : 'Confirming upload...',
+        ));
+      },
+    );
+
+    if (result == null) {
+      update(const UploadSheetUploadUpdate(
+        stage: UploadSheetProcessingStage.error,
+        message: 'Upload failed before AI processing started.',
+      ));
+      return const UploadSheetUploadResult.error(
+        'Upload failed before AI processing started.',
+      );
+    }
+
+    return _waitForMaterialTopicsOnly(
+      moduleId: module.id,
+      materialId: result.materialId,
+      update: update,
+    );
+  }
+
+  Future<UploadSheetUploadResult> _waitForMaterialTopicsOnly({
+    required int moduleId,
+    required int materialId,
+    required void Function(UploadSheetUploadUpdate update) update,
+  }) async {
+    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+    final materialsApi = ref.read(materialsApiProvider);
+
+    update(const UploadSheetUploadUpdate(
+      stage: UploadSheetProcessingStage.processing,
+      message: 'AI is extracting the material topic tree...',
+    ));
+
+    bool contentStructureReady = false;
+    try {
+      final event = await materialsApi.waitForContentStructureGeneration(
+        courseId: widget.course.id,
+        materialId: materialId,
+      );
+      contentStructureReady = event.isReady;
+    } catch (_) {
+      contentStructureReady = false;
+    }
+
+    if (!contentStructureReady) {
+      final fallbackReady = await _waitForMaterialReady(
+        moduleId: moduleId,
+        materialId: materialId,
+        update: update,
+      );
+      if (fallbackReady != true) {
+        return UploadSheetUploadResult.error(
+          fallbackReady == false
+              ? 'AI topic extraction returned an error. Check the material pipeline.'
+              : 'AI topic extraction is taking too long. Refresh materials and try again.',
+          materialId: materialId,
+        );
+      }
+    }
+
+    update(const UploadSheetUploadUpdate(
+      stage: UploadSheetProcessingStage.processing,
+      message: 'Topics received. Loading the material tree...',
+    ));
+
+    await notifier.loadMaterials(moduleId, force: true);
+    await notifier.loadTopicsForMaterial(
+      moduleId: moduleId,
+      materialId: materialId,
+      force: true,
+    );
+
+    if (!mounted) {
+      return UploadSheetUploadResult.ready(
+        materialId: materialId,
+        message: 'Material saved. Topic extraction completed.',
+      );
+    }
+
+    final controllerState = ref.read(courseDetailsControllerProvider(widget.course.id));
+    final materialTopics = (controllerState.topics[moduleId] ?? const <TopicItem>[])
+        .where((TopicItem topic) => topic.materialId == materialId)
+        .toList(growable: false);
+    if (materialTopics.isEmpty) {
+      return UploadSheetUploadResult.ready(
+        materialId: materialId,
+        message: 'Material saved. The backend callback arrived, but no topics were returned yet.',
+      );
+    }
+
+    update(UploadSheetUploadUpdate(
+      stage: UploadSheetProcessingStage.ready,
+      progress: 1,
+      message: 'Topics received (${materialTopics.length}). Material is ready.',
+    ));
+
+    return UploadSheetUploadResult.ready(
+      materialId: materialId,
+      message: 'Material saved. Topic extraction completed.',
+    );
+  }
+
+  Future<bool?> _waitForMaterialReady({
+    required int moduleId,
+    required int materialId,
+    required void Function(UploadSheetUploadUpdate update) update,
+  }) async {
+    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+
+    for (var attempt = 0; attempt < 60; attempt++) {
+      if (!mounted) return null;
+      await Future<void>.delayed(const Duration(seconds: 2));
+      await notifier.loadMaterials(moduleId, force: true);
+      final state = ref.read(courseDetailsControllerProvider(widget.course.id));
+      final materials = state.materials[moduleId] ?? const <MaterialItem>[];
+      MaterialItem? material;
+      for (final item in materials) {
+        if (item.id == materialId) {
+          material = item;
+          break;
+        }
+      }
+
+      final status = material?.status.trim().toLowerCase();
+      if (status == 'ready') {
+        update(const UploadSheetUploadUpdate(
+          stage: UploadSheetProcessingStage.ready,
+          progress: 1,
+          message: 'Ready to save. AI analysis completed.',
+        ));
+        return true;
+      }
+      if (status == 'error') {
+        update(const UploadSheetUploadUpdate(
+          stage: UploadSheetProcessingStage.error,
+          message: 'AI processing failed for this file.',
+        ));
+        return false;
+      }
+
+      update(UploadSheetUploadUpdate(
+        stage: UploadSheetProcessingStage.processing,
+        message: status == null || status.isEmpty
+            ? 'Waiting for AI processing status...'
+            : 'AI processing: ${status.replaceAll('_', ' ')}...',
+      ));
+    }
+
+    return null;
+  }
+
+  Future<void> _showShareModuleDialog(ModuleItem m) async {
+    final targetCourse = await _showManagedDialog<MyCourseItem>(
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => _ShareModuleDialog(module: m, currentCourseId: widget.course.id),
+    );
+    if (targetCourse == null || !mounted) return;
+
+    final copied = await ref
+        .read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .copyModule(
+          sourceCourseId: widget.course.id,
+          moduleId: m.id,
+          targetCourseId: targetCourse.id,
+        );
+
+    if (!mounted) return;
+    if (copied != null) {
       AppToast.success(
         context,
-        title: 'Topic updated',
-        message: 'Topic details were saved.',
+        title: 'Module copied',
+        message: '"${m.title}" has been copied to "${targetCourse.safeTitle}".',
+      );
+    } else {
+      AppToast.error(context,
+          title: 'Copy failed',
+          message: 'Could not copy module. Please try again.',);
+    }
+  }
+
+  Future<void> _showRenameDialog(ModuleItem m) async {
+    final c = TextEditingController(text: m.title);
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => _SimpleDialog(
+        title: 'Rename Module',
+        ctrl: c,
+        confirm: 'Save',
+        confirmColor: AppColors.primary,
+      ),
+    );
+    final title = c.text.trim();
+    if (ok != true || !mounted || title.isEmpty || title == m.title) return;
+
+    final updated = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .updateModule(moduleId: m.id, title: title);
+    if (!mounted) return;
+
+    if (updated != null) {
+      setState(() {
+        if (_active?.type == _CType.module && _active?.module?.id == updated.id) {
+          _sel = _Ctx.module(updated);
+        }
+      });
+      AppToast.success(context, title: 'Module renamed', message: 'The module name was updated.');
+    } else {
+      AppToast.error(context, title: 'Rename failed', message: 'Please try again.');
+    }
+  }
+
+  Future<void> _showEditDescriptionDialog(ModuleItem m) async {
+    final c = TextEditingController(text: m.description ?? '');
+    final ok = await showDialog<bool>(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => _DescriptionDialog(ctrl: c),
+    );
+    final description = c.text.trim();
+    final normalizedExisting = (m.description ?? '').trim();
+    if (ok != true || !mounted || description == normalizedExisting) return;
+
+    final updated = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .updateModule(moduleId: m.id, description: description);
+    if (!mounted) return;
+
+    if (updated != null) {
+      setState(() {
+        if (_active?.type == _CType.module && _active?.module?.id == updated.id) {
+          _sel = _Ctx.module(updated);
+        }
+      });
+      AppToast.success(context, title: 'Description updated', message: 'Module description saved successfully.');
+    } else {
+      AppToast.error(context, title: 'Update failed', message: 'Please try again.');
+    }
+  }
+
+  Future<void> _togglePublish(ModuleItem m) async {
+    final updated = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .updateModule(moduleId: m.id, isPublished: !m.isPublished);
+    if (!mounted) return;
+
+    if (updated != null) {
+      setState(() {
+        if (_active?.type == _CType.module && _active?.module?.id == updated.id) {
+          _sel = _Ctx.module(updated);
+        }
+      });
+      AppToast.success(
+        context,
+        title: updated.isPublished ? 'Module published' : 'Module unpublished',
+        message: updated.isPublished ? 'The module is now visible to students.' : 'The module is now hidden from students.',
+      );
+    } else {
+      AppToast.error(context, title: 'Update failed', message: 'Please try again.');
+    }
+  }
+
+  Future<void> _showChangePositionDialog(ModuleItem m) async {
+    final sortedModules = [...ref.read(courseDetailsControllerProvider(widget.course.id)).modules]
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    final selected = await _showManagedDialog<int>(
+      barrierColor: Colors.black.withValues(alpha: 0.35),
+      builder: (_) => _ChangeModulePositionDialog(
+        module: m,
+        modules: sortedModules,
+      ),
+    );
+    if (selected == null || !mounted) return;
+
+    final success = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .reorderModule(moduleId: m.id, newPosition: selected - 1);
+    if (!mounted) return;
+
+    if (success) {
+      final refreshed = ref.read(courseDetailsControllerProvider(widget.course.id)).modules
+          .firstWhere((module) => module.id == m.id, orElse: () => m);
+      setState(() {
+        if (_active?.type == _CType.module && _active?.module?.id == m.id) {
+          _sel = _Ctx.module(refreshed);
+        }
+      });
+      AppToast.success(context, title: 'Position updated', message: 'Module moved to #$selected.');
+    } else {
+      AppToast.error(context, title: 'Reorder failed', message: 'Please try again.');
+    }
+  }
+
+  Future<void> _confirmDeleteMaterial(ModuleItem module, MaterialItem material) async {
+    final ok = await _showManagedDialog<bool>(
+          barrierColor: Colors.black.withValues(alpha: 0.35),
+          builder: (_) => _ConfirmDialogWidget(
+            title: 'Delete File',
+            body: 'Delete "${material.title}"? This will remove the PDF and its generated topics.',
+            confirm: 'Delete',
+            confirmColor: AppColors.dangerText,
+          ),
+        ) ??
+        false;
+    if (!ok || !mounted) return;
+
+    final success = await ref
+        .read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .deleteMaterial(moduleId: module.id, materialId: material.id);
+    if (!mounted) return;
+
+    if (success) {
+      final refreshedState =
+          ref.read(courseDetailsControllerProvider(widget.course.id));
+      final refreshedModule = refreshedState.modules.firstWhere(
+        (item) => item.id == module.id,
+        orElse: () => module,
+      );
+      setState(() {
+        _sel = _Ctx.module(refreshedModule);
+        _stack.clear();
+        _hideFooterForActive = false;
+        _persistUiState();
+      });
+      AppToast.success(
+        context,
+        title: 'File deleted',
+        message: '"${material.title}" was removed from this module.',
+      );
+    } else {
+      AppToast.error(
+        context,
+        title: 'Delete failed',
+        message: 'Please try again.',
       );
     }
   }
 
-  Future<void> _showAddQuestionSheet(ModuleItem module, MaterialItem material, TopicItem topic) async {
-    await showAddQuestionDialog(
-      context,
+  Future<void> _confirmDelete(ModuleItem m) async {
+    final ok = await _showManagedDialog<bool>(
+        barrierColor: Colors.black.withValues(alpha: 0.35),
+        builder: (_) => _ConfirmDialogWidget(title: 'Delete Module',
+            body: 'Delete "${m.title}"? This will also remove all its materials.',
+            confirm: 'Delete', confirmColor: const Color(0xFFEF4444),),);
+    if (ok != true || !mounted) return;
+
+    final success = await ref.read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .deleteModule(m.id);
+    if (!mounted) return;
+
+    if (success) {
+      setState(() {
+        _expanded.remove(m.id);
+        if (_active?.module?.id == m.id) {
+          _sel = null;
+          _stack.clear();
+        }
+      });
+      AppToast.success(context, title: 'Module deleted', message: '"${m.title}" was removed.');
+    } else {
+      AppToast.error(context, title: 'Delete failed', message: 'Please try again.');
+    }
+  }
+
+  Future<bool> _createManualTopicInline({
+    required ModuleItem module,
+    required MaterialItem material,
+    required String title,
+    String? description,
+    List<int> learningOutcomeIds = const [],
+  }) async {
+    final trimmedTitle = title.trim();
+    if (trimmedTitle.isEmpty) return false;
+
+    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+    final topic = await notifier.createTopic(
       moduleId: module.id,
-      moduleName: module.title,
       materialId: material.id,
-      materialName: material.displayTitle,
-      topicName: topic.title,
-      onAdd: (q) => ref.read(courseDetailsControllerProvider(widget.course.id).notifier).addQuestion(q),
+      payload: TopicCreateRequest(
+        title: trimmedTitle,
+        description: description?.trim().isEmpty ?? false ? null : description?.trim(),
+        learningOutcomeIds: learningOutcomeIds,
+      ),
+    );
+
+    if (!mounted) return false;
+
+    if (topic != null) {
+      AppToast.success(
+        context,
+        title: 'Topic added',
+        message: '"${topic.title}" was attached to this PDF.',
+      );
+      return true;
+    }
+
+    AppToast.error(
+      context,
+      title: 'Could not add topic',
+      message: 'Please try again.',
+    );
+    return false;
+  }
+
+  Set<int> _leafTopicIdsForActive(_Ctx active, CourseDetailsState st) {
+    switch (active.type) {
+      case _CType.module:
+        final ModuleItem? module = active.module;
+        if (module == null) return const <int>{};
+        return _selectableTopicIdsForModule(st, module.id);
+      case _CType.material:
+        final ModuleItem? module = active.module;
+        final MaterialItem? material = active.material;
+        if (module == null || material == null) return const <int>{};
+        return _selectableTopicIdsForMaterial(st, module.id, material.id);
+      case _CType.topic:
+        final ModuleItem? module = active.module;
+        final MaterialItem? material = active.material;
+        final TopicItem? topic = active.topic;
+        if (module == null || material == null || topic == null) return const <int>{};
+        return _selectableTopicIdsForTopic(
+          _topicsForMaterial(st, module.id, material.id),
+          topic,
+        );
+    }
+  }
+
+  List<QuestionAuthoringTarget> _authoringTargetsForTopicIds(
+    CourseDetailsState st,
+    Set<int> topicIds,
+  ) {
+    if (topicIds.isEmpty) return const <QuestionAuthoringTarget>[];
+    final List<QuestionAuthoringTarget> targets = <QuestionAuthoringTarget>[];
+
+    for (final ModuleItem module in st.modules) {
+      final List<TopicItem> moduleTopics = st.topics[module.id] ?? const <TopicItem>[];
+      if (moduleTopics.isEmpty) continue;
+      final List<MaterialItem> moduleMaterials = _materialsForModule(st, module.id);
+
+      for (final TopicItem topic in moduleTopics) {
+        if (!topicIds.contains(topic.id)) continue;
+        MaterialItem? material;
+        for (final MaterialItem item in moduleMaterials) {
+          if (item.id == topic.materialId) {
+            material = item;
+            break;
+          }
+        }
+
+        TopicItem? parent;
+        if (topic.parentTopicId != null) {
+          for (final TopicItem item in moduleTopics) {
+            if (item.id == topic.parentTopicId && item.materialId == topic.materialId) {
+              parent = item;
+              break;
+            }
+          }
+        }
+
+        targets.add(
+          QuestionAuthoringTarget(
+            moduleId: module.id,
+            moduleName: module.title,
+            materialId: material?.id ?? topic.materialId,
+            materialName: material?.displayTitle,
+            topicId: topic.id,
+            topicName: topic.title,
+            isSubtopic: topic.parentTopicId != null,
+            parentTopicName: parent?.title,
+          ),
+        );
+      }
+    }
+
+    targets.sort((QuestionAuthoringTarget a, QuestionAuthoringTarget b) {
+      final int moduleCompare = (a.moduleId ?? 0).compareTo(b.moduleId ?? 0);
+      if (moduleCompare != 0) return moduleCompare;
+      final int materialCompare = (a.materialId ?? 0).compareTo(b.materialId ?? 0);
+      if (materialCompare != 0) return materialCompare;
+      return a.topicId.compareTo(b.topicId);
+    });
+    return targets;
+  }
+
+  void _warmAuthoringTreeData(_Ctx active) {
+    final ModuleItem? module = active.module;
+    if (module == null) return;
+    final notifier = ref.read(courseDetailsControllerProvider(widget.course.id).notifier);
+    unawaited(notifier.loadMaterials(module.id));
+    final int? materialId = active.material?.id;
+    if (materialId != null) {
+      unawaited(notifier.loadTopicsForMaterial(moduleId: module.id, materialId: materialId));
+    }
+  }
+
+  void _openQuestionAuthoringFromSelection(_Ctx active) {
+    final CourseDetailsState st = ref.read(
+      courseDetailsControllerProvider(widget.course.id),
+    );
+    final bool hasTreeSelection = _selectionMode && !_treeSelection.isEmpty;
+    final Set<int> topicIds = hasTreeSelection
+        ? <int>{..._treeSelection.topicIds}
+        : _leafTopicIdsForActive(active, st);
+
+    final Set<int> moduleIds = hasTreeSelection
+        ? <int>{..._treeSelection.moduleIds}
+        : <int>{if (active.module != null) active.module!.id};
+
+    final Set<int> materialIds = hasTreeSelection
+        ? <int>{..._treeSelection.materialIds}
+        : <int>{if (active.material != null) active.material!.id};
+
+    final QuestionAuthoringLaunchContext launchContext =
+        _buildAuthoringLaunchContext(
+      active,
+      st,
+      hasTreeSelection: hasTreeSelection,
+      resolvedModuleIds: moduleIds,
+      resolvedMaterialIds: materialIds,
+      resolvedTopicIds: topicIds,
+    );
+
+    if (moduleIds.isEmpty && materialIds.isEmpty && topicIds.isEmpty) {
+      _openGenerateDialog(
+        moduleId: active.module?.id,
+        materialId: active.material?.id,
+        topicId: active.topic?.id,
+      );
+      return;
+    }
+
+    if (topicIds.isEmpty) {
+      _warmAuthoringTreeData(active);
+    }
+
+    setState(() {
+      _authoringModuleIds = moduleIds;
+      _authoringMaterialIds = materialIds;
+      _authoringTopicIds = topicIds;
+      _authoringLaunchContext = launchContext;
+      _showQuestionAuthoring = true;
+      _hideFooterForActive = true;
+    });
+    _persistUiState();
+  }
+
+  QuestionAuthoringLaunchContext _buildAuthoringLaunchContext(
+    _Ctx active,
+    CourseDetailsState st, {
+    required bool hasTreeSelection,
+    required Set<int> resolvedModuleIds,
+    required Set<int> resolvedMaterialIds,
+    required Set<int> resolvedTopicIds,
+  }) {
+    final List<QuestionAuthoringTarget> targetSnapshots =
+        _authoringTargetsForTopicIds(st, resolvedTopicIds);
+    if (!hasTreeSelection) {
+      switch (active.type) {
+        case _CType.module:
+          final ModuleItem? module = active.module;
+          return QuestionAuthoringLaunchContext(
+            kind: QuestionAuthoringScopeKind.module,
+            title: module?.title ?? 'Selected module',
+            subtitle: 'Questions will be built from every topic and subtopic inside this module.',
+            selectedModuleId: module?.id,
+            selectedModuleIds: resolvedModuleIds.isNotEmpty
+                ? resolvedModuleIds
+                : <int>{if (module != null) module.id},
+            selectedMaterialIds: resolvedMaterialIds,
+            selectedTopicIds: resolvedTopicIds,
+            targetSnapshots: targetSnapshots,
+          );
+        case _CType.material:
+          final ModuleItem? module = active.module;
+          final MaterialItem? material = active.material;
+          return QuestionAuthoringLaunchContext(
+            kind: QuestionAuthoringScopeKind.material,
+            title: material?.displayTitle ?? 'Selected material',
+            subtitle: module == null
+                ? 'Questions will be built from this file structure.'
+                : '${module.title} • questions will use this file topics and subtopics.',
+            selectedModuleId: module?.id,
+            selectedMaterialId: material?.id,
+            selectedModuleIds: resolvedModuleIds.isNotEmpty
+                ? resolvedModuleIds
+                : <int>{if (module != null) module.id},
+            selectedMaterialIds: resolvedMaterialIds.isNotEmpty
+                ? resolvedMaterialIds
+                : <int>{if (material != null) material.id},
+            selectedTopicIds: resolvedTopicIds,
+            targetSnapshots: targetSnapshots,
+          );
+        case _CType.topic:
+          final ModuleItem? module = active.module;
+          final MaterialItem? material = active.material;
+          final TopicItem? topic = active.topic;
+          final bool isSubtopic = topic?.parentTopicId != null;
+          return QuestionAuthoringLaunchContext(
+            kind: isSubtopic
+                ? QuestionAuthoringScopeKind.subtopic
+                : QuestionAuthoringScopeKind.topic,
+            title: topic?.title ?? 'Selected topic',
+            subtitle: isSubtopic
+                ? 'Questions will target this specific subtopic.'
+                : 'Questions will use this topic and its subtopics if they exist.',
+            selectedModuleId: module?.id,
+            selectedMaterialId: material?.id,
+            selectedTopicId: topic?.id,
+            selectedModuleIds: resolvedModuleIds.isNotEmpty
+                ? resolvedModuleIds
+                : <int>{if (module != null) module.id},
+            selectedMaterialIds: resolvedMaterialIds.isNotEmpty
+                ? resolvedMaterialIds
+                : <int>{if (material != null) material.id},
+            selectedTopicIds: resolvedTopicIds.isNotEmpty
+                ? resolvedTopicIds
+                : <int>{if (topic != null) topic.id},
+            targetSnapshots: targetSnapshots,
+          );
+      }
+    }
+
+    final Set<int> containingModuleIds = <int>{};
+    final Set<int> containingMaterialIds = <int>{};
+    final Set<int> selectedTopicIds = <int>{...resolvedTopicIds};
+
+    for (final ModuleItem module in st.modules) {
+      final List<TopicItem> topics = st.topics[module.id] ?? const <TopicItem>[];
+      for (final TopicItem topic in topics) {
+        if (!selectedTopicIds.contains(topic.id)) continue;
+        containingModuleIds.add(module.id);
+        containingMaterialIds.add(topic.materialId);
+      }
+    }
+
+    final Set<int> moduleIds = <int>{
+      ...containingModuleIds,
+      ...resolvedModuleIds,
+      ..._treeSelection.moduleIds,
+    };
+    final Set<int> materialIds = <int>{
+      ...containingMaterialIds,
+      ...resolvedMaterialIds,
+      ..._treeSelection.materialIds,
+    };
+
+    ModuleItem? selectedModule;
+    MaterialItem? selectedMaterial;
+    TopicItem? selectedTopic;
+
+    if (_treeSelection.moduleIds.length == 1) {
+      selectedModule = _findModuleById(st, _treeSelection.moduleIds.first);
+    }
+    if (_treeSelection.materialIds.length == 1) {
+      selectedMaterial = _findMaterialById(st, _treeSelection.materialIds.first);
+    }
+    if (_treeSelection.topicIds.length == 1) {
+      selectedTopic = _findTopicById(st, _treeSelection.topicIds.first);
+      selectedMaterial ??= selectedTopic == null ? null : _findMaterialById(st, selectedTopic.materialId);
+      selectedModule ??= selectedMaterial == null ? null : _findModuleById(st, selectedMaterial.moduleId);
+    }
+
+    if (selectedModule != null && _treeSelection.moduleIds.length == 1) {
+      return QuestionAuthoringLaunchContext(
+        kind: QuestionAuthoringScopeKind.module,
+        title: selectedModule.title,
+        subtitle: 'Full module selected from the structure tree.',
+        selectedModuleId: selectedModule.id,
+        selectedModuleIds: moduleIds,
+        selectedMaterialIds: materialIds,
+        selectedTopicIds: selectedTopicIds,
+        targetSnapshots: targetSnapshots,
+      );
+    }
+
+    if (selectedMaterial != null && _treeSelection.materialIds.length == 1) {
+      return QuestionAuthoringLaunchContext(
+        kind: QuestionAuthoringScopeKind.material,
+        title: selectedMaterial.displayTitle,
+        subtitle: 'Full material file selected from the structure tree.',
+        selectedModuleId: selectedModule?.id ?? selectedMaterial.moduleId,
+        selectedMaterialId: selectedMaterial.id,
+        selectedModuleIds: moduleIds,
+        selectedMaterialIds: materialIds,
+        selectedTopicIds: selectedTopicIds,
+        targetSnapshots: targetSnapshots,
+      );
+    }
+
+    if (selectedTopic != null && _treeSelection.topicIds.length == 1) {
+      final bool isSubtopic = selectedTopic.parentTopicId != null;
+      return QuestionAuthoringLaunchContext(
+        kind: isSubtopic
+            ? QuestionAuthoringScopeKind.subtopic
+            : QuestionAuthoringScopeKind.topic,
+        title: selectedTopic.title,
+        subtitle: isSubtopic
+            ? 'One subtopic selected from the structure tree.'
+            : 'One topic selected from the structure tree.',
+        selectedModuleId: selectedModule?.id,
+        selectedMaterialId: selectedMaterial?.id,
+        selectedTopicId: selectedTopic.id,
+        selectedModuleIds: moduleIds,
+        selectedMaterialIds: materialIds,
+        selectedTopicIds: selectedTopicIds,
+        targetSnapshots: targetSnapshots,
+      );
+    }
+
+    return QuestionAuthoringLaunchContext(
+      kind: QuestionAuthoringScopeKind.selection,
+      title: '${selectedTopicIds.length} selected content targets',
+      subtitle: 'Custom selection across ${moduleIds.length} module${moduleIds.length == 1 ? '' : 's'} and ${materialIds.length} file${materialIds.length == 1 ? '' : 's'}.',
+      selectedModuleIds: moduleIds,
+      selectedMaterialIds: materialIds,
+      selectedTopicIds: selectedTopicIds,
+      targetSnapshots: targetSnapshots,
     );
   }
 
-  void _openGenerateDialog({int? moduleId, int? materialId, int? topicId}) => showDialog(context: context,
+  ModuleItem? _findModuleById(CourseDetailsState st, int id) {
+    for (final ModuleItem module in st.modules) {
+      if (module.id == id) return module;
+    }
+    return null;
+  }
+
+  MaterialItem? _findMaterialById(CourseDetailsState st, int id) {
+    for (final List<MaterialItem> materials in st.materials.values) {
+      for (final MaterialItem material in materials) {
+        if (material.id == id) return material;
+      }
+    }
+    return null;
+  }
+
+  TopicItem? _findTopicById(CourseDetailsState st, int id) {
+    for (final List<TopicItem> topics in st.topics.values) {
+      for (final TopicItem topic in topics) {
+        if (topic.id == id) return topic;
+      }
+    }
+    return null;
+  }
+
+  void _closeQuestionAuthoring() {
+    if (!mounted) return;
+    setState(() {
+      _showQuestionAuthoring = false;
+      _authoringModuleIds = const <int>{};
+      _authoringMaterialIds = const <int>{};
+      _authoringTopicIds = const <int>{};
+      _authoringLaunchContext = null;
+    });
+    _persistUiState();
+  }
+
+  void _openQuestionBankAfterSave() {
+    _closeQuestionAuthoring();
+    if (!mounted) return;
+    SelectedCourseCache.set(widget.course);
+    context.go(Routes.courseQuestionBank(buildCourseRouteSlug(widget.course)));
+  }
+
+  void _openGenerateDialog({int? moduleId, int? materialId, int? topicId}) => _showManagedDialog(
       builder: (_) => GenerateQuestionsDialog(
         courseId: widget.course.id,
         initialModuleId: moduleId,
         initialMaterialId: materialId,
         initialTopicId: topicId,
-      ));
+      ),);
 }
+
+Color _criteriaDifficultyColor(OutcomeDifficulty level) {
+  switch (level) {
+    case OutcomeDifficulty.beginner:
+      return const Color(0xFF16A34A);
+    case OutcomeDifficulty.intermediate:
+      return const Color(0xFFF59E0B);
+    case OutcomeDifficulty.advanced:
+      return const Color(0xFFDC2626);
+  }
+}
+
+String _criteriaDifficultyShortLabel(OutcomeDifficulty level) {
+  switch (level) {
+    case OutcomeDifficulty.beginner:
+      return 'P';
+    case OutcomeDifficulty.intermediate:
+      return 'M';
+    case OutcomeDifficulty.advanced:
+      return 'D';
+  }
+}
+
+class _CriteriaIconDot extends StatelessWidget {
+  final OutcomeDifficulty difficulty;
+  const _CriteriaIconDot({required this.difficulty});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _criteriaDifficultyColor(difficulty);
+    return Container(
+      width: 26,
+      height: 26,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        shape: BoxShape.circle,
+        border: Border.all(color: color.withValues(alpha: 0.30)),
+      ),
+      alignment: Alignment.center,
+      child: Text(
+        _criteriaDifficultyShortLabel(difficulty),
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w900,
+          color: color,
+          height: 1,
+        ),
+      ),
+    );
+  }
+}
+
+class _CriteriaMappingEmptyState extends StatelessWidget {
+  const _CriteriaMappingEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 38,
+            height: 38,
+            decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(14)),
+            child: const Icon(Icons.flag_outlined, size: 18, color: AppColors.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'No Sub LOs yet. Create an LO from the Outcomes tab, then add Sub LOs under it.',
+              style: TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.45, fontWeight: FontWeight.w800),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CriteriaMappingLoGroup extends StatelessWidget {
+  final LearningOutcome parent;
+  final List<LearningOutcome> criteria;
+  final Set<int> selectedIds;
+  final int? activeParentId;
+  final ValueChanged<LearningOutcome> onToggle;
+
+  const _CriteriaMappingLoGroup({
+    required this.parent,
+    required this.criteria,
+    required this.selectedIds,
+    required this.activeParentId,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final selectedCount = criteria.where((criterion) => selectedIds.contains(criterion.id)).length;
+    final isActiveLo = activeParentId == parent.id;
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: isActiveLo ? AppColors.badgeBlueBorder : AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 10),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+                  decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(999), border: Border.all(color: AppColors.badgeBlueBorder)),
+                  child: Text(parent.code, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: AppColors.primary)),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(parent.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+                ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                  decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(999), border: Border.all(color: AppColors.border)),
+                  child: Text(
+                    selectedCount == 0
+                        ? '${criteria.length} Sub LOs'
+                        : '1 selected here',
+                    style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: selectedCount == 0 ? AppColors.textMuted : AppColors.primary),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (criteria.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              child: Text('No Sub LOs added under this LO yet.', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
+              child: Column(
+                children: [
+                  for (final criterion in criteria) ...[
+                    _CriteriaMappingTile(
+                      criterion: criterion,
+                      selected: selectedIds.contains(criterion.id),
+                      onTap: () => onToggle(criterion),
+                    ),
+                    if (criterion != criteria.last) const SizedBox(height: 8),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+String _criterionShortCode(String code) {
+  final trimmed = code.trim();
+  final withoutWordPrefix = trimmed.replaceFirst(RegExp(r'^(Easy|Medium|Hard|Pass|Merit|Distinction)', caseSensitive: false), '').trim();
+  final withoutLetterPrefix = withoutWordPrefix.replaceFirst(RegExp(r'^[PMD](?=\d)', caseSensitive: false), '').trim();
+  return withoutLetterPrefix.isEmpty ? trimmed : withoutLetterPrefix;
+}
+
+class _CriteriaMappingTile extends StatelessWidget {
+  final LearningOutcome criterion;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _CriteriaMappingTile({required this.criterion, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final color = _criteriaDifficultyColor(criterion.difficulty);
+    final description = (criterion.description ?? '').trim();
+    return Material(
+      color: selected ? color.withValues(alpha: 0.08) : AppColors.surfaceBg,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: selected ? color.withValues(alpha: 0.38) : AppColors.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: selected ? color : AppColors.cardBg,
+                  border: Border.all(color: selected ? color : AppColors.border),
+                ),
+                child: selected
+                    ? const Icon(Icons.check_rounded, size: 15, color: Colors.white)
+                    : null,
+              ),
+              const SizedBox(width: 10),
+              _CriteriaIconDot(difficulty: criterion.difficulty),
+              const SizedBox(width: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+                decoration: BoxDecoration(color: color.withValues(alpha: 0.09), borderRadius: BorderRadius.circular(999), border: Border.all(color: color.withValues(alpha: 0.26))),
+                child: Text(_criterionShortCode(criterion.code), style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w900, color: color)),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(criterion.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+                    if (description.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(description, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// Question draft banner lives in materials_tab_question_draft_banner.dart.
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  SIDEBAR
 // ─────────────────────────────────────────────────────────────────────────────
-class _SidebarWidget extends StatelessWidget {
-  final CourseDetailsState state;
-  final Set<int>           expanded;
-  final _Ctx?              active;
-  final ScrollController   scroll;
-  final void Function(ModuleItem) onModuleTap;
-  final void Function(ModuleItem, MaterialItem) onMaterialTap;
-  final void Function(ModuleItem, MaterialItem, TopicItem) onTopicTap;
-  final void Function(ModuleItem) onAddMaterial;
-  final VoidCallback onAddModule;
-  final VoidCallback onRefresh;
-
-  const _SidebarWidget({
-    required this.state, required this.expanded, required this.active,
-    required this.scroll, required this.onModuleTap, required this.onMaterialTap,
-    required this.onTopicTap, required this.onAddMaterial,
-    required this.onAddModule, required this.onRefresh,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 272,
-      decoration: const BoxDecoration(
-          color: _K.sidebar,
-          border: Border(right: BorderSide(color: _K.div))),
-      child: Column(children: [
-        // header
-        Container(height: 44, padding: const EdgeInsets.symmetric(horizontal: 14),
-          decoration: const BoxDecoration(color: Colors.white,
-              border: Border(bottom: BorderSide(color: _K.div))),
-          child: Row(children: [
-            const Icon(Icons.folder_open_rounded, size: 14, color: AppColors.textHint),
-            const SizedBox(width: 7),
-            const Text('STRUCTURE', style: TextStyle(fontSize: 10, fontWeight: FontWeight.w800,
-                color: AppColors.textHint, letterSpacing: 1.0)),
-            const Spacer(),
-            if (state.modulesLoading)
-              const SizedBox(width: 12, height: 12,
-                  child: CircularProgressIndicator(strokeWidth: 1.5)),
-            _IBtn(icon: Icons.refresh_rounded, tooltip: 'Refresh', onTap: onRefresh),
-          ])),
-
-        // tree
-        Expanded(
-          child: state.modulesLoading && state.modules.isEmpty
-              ? const Center(child: CircularProgressIndicator(strokeWidth: 2))
-              : state.modules.isEmpty
-                  ? _SidebarEmpty(onAdd: onAddModule)
-                  : ListView.builder(
-                      controller: scroll,
-                      padding: const EdgeInsets.symmetric(vertical: 6),
-                      itemCount: state.modules.length,
-                      itemBuilder: (_, i) {
-                        final m = state.modules[i];
-                        return _ModuleRowWidget(
-                          module: m, isExpanded: expanded.contains(m.id),
-                          materials: state.materials[m.id] ?? [],
-                          loading: state.materialsLoading[m.id] ?? false,
-                          moduleTopics: state.topics[m.id] ?? [],
-                          active: active,
-                          onModuleTap: () => onModuleTap(m),
-                          onMaterialTap: (mat) => onMaterialTap(m, mat),
-                          onTopicTap: (mat, t) => onTopicTap(m, mat, t),
-                          onAddMaterial: () => onAddMaterial(m),
-                        );
-                      }),
-        ),
-
-        // footer
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: const BoxDecoration(border: Border(top: BorderSide(color: _K.div))),
-          child: SizedBox(
-            width: double.infinity, height: 36,
-            child: ElevatedButton.icon(
-              onPressed: onAddModule,
-              icon: const Icon(Icons.add_rounded, size: 15),
-              label: const Text('Add Module',
-                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white, elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-            ),
-          ),
-        ),
-      ]),
-    );
-  }
-}
-
-class _SidebarEmpty extends StatelessWidget {
-  final VoidCallback onAdd;
-  const _SidebarEmpty({required this.onAdd});
-  @override
-  Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(20),
-    child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 48, height: 48,
-          decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(12)),
-          child: const Icon(Icons.folder_open_outlined, size: 22, color: AppColors.primary)),
-      const SizedBox(height: 10),
-      const Text('No modules yet', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-      const SizedBox(height: 4),
-      const Text('Create your first module below.', textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-    ])));
-}
-
-// ─── Module row ──────────────────────────────────────────────────────────────
-class _ModuleRowWidget extends StatelessWidget {
-  final ModuleItem    module;
-  final bool          isExpanded;
-  final List<MaterialItem> materials;
-  final bool          loading;
-  final List<TopicItem> moduleTopics;
-  final _Ctx?         active;
-  final VoidCallback  onModuleTap;
-  final void Function(MaterialItem) onMaterialTap;
-  final void Function(MaterialItem, TopicItem) onTopicTap;
-  final VoidCallback  onAddMaterial;
-
-  const _ModuleRowWidget({
-    required this.module, required this.isExpanded,
-    required this.materials, required this.loading,
-    required this.moduleTopics, required this.active,
-    required this.onModuleTap, required this.onMaterialTap,
-    required this.onTopicTap, required this.onAddMaterial,
-  });
-
-  bool get _isSel => active?.type == _CType.module && active?.module?.id == module.id;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      InkWell(onTap: onModuleTap, child: AnimatedContainer(
-        duration: const Duration(milliseconds: 130),
-        margin: const EdgeInsets.fromLTRB(6, 1, 6, 1),
-        padding: const EdgeInsets.fromLTRB(8, 8, 8, 8),
-        decoration: BoxDecoration(color: _isSel ? _K.blueSoft : Colors.transparent,
-            borderRadius: BorderRadius.circular(8)),
-        child: Row(children: [
-          AnimatedRotation(turns: isExpanded ? 0.25 : 0, duration: const Duration(milliseconds: 130),
-              child: Icon(Icons.chevron_right_rounded, size: 15,
-                  color: _isSel ? AppColors.primary : AppColors.textHint)),
-          const SizedBox(width: 5),
-          Container(width: 22, height: 22,
-              decoration: BoxDecoration(
-                  color: _isSel ? _K.blueMid : const Color(0xFFFFF7ED),
-                  borderRadius: BorderRadius.circular(5)),
-              child: Icon(Icons.folder_rounded, size: 13,
-                  color: _isSel ? AppColors.primary : const Color(0xFFEA580C))),
-          const SizedBox(width: 8),
-          Expanded(child: Text(module.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700,
-                  color: _isSel ? AppColors.primary : AppColors.textTitle))),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-            decoration: BoxDecoration(
-                color: module.isPublished ? _K.greenSoft : _K.amberSoft,
-                borderRadius: BorderRadius.circular(4)),
-            child: Text(module.isPublished ? 'Live' : 'Draft',
-                style: TextStyle(fontSize: 9.5, fontWeight: FontWeight.w700,
-                    color: module.isPublished ? _K.green : _K.amber)),
-          ),
-          if (isExpanded) ...[
-            const SizedBox(width: 3),
-            Tooltip(message: 'Upload material', child: InkWell(onTap: onAddMaterial,
-                borderRadius: BorderRadius.circular(5), child: const Padding(
-                    padding: EdgeInsets.all(3),
-                    child: Icon(Icons.add_rounded, size: 14, color: AppColors.textHint)))),
-          ],
-        ]),
-      )),
-      if (isExpanded) _buildChildren(),
-    ]);
-  }
-
-  Widget _buildChildren() {
-    if (loading) {
-      return const Padding(padding: EdgeInsets.symmetric(vertical: 10),
-        child: Center(child: SizedBox(width: 14, height: 14,
-            child: CircularProgressIndicator(strokeWidth: 1.5))));
-    }
-    if (materials.isEmpty) {
-      return const Padding(padding: EdgeInsets.fromLTRB(50, 5, 12, 8),
-        child: Text('No materials — tap ＋ to upload',
-            style: TextStyle(fontSize: 11, color: AppColors.textHint)));
-    }
-    return Column(children: materials.map((mat) {
-      final matSel = active?.material?.id == mat.id &&
-          (active?.type == _CType.material || active?.type == _CType.topic);
-      final scopedTopics = moduleTopics
-          .where((t) => t.materialId == null || t.materialId == mat.id)
-          .toList();
-      return _MatRowWidget(material: mat, topics: scopedTopics, isSelected: matSel,
-          active: active, onTap: () => onMaterialTap(mat), onTopicTap: (t) => onTopicTap(mat, t));
-    }).toList());
-  }
-}
-
-class _MatRowWidget extends StatelessWidget {
-  final MaterialItem material;
-  final List<TopicItem> topics;
-  final bool isSelected;
-  final _Ctx? active;
-  final VoidCallback onTap;
-  final void Function(TopicItem) onTopicTap;
-  const _MatRowWidget({required this.material, required this.topics,
-      required this.isSelected, required this.active,
-      required this.onTap, required this.onTopicTap});
-
-  @override
-  Widget build(BuildContext context) {
-    const iconMap = {
-      'video': (Icons.play_circle_outline_rounded, Color(0xFF2563EB)),
-      'pdf'  : (Icons.picture_as_pdf_outlined,    Color(0xFFDC2626)),
-      'quiz' : (Icons.quiz_outlined,               Color(0xFF7C3AED)),
-    };
-    final (ico, col) = iconMap[material.type] ?? (Icons.article_outlined, AppColors.textMuted);
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      InkWell(onTap: onTap, child: Container(
-        margin: const EdgeInsets.fromLTRB(26, 1, 6, 1),
-        padding: const EdgeInsets.fromLTRB(10, 6, 8, 6),
-        decoration: BoxDecoration(
-            color: isSelected ? _K.blueSoft : Colors.transparent,
-            borderRadius: BorderRadius.circular(7)),
-        child: Row(children: [
-          Container(width: 1, height: 14, color: _K.div, margin: const EdgeInsets.only(right: 8)),
-          Icon(ico, size: 13, color: isSelected ? AppColors.primary : col),
-          const SizedBox(width: 7),
-          Expanded(child: Text(material.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 12, fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
-                  color: isSelected ? AppColors.primary : const Color(0xFF334155)))),
-          _Dot(status: material.status),
-        ]),
-      )),
-      ...topics.map((t) {
-        final tSel = active?.type == _CType.topic && active?.topic?.id == t.id;
-        return InkWell(onTap: () => onTopicTap(t), child: Container(
-          margin: const EdgeInsets.fromLTRB(40, 0, 6, 0),
-          padding: const EdgeInsets.fromLTRB(14, 4, 8, 4),
-          decoration: BoxDecoration(color: tSel ? _K.purpleSoft : Colors.transparent,
-              borderRadius: BorderRadius.circular(5)),
-          child: Row(children: [
-            Container(width: 1, height: 11, color: _K.div, margin: const EdgeInsets.only(right: 7)),
-            Icon(Icons.tag_rounded, size: 10, color: tSel ? _K.purple : AppColors.textHint),
-            const SizedBox(width: 5),
-            Expanded(child: Text(t.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11,
-                    fontWeight: tSel ? FontWeight.w600 : FontWeight.w400,
-                    color: tSel ? _K.purple : AppColors.textMuted))),
-          ]),
-        ));
-      }),
-    ]);
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  FOOTER
-// ─────────────────────────────────────────────────────────────────────────────
-class _FooterWidget extends StatelessWidget {
-  final _Ctx ctx; final bool uploading; final bool canGenerate;
-  final VoidCallback onUpload, onGenerate, onClose;
-  const _FooterWidget({required this.ctx, required this.uploading, required this.canGenerate,
-      required this.onUpload, required this.onGenerate, required this.onClose});
-
-  String get _label => switch (ctx.type) {
-    _CType.module   => ctx.module?.title ?? 'Module',
-    _CType.material => ctx.material?.displayTitle ?? 'Material',
-    _CType.topic    => ctx.topic?.title ?? 'Topic',
-  };
-  IconData get _icon => switch (ctx.type) {
-    _CType.module   => Icons.folder_rounded,
-    _CType.material => ctx.material?.type == 'video'
-        ? Icons.play_circle_filled_rounded : Icons.picture_as_pdf_rounded,
-    _CType.topic    => Icons.tag_rounded,
-  };
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: 56,
-      decoration: BoxDecoration(color: Colors.white,
-          border: const Border(top: BorderSide(color: _K.div)),
-          boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05),
-              blurRadius: 16, offset: const Offset(0, -4))]),
-      padding: const EdgeInsets.symmetric(horizontal: 18),
-      child: Row(children: [
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(7)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(_icon, size: 13, color: AppColors.primary), const SizedBox(width: 6),
-            ConstrainedBox(constraints: const BoxConstraints(maxWidth: 200),
-                child: Text(_label, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                        color: AppColors.primary))),
-          ])),
-        const Spacer(),
-        _Btn(icon: Icons.auto_awesome_rounded, label: canGenerate ? 'Generate Questions' : 'No content yet',
-            primary: true, disabled: !canGenerate, onTap: canGenerate ? onGenerate : null),
-        const SizedBox(width: 8),
-        InkWell(onTap: onClose, borderRadius: BorderRadius.circular(6),
-            child: const Padding(padding: EdgeInsets.all(7),
-                child: Icon(Icons.close_rounded, size: 15, color: AppColors.textHint))),
-      ]),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  EMPTY STATE
-// ─────────────────────────────────────────────────────────────────────────────
-class _EmptyStateWidget extends StatelessWidget {
-  final VoidCallback onCreate;
-  const _EmptyStateWidget({required this.onCreate});
-  @override
-  Widget build(BuildContext context) => Container(color: _K.bg, child: Center(child: Column(
-    mainAxisSize: MainAxisSize.min, children: [
-    Container(width: 72, height: 72,
-        decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(20)),
-        child: const Icon(Icons.folder_open_rounded, size: 34, color: AppColors.primary)),
-    const SizedBox(height: 18),
-    const Text('Select something to get started', style: TextStyle(
-        fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-    const SizedBox(height: 6),
-    const Text('Choose a module or material from the left panel.',
-        style: TextStyle(fontSize: 13, color: AppColors.textMuted)),
-    const SizedBox(height: 22),
-    OutlinedButton.icon(onPressed: onCreate,
-        icon: const Icon(Icons.add_rounded, size: 15),
-        label: const Text('New Module'),
-        style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary,
-            side: const BorderSide(color: AppColors.primary),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)))),
-  ])));
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  MODULE PANEL
-// ─────────────────────────────────────────────────────────────────────────────
-class _ModulePanelWidget extends StatelessWidget {
-  final ModuleItem module; final List<MaterialItem> materials;
-  final bool uploading; final double uploadProgress;
-  final VoidCallback onUpload; final void Function(MaterialItem) onMaterialTap;
-  final VoidCallback? onRename, onTogglePublish, onDelete, onShare;
-  const _ModulePanelWidget({required this.module, required this.materials,
-      required this.uploading, required this.uploadProgress,
-      required this.onUpload, required this.onMaterialTap,
-      this.onRename, this.onTogglePublish, this.onDelete, this.onShare});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(color: _K.bg, child: SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 100),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        _ModuleHeroWidget(module: module, materialCount: materials.length),
-        const SizedBox(height: 16),
-        if (uploading) ...[_UploadProgressWidget(progress: uploadProgress), const SizedBox(height: 14)],
-
-        _CardWidget(
-          header: const _HdrWidget(icon: Icons.tune_rounded, iconColor: AppColors.primary, title: 'Preferences'),
-          child: Column(children: [
-            _PRow(icon: Icons.drive_file_rename_outline_rounded, iconBg: _K.blueSoft,
-                iconFg: AppColors.primary, label: 'Rename Module', sub: module.title, onTap: onRename),
-            _DivW(),
-            _PRow(icon: Icons.notes_rounded, iconBg: _K.blueSoft, iconFg: AppColors.primary,
-                label: 'Edit Description',
-                sub: (module.description?.isNotEmpty ?? false) ? module.description! : 'No description yet',
-                onTap: onRename),
-            _DivW(),
-            _PRow(icon: module.isPublished ? Icons.visibility_off_rounded : Icons.visibility_rounded,
-                iconBg: module.isPublished ? _K.amberSoft : _K.greenSoft,
-                iconFg: module.isPublished ? _K.amber : _K.green,
-                label: module.isPublished ? 'Unpublish' : 'Publish',
-                sub: module.isPublished ? 'Hide from students' : 'Make visible to students',
-                onTap: onTogglePublish),
-            _DivW(),
-            _PRow(icon: Icons.upload_file_rounded, iconBg: _K.purpleSoft, iconFg: _K.purple,
-                label: 'Upload Material', sub: 'Add a PDF, video, or document',
-                onTap: uploading ? null : onUpload),
-            _DivW(),
-            _PRow(icon: Icons.swap_vert_rounded, iconBg: _K.greenSoft, iconFg: _K.green,
-                label: 'Change Position',
-                sub: 'Currently #${module.orderIndex + 1} in the course'),
-            _DivW(),
-            _PRow(icon: Icons.share_rounded, iconBg: const Color(0xFFF0FDF4), iconFg: const Color(0xFF16A34A),
-                label: 'Share with Another Course',
-                sub: module.sharedWithCourseIds.isEmpty
-                    ? 'Not shared with any other course'
-                    : 'Shared with ${module.sharedWithCourseIds.length} course${module.sharedWithCourseIds.length == 1 ? "" : "s"}',
-                onTap: onShare),
-            _DivW(),
-            _PRow(icon: Icons.delete_outline_rounded,
-                iconBg: const Color(0xFFFEE2E2), iconFg: const Color(0xFFEF4444),
-                label: 'Delete Module', sub: 'Permanently remove this module',
-                onTap: onDelete, danger: true),
-          ]),
-        ),
-        const SizedBox(height: 16),
-
-        _CardWidget(
-          header: _HdrWidget(icon: Icons.folder_open_rounded, iconColor: AppColors.primary,
-              title: 'Materials', badge: '${materials.length}',
-              trailing: _SmBtn(icon: Icons.upload_rounded, label: 'Upload',
-                  disabled: uploading, onTap: onUpload)),
-          child: materials.isEmpty
-              ? _MatEmptyWidget(onUpload: onUpload)
-              : Column(children: materials.asMap().entries.map((e) =>
-                  _MatListItemWidget(material: e.value, isLast: e.key == materials.length - 1,
-                      onTap: () => onMaterialTap(e.value))).toList()),
-        ),
-      ]),
-    ));
-  }
-}
-
-class _ModuleHeroWidget extends StatelessWidget {
-  final ModuleItem module; final int materialCount;
-  const _ModuleHeroWidget({required this.module, required this.materialCount});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight,
-            colors: [Color(0xFF1565C0), Color(0xFF137FEC), Color(0xFF42A5F5)]),
-        borderRadius: BorderRadius.circular(14),
-        boxShadow: [BoxShadow(color: AppColors.primary.withOpacity(0.2),
-            blurRadius: 20, offset: const Offset(0, 6))],
-      ),
-      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Wrap(spacing: 6, children: [
-            _HPill(module.isPublished ? '● Live' : '● Draft',
-                module.isPublished ? const Color(0xFF4ADE80) : const Color(0xFFFBBF24)),
-            const _HPill('MODULE', Colors.white70),
-            if (materialCount > 0) _HPill('$materialCount material${materialCount == 1 ? '' : 's'}', Colors.white70),
-          ]),
-          const SizedBox(height: 10),
-          Text(module.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
-              color: Colors.white, height: 1.2)),
-          if (module.description != null) ...[
-            const SizedBox(height: 5),
-            Text(module.description!, style: TextStyle(fontSize: 13,
-                color: Colors.white.withOpacity(0.75), height: 1.5)),
-          ],
-        ])),
-        const SizedBox(width: 12),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: Colors.white.withOpacity(0.2))),
-          child: Column(children: [
-            Text('Order', style: TextStyle(fontSize: 10, color: Colors.white.withOpacity(0.7),
-                fontWeight: FontWeight.w500)),
-            const SizedBox(height: 3),
-            Text('#${module.orderIndex + 1}', style: const TextStyle(
-                fontSize: 20, fontWeight: FontWeight.w800, color: Colors.white)),
-          ]),
-        ),
-      ]),
-    );
-  }
-}
-
-class _HPill extends StatelessWidget {
-  final String l; final Color c; const _HPill(this.l, this.c);
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 3),
-    decoration: BoxDecoration(color: Colors.white.withOpacity(0.15),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.white.withOpacity(0.2))),
-    child: Text(l, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: c)));
-}
-
-class _UploadProgressWidget extends StatelessWidget {
-  final double progress; const _UploadProgressWidget({required this.progress});
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.fromLTRB(16, 13, 16, 13),
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: _K.div)),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Row(children: [
-        const SizedBox(width: 14, height: 14,
-            child: CircularProgressIndicator(strokeWidth: 1.5)),
-        const SizedBox(width: 10),
-        const Expanded(child: Text('Uploading material…',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13))),
-        Text('${(progress * 100).toInt()}%', style: const TextStyle(
-            fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
-      ]),
-      const SizedBox(height: 8),
-      ClipRRect(borderRadius: BorderRadius.circular(4),
-          child: LinearProgressIndicator(value: progress,
-              backgroundColor: const Color(0xFFE2E8F0), color: AppColors.primary, minHeight: 4)),
-    ]),
-  );
-}
-
-class _MatEmptyWidget extends StatelessWidget {
-  final VoidCallback onUpload; const _MatEmptyWidget({required this.onUpload});
-  @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 28),
-    child: Center(child: Column(children: [
-      const Icon(Icons.upload_file_outlined, size: 28, color: AppColors.textHint),
-      const SizedBox(height: 8),
-      const Text('No materials yet', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
-      const SizedBox(height: 4),
-      const Text('Upload a PDF, video, or document', style: TextStyle(fontSize: 12, color: AppColors.textHint)),
-      const SizedBox(height: 12),
-      OutlinedButton.icon(onPressed: onUpload,
-          icon: const Icon(Icons.upload_rounded, size: 14), label: const Text('Upload Material'),
-          style: OutlinedButton.styleFrom(foregroundColor: AppColors.primary,
-              side: const BorderSide(color: AppColors.primary))),
-    ])));
-}
-
-class _MatListItemWidget extends StatelessWidget {
-  final MaterialItem material; final bool isLast; final VoidCallback onTap;
-  const _MatListItemWidget({required this.material, required this.isLast, required this.onTap});
-  static const _colors = {
-    'video': (Icons.play_circle_filled_rounded, Color(0xFFDBEAFE), Color(0xFF2563EB)),
-    'pdf'  : (Icons.picture_as_pdf_rounded,     Color(0xFFFEE2E2), Color(0xFFDC2626)),
-    'quiz' : (Icons.quiz_rounded,                Color(0xFFF3E8FF), Color(0xFF9333EA)),
-  };
-  static const _status = {
-    'ready'      : ('Ready',      Color(0xFFDCFCE7), Color(0xFF16A34A)),
-    'processing' : ('Processing', Color(0xFFFEF3C7), Color(0xFFD97706)),
-    'uploaded'   : ('Processing', Color(0xFFFEF3C7), Color(0xFFD97706)),
-    'draft_upload': ('Uploading', Color(0xFFE0F2FE), Color(0xFF0369A1)),
-    'error'      : ('Error',      Color(0xFFFEF2F2), Color(0xFFDC2626)),
-  };
-  @override
-  Widget build(BuildContext context) {
-    final (ico, ib, ic) = _colors[material.type] ??
-        (Icons.insert_drive_file_rounded, const Color(0xFFF1F5F9), AppColors.textMuted);
-    final (sl, sb, sf) = _status[material.status] ??
-        (material.status, const Color(0xFFF1F5F9), AppColors.textMuted);
-    return InkWell(onTap: onTap, child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 11),
-      decoration: BoxDecoration(border: isLast ? null : const Border(bottom: BorderSide(color: _K.div))),
-      child: Row(children: [
-        Container(width: 34, height: 34,
-            decoration: BoxDecoration(color: ib, borderRadius: BorderRadius.circular(9)),
-            child: Icon(ico, size: 17, color: ic)),
-        const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text(material.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.textTitle)),
-          const SizedBox(height: 2),
-          Text(material.type.toUpperCase(), style: const TextStyle(
-              fontSize: 9.5, fontWeight: FontWeight.w700, color: AppColors.textHint, letterSpacing: 0.5)),
-        ])),
-        Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(color: sb, borderRadius: BorderRadius.circular(5)),
-            child: Text(sl, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w700, color: sf))),
-        const SizedBox(width: 6),
-        const Icon(Icons.chevron_right_rounded, size: 15, color: AppColors.textHint),
-      ]),
-    ));
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  MATERIAL PANEL
-// ─────────────────────────────────────────────────────────────────────────────
-class _MaterialPanelWidget extends StatelessWidget {
-  final ModuleItem module; final MaterialItem material;
-  final List<TopicItem> topics; final bool topicsLoading;
-  final List<LearningOutcome> outcomes;
-  final String? downloadUrl; final bool urlLoading;
-  final void Function(TopicItem) onTopicTap;
-  final VoidCallback onAddTopicManual, onGenerateTopicsAI, onRefreshUrl;
-  const _MaterialPanelWidget({required this.module, required this.material,
-      required this.topics, required this.topicsLoading, required this.outcomes,
-      required this.downloadUrl, required this.urlLoading,
-      required this.onTopicTap, required this.onAddTopicManual,
-      required this.onGenerateTopicsAI, required this.onRefreshUrl});
-
-  @override
-  Widget build(BuildContext context) {
-    final mappedOutcomeIds = <String>{};
-    for (final topic in topics) {
-      mappedOutcomeIds.addAll(topic.linkedOutcomeIds);
-      if (topic.linkedOutcomeId != null) mappedOutcomeIds.add(topic.linkedOutcomeId!);
-    }
-    final readyCount = topics.where((t) => t.readiness == TopicReadiness.ready).length;
-    return Container(color: _K.bg, child: Column(children: [
-      _MatHeaderWidget(module: module, material: material),
-      Padding(
-        padding: const EdgeInsets.fromLTRB(20, 14, 20, 0),
-        child: _MaterialInsightsStrip(
-          topicCount: topics.length,
-          readyCount: readyCount,
-          mappedOutcomeCount: mappedOutcomeIds.length,
-          totalOutcomeCount: outcomes.length,
-        ),
-      ),
-      Expanded(child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Expanded(child: _FilePreviewWidget(material: material, downloadUrl: downloadUrl,
-            loading: urlLoading, onRefresh: onRefreshUrl)),
-        Container(
-          width: 280,
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(left: BorderSide(color: _K.div)),
-          ),
-          child: _TopicsSidebarWidget(
-            topics: topics,
-            loading: topicsLoading,
-            onTopicTap: onTopicTap,
-            onAddManual: onAddTopicManual,
-            onGenerateAI: onGenerateTopicsAI,
-          ),
-        ),
-      ])),
-    ]));
-  }
-}
-
-class _MaterialInsightsStrip extends StatelessWidget {
-  final int topicCount;
-  final int readyCount;
-  final int mappedOutcomeCount;
-  final int totalOutcomeCount;
-
-  const _MaterialInsightsStrip({
-    required this.topicCount,
-    required this.readyCount,
-    required this.mappedOutcomeCount,
-    required this.totalOutcomeCount,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(spacing: 10, runSpacing: 10, children: [
-      _InsightPill(icon: Icons.tag_rounded, label: '$topicCount topic${topicCount == 1 ? '' : 's'}'),
-      _InsightPill(icon: Icons.task_alt_rounded, label: '$readyCount ready'),
-      _InsightPill(icon: Icons.flag_outlined, label: totalOutcomeCount == 0 ? 'No outcomes yet' : '$mappedOutcomeCount / $totalOutcomeCount LOs mapped'),
-    ]);
-  }
-}
-
-class _InsightPill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _InsightPill({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-    decoration: BoxDecoration(
-      color: Colors.white,
-      borderRadius: BorderRadius.circular(999),
-      border: Border.all(color: _K.div),
-    ),
-    child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 13, color: AppColors.primary),
-      const SizedBox(width: 6),
-      Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-    ]),
-  );
-}
-
-class _MatHeaderWidget extends StatelessWidget {
-  final ModuleItem module; final MaterialItem material;
-  const _MatHeaderWidget({required this.module, required this.material});
-  static const _tc = {
-    'video': (Color(0xFF2563EB), Color(0xFFDBEAFE)),
-    'pdf'  : (Color(0xFFDC2626), Color(0xFFFEE2E2)),
-    'image': (Color(0xFF7C3AED), Color(0xFFF3E8FF)),
-    'audio': (Color(0xFF16A34A), Color(0xFFDCFCE7)),
-    'quiz' : (Color(0xFF9333EA), Color(0xFFF3E8FF)),
-  };
-  @override
-  Widget build(BuildContext context) {
-    final (tcol, tbg) = _tc[material.type] ?? (AppColors.textMuted, const Color(0xFFF1F5F9));
-    final (scol, sbg) = material.isReady ? (_K.green, _K.greenSoft)
-        : material.isProcessing ? (_K.amber, _K.amberSoft)
-        : (AppColors.dangerText, const Color(0xFFFFF1F2));
-    final sl = material.isReady ? '● Ready' : material.isProcessing ? '● Processing' : '● Error';
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 12, 16, 12),
-      decoration: const BoxDecoration(color: Colors.white,
-          border: Border(bottom: BorderSide(color: _K.div))),
-      child: Row(children: [
-        _TIcon(type: material.type, size: 36), const SizedBox(width: 12),
-        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: [
-            _Pill(l: material.type.toUpperCase(), fg: tcol, bg: tbg), const SizedBox(width: 6),
-            _Pill(l: sl, fg: scol, bg: sbg),
-          ]),
-          const SizedBox(height: 4),
-          Text(material.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-          Text('In "${module.title}"', style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-        ])),
-      ]),
-    );
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  FILE PREVIEW
-// ─────────────────────────────────────────────────────────────────────────────
-enum _PK { pdf, image, video, audio, link, other }
-
-class _FilePreviewWidget extends StatelessWidget {
-  final MaterialItem material; final String? downloadUrl;
-  final bool loading; final VoidCallback onRefresh;
-  const _FilePreviewWidget({required this.material, required this.downloadUrl,
-      required this.loading, required this.onRefresh});
-
-  _PK get _kind {
-    final t = material.type.toLowerCase(); final m = (material.mimeType ?? '').toLowerCase();
-    if (t == 'video' || m.startsWith('video/')) return _PK.video;
-    if (t == 'pdf'   || m == 'application/pdf') return _PK.pdf;
-    if (t == 'image' || m.startsWith('image/')) return _PK.image;
-    if (t == 'audio' || m.startsWith('audio/')) return _PK.audio;
-    if (t == 'link') return _PK.link;
-    return _PK.other;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (loading) return const _LoaderW(label: 'Loading preview…');
-    if (material.isProcessing) {
-      return const _PlaceholderW(icon: Icons.hourglass_top_rounded,
-        iconColor: _K.amber, iconBg: _K.amberSoft, title: 'Processing…',
-        sub: 'Your file is being processed. Preview will be available shortly.');
-    }
-    if (material.isError) {
-      return _PlaceholderW(icon: Icons.error_outline_rounded,
-        iconColor: AppColors.dangerText, iconBg: _K.redSoft, title: 'Processing failed',
-        sub: 'Something went wrong processing this file.',
-        actionLabel: 'Retry', onAction: onRefresh);
-    }
-    if (downloadUrl == null || downloadUrl!.isEmpty) {
-      return _PlaceholderW(icon: Icons.link_off_rounded, iconColor: AppColors.textMuted,
-          iconBg: _K.bg, title: 'Preview unavailable',
-          sub: 'Could not load a URL for this file.',
-          actionLabel: 'Retry', onAction: onRefresh);
-    }
-
-    final url = downloadUrl!;
-    return switch (_kind) {
-      _PK.pdf   => _PdfPreviewWidget(url: url, material: material),
-      _PK.image => _ImagePreviewWidget(url: url),
-      _PK.video => _VideoPreviewWidget(url: url, material: material),
-      _PK.audio => _AudioPreviewWidget(url: url, material: material),
-      _PK.link  => _LinkPreviewWidget(url: url),
-      _PK.other => _FallbackWidget(url: url, material: material),
-    };
-  }
-}
-
-class _PdfPreviewWidget extends StatelessWidget {
-  final String url; final MaterialItem material;
-  const _PdfPreviewWidget({required this.url, required this.material});
-  @override
-  Widget build(BuildContext context) {
-    return Padding(padding: const EdgeInsets.all(20), child: Column(
-      crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _MetaStripW(material: material), const SizedBox(height: 14),
-      Expanded(child: Container(
-        decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _K.div),
-            boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04),
-                blurRadius: 12, offset: const Offset(0, 4))]),
-        child: Column(children: [
-          // toolbar
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 11, 14, 11),
-            decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div)),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(13))),
-            child: Row(children: [
-              Container(width: 30, height: 30, decoration: BoxDecoration(
-                  color: _K.redSoft, borderRadius: BorderRadius.circular(7)),
-                  child: const Icon(Icons.picture_as_pdf_rounded, size: 15, color: _K.red)),
-              const SizedBox(width: 10),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                Text(material.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-                if (material.pageCount != null)
-                  Text('${material.pageCount} pages',
-                      style: const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-              ])),
-              _OBtn(url: url),
-            ]),
-          ),
-          // body
-          Expanded(child: Container(
-            decoration: const BoxDecoration(color: Color(0xFFF8F9FB),
-                borderRadius: BorderRadius.vertical(bottom: Radius.circular(13))),
-            child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(width: 80, height: 80,
-                  decoration: BoxDecoration(color: _K.redSoft, borderRadius: BorderRadius.circular(20)),
-                  child: const Icon(Icons.picture_as_pdf_rounded, size: 40, color: _K.red)),
-              const SizedBox(height: 16),
-              const Text('PDF Document', style: TextStyle(fontSize: 16,
-                  fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-              const SizedBox(height: 6),
-              const Text('Tap "Open" to view this PDF in your browser.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textMuted), textAlign: TextAlign.center),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: () async {
-                  final uri = Uri.tryParse(url);
-                  if (uri != null && await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
-                icon: const Icon(Icons.open_in_new_rounded, size: 15),
-                label: const Text('Open PDF in Browser'),
-                style: ElevatedButton.styleFrom(backgroundColor: _K.red, foregroundColor: Colors.white,
-                    elevation: 0, padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 11),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
-                    textStyle: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700)),
-              ),
-              const SizedBox(height: 10),
-              TextButton.icon(
-                onPressed: () async {
-                  await Clipboard.setData(ClipboardData(text: url));
-                  if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('URL copied to clipboard'), duration: Duration(seconds: 2)));
-                  }
-                },
-                icon: const Icon(Icons.copy_rounded, size: 13),
-                label: const Text('Copy URL'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.textMuted),
-              ),
-            ])),
-          )),
-        ]),
-      )),
-    ]));
-  }
-}
-
-class _ImagePreviewWidget extends StatelessWidget {
-  final String url; const _ImagePreviewWidget({required this.url});
-  @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
-    child: Container(decoration: BoxDecoration(color: Colors.white,
-        borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div)),
-      child: ClipRRect(borderRadius: BorderRadius.circular(13), child: Stack(children: [
-        Container(color: const Color(0xFFF8F9FB)),
-        Center(child: Image.network(url, fit: BoxFit.contain,
-            errorBuilder: (_, __, ___) => _FallbackWidget(url: url, material: null),
-            loadingBuilder: (_, child, p) => p == null ? child :
-                const Center(child: CircularProgressIndicator(strokeWidth: 2)))),
-        Positioned(top: 12, right: 12, child: _OBtn(url: url)),
-      ]))));
-}
-
-class _VideoPreviewWidget extends StatelessWidget {
-  final String url; final MaterialItem material;
-  const _VideoPreviewWidget({required this.url, required this.material});
-  static String _fmt(int s) {
-    final h = s ~/ 3600; final m = (s % 3600) ~/ 60; final sec = s % 60;
-    return h > 0 ? '${h}h ${m}m' : '${m}m ${sec}s';
-  }
-  @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      _MetaStripW(material: material), const SizedBox(height: 14),
-      Expanded(child: Container(
-        decoration: BoxDecoration(color: const Color(0xFF0D1117),
-            borderRadius: BorderRadius.circular(14), border: Border.all(color: _K.div)),
-        child: ClipRRect(borderRadius: BorderRadius.circular(13),
-            child: Stack(alignment: Alignment.center, children: [
-          Container(decoration: const BoxDecoration(gradient: RadialGradient(
-              colors: [Color(0xFF1A2332), Color(0xFF0D1117)]))),
-          Column(mainAxisSize: MainAxisSize.min, children: [
-            Container(width: 80, height: 80,
-                decoration: BoxDecoration(color: Colors.white.withOpacity(0.1),
-                    shape: BoxShape.circle, border: Border.all(color: Colors.white.withOpacity(0.2))),
-                child: const Icon(Icons.play_arrow_rounded, size: 44, color: Colors.white)),
-            const SizedBox(height: 16),
-            Text(material.displayTitle, style: const TextStyle(fontSize: 16,
-                fontWeight: FontWeight.w700, color: Colors.white)),
-            if (material.durationSeconds != null) ...[
-              const SizedBox(height: 4),
-              Text(_fmt(material.durationSeconds!),
-                  style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.55))),
-            ],
-            const SizedBox(height: 22),
-            ElevatedButton.icon(onPressed: () {},
-                icon: const Icon(Icons.open_in_new_rounded, size: 14),
-                label: const Text('Open Video'),
-                style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.15),
-                    foregroundColor: Colors.white, elevation: 0,
-                    side: BorderSide(color: Colors.white.withOpacity(0.25)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)))),
-          ]),
-        ])))),
-    ]));
-}
-
-class _AudioPreviewWidget extends StatelessWidget {
-  final String url; final MaterialItem material;
-  const _AudioPreviewWidget({required this.url, required this.material});
-  @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
-    child: Container(padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _K.div)),
-      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Container(width: 80, height: 80, decoration: BoxDecoration(
-            color: _K.greenSoft, borderRadius: BorderRadius.circular(22)),
-            child: const Icon(Icons.headphones_rounded, size: 40, color: _K.green)),
-        const SizedBox(height: 18),
-        Text(material.displayTitle, textAlign: TextAlign.center, style: const TextStyle(
-            fontSize: 17, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-        if (material.durationSeconds != null) ...[
-          const SizedBox(height: 6),
-          Text('Duration: ${material.durationSeconds! ~/ 60}m ${material.durationSeconds! % 60}s',
-              style: const TextStyle(fontSize: 13, color: AppColors.textMuted)),
-        ],
-        const SizedBox(height: 24),
-        _OBtn(url: url, big: true),
-      ])));
-}
-
-class _LinkPreviewWidget extends StatelessWidget {
-  final String url; const _LinkPreviewWidget({required this.url});
-  @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(20),
-    child: Container(padding: const EdgeInsets.all(32),
-      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: _K.div)),
-      child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Container(width: 72, height: 72, decoration: BoxDecoration(
-            color: _K.blueSoft, borderRadius: BorderRadius.circular(18)),
-            child: const Icon(Icons.link_rounded, size: 34, color: AppColors.primary)),
-        const SizedBox(height: 16),
-        const Text('External Link', style: TextStyle(fontSize: 17,
-            fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-        const SizedBox(height: 8),
-        Text(url, maxLines: 2, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center,
-            style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-        const SizedBox(height: 20), _OBtn(url: url, big: true),
-      ])));
-}
-
-class _FallbackWidget extends StatelessWidget {
-  final String url; final MaterialItem? material;
-  const _FallbackWidget({required this.url, required this.material});
-  @override
-  Widget build(BuildContext context) => _PlaceholderW(icon: Icons.insert_drive_file_rounded,
-      iconColor: AppColors.textMuted, iconBg: _K.bg, title: 'Preview not available',
-      sub: material != null ? 'This file type (${material!.type}) cannot be previewed inline.'
-          : 'Preview not available.', actionLabel: 'Open / Download', onAction: () {});
-}
-
-class _LoaderW extends StatelessWidget {
-  final String label; const _LoaderW({required this.label});
-  @override
-  Widget build(BuildContext context) => Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-    const CircularProgressIndicator(strokeWidth: 2), const SizedBox(height: 12),
-    Text(label, style: const TextStyle(fontSize: 13, color: AppColors.textMuted))]));
-}
-
-class _PlaceholderW extends StatelessWidget {
-  final IconData icon; final Color iconColor, iconBg;
-  final String title, sub; final String? actionLabel; final VoidCallback? onAction;
-  const _PlaceholderW({required this.icon, required this.iconColor, required this.iconBg,
-      required this.title, required this.sub, this.actionLabel, this.onAction});
-  @override
-  Widget build(BuildContext context) => Center(child: Padding(padding: const EdgeInsets.all(32),
-    child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Container(width: 70, height: 70,
-          decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(18)),
-          child: Icon(icon, size: 32, color: iconColor)),
-      const SizedBox(height: 16),
-      Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800, color: AppColors.textTitle)),
-      const SizedBox(height: 6),
-      Text(sub, style: const TextStyle(fontSize: 13, color: AppColors.textMuted, height: 1.5),
-          textAlign: TextAlign.center),
-      if (actionLabel != null && onAction != null) ...[
-        const SizedBox(height: 20),
-        ElevatedButton.icon(onPressed: onAction,
-            icon: const Icon(Icons.open_in_new_rounded, size: 14), label: Text(actionLabel!)),
-      ],
-    ])));
-}
-
-class _MetaStripW extends StatelessWidget {
-  final MaterialItem material; const _MetaStripW({required this.material});
-  static String _fmt(int b) {
-    if (b < 1024) return '$b B';
-    if (b < 1024 * 1024) return '${(b / 1024).toStringAsFixed(1)} KB';
-    return '${(b / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-  @override
-  Widget build(BuildContext context) {
-    final items = <(IconData, String)>[];
-    if (material.fileSize != null) items.add((Icons.storage_rounded, _fmt(material.fileSize!)));
-    if (material.pageCount != null) items.add((Icons.menu_book_rounded, '${material.pageCount} pages'));
-    if (material.durationSeconds != null) { final s = material.durationSeconds!;
-      items.add((Icons.timer_rounded, '${s ~/ 60}m ${s % 60}s')); }
-    final d = material.uploadedAt;
-    items.add((Icons.calendar_today_rounded, 'Uploaded ${d.day}/${d.month}/${d.year}'));
-    if (items.isEmpty) return const SizedBox.shrink();
-    return Wrap(spacing: 14, runSpacing: 5, children: items.map((it) =>
-        Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(it.$1, size: 12, color: AppColors.textHint), const SizedBox(width: 4),
-          Text(it.$2, style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w500)),
-        ])).toList());
-  }
-}
-
-class _OBtn extends StatelessWidget {
-  final String url; final bool big; const _OBtn({required this.url, this.big = false});
-
-  Future<void> _open() async {
-    final uri = Uri.tryParse(url);
-    if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (big) {
-      return ElevatedButton.icon(onPressed: _open,
-        icon: const Icon(Icons.open_in_new_rounded, size: 14), label: const Text('Open'),
-        style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white, elevation: 0,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))));
-    }
-    return Material(color: AppColors.primary, borderRadius: BorderRadius.circular(7),
-        child: InkWell(onTap: _open, borderRadius: BorderRadius.circular(7),
-            child: const Padding(padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                child: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Icon(Icons.open_in_new_rounded, size: 12, color: Colors.white),
-                  SizedBox(width: 5),
-                  Text('Open', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: Colors.white)),
-                ]))));
-  }
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  TOPICS SIDEBAR
-// ─────────────────────────────────────────────────────────────────────────────
-class _TopicsSidebarWidget extends StatelessWidget {
-  final List<TopicItem> topics; final bool loading;
-  final void Function(TopicItem) onTopicTap;
-  final VoidCallback onAddManual, onGenerateAI;
-  const _TopicsSidebarWidget({required this.topics, required this.loading,
-      required this.onTopicTap, required this.onAddManual, required this.onGenerateAI});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      // header
-      Container(padding: const EdgeInsets.fromLTRB(14, 11, 12, 11),
-          decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
-          child: Row(children: [
-            Container(width: 24, height: 24, decoration: BoxDecoration(
-                color: _K.purpleSoft, borderRadius: BorderRadius.circular(7)),
-                alignment: Alignment.center,
-                child: const Icon(Icons.tag_rounded, size: 13, color: _K.purple)),
-            const SizedBox(width: 8),
-            const Text('Topics', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-            if (!loading && topics.isNotEmpty) ...[
-              const SizedBox(width: 6),
-              Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(color: _K.purpleSoft, borderRadius: BorderRadius.circular(10)),
-                  child: Text('${topics.length}', style: const TextStyle(
-                      fontSize: 10.5, fontWeight: FontWeight.w700, color: _K.purple))),
-            ],
-            const Spacer(),
-            if (loading) const SizedBox(width: 13, height: 13,
-                child: CircularProgressIndicator(strokeWidth: 1.5)),
-          ])),
-
-      // add buttons
-      Container(
-        padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-        decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
-        child: Row(children: [
-          Expanded(child: _AddTopicBtnW(icon: Icons.edit_rounded, label: 'Manual',
-              onTap: onAddManual, color: AppColors.primary, bg: _K.blueSoft)),
-          const SizedBox(width: 6),
-          Expanded(child: _AddTopicBtnW(icon: Icons.auto_awesome_rounded, label: 'AI',
-              onTap: onGenerateAI, color: _K.purple, bg: _K.purpleSoft)),
-        ]),
-      ),
-
-      // list
-      Expanded(child: loading
-          ? const Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-              CircularProgressIndicator(strokeWidth: 2), SizedBox(height: 8),
-              Text('Loading topics…', style: TextStyle(fontSize: 12, color: AppColors.textMuted))]))
-          : topics.isEmpty
-              ? _TopicsEmptyW(onAddManual: onAddManual, onGenerateAI: onGenerateAI)
-              : ListView.builder(
-                  padding: const EdgeInsets.symmetric(vertical: 4),
-                  itemCount: topics.length,
-                  itemBuilder: (_, i) => _TopicItemW(
-                      topic: topics[i], index: i, onTap: () => onTopicTap(topics[i])))),
-    ]);
-  }
-}
-
-class _AddTopicBtnW extends StatelessWidget {
-  final IconData icon; final String label; final VoidCallback onTap;
-  final Color color, bg;
-  const _AddTopicBtnW({required this.icon, required this.label, required this.onTap,
-      required this.color, required this.bg});
-  @override
-  Widget build(BuildContext context) => InkWell(onTap: onTap,
-      borderRadius: BorderRadius.circular(7), child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 6),
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(7)),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 13, color: color), const SizedBox(width: 5),
-          Text(label, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
-        ])));
-}
-
-class _TopicsEmptyW extends StatelessWidget {
-  final VoidCallback onAddManual, onGenerateAI;
-  const _TopicsEmptyW({required this.onAddManual, required this.onGenerateAI});
-  @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.all(14),
-    child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-      Container(width: 44, height: 44, decoration: BoxDecoration(
-          color: _K.purpleSoft, borderRadius: BorderRadius.circular(12)),
-          child: const Icon(Icons.auto_awesome_rounded, size: 22, color: _K.purple)),
-      const SizedBox(height: 10),
-      const Text('No topics yet', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-      const SizedBox(height: 5),
-      const Text('Add manually or let AI generate topics from this material.',
-          textAlign: TextAlign.center, style: TextStyle(fontSize: 11, color: AppColors.textMuted, height: 1.5)),
-    ]));
-}
-
-class _TopicItemW extends StatelessWidget {
-  final TopicItem topic; final int index; final VoidCallback onTap;
-  const _TopicItemW({required this.topic, required this.index, required this.onTap});
-  @override
-  Widget build(BuildContext context) => InkWell(onTap: onTap, child: Container(
-    padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
-    decoration: const BoxDecoration(border: Border(bottom: BorderSide(color: _K.div))),
-    child: Row(children: [
-      Container(width: 26, height: 26, decoration: BoxDecoration(
-          color: _K.purpleSoft, borderRadius: BorderRadius.circular(7)),
-          alignment: Alignment.center,
-          child: Text('${index + 1}', style: const TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w800, color: _K.purple))),
-      const SizedBox(width: 9),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(topic.title, maxLines: 2, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.textTitle)),
-        if (topic.estimatedDurationMinutes != null)
-          Text('~${topic.estimatedDurationMinutes}m',
-              style: const TextStyle(fontSize: 10.5, color: AppColors.textHint)),
-      ])),
-      const Icon(Icons.chevron_right_rounded, size: 14, color: AppColors.textHint),
-    ])));
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  TOPIC DRILL-DOWN PANEL
-// ─────────────────────────────────────────────────────────────────────────────
-class _TopicPanelWidget extends StatelessWidget {
-  final ModuleItem module;
-  final MaterialItem material;
-  final TopicItem topic;
-  final List<LearningOutcome> outcomes;
-  final bool canPop;
-  final VoidCallback onBack, onGenerate, onAddManualQuestion, onEditTopic;
-
-  const _TopicPanelWidget({
-    required this.module,
-    required this.material,
-    required this.topic,
-    required this.outcomes,
-    required this.canPop,
-    required this.onBack,
-    required this.onGenerate,
-    required this.onAddManualQuestion,
-    required this.onEditTopic,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final mappedOutcomes = outcomes
-        .where((o) => topic.linkedOutcomeIds.contains(o.id) || topic.linkedOutcomeId == o.id)
-        .toList();
-
-    return Container(color: _K.bg, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Container(height: 48, padding: const EdgeInsets.symmetric(horizontal: 16),
-          decoration: const BoxDecoration(color: Colors.white,
-              border: Border(bottom: BorderSide(color: _K.div))),
-          child: Row(children: [
-            if (canPop) InkWell(onTap: onBack, borderRadius: BorderRadius.circular(7),
-                child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(color: _K.bg, borderRadius: BorderRadius.circular(7),
-                        border: Border.all(color: _K.div)),
-                    child: Row(mainAxisSize: MainAxisSize.min, children: [
-                      const Icon(Icons.arrow_back_ios_new_rounded, size: 11, color: AppColors.textMuted),
-                      const SizedBox(width: 5),
-                      Text(material.displayTitle, style: const TextStyle(
-                          fontSize: 11.5, fontWeight: FontWeight.w600, color: AppColors.textMuted)),
-                    ]))),
-            if (canPop) const SizedBox(width: 10),
-            const Icon(Icons.tag_rounded, size: 14, color: _K.purple), const SizedBox(width: 6),
-            Expanded(child: Text(topic.title, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle))),
-            TextButton.icon(
-              onPressed: onEditTopic,
-              icon: const Icon(Icons.edit_outlined, size: 14),
-              label: const Text('Manage'),
-            ),
-          ])),
-
-      Expanded(child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
-        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Wrap(spacing: 6, runSpacing: 6, children: [
-            const _Pill(l: 'TOPIC', fg: _K.purple, bg: _K.purpleSoft),
-            if (topic.isRequired) const _Pill(l: 'REQUIRED', fg: _K.blue, bg: _K.blueMid),
-            _Pill(
-              l: topic.readiness.label.toUpperCase(),
-              fg: topic.readiness == TopicReadiness.ready ? _K.green : (topic.readiness == TopicReadiness.review ? _K.amber : AppColors.textMuted),
-              bg: topic.readiness == TopicReadiness.ready ? _K.greenSoft : (topic.readiness == TopicReadiness.review ? _K.amberSoft : const Color(0xFFF1F5F9)),
-            ),
-          ]),
-          const SizedBox(height: 14),
-          Text(topic.title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800,
-              color: AppColors.textTitle, height: 1.3)),
-          const SizedBox(height: 6),
-          Row(children: [
-            const Icon(Icons.folder_outlined, size: 12, color: AppColors.textHint), const SizedBox(width: 5),
-            Text(module.title, style: const TextStyle(fontSize: 12, color: AppColors.textMuted)),
-            const Padding(padding: EdgeInsets.symmetric(horizontal: 5),
-                child: Text('›', style: TextStyle(fontSize: 12, color: AppColors.textHint))),
-            const Icon(Icons.article_outlined, size: 12, color: AppColors.textHint), const SizedBox(width: 5),
-            Expanded(child: Text(material.displayTitle, maxLines: 1, overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 12, color: AppColors.textMuted))),
-          ]),
-          const SizedBox(height: 20),
-
-          if (topic.description?.isNotEmpty ?? false) ...[
-            _CardWidget(
-              header: const _HdrWidget(icon: Icons.description_outlined, iconColor: AppColors.primary, title: 'Description'),
-              child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                  child: Text(topic.description!, style: const TextStyle(
-                      fontSize: 13, color: AppColors.textMuted, height: 1.6)))),
-            const SizedBox(height: 14),
-          ],
-
-          _CardWidget(
-            header: const _HdrWidget(icon: Icons.info_outline_rounded, iconColor: AppColors.primary, title: 'Teaching Context'),
-            child: Column(children: [
-              _MRowW(icon: Icons.track_changes_rounded, label: 'Readiness', value: topic.readiness.label),
-              _MRowW(icon: Icons.signal_cellular_alt_rounded, label: 'Difficulty', value: topic.difficulty.label),
-              _MRowW(icon: Icons.sort_rounded, label: 'Order', value: '#${topic.orderIndex + 1}'),
-              _MRowW(icon: Icons.flag_outlined, label: 'Mapped outcomes', value: mappedOutcomes.isEmpty ? 'Not mapped yet' : '${mappedOutcomes.length} outcome(s)'),
-              _MRowW(icon: Icons.calendar_today_outlined, label: 'Created',
-                  value: '${topic.createdAt.day}/${topic.createdAt.month}/${topic.createdAt.year}', isLast: true),
-            ])),
-          const SizedBox(height: 16),
-
-          _CardWidget(
-            header: const _HdrWidget(icon: Icons.flag_outlined, iconColor: AppColors.primary, title: 'Learning Outcome Alignment'),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-              child: mappedOutcomes.isEmpty
-                  ? const Text('This topic is not mapped yet. Use Manage to align it to one or more course outcomes.',
-                      style: TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.5))
-                  : Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: mappedOutcomes.map((lo) => Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                        decoration: BoxDecoration(
-                          color: _K.blueSoft,
-                          borderRadius: BorderRadius.circular(999),
-                          border: Border.all(color: _K.blueMid),
-                        ),
-                        child: Text('${lo.code} • ${lo.description}',
-                            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                      )).toList(),
-                    ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          _CardWidget(
-            header: const _HdrWidget(icon: Icons.sticky_note_2_outlined, iconColor: AppColors.primary, title: 'Instructor Notes'),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-              child: Text(
-                (topic.instructorNotes?.trim().isNotEmpty ?? false)
-                    ? topic.instructorNotes!.trim()
-                    : 'No notes yet. Use Manage to add delivery notes, examples, or assessment guidance.',
-                style: const TextStyle(fontSize: 12.5, color: AppColors.textMuted, height: 1.6),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          Row(children: [
-            Expanded(
-              child: _CardWidget(noPadding: true, child: InkWell(onTap: onAddManualQuestion,
-                borderRadius: BorderRadius.circular(12), child: Padding(padding: const EdgeInsets.all(16),
-                  child: Row(children: [
-                    Container(width: 42, height: 42, decoration: BoxDecoration(
-                        color: _K.blueSoft, borderRadius: BorderRadius.circular(11)),
-                        child: const Icon(Icons.edit_note_rounded, size: 20, color: AppColors.primary)),
-                    const SizedBox(width: 12),
-                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Add Manual Question', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-                      SizedBox(height: 2),
-                      Text('Create a question draft linked to this topic.',
-                          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-                    ])),
-                  ])))),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: _CardWidget(noPadding: true, child: InkWell(onTap: onGenerate,
-                borderRadius: BorderRadius.circular(12), child: Padding(padding: const EdgeInsets.all(16),
-                  child: Row(children: [
-                    Container(width: 42, height: 42, decoration: BoxDecoration(
-                        color: _K.purpleSoft, borderRadius: BorderRadius.circular(11)),
-                        child: const Icon(Icons.auto_awesome_rounded, size: 20, color: _K.purple)),
-                    const SizedBox(width: 12),
-                    const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text('Generate Questions', style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-                      SizedBox(height: 2),
-                      Text('Open scoped generation for this topic.',
-                          style: TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-                    ])),
-                  ])))),
-            ),
-          ]),
-        ]),
-      )),
-    ]));
-  }
-}
-// ─────────────────────────────────────────────────────────────────────────────
-//  DIALOGS
-// ─────────────────────────────────────────────────────────────────────────────
-class _ModuleDialogWidget extends StatelessWidget {
-  final TextEditingController titleCtrl, descCtrl;
-  const _ModuleDialogWidget({required this.titleCtrl, required this.descCtrl});
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    title: const Row(children: [Icon(Icons.add_box_outlined, size: 18, color: AppColors.primary),
-        SizedBox(width: 8), Text('New Module', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800))]),
-    content: Column(mainAxisSize: MainAxisSize.min, children: [
-      TextField(controller: titleCtrl, autofocus: true, decoration: InputDecoration(
-          hintText: 'e.g. Lecture 1: Introduction', labelText: 'Title *',
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
-      const SizedBox(height: 12),
-      TextField(controller: descCtrl, maxLines: 2, decoration: InputDecoration(
-          hintText: 'Optional description', labelText: 'Description',
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
-    ]),
-    actions: [
-      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-      ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.primary, foregroundColor: Colors.white,
-              elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
-          onPressed: () { if (titleCtrl.text.trim().isEmpty) return; Navigator.pop(context, true); },
-          child: const Text('Create')),
-    ]);
-}
-
-class _AddTopicDialogWidget extends StatefulWidget {
-  final String moduleTitle;
-  final TextEditingController titleCtrl, descCtrl;
-  final ValueChanged<TopicDifficulty> onDifficultyChanged;
-  const _AddTopicDialogWidget({required this.moduleTitle, required this.titleCtrl,
-      required this.descCtrl, required this.onDifficultyChanged});
-  @override
-  State<_AddTopicDialogWidget> createState() => _AddTopicDialogWidgetState();
-}
-
-class _AddTopicDialogWidgetState extends State<_AddTopicDialogWidget> {
-  TopicDifficulty _diff = TopicDifficulty.beginner;
-
-  static const _diffColors = {
-    TopicDifficulty.beginner:     (Color(0xFF16A34A), Color(0xFFDCFCE7)),
-    TopicDifficulty.intermediate: (Color(0xFFD97706), Color(0xFFFEF3C7)),
-    TopicDifficulty.advanced:     (Color(0xFFDC2626), Color(0xFFFEE2E2)),
-  };
-
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Row(children: [Icon(Icons.tag_rounded, size: 17, color: _K.purple), SizedBox(width: 8),
-          Text('Add Topic', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800))]),
-      const SizedBox(height: 3),
-      Text('in "${widget.moduleTitle}"', style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w400)),
-    ]),
-    content: SizedBox(width: 440, child: Column(mainAxisSize: MainAxisSize.min, children: [
-      Container(padding: const EdgeInsets.fromLTRB(12, 10, 12, 10), margin: const EdgeInsets.only(bottom: 14),
-          decoration: BoxDecoration(color: _K.purpleSoft, borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: _K.purpleBd)),
-          child: const Row(children: [Icon(Icons.auto_awesome_rounded, size: 15, color: _K.purple),
-              SizedBox(width: 8),
-              Expanded(child: Text('Tip: Use AI to auto-generate topics from your PDF.',
-                  style: TextStyle(fontSize: 11.5, color: _K.purple, fontWeight: FontWeight.w500, height: 1.4)))])),
-      TextField(controller: widget.titleCtrl, autofocus: true, decoration: InputDecoration(
-          hintText: 'e.g. Introduction to Cryptography', labelText: 'Topic Title *',
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
-      const SizedBox(height: 12),
-      TextField(controller: widget.descCtrl, maxLines: 2, decoration: InputDecoration(
-          hintText: 'Optional description…', labelText: 'Description',
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
-      const SizedBox(height: 14),
-      Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        const Text('Difficulty', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.textMuted)),
-        const SizedBox(height: 8),
-        Row(children: TopicDifficulty.values.map((d) {
-          final (fg, bg) = _diffColors[d]!;
-          final sel = _diff == d;
-          final isLast = d == TopicDifficulty.advanced;
-          return Expanded(child: Padding(
-            padding: EdgeInsets.only(right: isLast ? 0 : 8),
-            child: GestureDetector(
-              onTap: () { setState(() => _diff = d); widget.onDifficultyChanged(d); },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 120),
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                decoration: BoxDecoration(
-                  color: sel ? bg : const Color(0xFFF8FAFC),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: sel ? fg : const Color(0xFFE2E8F0), width: sel ? 1.5 : 1),
-                ),
-                child: Center(child: Text(d.label,
-                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700,
-                        color: sel ? fg : AppColors.textMuted))),
-              ),
-            ),
-          ));
-        }).toList()),
-      ]),
-    ])),
-    actions: [
-      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-      ElevatedButton(
-          style: ElevatedButton.styleFrom(backgroundColor: _K.purple, foregroundColor: Colors.white,
-              elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
-          onPressed: () {
-            if (widget.titleCtrl.text.trim().isEmpty) return;
-            Navigator.pop(context, {'difficulty': _diff});
-          },
-          child: const Text('Add Topic')),
-    ]);
-}
-
-class _SimpleDialog extends StatelessWidget {
-  final String title, confirm; final TextEditingController ctrl; final Color confirmColor;
-  const _SimpleDialog({required this.title, required this.ctrl, required this.confirm, required this.confirmColor});
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-    content: TextField(controller: ctrl, autofocus: true, decoration: InputDecoration(
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12))),
-    actions: [
-      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-      ElevatedButton(onPressed: () => Navigator.pop(context, true),
-          style: ElevatedButton.styleFrom(backgroundColor: confirmColor, foregroundColor: Colors.white,
-              elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
-          child: Text(confirm)),
-    ]);
-}
-
-class _ConfirmDialogWidget extends StatelessWidget {
-  final String title, body, confirm; final Color confirmColor;
-  const _ConfirmDialogWidget({required this.title, required this.body, required this.confirm, required this.confirmColor});
-  @override
-  Widget build(BuildContext context) => AlertDialog(
-    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-    title: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800)),
-    content: Text(body, style: const TextStyle(fontSize: 13.5, height: 1.5)),
-    actions: [
-      TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-      ElevatedButton(onPressed: () => Navigator.pop(context, true),
-          style: ElevatedButton.styleFrom(backgroundColor: confirmColor, foregroundColor: Colors.white,
-              elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9))),
-          child: Text(confirm)),
-    ]);
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  SHARED MICRO WIDGETS
-// ─────────────────────────────────────────────────────────────────────────────
-class _CardWidget extends StatelessWidget {
-  final Widget child; final _HdrWidget? header; final bool noPadding;
-  const _CardWidget({required this.child, this.header, this.noPadding = false});
-  @override
-  Widget build(BuildContext context) => Container(
-    decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: _K.div)),
-    child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (header != null) ...[header!, const Divider(height: 1, color: _K.div)],
-      child,
-    ]));
-}
-
-class _HdrWidget extends StatelessWidget {
-  final IconData icon; final Color iconColor; final String title;
-  final String? badge; final Widget? trailing;
-  const _HdrWidget({required this.icon, required this.iconColor, required this.title,
-      this.badge, this.trailing});
-  @override
-  Widget build(BuildContext context) => Padding(padding: const EdgeInsets.fromLTRB(16, 12, 14, 12),
-    child: Row(children: [
-      Icon(icon, size: 14, color: iconColor), const SizedBox(width: 8),
-      Text(title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
-      if (badge != null) ...[const SizedBox(width: 7),
-        Container(padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-            decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(10)),
-            child: Text(badge!, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.primary)))],
-      const Spacer(), if (trailing != null) trailing!,
-    ]));
-}
-
-class _SmBtn extends StatelessWidget {
-  final IconData icon; final String label; final VoidCallback onTap; final bool disabled;
-  const _SmBtn({required this.icon, required this.label, required this.onTap, this.disabled = false});
-  @override
-  Widget build(BuildContext context) => InkWell(onTap: disabled ? null : onTap,
-    borderRadius: BorderRadius.circular(7), child: Opacity(opacity: disabled ? 0.4 : 1.0,
-      child: Container(padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(color: _K.blueSoft, borderRadius: BorderRadius.circular(7)),
-          child: Row(mainAxisSize: MainAxisSize.min, children: [
-            Icon(icon, size: 13, color: AppColors.primary), const SizedBox(width: 5),
-            Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.primary)),
-          ]))));
-}
-
-class _Pill extends StatelessWidget {
-  final String l; final Color fg, bg; const _Pill({required this.l, required this.fg, required this.bg});
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 4),
-    decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(6)),
-    child: Text(l, style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: fg, letterSpacing: 0.1)));
-}
-
-class _PRow extends StatelessWidget {
-  final IconData icon; final Color iconBg, iconFg;
-  final String label, sub; final VoidCallback? onTap; final bool danger;
-  const _PRow({required this.icon, required this.iconBg, required this.iconFg,
-      required this.label, required this.sub, this.onTap, this.danger = false});
-  @override
-  Widget build(BuildContext context) => InkWell(onTap: onTap, child: Opacity(opacity: onTap == null ? 0.45 : 1.0,
-    child: Padding(padding: const EdgeInsets.fromLTRB(16, 12, 14, 12), child: Row(children: [
-      Container(width: 32, height: 32, decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(8)),
-          child: Icon(icon, size: 16, color: iconFg)),
-      const SizedBox(width: 12),
-      Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
-            color: danger ? const Color(0xFFEF4444) : AppColors.textTitle)),
-        const SizedBox(height: 2),
-        Text(sub, maxLines: 1, overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 11.5, color: AppColors.textMuted)),
-      ])),
-      Icon(Icons.chevron_right_rounded, size: 16,
-          color: danger ? const Color(0xFFEF4444).withOpacity(0.4) : AppColors.textHint),
-    ]))));
-}
-
-class _DivW extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) =>
-      const Divider(height: 1, color: _K.div, indent: 16, endIndent: 16);
-}
-
-class _MRowW extends StatelessWidget {
-  final IconData icon; final String label, value; final bool isLast;
-  const _MRowW({required this.icon, required this.label, required this.value, this.isLast = false});
-  @override
-  Widget build(BuildContext context) => Column(children: [
-    Padding(padding: const EdgeInsets.fromLTRB(16, 10, 16, 10), child: Row(children: [
-      Icon(icon, size: 13, color: AppColors.textHint), const SizedBox(width: 8),
-      SizedBox(width: 110, child: Text(label, style: const TextStyle(
-          fontSize: 12, color: AppColors.textMuted, fontWeight: FontWeight.w500))),
-      Expanded(child: Text(value, style: const TextStyle(
-          fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.textTitle))),
-    ])),
-    if (!isLast) const Divider(height: 1, color: _K.div, indent: 16, endIndent: 16),
-  ]);
-}
-
-class _TIcon extends StatelessWidget {
-  final String type; final double size; const _TIcon({required this.type, this.size = 40});
-  static const _m = {
-    'video': (Icons.play_circle_filled_rounded, Color(0xFFDBEAFE), Color(0xFF2563EB)),
-    'pdf'  : (Icons.picture_as_pdf_rounded,     Color(0xFFFEE2E2), Color(0xFFDC2626)),
-    'quiz' : (Icons.quiz_rounded,                Color(0xFFF3E8FF), Color(0xFF9333EA)),
-  };
-  @override
-  Widget build(BuildContext context) {
-    final (ico, bg, fg) = _m[type] ??
-        (Icons.insert_drive_file_rounded, const Color(0xFFF1F5F9), AppColors.textMuted);
-    return Container(width: size, height: size,
-        decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(11)),
-        child: Icon(ico, size: size * 0.48, color: fg));
-  }
-}
-
-class _Dot extends StatelessWidget {
-  final String status; const _Dot({required this.status});
-  @override
-  Widget build(BuildContext context) {
-    final c = switch (status) {
-      'ready'       => _K.green,
-      'processing'  => _K.amber,
-      'uploaded'    => _K.amber,
-      'draft_upload'=> const Color(0xFF0369A1),
-      'error'       => AppColors.dangerText,
-      _             => AppColors.textHint,
-    };
-    return Container(width: 6, height: 6, margin: const EdgeInsets.only(left: 5),
-        decoration: BoxDecoration(color: c, shape: BoxShape.circle));
-  }
-}
-
-class _IBtn extends StatelessWidget {
-  final IconData icon; final String tooltip; final VoidCallback onTap;
-  const _IBtn({required this.icon, required this.tooltip, required this.onTap});
-  @override
-  Widget build(BuildContext context) => Tooltip(message: tooltip, child: InkWell(onTap: onTap,
-      borderRadius: BorderRadius.circular(6), child: Padding(padding: const EdgeInsets.all(5),
-          child: Icon(icon, size: 14, color: AppColors.textHint))));
-}
-
-class _Btn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool primary;
-  final bool disabled;
-  final VoidCallback? onTap;
-
-  const _Btn({
-    required this.icon,
-    required this.label,
-    this.primary = false,
-    this.disabled = false,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final fg = disabled
-        ? AppColors.textHint
-        : (primary ? Colors.white : AppColors.textTitle);
-    final bg = disabled
-        ? const Color(0xFFE5E7EB)
-        : (primary ? AppColors.primary : Colors.transparent);
-
-    return Material(
-      color: bg,
-      borderRadius: BorderRadius.circular(8),
-      child: InkWell(
-        onTap: disabled ? null : onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-          decoration: primary || disabled
-              ? null
-              : BoxDecoration(
-                  border: Border.all(color: _K.div),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(icon, size: 13, color: fg),
-              const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontSize: 12.5,
-                  fontWeight: FontWeight.w700,
-                  color: fg,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}

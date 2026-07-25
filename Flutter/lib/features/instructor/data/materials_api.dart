@@ -74,6 +74,18 @@ class MaterialsApi {
     throw const FormatException('Invalid response from POST confirm-upload');
   }
 
+  Future<SseEvent> waitForContentStructureGeneration({
+    required int courseId,
+    required int materialId,
+    CancelToken? cancelToken,
+  }) {
+    return _client.waitForSseEvent(
+      Endpoints.contentStructureGenerationStream(courseId, materialId),
+      cancelToken: cancelToken,
+      receiveTimeout: const Duration(minutes: 6),
+    );
+  }
+
   /// Fetches a fresh signed download URL for the given material.
   Future<String?> getDownloadUrl({
     required int courseId,
@@ -95,5 +107,45 @@ class MaterialsApi {
     } catch (_) {
       return null;
     }
+  }
+
+  // ─── DELETE ───────────────────────────────────────────────────────────────
+  /// DELETE /courses/{c}/modules/{m}/materials/{mat}
+  Future<void> deleteMaterial({
+    required int courseId,
+    required int moduleId,
+    required int materialId,
+    CancelToken? cancelToken,
+  }) async {
+    await _client.delete<void>(
+      Endpoints.deleteMaterial(courseId, moduleId, materialId),
+      cancelToken: cancelToken,
+    );
+  }
+
+  // ─── REASSIGN ─────────────────────────────────────────────────────────────
+  /// PATCH /{materialId}/reassign?course_id={courseId}&module_id={moduleId}
+  /// Moves a material to a different module within the same course.
+  Future<MaterialReassignResponse> reassignMaterial({
+    required int courseId,
+    required int moduleId,
+    required int materialId,
+    required int targetModuleId,
+    CancelToken? cancelToken,
+  }) async {
+    final res = await _client.patch<Map<String, dynamic>>(
+      Endpoints.reassignMaterial(materialId),
+      data: {'target_module_id': targetModuleId},
+      queryParameters: {
+        'course_id': courseId,
+        'module_id': moduleId,
+      },
+      cancelToken: cancelToken,
+    );
+    final data = res.data;
+    if (data is Map<String, dynamic>) {
+      return MaterialReassignResponse.fromJson(data);
+    }
+    throw const FormatException('Invalid response from PATCH material/reassign');
   }
 }

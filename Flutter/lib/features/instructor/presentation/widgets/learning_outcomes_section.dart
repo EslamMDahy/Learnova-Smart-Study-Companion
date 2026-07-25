@@ -44,9 +44,9 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
     final text = _descCtrl.text.trim();
     if (text.isEmpty) return;
     final lo = LearningOutcome(
-      id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+      id: 0,  // backend will assign the real id
       code: LearningOutcome.codeForIndex(_counter),
-      description: text,
+      title: text,
       difficulty: _selectedDiff,
     );
     setState(() {
@@ -59,7 +59,7 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
     _focusNode.requestFocus();
   }
 
-  void _delete(String id) {
+  void _delete(int id) {
     setState(() {
       _outcomes = _outcomes.where((o) => o.id != id).toList();
       _outcomes = List.generate(
@@ -84,6 +84,7 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
       // ── Outcomes list ────────────────────────────────────────────────────
       if (_outcomes.isEmpty)
@@ -96,7 +97,7 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
             onEdit:   () => _editOutcome(_outcomes[i]),
             onDelete: () => _delete(_outcomes[i].id),
           ),
-        )),
+        ),),
 
       const SizedBox(height: 10),
 
@@ -105,26 +106,26 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
         duration: const Duration(milliseconds: 150),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppColors.cardBg,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: _isFocused ? AppColors.primary : AppColors.borderSoft,
             width: _isFocused ? 1.5 : 1,
           ),
           boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 1)),
+            BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 6, offset: const Offset(0, 1)),
             if (_isFocused)
-              BoxShadow(color: AppColors.primary.withOpacity(0.08), blurRadius: 10, offset: const Offset(0, 2)),
+              BoxShadow(color: AppColors.primary.withValues(alpha: 0.08), blurRadius: 10, offset: const Offset(0, 2)),
           ],
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
           // Difficulty label + chips row
-          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Row(children: [
             Text('Difficulty',
                 style: AppText.label.copyWith(
                     fontSize: 12, fontWeight: FontWeight.w700,
-                    color: AppColors.textTitle)),
+                    color: AppColors.textTitle,),),
             const SizedBox(width: 12),
             ...OutcomeDifficulty.values.map((d) {
               final sel   = _selectedDiff == d;
@@ -137,25 +138,25 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
                     duration: const Duration(milliseconds: 120),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
                     decoration: BoxDecoration(
-                      color: sel ? color.withOpacity(0.1) : Colors.white,
+                      color: sel ? color.withValues(alpha: 0.1) : AppColors.cardBg,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
                           color: sel ? color : AppColors.border,
-                          width: sel ? 1.5 : 1),
+                          width: sel ? 1.5 : 1,),
                     ),
                     child: Text(d.label, style: TextStyle(
                         fontSize: 11.5, fontWeight: FontWeight.w600,
-                        color: sel ? color : AppColors.textMuted)),
+                        color: sel ? color : AppColors.textMuted,),),
                   ),
                 ),
               );
             }),
-          ]),
+          ],),
 
           const SizedBox(height: 10),
 
           // Description input row
-          Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
+          Row(children: [
             Expanded(
               child: Container(
                 height: 40,
@@ -193,17 +194,17 @@ class _LearningOutcomesSectionState extends State<LearningOutcomesSection> {
                 padding: EdgeInsets.zero,
               ),
             ),
-          ]),
-        ]),
+          ],),
+        ],),
       ),
-    ]);
+    ],);
   }
 
   static Color _diffColor(OutcomeDifficulty d) {
     switch (d) {
-      case OutcomeDifficulty.beginner:     return const Color(0xFF16A34A);
-      case OutcomeDifficulty.intermediate: return const Color(0xFFD97706);
-      case OutcomeDifficulty.advanced:     return const Color(0xFFDC2626);
+      case OutcomeDifficulty.beginner:     return AppColors.successText;
+      case OutcomeDifficulty.intermediate: return AppColors.warningText;
+      case OutcomeDifficulty.advanced:     return AppColors.dangerText;
     }
   }
 }
@@ -225,7 +226,7 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
   @override
   void initState() {
     super.initState();
-    _ctrl = TextEditingController(text: widget.outcome.description);
+    _ctrl = TextEditingController(text: widget.outcome.title);
     _diff = widget.outcome.difficulty;
   }
 
@@ -234,9 +235,10 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Dialog(
       insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.cardBg,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 480),
@@ -246,16 +248,16 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
 
             // Title
             Text('Edit ${widget.outcome.code}',
-                style: AppText.h1.copyWith(fontSize: 17, color: AppColors.textTitle)),
+                style: AppText.h1.copyWith(fontSize: 17, color: AppColors.textTitle),),
             const SizedBox(height: 18),
 
             // Description label + input
             Text('Description', style: AppText.label.copyWith(
-                fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle,),),
             const SizedBox(height: 6),
             Container(
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppColors.cardBg,
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: AppColors.borderSoft),
               ),
@@ -279,7 +281,7 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
 
             // Difficulty label + chips
             Text('Difficulty', style: AppText.label.copyWith(
-                fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle)),
+                fontSize: 12.5, fontWeight: FontWeight.w700, color: AppColors.textTitle,),),
             const SizedBox(height: 8),
             Row(children: OutcomeDifficulty.values.map((d) {
               final sel   = _diff == d;
@@ -292,18 +294,18 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
                     duration: const Duration(milliseconds: 120),
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     decoration: BoxDecoration(
-                      color: sel ? color.withOpacity(0.08) : AppColors.pageBg,
+                      color: sel ? color.withValues(alpha: 0.08) : AppColors.pageBg,
                       borderRadius: BorderRadius.circular(8),
                       border: Border.all(color: sel ? color : AppColors.border, width: sel ? 1.5 : 1),
                     ),
                     alignment: Alignment.center,
                     child: Text(d.label, style: TextStyle(
                         fontSize: 12, fontWeight: FontWeight.w600,
-                        color: sel ? color : AppColors.textMuted)),
+                        color: sel ? color : AppColors.textMuted,),),
                   ),
                 ),
-              ));
-            }).toList()),
+              ),);
+            }).toList(),),
 
             const SizedBox(height: 22),
 
@@ -323,13 +325,13 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
                   final t = _ctrl.text.trim();
                   if (t.isEmpty) return;
                   Navigator.pop(context,
-                      widget.outcome.copyWith(description: t, difficulty: _diff));
+                      widget.outcome.copyWith(title: t, difficulty: _diff),);
                 },
                 height: 40,
                 padding: const EdgeInsets.symmetric(horizontal: 18),
               ),
-            ]),
-          ]),
+            ],),
+          ],),
         ),
       ),
     );
@@ -337,9 +339,9 @@ class _EditOutcomeDialogState extends State<_EditOutcomeDialog> {
 
   static Color _diffColor(OutcomeDifficulty d) {
     switch (d) {
-      case OutcomeDifficulty.beginner:     return const Color(0xFF16A34A);
-      case OutcomeDifficulty.intermediate: return const Color(0xFFD97706);
-      case OutcomeDifficulty.advanced:     return const Color(0xFFDC2626);
+      case OutcomeDifficulty.beginner:     return AppColors.successText;
+      case OutcomeDifficulty.intermediate: return AppColors.warningText;
+      case OutcomeDifficulty.advanced:     return AppColors.dangerText;
     }
   }
 }
@@ -355,19 +357,20 @@ class _OutcomeTile extends StatelessWidget {
 
   static Color _diffColor(OutcomeDifficulty d) {
     switch (d) {
-      case OutcomeDifficulty.beginner:     return const Color(0xFF16A34A);
-      case OutcomeDifficulty.intermediate: return const Color(0xFFD97706);
-      case OutcomeDifficulty.advanced:     return const Color(0xFFDC2626);
+      case OutcomeDifficulty.beginner:     return AppColors.successText;
+      case OutcomeDifficulty.intermediate: return AppColors.warningText;
+      case OutcomeDifficulty.advanced:     return AppColors.dangerText;
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final diffColor = _diffColor(outcome.difficulty);
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 9, 8, 9),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(9),
         border: Border.all(color: AppColors.border),
       ),
@@ -380,8 +383,8 @@ class _OutcomeTile extends StatelessWidget {
             borderRadius: BorderRadius.circular(6),
             border: Border.all(color: AppColors.badgeBlueBorder),
           ),
-          child: Text(outcome.code, style: const TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg)),
+          child: Text(outcome.code, style: TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w800, color: AppColors.badgeBlueFg,),),
         ),
         const SizedBox(width: 8),
 
@@ -389,17 +392,17 @@ class _OutcomeTile extends StatelessWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
           decoration: BoxDecoration(
-            color: diffColor.withOpacity(0.09),
+            color: diffColor.withValues(alpha: 0.09),
             borderRadius: BorderRadius.circular(6),
           ),
           child: Text(outcome.difficulty.label, style: TextStyle(
-              fontSize: 10.5, fontWeight: FontWeight.w700, color: diffColor)),
+              fontSize: 10.5, fontWeight: FontWeight.w700, color: diffColor,),),
         ),
         const SizedBox(width: 10),
 
         // Description
-        Expanded(child: Text(outcome.description,
-            style: AppText.input.copyWith(fontSize: 12.5, height: 1.4))),
+        Expanded(child: Text(outcome.title,
+            style: AppText.input.copyWith(fontSize: 12.5, height: 1.4),),),
 
         // Edit
         IconButton(
@@ -418,7 +421,7 @@ class _OutcomeTile extends StatelessWidget {
           visualDensity: VisualDensity.compact,
           onPressed: onDelete,
         ),
-      ]),
+      ],),
     );
   }
 }
@@ -436,12 +439,12 @@ class _EmptyHint extends StatelessWidget {
       border: Border.all(color: AppColors.border),
     ),
     child: Row(children: [
-      const Icon(Icons.info_outline, size: 14, color: AppColors.hint),
+      Icon(Icons.info_outline, size: 14, color: AppColors.hint),
       const SizedBox(width: 8),
       Expanded(child: Text(
         'No outcomes added yet. Add learning outcomes to guide students and link topics.',
         style: AppText.mutedSmall.copyWith(fontSize: 12, height: 1.5),
-      )),
-    ]),
+      ),),
+    ],),
   );
 }

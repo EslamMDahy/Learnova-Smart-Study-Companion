@@ -1,6 +1,54 @@
+import 'course_vocabulary.dart';
+
 enum CourseType { individual, organization }
 
 enum CourseVisibilityLevel { private, public, unlisted }
+
+int? _asInt(dynamic value) {
+  if (value == null) return null;
+  if (value is int) return value;
+  if (value is num) return value.toInt();
+  return int.tryParse(value.toString());
+}
+
+bool _asBool(dynamic value, {bool fallback = false}) {
+  if (value == null) return fallback;
+  if (value is bool) return value;
+  final normalized = value.toString().trim().toLowerCase();
+  if (normalized == 'true' || normalized == '1') return true;
+  if (normalized == 'false' || normalized == '0') return false;
+  return fallback;
+}
+
+
+String? _asNullableString(dynamic value) {
+  final text = (value ?? '').toString().trim();
+  return text.isEmpty ? null : text;
+}
+
+String? _firstNonEmptyString(List<dynamic> values) {
+  for (final value in values) {
+    final text = _asNullableString(value);
+    if (text != null) return text;
+  }
+  return null;
+}
+
+int? _countFromDynamicCollection(dynamic value) {
+  if (value is List) return value.length;
+  if (value is Map<String, dynamic>) {
+    final items = value['items'];
+    if (items is List) return items.length;
+    final modules = value['modules'];
+    if (modules is List) return modules.length;
+    final students = value['students'];
+    if (students is List) return students.length;
+    final enrollments = value['enrollments'];
+    if (enrollments is List) return enrollments.length;
+    return _asInt(value['count']) ?? _asInt(value['total']);
+  }
+  return null;
+}
 
 class MyCourseItem {
   final int id;
@@ -52,7 +100,13 @@ class MyCourseItem {
     return v.isEmpty ? 'CS-$id' : v;
   }
 
-  bool get isPrivate => visibilityLevel.trim().toLowerCase() == 'private';
+  CourseAccessType get accessType => parseCourseAccessType(courseType);
+
+  CourseVisibility get visibility => parseCourseVisibility(visibilityLevel);
+
+  CourseLifecycleStatus get lifecycleStatus => parseCourseLifecycleStatus(status);
+
+  bool get isPrivate => visibility == CourseVisibility.private;
 
   MyCourseItem copyWith({
     int? id,
@@ -97,34 +151,49 @@ class MyCourseItem {
   factory MyCourseItem.fromJson(Map<String, dynamic> json) {
     String s(dynamic v) => (v ?? '').toString().trim();
 
+    final enrollmentCount =
+        _asInt(json['enrollment_count']) ??
+        _asInt(json['student_count']) ??
+        _asInt(json['students_count']) ??
+        _asInt(json['active_students']) ??
+        _countFromDynamicCollection(json['students']) ??
+        _countFromDynamicCollection(json['enrollments']);
+
+    final moduleCount =
+        _asInt(json['module_count']) ??
+        _asInt(json['modules_count']) ??
+        _countFromDynamicCollection(json['modules']);
+
     return MyCourseItem(
-      id: (json['id'] as num).toInt(),
+      id: _asInt(json['id']) ?? 0,
       title: s(json['title']),
       courseCode: s(json['course_code']).isEmpty ? null : s(json['course_code']),
-      courseType: s(json['course_type']),
-      organizationId: json['organization_id'] == null
-          ? null
-          : (json['organization_id'] as num).toInt(),
-      isPublic: (json['is_public'] as bool?) ?? false,
-      visibilityLevel: s(json['visibility_level']),
-      status: s(json['status']),
-      coverImageUrl: json['cover_image_url']?.toString(),
-      bannerImageUrl: json['banner_image_url']?.toString(),
+      courseType: parseCourseAccessType(s(json['course_type'])).backendValue,
+      organizationId: _asInt(json['organization_id']),
+      isPublic: _asBool(
+        json['is_open_for_enrollment'] ?? json['is_public'],
+      ),
+      visibilityLevel: parseCourseVisibility(s(json['visibility_level'])).backendValue,
+      status: parseCourseLifecycleStatus(s(json['status'])).backendValue,
+      coverImageUrl: _firstNonEmptyString([
+        json['cover_url'],
+        json['cover_image_url'],
+        json['coverImageUrl'],
+      ]),
+      bannerImageUrl: _firstNonEmptyString([
+        json['banner_url'],
+        json['banner_image_url'],
+        json['bannerImageUrl'],
+      ]),
       category: json['category']?.toString(),
-      createdBy: (json['created_by'] as num?)?.toInt() ?? 0,
+      createdBy: _asInt(json['created_by']) ?? 0,
       createdAt: DateTime.tryParse((json['created_at'] ?? '').toString()) ??
           DateTime.fromMillisecondsSinceEpoch(0),
       updatedAt: DateTime.tryParse((json['updated_at'] ?? '').toString()) ??
           DateTime.fromMillisecondsSinceEpoch(0),
-      enrollmentCount: json['enrollment_count'] == null
-          ? null
-          : (json['enrollment_count'] as num).toInt(),
-      pendingInvites: json['pending_invites'] == null
-          ? null
-          : (json['pending_invites'] as num).toInt(),
-      moduleCount: json['module_count'] == null
-          ? null
-          : (json['module_count'] as num).toInt(),
+      enrollmentCount: enrollmentCount,
+      pendingInvites: _asInt(json['pending_invites']),
+      moduleCount: moduleCount,
     );
   }
 }
@@ -145,6 +214,158 @@ class MyCoursesResponse {
     return MyCoursesResponse(
       items: items,
       total: (json['total'] as num?)?.toInt() ?? items.length,
+    );
+  }
+}
+
+
+class CourseCoverUploadInitResponse {
+  final String uploadUrl;
+  final String storageKey;
+  final String contentType;
+  final int maxBytes;
+
+  const CourseCoverUploadInitResponse({
+    required this.uploadUrl,
+    required this.storageKey,
+    required this.contentType,
+    required this.maxBytes,
+  });
+
+  factory CourseCoverUploadInitResponse.fromJson(Map<String, dynamic> json) {
+    return CourseCoverUploadInitResponse(
+      uploadUrl: _firstNonEmptyString([
+            json['upload_url'],
+            json['uploadUrl'],
+            json['signed_url'],
+            json['signedUrl'],
+            json['url'],
+          ]) ??
+          '',
+      storageKey: _firstNonEmptyString([
+            json['storage_key'],
+            json['storageKey'],
+            json['path'],
+            json['key'],
+          ]) ??
+          '',
+      contentType: _firstNonEmptyString([
+            json['content_type'],
+            json['contentType'],
+          ]) ??
+          'image/jpeg',
+      maxBytes: _asInt(json['max_bytes'] ?? json['maxBytes']) ?? 5 * 1024 * 1024,
+    );
+  }
+}
+
+class CourseCoverConfirmResponse {
+  final String coverUrl;
+  final DateTime? updatedAt;
+
+  const CourseCoverConfirmResponse({
+    required this.coverUrl,
+    required this.updatedAt,
+  });
+
+  factory CourseCoverConfirmResponse.fromJson(Map<String, dynamic> json) {
+    return CourseCoverConfirmResponse(
+      coverUrl: _firstNonEmptyString([
+            json['cover_url'],
+            json['coverImageUrl'],
+            json['cover_image_url'],
+          ]) ??
+          '',
+      updatedAt: DateTime.tryParse((json['updated_at'] ?? json['updatedAt'] ?? '').toString()),
+    );
+  }
+}
+
+
+class CourseUpdateRequest {
+  final String? title;
+  final String? courseCode;
+  final String? description;
+  final String? category;
+  final String? courseType;
+  final int? organizationId;
+  final bool? isPublic;
+  final String? visibilityLevel;
+  final bool? requiresEnrollmentApproval;
+  final String? status;
+
+  const CourseUpdateRequest({
+    this.title,
+    this.courseCode,
+    this.description,
+    this.category,
+    this.courseType,
+    this.organizationId,
+    this.isPublic,
+    this.visibilityLevel,
+    this.requiresEnrollmentApproval,
+    this.status,
+  });
+
+  bool get isEmpty => toJson().isEmpty;
+
+  Map<String, dynamic> toJson() {
+    final map = <String, dynamic>{};
+
+    final cleanTitle = title?.trim();
+    if (cleanTitle != null && cleanTitle.isNotEmpty) {
+      map['title'] = cleanTitle;
+    }
+
+    if (courseCode != null) {
+      final cleanCode = courseCode!.trim();
+      map['course_code'] = cleanCode.isEmpty ? null : cleanCode;
+    }
+
+    if (description != null) {
+      final cleanDescription = description!.trim();
+      map['description'] = cleanDescription.isEmpty ? null : cleanDescription;
+    }
+
+    if (category != null) {
+      final cleanCategory = category!.trim();
+      map['category'] = cleanCategory.isEmpty ? null : cleanCategory;
+    }
+
+    // Backend CourseUpdateRequest accepts only metadata/access fields.
+    // Do not send course_type, organization_id, or status here; publish has its
+    // own endpoint and archive/delete are not exposed by the current backend.
+    if (isPublic != null) map['is_open_for_enrollment'] = isPublic;
+    if (visibilityLevel != null) {
+      map['visibility_level'] = parseCourseVisibility(visibilityLevel).backendValue;
+    }
+    if (requiresEnrollmentApproval != null) {
+      map['requires_enrollment_approval'] = requiresEnrollmentApproval;
+    }
+
+    return map;
+  }
+}
+
+
+class CourseCreatedResponse {
+  final int id;
+  final String title;
+  final String? courseCode;
+
+  const CourseCreatedResponse({
+    required this.id,
+    required this.title,
+    required this.courseCode,
+  });
+
+  factory CourseCreatedResponse.fromJson(Map<String, dynamic> json) {
+    String s(dynamic v) => (v ?? '').toString().trim();
+
+    return CourseCreatedResponse(
+      id: _asInt(json['id']) ?? 0,
+      title: s(json['title']),
+      courseCode: s(json['course_code']).isEmpty ? null : s(json['course_code']),
     );
   }
 }
@@ -171,7 +392,6 @@ class CourseCreateRequest {
 
   // UI-only fields (NOT sent to backend because backend schema forbids extra fields)
   final String? courseCode;
-  final String? academicTerm;
   final String? localStatus;
 
   const CourseCreateRequest({
@@ -192,28 +412,128 @@ class CourseCreateRequest {
     this.status,
 
     this.courseCode,
-    this.academicTerm,
     this.localStatus,
   });
 
   Map<String, dynamic> toJson() {
+    // IMPORTANT: backend uses extra="forbid" — only send fields the schema accepts.
+    // Excluded: learning_outcomes (commented out in backend), cover_image_url,
+    //           banner_image_url and localStatus (UI-only).
     final map = <String, dynamic>{
-      'course_type': courseType,
-      'organization_id': organizationId,
+      'course_type': parseCourseAccessType(courseType).backendValue,
       'title': title,
-      'description': description,
-      'course_code': courseCode,
-      // Backend expects enrollment openness, not an is_public flag.
       'is_open_for_enrollment': isPublic,
-      'visibility_level': visibilityLevel,
+      'visibility_level': parseCourseVisibility(visibilityLevel).backendValue,
       'requires_enrollment_approval': requiresEnrollmentApproval,
-      'learning_outcomes': learningOutcomes,
-      'tags': (tags != null && tags!.isNotEmpty) ? tags : null,
-      'category': category,
-      'status': status,
     };
 
-    map.removeWhere((k, v) => v == null);
+    // Optional backend fields — only include when non-null/non-empty
+    if (organizationId != null) map['organization_id'] = organizationId;
+    if (courseCode != null && courseCode!.trim().isNotEmpty) {
+      map['course_code'] = courseCode!.trim();
+    }
+    if (description != null && description!.trim().isNotEmpty) {
+      map['description'] = description!.trim();
+    }
+    if (tags != null && tags!.isNotEmpty) map['tags'] = tags;
+    if (category != null && category!.trim().isNotEmpty) map['category'] = category;
+    if (status != null) map['status'] = parseCourseLifecycleStatus(status).backendValue;
+
     return map;
+  }
+}
+
+
+class PublishCourseResponse {
+  final int id;
+  final String status;
+  final String message;
+
+  const PublishCourseResponse({
+    required this.id,
+    required this.status,
+    required this.message,
+  });
+
+  factory PublishCourseResponse.fromJson(Map<String, dynamic> json) {
+    return PublishCourseResponse(
+      id: _asInt(json['id']) ?? 0,
+      status: (json['status'] ?? '').toString().trim(),
+      message: (json['message'] ?? '').toString().trim(),
+    );
+  }
+}
+
+class CourseEnrollmentRequestItem {
+  final int enrollmentId;
+  final int studentId;
+  final String fullName;
+  final String email;
+  final String status;
+  final DateTime enrolledAt;
+
+  const CourseEnrollmentRequestItem({
+    required this.enrollmentId,
+    required this.studentId,
+    required this.fullName,
+    required this.email,
+    required this.status,
+    required this.enrolledAt,
+  });
+
+  factory CourseEnrollmentRequestItem.fromJson(Map<String, dynamic> json) {
+    return CourseEnrollmentRequestItem(
+      enrollmentId: _asInt(json['enrollment_id']) ?? 0,
+      studentId: _asInt(json['student_id']) ?? 0,
+      fullName: (json['full_name'] ?? '').toString().trim(),
+      email: (json['email'] ?? '').toString().trim(),
+      status: (json['status'] ?? 'pending').toString().trim().toLowerCase(),
+      enrolledAt: DateTime.tryParse((json['enrolled_at'] ?? '').toString()) ??
+          DateTime.fromMillisecondsSinceEpoch(0),
+    );
+  }
+}
+
+class CourseEnrollmentRequestsResponse {
+  final int courseId;
+  final int total;
+  final List<CourseEnrollmentRequestItem> requests;
+
+  const CourseEnrollmentRequestsResponse({
+    required this.courseId,
+    required this.total,
+    required this.requests,
+  });
+
+  factory CourseEnrollmentRequestsResponse.fromJson(Map<String, dynamic> json) {
+    final raw = (json['requests'] as List?) ?? const <dynamic>[];
+    final requests = raw
+        .whereType<Map>()
+        .map((item) => CourseEnrollmentRequestItem.fromJson(
+              Map<String, dynamic>.from(item),
+            ))
+        .toList(growable: false);
+    return CourseEnrollmentRequestsResponse(
+      courseId: _asInt(json['course_id']) ?? 0,
+      total: _asInt(json['total']) ?? requests.length,
+      requests: requests,
+    );
+  }
+}
+
+class EnrollmentRequestUpdateResponse {
+  final int enrollmentId;
+  final String status;
+
+  const EnrollmentRequestUpdateResponse({
+    required this.enrollmentId,
+    required this.status,
+  });
+
+  factory EnrollmentRequestUpdateResponse.fromJson(Map<String, dynamic> json) {
+    return EnrollmentRequestUpdateResponse(
+      enrollmentId: _asInt(json['enrollment_id']) ?? 0,
+      status: (json['status'] ?? '').toString().trim(),
+    );
   }
 }

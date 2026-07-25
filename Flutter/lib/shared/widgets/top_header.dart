@@ -35,27 +35,30 @@ class TopHeaderWidget extends StatelessWidget {
     this.onMenuTap,
   });
 
-  static const Color _bg = Colors.white;
-  static const Color _bottomBorder = Color(0xFFEDF2F7);
-  static const Color _divider = Color(0xFFE5E7EB);
+  static Color get _bg => AppColors.cardBg;
+  static Color get _bottomBorder => AppColors.border;
+  static Color get _divider => AppColors.border;
 
   static const double _drawerBp = 1100;
   static const double _searchCollapseBp = 700;
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final w = MediaQuery.sizeOf(context).width;
 
     final isDrawerMode = w < _drawerBp;
     final collapseSearch = w < _searchCollapseBp;
+    final veryCompact = w < 430;
+    final hideProfileText = w < 520;
 
     return Container(
-      height: 73,
+      height: veryCompact ? 64 : 73,
       padding: EdgeInsets.symmetric(
-        horizontal: w < 900 ? 16 : 32,
-        vertical: 16,
+        horizontal: w < 380 ? 10 : (w < 900 ? 14 : 32),
+        vertical: veryCompact ? 10 : 16,
       ),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: _bg,
         border: Border(bottom: BorderSide(color: _bottomBorder)),
       ),
@@ -70,16 +73,17 @@ class TopHeaderWidget extends StatelessWidget {
                     Scaffold.of(context).openDrawer();
                   },
             ),
-            const SizedBox(width: 12),
+            SizedBox(width: veryCompact ? 6 : 12),
           ],
 
           if (!collapseSearch)
             SizedBox(
-              width: w < 900 ? 240 : 320,
+              width: w < 820 ? 220 : 320,
               height: 40,
               child: FigmaUmSearch40(
                 controller: searchController,
                 onChanged: onSearchChanged ?? (_) {},
+                hint: searchHint,
               ),
             )
           else
@@ -98,14 +102,18 @@ class TopHeaderWidget extends StatelessWidget {
                 hasBadge: notificationsCount > 0,
                 onTap: onNotificationsTap,
               ),
-              const SizedBox(width: 16),
-              Container(width: 1, height: 24, color: _divider),
-              const SizedBox(width: 16),
+              if (!veryCompact) ...[
+                const SizedBox(width: 10),
+                Container(width: 1, height: 24, color: _divider),
+                const SizedBox(width: 10),
+              ] else
+                const SizedBox(width: 4),
 
               _ModernHeaderProfileMenu(
                 name: userName,
                 subtitle: userSubtitle,
                 avatarUrl: avatarUrl,
+                showText: !hideProfileText,
                 onLogout: onLogout,
                 onProfile: onProfile,
                 onSettings: onSettings,
@@ -164,13 +172,14 @@ class _HeaderIconButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Semantics(
       button: true,
       label: tooltip,
       child: IconButton(
         tooltip: tooltip,
         onPressed: onTap,
-        icon: Icon(icon, size: 22, color: const Color(0xFF617589)),
+        icon: Icon(icon, size: 22, color: AppColors.textMuted),
       ),
     );
   }
@@ -187,16 +196,17 @@ class _NotifIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Stack(
       clipBehavior: Clip.none,
       children: [
         IconButton(
           tooltip: 'Notifications',
           onPressed: onTap,
-          icon: const Icon(
+          icon: Icon(
             Icons.notifications_none_rounded,
             size: 22,
-            color: Color(0xFF617589),
+            color: AppColors.textMuted,
           ),
         ),
         if (hasBadge)
@@ -207,9 +217,9 @@ class _NotifIcon extends StatelessWidget {
               width: 8,
               height: 8,
               decoration: BoxDecoration(
-                color: const Color(0xFFEF4444),
+                color: AppColors.errorDot,
                 borderRadius: BorderRadius.circular(999),
-                border: Border.all(color: Colors.white, width: 1.5),
+                border: Border.all(color: AppColors.cardBg, width: 1.5),
               ),
             ),
           ),
@@ -227,11 +237,13 @@ class _ModernHeaderProfileMenu extends StatefulWidget {
   final VoidCallback? onLogout;
   final VoidCallback? onProfile;
   final VoidCallback? onSettings;
+  final bool showText;
 
   const _ModernHeaderProfileMenu({
     required this.name,
     required this.subtitle,
     this.avatarUrl,
+    this.showText = true,
     this.onLogout,
     this.onProfile,
     this.onSettings,
@@ -245,8 +257,8 @@ class _ModernHeaderProfileMenu extends StatefulWidget {
 class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
   final GlobalKey _anchorKey = GlobalKey();
 
-  static const _nameColor = Color(0xFF0F172A);
-  static const _subColor = Color(0xFF64748B);
+  static Color get _nameColor => AppColors.textTitle;
+  static Color get _subColor => AppColors.textMuted;
 
   Future<void> _openMenu() async {
     final action = await showFigmaUmMenu<String>(
@@ -290,6 +302,7 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return GestureDetector(
       onTap: _openMenu,
       child: Container(
@@ -321,10 +334,11 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
                     )
                   : const Icon(Icons.person, size: 16, color: Colors.white),
             ),
-            const SizedBox(width: 10),
-            ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 180),
-              child: Column(
+            if (widget.showText) ...[
+              const SizedBox(width: 10),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 180),
+                child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
@@ -332,7 +346,7 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
                     widget.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 12.5,
                       fontWeight: FontWeight.w800,
                       color: _nameColor,
@@ -344,7 +358,7 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
                     widget.subtitle,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
                       color: _subColor,
@@ -352,13 +366,14 @@ class _ModernHeaderProfileMenuState extends State<_ModernHeaderProfileMenu> {
                     ),
                   ),
                 ],
+                ),
               ),
-            ),
-            const SizedBox(width: 10),
-            const Icon(
+              const SizedBox(width: 10),
+            ],
+            Icon(
               Icons.keyboard_arrow_down_rounded,
               size: 18,
-              color: Color(0xFF64748B),
+              color: AppColors.textMuted,
             ),
           ],
         ),

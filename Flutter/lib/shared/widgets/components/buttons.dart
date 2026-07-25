@@ -29,6 +29,7 @@ class AppButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final h = height ??
         (variant == AppButtonVariant.danger
             ? 42
@@ -42,10 +43,10 @@ class AppButton extends StatelessWidget {
     Color bg = AppColors.primary;
     Color? border;
     Color fg = Colors.white;
-    List<BoxShadow> shadow = const [
+    List<BoxShadow> shadow = [
       BoxShadow(
         blurRadius: 2,
-        offset: Offset(0, 1),
+        offset: const Offset(0, 1),
         color: AppColors.shadowBlue,
       ),
     ];
@@ -54,46 +55,46 @@ class AppButton extends StatelessWidget {
       case AppButtonVariant.primary:
         bg = AppColors.primary;
         fg = Colors.white;
-        shadow = const [
+        shadow = [
           BoxShadow(
             blurRadius: 2,
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
             color: AppColors.shadowBlue,
           ),
         ];
         break;
 
       case AppButtonVariant.soft:
-        bg = Colors.white;
+        bg = AppColors.cardBg;
         border = AppColors.borderSoft;
         fg = AppColors.title;
-        shadow = const [
+        shadow = [
           BoxShadow(
             blurRadius: 2,
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
             color: AppColors.shadowThin,
           ),
         ];
         break;
 
       case AppButtonVariant.primarySoft:
-        bg = Colors.white;
+        bg = AppColors.cardBg;
         border = AppColors.border;
         fg = AppColors.title;
-        shadow = const [
+        shadow = [
           BoxShadow(
             blurRadius: 2,
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
             color: AppColors.shadowThin,
           ),
         ];
         break;
 
       case AppButtonVariant.danger:
-        bg = Colors.white;
+        bg = AppColors.cardBg;
         border = AppColors.dangerBorder;
         fg = AppColors.dangerText;
-        shadow = const [];
+        shadow = [];
         break;
     }
 
@@ -103,12 +104,23 @@ class AppButton extends StatelessWidget {
             height: 18,
             child: CircularProgressIndicator(strokeWidth: 2),
           )
-        : Text(label, style: AppText.button.copyWith(color: fg));
+        : Text(
+        label, 
+        style: AppText.button.copyWith(
+          color: fg,
+          height: 1.0,
+          leadingDistribution: TextLeadingDistribution.even,
+        ),
+      );
 
-    final btn = InkWell(
-      onTap: (loading ? null : onTap),
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
+    final btn = MouseRegion(
+      cursor: (loading || onTap == null)
+          ? SystemMouseCursors.basic
+          : SystemMouseCursors.click,
+      child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+        onTap: (loading ? null : onTap),
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
         height: h,
         padding: pad,
         alignment: Alignment.center,
@@ -120,6 +132,7 @@ class AppButton extends StatelessWidget {
         ),
         child: child,
       ),
+    ),  // MouseRegion
     );
 
     if (!fullWidth) return btn;
@@ -141,6 +154,7 @@ class AppSoftButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return AppButton(
       label: label,
       onTap: onTap,

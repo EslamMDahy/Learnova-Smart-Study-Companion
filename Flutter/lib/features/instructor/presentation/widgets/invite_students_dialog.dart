@@ -1,301 +1,369 @@
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:learnova/core/theme/app_theme.dart';
+import 'package:learnova/core/ui/toast.dart';
+import 'package:learnova/features/instructor/data/courses_providers.dart';
 
-import 'package:learnova/core/utils/file_download_stub.dart'
-    if (dart.library.html) 'package:learnova/core/utils/file_download_web.dart'
-    as file_download;
-
-import '../../data/courses_providers.dart';
-import '../../../../core/ui/toast.dart';
-
-/// Dialog to invite students for PRIVATE courses.
-///
-/// Backend supports:
-/// - POST /courses/{id}/invitations/upload (multipart file)
-/// - POST /courses/{id}/invitations/send
-///
-/// So frontend should upload an Excel/CSV file then optionally trigger send.
 class InviteStudentsDialog extends ConsumerStatefulWidget {
   final int courseId;
-
-  const InviteStudentsDialog({
-    super.key,
-    required this.courseId,
-  });
+  const InviteStudentsDialog({super.key, required this.courseId});
 
   @override
-  ConsumerState<InviteStudentsDialog> createState() => _InviteStudentsDialogState();
+  ConsumerState<InviteStudentsDialog> createState() =>
+      _InviteStudentsDialogState();
 }
 
 class _InviteStudentsDialogState extends ConsumerState<InviteStudentsDialog> {
-  String? _error;
   bool _loading = false;
-
   PlatformFile? _pickedFile;
-  Uint8List? _pickedBytes;
 
-  bool _sendAfterUpload = true;
+  // ألوان التصميم الجديد
+  Color get _accentColor => AppColors.primary;
+  Color get _bgLight => AppColors.surfaceBg;
+  Color get _border => AppColors.border;
 
-  void _downloadTemplate() {
-    const csv = 'email,full_name\nstudent1@example.com,Student One\nstudent2@example.com,Student Two\n';
-    file_download.downloadTextFile(
-      filename: 'invite_template.csv',
-      content: csv,
-      mimeType: 'text/csv',
-    );
-    AppToast.success(
+
+  Future<void> _downloadTemplate() async {
+    AppToast.info(
       context,
-      title: 'Template Downloaded',
-      message: 'Fill it in, then upload to import students.',
+      title: 'Template format',
+      message: 'Use an .xlsx spreadsheet with one column named email.',
     );
   }
 
   Future<void> _pickFile() async {
-    setState(() {
-      _error = null;
-    });
-
-    final res = await FilePicker.platform.pickFiles(
+    final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: const ['xlsx', 'xls', 'csv'],
-      withData: true, // important for web + easier upload as bytes
+      allowedExtensions: const ['xlsx'],
+      withData: true,
     );
 
-    if (res == null || res.files.isEmpty) return;
+    if (!mounted || result == null || result.files.isEmpty) return;
 
-    final f = res.files.first;
-    final bytes = f.bytes;
+    final file = result.files.single;
+    final name = file.name.toLowerCase();
+    final valid = name.endsWith('.xlsx');
 
-    if (bytes == null || bytes.isEmpty) {
-      setState(() => _error = 'Could not read the selected file. Please try again.');
+    if (!valid) {
+      AppToast.error(
+        context,
+        title: 'Invalid file',
+        message: 'Please choose a valid .xlsx file.',
+      );
       return;
     }
 
-    setState(() {
-      _pickedFile = f;
-      _pickedBytes = bytes;
-      _error = null;
-    });
+    setState(() => _pickedFile = file);
   }
 
   Future<void> _submit() async {
-    if (_pickedFile == null || _pickedBytes == null) {
-      setState(() => _error = 'Please select an Excel/CSV file first.');
+    final file = _pickedFile;
+    final bytes = file?.bytes;
+
+    if (file == null || bytes == null || bytes.isEmpty) {
+      AppToast.error(
+        context,
+        title: 'No file selected',
+        message: 'Choose a valid .xlsx file before uploading.',
+      );
       return;
     }
 
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() => _loading = true);
 
     try {
       final repo = ref.read(coursesRepositoryProvider);
-
       await repo.uploadInvitationsFile(
         courseId: widget.courseId.toString(),
-        bytes: _pickedBytes!,
-        filename: _pickedFile!.name,
+        bytes: bytes,
+        filename: file.name,
       );
 
-      if (_sendAfterUpload) {
-        await repo.sendInvitations(
-          courseId: widget.courseId.toString(),
-        );
-      }
-
       if (!mounted) return;
-      Navigator.of(context).pop(true);
+      AppToast.success(
+        context,
+        title: 'Invitations ready',
+        message: 'Student emails were uploaded and the invitation flow was triggered.',
+      );
+      Navigator.pop(context, true);
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _error = e.toString();
-        _loading = false;
-      });
+      AppToast.error(
+        context,
+        title: 'Upload failed',
+        message: e.toString(),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final fileName = _pickedFile?.name;
+    final viewportWidth = MediaQuery.sizeOf(context).width;
+    final dialogWidth = viewportWidth < 610 ? viewportWidth - 40 : 550.0;
 
     return Dialog(
-      insetPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       backgroundColor: Colors.transparent,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 720),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFFE5E7EB)),
-            boxShadow: [
-              const BoxShadow(color: Color(0x14000000), blurRadius: (kIsWeb ? 12 : 26), offset: Offset(0, 14)),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+      child: Container(
+        width: dialogWidth,
+        decoration: BoxDecoration(
+          color: AppColors.cardBg,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 40,
+              offset: const Offset(0, 20),
+            ),
+          ],
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildHeader(),
+              Padding(
+                padding: const EdgeInsets.all(30),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTemplateSection(),
+                    const SizedBox(height: 24),
+                    _buildUploadZone(),
+                    const SizedBox(height: 24),
+                    _buildSettingsToggle(),
+                    const SizedBox(height: 32),
+                    _buildActions(),
+                  ],
+                ),
+              ),
             ],
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(18, 16, 18, 12),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: _bgLight,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border(bottom: BorderSide(color: _border)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: _accentColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(Icons.group_add_rounded, color: _accentColor, size: 28),
+          ),
+          const SizedBox(width: 16),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Invite Students',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textTitle,
+                ),
+              ),
+              Text(
+                'Import your student list via .xlsx',
+                style: TextStyle(fontSize: 13, color: AppColors.textMuted),
+              ),
+            ],
+          ),
+          const Spacer(),
+          IconButton(
+            onPressed: () => Navigator.pop(context),
+            icon: const Icon(Icons.close_rounded),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTemplateSection() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.amber.withValues(alpha: 0.05),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline_rounded, color: Colors.amber, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Please use our official template for a smooth import.',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textTitle,
+              ),
+            ),
+          ),
+          TextButton.icon(
+            onPressed: _downloadTemplate,
+            icon: const Icon(Icons.download_rounded, size: 18),
+            label: const Text('Download'),
+            style: TextButton.styleFrom(foregroundColor: Colors.amber[900]),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildUploadZone() {
+    return InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
+      onTap: _pickFile,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(40),
+        decoration: BoxDecoration(
+          color: _pickedFile != null
+              ? _accentColor.withValues(alpha: 0.02)
+              : _bgLight,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: _pickedFile != null ? _accentColor : _border,
+            style: _pickedFile != null ? BorderStyle.solid : BorderStyle.solid,
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          children: [
+            Icon(
+              _pickedFile != null
+                  ? Icons.insert_drive_file_rounded
+                  : Icons.cloud_upload_outlined,
+              size: 48,
+              color: _pickedFile != null ? _accentColor : Colors.grey[400],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              _pickedFile != null
+                  ? _pickedFile!.name
+                  : 'Click to select or drag file',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+                color: _pickedFile != null
+                    ? _accentColor
+                    : AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _pickedFile != null
+                  ? '${(_pickedFile!.size / 1024).toStringAsFixed(1)} KB'
+                  : 'Supports .xlsx files with an email column',
+              style: TextStyle(fontSize: 12, color: Colors.grey[500]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSettingsToggle() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _bgLight,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: _border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.mark_email_read_outlined, color: AppColors.primary),
+          const SizedBox(width: 12),
+          Expanded(
             child: Column(
-              mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 38,
-                      height: 38,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFFEAF2FF),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.group_add_rounded, color: Color(0xFF137FEC)),
-                    ),
-                    const SizedBox(width: 12),
-                    const Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Invite Students',
-                            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w900, color: Color(0xFF111418)),
-                          ),
-                          SizedBox(height: 4),
-                          Text(
-                            'Upload an Excel/CSV file, then we’ll create invitations (and send them if you choose).',
-                            style: TextStyle(fontSize: 12.4, fontWeight: FontWeight.w600, color: Color(0xFF617589)),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Close',
-                      onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-                      icon: const Icon(Icons.close_rounded, color: Color(0xFF617589)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                Row(
-                  children: [
-                    TextButton.icon(
-                      onPressed: _loading ? null : _downloadTemplate,
-                      icon: const Icon(Icons.download_rounded, size: 18),
-                      label: const Text('Download CSV template', style: TextStyle(fontWeight: FontWeight.w900)),
-                      style: TextButton.styleFrom(foregroundColor: const Color(0xFF137FEC)),
-                    ),
-                    const Spacer(),
-                    const Text(
-                      'Accepted: .csv, .xlsx',
-                      style: TextStyle(fontSize: 12.2, fontWeight: FontWeight.w700, color: Color(0xFF94A3B8)),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-
-                Container(
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF8FAFC),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE5E7EB)),
-                  ),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          fileName ?? 'No file selected',
-                          style: TextStyle(
-                            fontSize: 12.8,
-                            fontWeight: FontWeight.w700,
-                            color: fileName == null ? const Color(0xFF94A3B8) : const Color(0xFF111418),
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      OutlinedButton.icon(
-                        onPressed: _loading ? null : _pickFile,
-                        icon: const Icon(Icons.upload_file_rounded, size: 18),
-                        label: const Text('Choose file', style: TextStyle(fontWeight: FontWeight.w900)),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: const Color(0xFF137FEC),
-                          side: const BorderSide(color: Color(0xFFBFDBFE)),
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        ),
-                      ),
-                    ],
+                Text(
+                  'Automatic email sending',
+                  style: TextStyle(
+                    color: AppColors.textTitle,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
                   ),
                 ),
-
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _sendAfterUpload,
-                      onChanged: _loading ? null : (v) => setState(() => _sendAfterUpload = v ?? true),
-                    ),
-                    const SizedBox(width: 6),
-                    const Expanded(
-                      child: Text(
-                        'Send invitations after upload',
-                        style: TextStyle(fontWeight: FontWeight.w800, color: Color(0xFF111418)),
-                      ),
-                    ),
-                  ],
-                ),
-
-                if (_error != null) ...[
-                  const SizedBox(height: 10),
-                  Text(
-                    _error!,
-                    style: const TextStyle(color: Colors.red, fontWeight: FontWeight.w700, fontSize: 12.5),
-                  ),
-                ],
-
-                const SizedBox(height: 14),
-                Row(
-                  children: [
-                    TextButton(
-                      onPressed: _loading ? null : () => Navigator.of(context).pop(false),
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF617589),
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                      child: const Text('Back', style: TextStyle(fontWeight: FontWeight.w800)),
-                    ),
-                    const Spacer(),
-                    ElevatedButton.icon(
-                      onPressed: _loading ? null : _submit,
-                      icon: _loading
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Icon(Icons.send_rounded, size: 18, color: Colors.white),
-                      label: Text(
-                        _loading ? 'Processing...' : 'Upload & Continue',
-                        style: const TextStyle(fontWeight: FontWeight.w900, color: Colors.white),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF137FEC),
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      ),
-                    ),
-                  ],
+                const SizedBox(height: 4),
+                Text(
+                  'After upload, the backend prepares and sends course invitations automatically.',
+                  style: TextStyle(fontSize: 12, color: AppColors.textMuted),
                 ),
               ],
             ),
           ),
-        ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildActions() {
+    return Row(
+      children: [
+        Expanded(
+          child: OutlinedButton(
+            onPressed: () => Navigator.pop(context),
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          flex: 2,
+          child: ElevatedButton(
+            onPressed: _loading || _pickedFile == null ? null : _submit,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: _accentColor,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            child: _loading
+                ? SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      color: AppColors.cardBg,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Text(
+                    'Upload & Continue',
+                    style: TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
+                  ),
+          ),
+        ),
+      ],
     );
   }
 }

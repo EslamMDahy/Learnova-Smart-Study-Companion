@@ -1,3 +1,5 @@
+import 'material_vocabulary.dart';
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  Materials — data models (mirrors backend schemas exactly)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -42,9 +44,16 @@ class MaterialItem {
           ? 'Untitled Material'
           : (title ?? fileName)!.trim();
 
-  bool get isReady => status == 'ready';
-  bool get isProcessing => status == 'processing' || status == 'uploaded' || status == 'draft_upload';
-  bool get isError => status == 'error';
+  MaterialKind get kind => parseMaterialKind(type);
+
+  MaterialProcessingStatus get processingStatus =>
+      parseMaterialProcessingStatus(status);
+
+  bool get isReady => processingStatus == MaterialProcessingStatus.ready;
+  bool get isProcessing => processingStatus == MaterialProcessingStatus.processing ||
+      processingStatus == MaterialProcessingStatus.draftUpload;
+  // 'uploaded' = file is on Supabase but not AI-processed yet — still previewable
+  bool get isError => processingStatus == MaterialProcessingStatus.error;
 
   factory MaterialItem.fromJson(Map<String, dynamic> json) {
     DateTime dt(dynamic v) => DateTime.tryParse((v ?? '').toString()) ??
@@ -55,8 +64,8 @@ class MaterialItem {
       moduleId: (json['module_id'] as num).toInt(),
       title: json['title']?.toString(),
       description: json['description']?.toString(),
-      type: (json['type'] ?? 'pdf').toString(),
-      status: (json['status'] ?? 'ready').toString(),
+      type: parseMaterialKind((json['type'] ?? 'pdf').toString()).backendValue,
+      status: parseMaterialProcessingStatus((json['status'] ?? 'ready').toString()).backendValue,
       fileName: json['file_name']?.toString(),
       fileSize: json['file_size'] == null
           ? null
@@ -107,6 +116,7 @@ class MaterialInitUploadRequest {
   final int fileSizeBytes;
   final String? title;
   final String? description;
+  final bool useAiProcessing;
 
   const MaterialInitUploadRequest({
     required this.filename,
@@ -114,6 +124,7 @@ class MaterialInitUploadRequest {
     required this.fileSizeBytes,
     this.title,
     this.description,
+    this.useAiProcessing = true,
   });
 
   Map<String, dynamic> toJson() {
@@ -121,6 +132,7 @@ class MaterialInitUploadRequest {
       'filename': filename,
       'content_type': contentType,
       'file_size_bytes': fileSizeBytes,
+      'use_ai_processing': useAiProcessing,
     };
     if (title != null) m['title'] = title;
     if (description != null) m['description'] = description;
@@ -161,7 +173,7 @@ class MaterialInitUploadResponse {
       bucket: (json['bucket'] ?? '').toString(),
       contentType: (json['content_type'] ?? '').toString(),
       maxBytes: (json['max_bytes'] as num?)?.toInt() ?? 0,
-      status: (json['status'] ?? 'draft_upload').toString(),
+      status: parseMaterialProcessingStatus((json['status'] ?? 'draft_upload').toString()).backendValue,
     );
   }
 }
@@ -188,10 +200,63 @@ class MaterialConfirmUploadResponse {
       materialId: (json['material_id'] as num).toInt(),
       moduleId: (json['module_id'] as num).toInt(),
       courseId: (json['course_id'] as num).toInt(),
-      status: (json['status'] ?? '').toString(),
+      status: parseMaterialProcessingStatus((json['status'] ?? '').toString()).backendValue,
       updatedAt: DateTime.tryParse((json['updated_at'] ?? '').toString()) ??
           DateTime.fromMillisecondsSinceEpoch(0),
       downloadUrl: json['download_url']?.toString(),
+    );
+  }
+}
+
+// ─── Reassign response ────────────────────────────────────────────────────────
+// Backend: { id, module_id, storage_key }
+class MaterialReassignResponse {
+  final int id;
+  final int moduleId;
+  final String storageKey;
+
+  const MaterialReassignResponse({
+    required this.id,
+    required this.moduleId,
+    required this.storageKey,
+  });
+
+  factory MaterialReassignResponse.fromJson(Map<String, dynamic> json) {
+    return MaterialReassignResponse(
+      id: (json['id'] as num).toInt(),
+      moduleId: (json['module_id'] as num).toInt(),
+      storageKey: (json['storage_key'] ?? '').toString(),
+    );
+  }
+}
+
+
+/// Frontend-only helper for the full browser upload flow.
+/// It keeps the controller/presentation layer from losing the material id
+/// returned by init-upload/confirm-upload, so the UI can poll until AI
+/// processing marks the material as ready.
+class MaterialUploadFlowResult {
+  final int materialId;
+  final int moduleId;
+  final int courseId;
+  final String status;
+  final String? downloadUrl;
+
+  const MaterialUploadFlowResult({
+    required this.materialId,
+    required this.moduleId,
+    required this.courseId,
+    required this.status,
+    this.downloadUrl,
+  });
+
+  factory MaterialUploadFlowResult.fromConfirm(MaterialConfirmUploadResponse response) {
+    return MaterialUploadFlowResult(
+      materialId: response.materialId,
+      moduleId: response.moduleId,
+      courseId: response.courseId,
+      status: response.status,
+      downloadUrl: response.downloadUrl,
     );
   }
 }

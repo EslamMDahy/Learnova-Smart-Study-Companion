@@ -8,7 +8,7 @@ import 'user_management_state.dart';
 
 final userManagementControllerProvider =
     StateNotifierProvider<UserManagementController, UserManagementState>(
-  (ref) => UserManagementController(ref),
+  UserManagementController.new,
 );
 
 class UserManagementController extends StateNotifier<UserManagementState> {

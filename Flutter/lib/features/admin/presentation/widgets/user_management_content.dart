@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/storage/user_storage.dart';
 import '../../../../core/ui/toast.dart';
+import '../../../../core/utils/organization_member_status.dart';
 import '../controllers/user_management_controller.dart';
 import '../controllers/user_management_state.dart';
 import '../../data/dto/join_request_user.dart';
@@ -106,6 +107,7 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final state = ref.watch(userManagementControllerProvider);
     final users = _applyFilters(state.users);
 
@@ -211,10 +213,11 @@ class _UserManagementContentState extends ConsumerState<UserManagementContent> {
   }
 
   String _normalizeStatus(String s) {
-    final v = s.toLowerCase().trim();
-    if (v == 'declinate') return 'declined';
-    if (v == 'rejected') return 'declined';
-    return v;
+    try {
+      return normalizeOrganizationMemberStatus(s);
+    } catch (_) {
+      return s.toLowerCase().trim();
+    }
   }
 }
 
@@ -229,6 +232,7 @@ class _StatsRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final total = users.length;
     final instructors = users.where((e) {
       final r = e.systemRole.toLowerCase();
@@ -243,43 +247,56 @@ class _StatsRow extends StatelessWidget {
         title: 'Total Users',
         value: '$total',
         subtitle: '+12% from last month',
-        subtitleColor: const Color(0xFF16A34A),
+        subtitleColor: AppColors.successText,
         iconBg: const Color(0x1A137FEC),
         icon: Icons.people_alt_outlined,
-        iconColor: const Color(0xFF137FEC),
+        iconColor: AppColors.primary,
       ),
       FigmaUmStatCard(
         title: 'Active Instructors',
         value: '$instructors',
         subtitle: 'Across 12 Departments',
         subtitleColor: AppColors.cGray500,
-        iconBg: const Color(0xFFFAF5FF),
+        iconBg: AppColors.purpleBg,
         icon: Icons.school_outlined,
-        iconColor: const Color(0xFF9333EA),
+        iconColor: AppColors.purpleText,
       ),
       FigmaUmStatCard(
         title: 'Active Students',
         value: '$students',
         subtitle: '+5% new enrollments',
-        subtitleColor: const Color(0xFF16A34A),
-        iconBg: const Color(0xFFFFF7ED),
+        subtitleColor: AppColors.successText,
+        iconBg: AppColors.warningBg,
         icon: Icons.groups_outlined,
-        iconColor: const Color(0xFFEA580C),
+        iconColor: AppColors.warningText,
       ),
       FigmaUmStatCard(
         title: 'Pending Approvals',
         value: '$pending',
         subtitle: 'Requires attention',
-        subtitleColor: const Color(0xFFCA8A04),
-        iconBg: const Color(0xFFFEFCE8),
+        subtitleColor: AppColors.warningText,
+        iconBg: AppColors.warningSoftBg,
         icon: Icons.hourglass_bottom_rounded,
-        iconColor: const Color(0xFFCA8A04),
+        iconColor: AppColors.warningText,
         fixedWidth: isNarrow ? null : 319,
       ),
     ];
 
     if (isNarrow) {
-      return Wrap(spacing: 16, runSpacing: 16, children: updated);
+      return LayoutBuilder(
+        builder: (context, constraints) {
+          final cardWidth = constraints.maxWidth < 560
+              ? constraints.maxWidth
+              : (constraints.maxWidth - 16) / 2;
+          return Wrap(
+            spacing: 16,
+            runSpacing: 16,
+            children: updated
+                .map((card) => SizedBox(width: cardWidth, child: card))
+                .toList(),
+          );
+        },
+      );
     }
 
     return Row(
@@ -325,6 +342,7 @@ class _UsersTableFigma extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final total = totalCount <= 0 ? users.length : totalCount;
     final from = users.isEmpty ? 0 : ((page - 1) * pageSize + 1);
     final to = users.isEmpty ? 0 : (from + users.length - 1);
@@ -335,8 +353,8 @@ class _UsersTableFigma extends StatelessWidget {
         color: AppColors.cBg,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: AppColors.cBorder),
-        boxShadow: const [
-          BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
+        boxShadow: [
+          const BoxShadow(color: Color(0x0D000000), blurRadius: 2, offset: Offset(0, 1)),
         ],
       ),
       clipBehavior: Clip.antiAlias,
@@ -361,7 +379,7 @@ class _UsersTableFigma extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               itemCount: users.length,
               separatorBuilder: (_, __) =>
-                  const Divider(height: 1, color: AppColors.cBorderSoft),
+                  Divider(height: 1, color: AppColors.cBorderSoft),
               itemBuilder: (_, i) => _UserRowFigma(
                 user: users[i],
                 isNarrow: isNarrow,
@@ -394,6 +412,7 @@ class _UserRowFigma extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return SizedBox(
       height: 91,
       child: Padding(
@@ -408,7 +427,7 @@ class _UserRowFigma extends StatelessWidget {
                 onChanged: (_) {},
                 materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                 visualDensity: VisualDensity.compact,
-                side: const BorderSide(color: Color(0xFFD1D5DB)),
+                side: BorderSide(color: AppColors.borderSoft),
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)),
               ),
             ),
@@ -424,7 +443,7 @@ class _UserRowFigma extends StatelessWidget {
                       width: 40,
                       height: 40,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFDBEAFE),
+                        color: AppColors.badgeBlueBg,
                         borderRadius: BorderRadius.circular(9999),
                         border: Border.all(color: AppColors.cBorderSoft),
                       ),
@@ -436,7 +455,7 @@ class _UserRowFigma extends StatelessWidget {
                           fontSize: 14,
                           fontWeight: FontWeight.w700,
                           height: 20 / 14,
-                          color: Color(0xFF2563EB),
+                          color: AppColors.primary,
                         ),
                       ),
                     ),
@@ -449,7 +468,7 @@ class _UserRowFigma extends StatelessWidget {
                           Text(
                             user.fullName,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 14,
                               fontWeight: FontWeight.w700,
@@ -461,7 +480,7 @@ class _UserRowFigma extends StatelessWidget {
                           Text(
                             user.email,
                             overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 12,
                               fontWeight: FontWeight.w400,
@@ -470,14 +489,14 @@ class _UserRowFigma extends StatelessWidget {
                             ),
                           ),
                           const SizedBox(height: 2),
-                          const Text(
+                          Text(
                             'ID: —',
                             style: TextStyle(
                               fontFamily: 'Inter',
                               fontSize: 10,
                               fontWeight: FontWeight.w400,
                               height: 20 / 10,
-                              color: Color(0xFF9CA3AF),
+                              color: AppColors.textHint,
                             ),
                           ),
                         ],
@@ -500,10 +519,10 @@ class _UserRowFigma extends StatelessWidget {
             ),
 
             if (!isNarrow)
-              const Expanded(
+              Expanded(
                 flex: 3,
                 child: Padding(
-                  padding: EdgeInsets.only(left: _kCellLeftPad),
+                  padding: const EdgeInsets.only(left: _kCellLeftPad),
                   child: Text(
                     '—',
                     overflow: TextOverflow.ellipsis,
@@ -512,17 +531,17 @@ class _UserRowFigma extends StatelessWidget {
                       fontSize: 14,
                       fontWeight: FontWeight.w400,
                       height: 20 / 14,
-                      color: Color(0xFF4B5563),
+                      color: AppColors.textGray,
                     ),
                   ),
                 ),
               ),
 
             if (!isNarrow)
-              const Expanded(
+              Expanded(
                 flex: 2,
                 child: Padding(
-                  padding: EdgeInsets.only(left: _kCellLeftPad),
+                  padding: const EdgeInsets.only(left: _kCellLeftPad),
                   child: Text(
                     '—',
                     overflow: TextOverflow.ellipsis,
@@ -552,13 +571,13 @@ class _UserRowFigma extends StatelessWidget {
                 child: SizedBox(
                   width: 28,
                   height: 28,
-                  child: InkWell(
+                  child: InkWell(hoverColor: Colors.transparent, splashColor: Colors.transparent, highlightColor: Colors.transparent, overlayColor: const WidgetStatePropertyAll(Colors.transparent), 
                     onTap: onActionTap,
                     borderRadius: BorderRadius.circular(9999),
-                    child: const Icon(
+                    child: Icon(
                       Icons.more_vert,
                       size: 20,
-                      color: Color(0xFF9CA3AF),
+                      color: AppColors.textHint,
                     ),
                   ),
                 ),

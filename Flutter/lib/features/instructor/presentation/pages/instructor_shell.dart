@@ -57,8 +57,12 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
   int _selectedIndexFromPath(String path) {
     if (path.startsWith(Routes.instructorDashboard)) return InstructorTabs.dashboard;
     if (path.startsWith(Routes.instructorCourses)) return InstructorTabs.course;
-    if (path.startsWith(Routes.instructorQuestionBank)) return InstructorTabs.questionBank;
-    if (path.startsWith(Routes.instructorQuizzes)) return InstructorTabs.quizzes;
+    if (path.startsWith(Routes.instructorExamCorrection)) return InstructorTabs.examCorrection;
+    if (path.startsWith(Routes.instructorPresentation)) return InstructorTabs.presentation;
+    if (path.startsWith(Routes.instructorQuizzes) ||
+        path.startsWith(Routes.instructorQuizzesLegacy)) {
+      return InstructorTabs.quizzes;
+    }
     if (path.startsWith(Routes.instructorSettings)) return InstructorTabs.settings;
     if (path.startsWith(Routes.instructorHelp)) return InstructorTabs.help;
 
@@ -73,8 +77,11 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
       case InstructorTabs.course:
         context.go(Routes.instructorCourses);
         return;
-      case InstructorTabs.questionBank:
-        context.go(Routes.instructorQuestionBank);
+      case InstructorTabs.examCorrection:
+        context.go(Routes.instructorExamCorrection);
+        return;
+      case InstructorTabs.presentation:
+        context.go(Routes.instructorPresentation);
         return;
       case InstructorTabs.quizzes:
         context.go(Routes.instructorQuizzes);
@@ -113,15 +120,17 @@ class _InstructorShellState extends ConsumerState<InstructorShell> {
         return BaseDashboardShell(
           wrapChild: false,
 
-          sidebar: InstructorSidebarWidget(
+          sidebarBuilder: (isCollapsed, toggleSidebar) => InstructorSidebarWidget(
             selectedIndex: _selectedIndexFromPath(path),
             onItemSelected: _goByIndex,
+            isCollapsed: isCollapsed,
+            onToggle: toggleSidebar,
           ),
 
           header: TopHeaderWidget(
             searchController: _search,
             onSearchChanged: (_) => setState(() {}),
-            searchHint: 'Search your courses, lessons, or students...',
+            searchHint: 'Search your courses, exams, or students...',
             userName: _displayName(),
             userSubtitle: _displaySubtitle(),
             avatarUrl: UserStorage.avatarUrl,

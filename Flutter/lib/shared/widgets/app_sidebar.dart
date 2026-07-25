@@ -1,4 +1,4 @@
-import 'app_ui_components.dart' as ui; 
+import 'app_ui_components.dart' as ui;
 
 typedef AppSidebarItem = ui.AppSidebarItem;
 
@@ -13,5 +13,7 @@ class AppSidebar extends ui.AppSidebar {
     super.brandTitle = 'Learnova',
     super.logoAssetPath = 'assets/logo.webp',
     super.onBrandTap,
+    super.isCollapsed = false,
+    super.onToggle,
   });
 }

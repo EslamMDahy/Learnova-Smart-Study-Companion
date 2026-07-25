@@ -1,19 +1,28 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:learnova/core/theme/app_theme.dart';
 import 'package:learnova/core/ui/toast.dart';
+import 'package:learnova/core/utils/image_picker_bytes.dart';
 import 'package:learnova/features/instructor/data/courses_models.dart';
+import 'package:learnova/features/instructor/data/course_vocabulary.dart';
 import 'package:learnova/features/instructor/data/learning_outcomes_models.dart';
-import 'package:learnova/shared/widgets/components/dropdowns.dart';
-import 'learning_outcomes_section.dart';
 
 class CreateCourseDialogResult {
   final CourseCreateRequest request;
   final bool needsInvites;
   final List<LearningOutcome> learningOutcomes;
+  final List<int>? coverBytes;
+  final String? coverContentType;
+  final String? coverFilename;
+
   const CreateCourseDialogResult({
     required this.request,
     required this.needsInvites,
     required this.learningOutcomes,
+    this.coverBytes,
+    this.coverContentType,
+    this.coverFilename,
   });
 }
 
@@ -29,39 +38,40 @@ class CreateCourseDialog extends StatefulWidget {
 class _CreateCourseDialogState extends State<CreateCourseDialog> {
   final _titleCtrl = TextEditingController();
   final _codeCtrl  = TextEditingController();
+  final _categoryCtrl = TextEditingController();
   final _descCtrl  = TextEditingController();
 
-  String _selectedTerm = 'Fall 2025';
   _PublishChoice    _publish    = _PublishChoice.draft;
   _VisibilityChoice _visibility = _VisibilityChoice.privateCourse;
 
   String? _titleError;
   String? _codeError;
+  String? _categoryError;
   bool _titleTouched = false;
   bool _codeTouched  = false;
+  bool _categoryTouched = false;
 
-  List<LearningOutcome> _outcomes = [];
+  final List<LearningOutcome> _outcomes = [];
+  PickedBrowserFile? _coverFile;
 
   static final _codeRx = RegExp(r'^[A-Za-z0-9][A-Za-z0-9\-_\/ ]*$');
-
-  static const _terms = [
-    'Fall 2023', 'Spring 2024', 'Fall 2024',
-    'Spring 2025', 'Fall 2025', 'Spring 2026',
-  ];
 
   @override
   void initState() {
     super.initState();
     _titleCtrl.addListener(_onTitleChanged);
     _codeCtrl.addListener(_onCodeChanged);
+    _categoryCtrl.addListener(_onCategoryChanged);
   }
 
   @override
   void dispose() {
     _titleCtrl.removeListener(_onTitleChanged);
     _codeCtrl.removeListener(_onCodeChanged);
+    _categoryCtrl.removeListener(_onCategoryChanged);
     _titleCtrl.dispose();
     _codeCtrl.dispose();
+    _categoryCtrl.dispose();
     _descCtrl.dispose();
     super.dispose();
   }
@@ -76,8 +86,19 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
     _validateCode();
   }
 
+  void _onCategoryChanged() {
+    if (!_categoryTouched) return;
+    _validateCategory();
+  }
+
   void _validateTitle() {
-    final err = _titleCtrl.text.trim().isEmpty ? 'Course title is required.' : null;
+    final title = _titleCtrl.text.trim();
+    String? err;
+    if (title.isEmpty) {
+      err = 'Course title is required.';
+    } else if (title.length > 255) {
+      err = 'Course title must be 255 characters or less.';
+    }
     if (err == _titleError) return;
     if (mounted) setState(() => _titleError = err);
   }
@@ -86,60 +107,129 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
     final c = _codeCtrl.text.trim();
     String? err;
     if (c.isNotEmpty) {
-      if (c.length < 2 || c.length > 31)  err = 'Course code must be 2–31 characters.';
-      else if (!_codeRx.hasMatch(c))       err = 'Use letters/numbers and - _ / only.';
+      if (c.length < 2 || c.length > 50) {
+        err = 'Course code must be 2–50 characters.';
+      } else if (!_codeRx.hasMatch(c)) {
+        err = 'Use letters/numbers and - _ / only.';
+      }
     }
     if (err == _codeError) return;
     if (mounted) setState(() => _codeError = err);
   }
 
+  void _validateCategory() {
+    final category = _categoryCtrl.text.trim();
+    final err = category.length > 100 ? 'Category must be 100 characters or less.' : null;
+    if (err == _categoryError) return;
+    if (mounted) setState(() => _categoryError = err);
+  }
+
   void _validateAll() {
-    setState(() { _titleTouched = true; _codeTouched = true; });
+    setState(() {
+      _titleTouched = true;
+      _codeTouched = true;
+      _categoryTouched = true;
+    });
     _validateTitle();
     _validateCode();
+    _validateCategory();
   }
 
   bool get _canSubmit =>
-      _titleCtrl.text.trim().isNotEmpty && _titleError == null && _codeError == null;
+      _titleCtrl.text.trim().isNotEmpty &&
+      _titleError == null &&
+      _codeError == null &&
+      _categoryError == null;
+
+  String? _coverValidationError(PickedBrowserFile file) {
+    final contentType = (file.mimeType ?? '').trim().toLowerCase();
+    final name = (file.name ?? '').trim().toLowerCase();
+    final isAllowed = contentType == 'image/png' ||
+        contentType == 'image/jpeg' ||
+        contentType == 'image/jpg' ||
+        name.endsWith('.png') ||
+        name.endsWith('.jpg') ||
+        name.endsWith('.jpeg');
+
+    if (!isAllowed) return 'Course cover must be PNG or JPG.';
+    if (file.bytes.length > 5 * 1024 * 1024) {
+      return 'Course cover must be 5MB or smaller.';
+    }
+    return null;
+  }
+
+  Future<void> _pickCover() async {
+    try {
+      final file = await pickSingleImageFile(
+        accept: const ['image/png', 'image/jpeg', 'image/jpg'],
+      );
+      if (!mounted || file == null) return;
+
+      final error = _coverValidationError(file);
+      if (error != null) {
+        AppToast.error(context, title: 'Invalid cover image', message: error);
+        return;
+      }
+
+      setState(() => _coverFile = file);
+    } catch (_) {
+      if (!mounted) return;
+      AppToast.error(
+        context,
+        title: 'Upload unavailable',
+        message: 'Could not open the image picker in this browser.',
+      );
+    }
+  }
+
+  void _removeCover() {
+    setState(() => _coverFile = null);
+  }
 
   void _submit() {
     _validateAll();
     if (!_canSubmit) {
       AppToast.error(context, title: 'Validation Error',
-          message: _titleError ?? _codeError ?? 'Fix highlighted fields.');
+          message: _titleError ?? _codeError ?? _categoryError ?? 'Fix highlighted fields.',);
       return;
     }
     final isPublic = _visibility == _VisibilityChoice.publicCourse;
-    final status   = _publish == _PublishChoice.published ? 'published' : 'draft';
+    final status = (_publish == _PublishChoice.published
+            ? CourseLifecycleStatus.published
+            : CourseLifecycleStatus.draft)
+        .backendValue;
     final request  = CourseCreateRequest(
-      courseType: 'individual',
+      courseType: CourseAccessType.individual.backendValue,
       organizationId: null,
       title: _titleCtrl.text.trim(),
       description: _descCtrl.text.trim().isEmpty ? null : _descCtrl.text.trim(),
       coverImageUrl: null,
       bannerImageUrl: null,
       isPublic: isPublic,
-      visibilityLevel: isPublic ? 'public' : 'private',
+      visibilityLevel: (isPublic ? CourseVisibility.public : CourseVisibility.private).backendValue,
       requiresEnrollmentApproval: !isPublic,
       learningOutcomes: _outcomes.map((o) => '${o.code}: ${o.description}').toList(),
-      tags: const [],
-      category: null,
+      tags: [],
+      category: _categoryCtrl.text.trim().isEmpty ? null : _categoryCtrl.text.trim(),
       status: status,
       courseCode: _codeCtrl.text.trim().isEmpty ? null : _codeCtrl.text.trim(),
-      academicTerm: _selectedTerm,
       localStatus: status,
     );
     Navigator.of(context).pop(CreateCourseDialogResult(
       request: request,
       needsInvites: !isPublic,
       learningOutcomes: _outcomes,
-    ));
+      coverBytes: _coverFile?.bytes,
+      coverContentType: _coverFile?.mimeType,
+      coverFilename: _coverFile?.name,
+    ),);
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final size = MediaQuery.of(context).size;
-    final maxW = size.width < 800 ? size.width * 0.96 : 740.0;
+    final maxW = size.width < 860 ? size.width * 0.96 : 820.0;
     final maxH = size.height * 0.92;
 
     return Dialog(
@@ -152,8 +242,8 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
             decoration: BoxDecoration(
               color: AppColors.pageBg,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: const [
-                BoxShadow(color: Color(0x22000000), blurRadius: 40, offset: Offset(0, 16)),
+              boxShadow: [
+                const BoxShadow(color: Color(0x22000000), blurRadius: 40, offset: Offset(0, 16)),
               ],
             ),
             child: Column(
@@ -166,8 +256,6 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
                     child: Column(
                       children: [
                         _buildCourseDetailsCard(),
-                        const SizedBox(height: 16),
-                        _buildLearningOutcomesCard(),
                         const SizedBox(height: 16),
                         _buildBottomRow(),
                         const SizedBox(height: 20),
@@ -188,33 +276,33 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
   Widget _buildHeader() {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 18, 16, 16),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border(bottom: BorderSide(color: Color(0xFFF0F2F4))),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+        border: Border(bottom: BorderSide(color: AppColors.headerBg)),
       ),
       child: Row(
         children: [
           Container(
             width: 38, height: 38,
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              border: Border.all(color: const Color(0xFFDBEAFE)),
+              color: AppColors.primarySoft,
+              border: Border.all(color: AppColors.badgeBlueBg),
               borderRadius: BorderRadius.circular(10),
             ),
-            child: const Icon(Icons.add_box_outlined, size: 18, color: Color(0xFF137FEC)),
+            child: const Icon(Icons.add_box_outlined, size: 18, color: AppColors.primary),
           ),
           const SizedBox(width: 12),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text('Create New Course',
                     style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700,
-                        color: Color(0xFF111418))),
-                SizedBox(height: 1),
+                        color: AppColors.textTitle,),),
+                const SizedBox(height: 1),
                 Text('Fill in the details to set up a new learning module.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF617589))),
+                    style: TextStyle(fontSize: 12, color: AppColors.textMuted),),
               ],
             ),
           ),
@@ -250,52 +338,48 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
           ),
           const SizedBox(height: 16),
 
-          // Code + Term row
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildFieldLabel('Course Code', optional: true),
-                    const SizedBox(height: 6),
-                    _TitledInputWithError(
-                      controller: _codeCtrl,
-                      hint: 'e.g. CS-101',
-                      prefixIcon: Icons.tag_rounded,
-                      error: _codeError,
-                      onBlur: () {
-                        if (!_codeTouched) setState(() => _codeTouched = true);
-                        _validateCode();
-                      },
-                    ),
-                  ],
+          // Code + Category row
+          _ResponsiveTwoColumn(
+            spacing: 14,
+            first: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildFieldLabel('Course Code', optional: true),
+                const SizedBox(height: 6),
+                _TitledInputWithError(
+                  controller: _codeCtrl,
+                  hint: 'e.g. CS-101',
+                  prefixIcon: Icons.tag_rounded,
+                  error: _codeError,
+                  onBlur: () {
+                    if (!_codeTouched) setState(() => _codeTouched = true);
+                    _validateCode();
+                  },
                 ),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildFieldLabel('Academic Term'),
-                    const SizedBox(height: 6),
-                    // Use the shared FigmaUmDropdown40 which is already pixel-perfect
-                    FigmaUmDropdown40(
-                      width: double.infinity,
-                      value: _selectedTerm,
-                      items: _terms,
-                      onChanged: (v) => setState(() => _selectedTerm = v),
-                    ),
-                  ],
+              ],
+            ),
+            second: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildFieldLabel('Category', optional: true),
+                const SizedBox(height: 6),
+                _TitledInputWithError(
+                  controller: _categoryCtrl,
+                  hint: 'e.g. Computer Science',
+                  prefixIcon: Icons.category_outlined,
+                  error: _categoryError,
+                  onBlur: () {
+                    if (!_categoryTouched) setState(() => _categoryTouched = true);
+                    _validateCategory();
+                  },
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
           const SizedBox(height: 16),
 
           // Description
-          _buildFieldLabel('Course Description'),
+          _buildFieldLabel('Course Description', optional: true),
           const SizedBox(height: 6),
           _DescriptionField(controller: _descCtrl),
           const SizedBox(height: 10),
@@ -304,19 +388,19 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
           Container(
             padding: const EdgeInsets.fromLTRB(12, 9, 12, 9),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: const Color(0xFFDBEAFE)),
+              border: Border.all(color: AppColors.badgeBlueBg),
             ),
             child: const Row(
               children: [
-                Icon(Icons.auto_awesome_rounded, size: 14, color: Color(0xFF137FEC)),
+                Icon(Icons.auto_awesome_rounded, size: 14, color: AppColors.primary),
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'AI Tip: A detailed description helps generate better quiz questions.',
-                    style: TextStyle(fontSize: 12, color: Color(0xFF137FEC),
-                        fontWeight: FontWeight.w500),
+                    style: TextStyle(fontSize: 12, color: AppColors.primary,
+                        fontWeight: FontWeight.w500,),
                   ),
                 ),
               ],
@@ -327,56 +411,51 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
     );
   }
 
-  // ── Learning Outcomes card ────────────────────────────────────────────────
-  Widget _buildLearningOutcomesCard() {
-    return _SectionCard(
-      icon: Icons.flag_outlined,
-      title: 'Learning Outcomes',
-      badge: _outcomes.isEmpty ? null : '${_outcomes.length}',
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text(
-            'Define what students will achieve. Topics will be linked to these outcomes.',
-            style: TextStyle(fontSize: 13, color: Color(0xFF617589), height: 1.5),
-          ),
-          const SizedBox(height: 14),
-          LearningOutcomesSection(
-            initialOutcomes: _outcomes,
-            onChanged: (list) => setState(() => _outcomes = list),
-          ),
-        ],
-      ),
-    );
-  }
-
   // ── Config + Cover row ────────────────────────────────────────────────────
   Widget _buildBottomRow() {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Expanded(
-          child: _SectionCard(
-            icon: Icons.tune_rounded,
-            title: 'Configuration',
-            child: _ConfigSection(
-              publish: _publish,
-              visibility: _visibility,
-              onPublishChanged: (v) => setState(() => _publish = v),
-              onVisibilityChanged: (v) => setState(() => _visibility = v),
-            ),
-          ),
-        ),
-        const SizedBox(width: 14),
-        SizedBox(
-          width: 210,
-          child: _SectionCard(
-            icon: Icons.image_outlined,
-            title: 'Course Cover',
-            child: _CoverUpload(),
-          ),
-        ),
-      ],
+    final config = _SectionCard(
+      icon: Icons.tune_rounded,
+      title: 'Configuration',
+      child: _ConfigSection(
+        publish: _publish,
+        visibility: _visibility,
+        onPublishChanged: (v) => setState(() => _publish = v),
+        onVisibilityChanged: (v) => setState(() => _visibility = v),
+      ),
+    );
+
+    final cover = _SectionCard(
+      icon: Icons.image_outlined,
+      title: 'Course Cover',
+      badge: 'Optional',
+      child: _CoverUpload(
+        file: _coverFile,
+        onPick: _pickCover,
+        onRemove: _removeCover,
+      ),
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 620) {
+          return Column(
+            children: [
+              config,
+              const SizedBox(height: 14),
+              cover,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: config),
+            const SizedBox(width: 14),
+            SizedBox(width: 240, child: cover),
+          ],
+        );
+      },
     );
   }
 
@@ -384,22 +463,13 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
   Widget _buildFooter() {
     return Container(
       padding: const EdgeInsets.fromLTRB(24, 14, 24, 18),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(16)),
-        border: Border(top: BorderSide(color: Color(0xFFF0F2F4))),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
+        border: Border(top: BorderSide(color: AppColors.headerBg)),
       ),
       child: Row(
         children: [
-          if (_outcomes.isNotEmpty) ...[
-            const Icon(Icons.check_circle_rounded, size: 14, color: Color(0xFF16A34A)),
-            const SizedBox(width: 5),
-            Text(
-              '${_outcomes.length} outcome${_outcomes.length == 1 ? "" : "s"} added',
-              style: const TextStyle(fontSize: 12, color: Color(0xFF16A34A),
-                  fontWeight: FontWeight.w600),
-            ),
-          ],
           const Spacer(),
           _OutlineBtn(label: 'Cancel', onTap: () => Navigator.of(context).pop()),
           const SizedBox(width: 10),
@@ -414,21 +484,21 @@ class _CreateCourseDialogState extends State<CreateCourseDialog> {
     return Row(
       children: [
         Text(label,
-            style: AppText.label.copyWith(fontSize: 13, fontWeight: FontWeight.w600)),
+            style: AppText.label.copyWith(fontSize: 13, fontWeight: FontWeight.w600),),
         if (required)
           const Text(' *',
-              style: TextStyle(fontSize: 13, color: Color(0xFFEF4444), fontWeight: FontWeight.w600)),
+              style: TextStyle(fontSize: 13, color: AppColors.errorDot, fontWeight: FontWeight.w600),),
         if (optional) ...[
           const SizedBox(width: 6),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
             decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
+              color: AppColors.primarySoft,
               borderRadius: BorderRadius.circular(4),
             ),
             child: const Text('Optional',
-                style: TextStyle(fontSize: 10.5, color: Color(0xFF137FEC),
-                    fontWeight: FontWeight.w600)),
+                style: TextStyle(fontSize: 10.5, color: AppColors.primary,
+                    fontWeight: FontWeight.w600,),),
           ),
         ],
       ],
@@ -452,10 +522,11 @@ class _SectionCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
       width: double.infinity,
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppColors.cardBg,
         borderRadius: BorderRadius.circular(14),
         border: Border.all(color: AppColors.border),
       ),
@@ -468,37 +539,76 @@ class _SectionCard extends StatelessWidget {
               Container(
                 width: 32, height: 32,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  border: Border.all(color: const Color(0xFFDBEAFE)),
+                  color: AppColors.primarySoft,
+                  border: Border.all(color: AppColors.badgeBlueBg),
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: Icon(icon, size: 15, color: const Color(0xFF137FEC)),
+                child: Icon(icon, size: 15, color: AppColors.primary),
               ),
               const SizedBox(width: 10),
               Text(title,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
-                      color: Color(0xFF111418))),
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700,
+                      color: AppColors.textTitle,),),
               if (badge != null) ...[
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF137FEC),
+                    color: AppColors.primary,
                     borderRadius: BorderRadius.circular(99),
                   ),
                   child: Text(badge!,
                       style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
-                          color: Colors.white)),
+                          color: Colors.white,),),
                 ),
               ],
             ],
           ),
           const SizedBox(height: 14),
-          Container(height: 1, color: const Color(0xFFF0F2F4)),
+          Container(height: 1, color: AppColors.headerBg),
           const SizedBox(height: 16),
           child,
         ],
       ),
+    );
+  }
+}
+
+
+class _ResponsiveTwoColumn extends StatelessWidget {
+  final Widget first;
+  final Widget second;
+  final double spacing;
+
+  const _ResponsiveTwoColumn({
+    required this.first,
+    required this.second,
+    this.spacing = 14,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth < 560) {
+          return Column(
+            children: [
+              first,
+              SizedBox(height: spacing),
+              second,
+            ],
+          );
+        }
+
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(child: first),
+            SizedBox(width: spacing),
+            Expanded(child: second),
+          ],
+        );
+      },
     );
   }
 }
@@ -546,9 +656,10 @@ class _TitledInputWithErrorState extends State<_TitledInputWithError> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final hasErr = (widget.error ?? '').isNotEmpty;
     final borderColor = hasErr
-        ? const Color(0xFFEF4444)
+        ? AppColors.errorDot
         : _focused
             ? AppColors.primary
             : AppColors.borderSoft;
@@ -561,7 +672,7 @@ class _TitledInputWithErrorState extends State<_TitledInputWithError> {
           height: 44,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            color: hasErr ? const Color(0xFFFEF2F2) : Colors.white,
+            color: hasErr ? AppColors.dangerBg : AppColors.cardBg,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: borderColor, width: borderWidth),
           ),
@@ -570,10 +681,10 @@ class _TitledInputWithErrorState extends State<_TitledInputWithError> {
               if (widget.prefixIcon != null) ...[
                 Icon(widget.prefixIcon, size: 16,
                     color: hasErr
-                        ? const Color(0xFFEF4444)
+                        ? AppColors.errorDot
                         : _focused
                             ? AppColors.primary
-                            : AppColors.muted),
+                            : AppColors.muted,),
                 const SizedBox(width: 8),
               ],
               Expanded(
@@ -602,11 +713,11 @@ class _TitledInputWithErrorState extends State<_TitledInputWithError> {
           const SizedBox(height: 4),
           Row(
             children: [
-              const Icon(Icons.error_outline_rounded, size: 12, color: Color(0xFFEF4444)),
+              const Icon(Icons.error_outline_rounded, size: 12, color: AppColors.errorDot),
               const SizedBox(width: 4),
               Text(widget.error!,
-                  style: const TextStyle(fontSize: 11.5, color: Color(0xFFEF4444),
-                      fontWeight: FontWeight.w500)),
+                  style: const TextStyle(fontSize: 11.5, color: AppColors.errorDot,
+                      fontWeight: FontWeight.w500,),),
             ],
           ),
         ],
@@ -643,6 +754,7 @@ class _DescriptionFieldState extends State<_DescriptionField> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return AnimatedContainer(
       duration: const Duration(milliseconds: 150),
       decoration: BoxDecoration(
@@ -661,7 +773,7 @@ class _DescriptionFieldState extends State<_DescriptionField> {
               height: 38,
               color: AppColors.surfaceBg,
               padding: const EdgeInsets.symmetric(horizontal: 8),
-              child: Row(
+              child: const Row(
                 children: [
                   _TbBtn(icon: Icons.format_bold_rounded),
                   _TbBtn(icon: Icons.format_italic_rounded),
@@ -670,7 +782,7 @@ class _DescriptionFieldState extends State<_DescriptionField> {
                 ],
               ),
             ),
-            Container(height: 1, color: const Color(0xFFF0F2F4)),
+            Container(height: 1, color: AppColors.headerBg),
             // Text area
             SizedBox(
               height: 110,
@@ -742,12 +854,13 @@ class _ConfigSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Visibility Status',
+        Text('Visibility Status',
             style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w600,
-                color: Color(0xFF617589), letterSpacing: 0.2)),
+                color: AppColors.textMuted, letterSpacing: 0.2,),),
         const SizedBox(height: 8),
         Row(children: [
           Expanded(child: _OptionTile(
@@ -755,15 +868,15 @@ class _ConfigSection extends StatelessWidget {
             sub: 'Only visible to instructors',
             selected: publish == _PublishChoice.draft,
             onTap: () => onPublishChanged(_PublishChoice.draft),
-          )),
+          ),),
           const SizedBox(width: 8),
           Expanded(child: _OptionTile(
             title: 'Publish Now',
             sub: 'Visible to enrolled students',
             selected: publish == _PublishChoice.published,
             onTap: () => onPublishChanged(_PublishChoice.published),
-          )),
-        ]),
+          ),),
+        ],),
         const SizedBox(height: 10),
         Row(children: [
           Expanded(child: _OptionTile(
@@ -771,15 +884,15 @@ class _ConfigSection extends StatelessWidget {
             sub: 'For specific Student',
             selected: visibility == _VisibilityChoice.privateCourse,
             onTap: () => onVisibilityChanged(_VisibilityChoice.privateCourse),
-          )),
+          ),),
           const SizedBox(width: 8),
           Expanded(child: _OptionTile(
             title: 'Set as Public',
             sub: 'For Public Student',
             selected: visibility == _VisibilityChoice.publicCourse,
             onTap: () => onVisibilityChanged(_VisibilityChoice.publicCourse),
-          )),
-        ]),
+          ),),
+        ],),
         if (visibility == _VisibilityChoice.privateCourse) ...[
           const SizedBox(height: 10),
           Container(
@@ -789,12 +902,12 @@ class _ConfigSection extends StatelessWidget {
               borderRadius: BorderRadius.circular(9),
               border: Border.all(color: AppColors.border),
             ),
-            child: const Row(children: [
-              Icon(Icons.info_outline_rounded, size: 14, color: Color(0xFF137FEC)),
-              SizedBox(width: 8),
+            child: Row(children: [
+              const Icon(Icons.info_outline_rounded, size: 14, color: AppColors.primary),
+              const SizedBox(width: 8),
               Expanded(child: Text('You can invite students after creating the course.',
-                  style: TextStyle(fontSize: 12, color: Color(0xFF111418)))),
-            ]),
+                  style: TextStyle(fontSize: 12, color: AppColors.textTitle),),),
+            ],),
           ),
         ],
       ],
@@ -821,8 +934,9 @@ class _OptionTileState extends State<_OptionTile> {
 
   @override
   Widget build(BuildContext context) {
-    const blue  = Color(0xFF137FEC);
-    const blueSoft = Color(0xFFEFF6FF);
+    Theme.of(context);
+    const blue = AppColors.primary;
+    final blueSoft = AppColors.primarySoft;
 
     return MouseRegion(
       cursor: SystemMouseCursors.click,
@@ -834,7 +948,7 @@ class _OptionTileState extends State<_OptionTile> {
           duration: const Duration(milliseconds: 110),
           padding: const EdgeInsets.fromLTRB(12, 10, 10, 10),
           decoration: BoxDecoration(
-            color: widget.selected ? blueSoft : _h ? AppColors.pageBg : Colors.white,
+            color: widget.selected ? blueSoft : _h ? AppColors.pageBg : AppColors.cardBg,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
               color: widget.selected ? blue : AppColors.border,
@@ -860,7 +974,7 @@ class _OptionTileState extends State<_OptionTile> {
                     const SizedBox(height: 2),
                     Text(
                       widget.sub,
-                      style: const TextStyle(fontSize: 10.5, color: Color(0xFF617589)),
+                      style: TextStyle(fontSize: 10.5, color: AppColors.textMuted),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -877,14 +991,14 @@ class _OptionTileState extends State<_OptionTile> {
                     color: widget.selected ? blue : AppColors.border,
                     width: 2,
                   ),
-                  color: Colors.white,
+                  color: AppColors.cardBg,
                 ),
                 child: widget.selected
                     ? Center(
                         child: Container(
                           width: 8, height: 8,
-                          decoration: const BoxDecoration(
-                            color: blue, shape: BoxShape.circle),
+                          decoration: BoxDecoration(
+                            color: blue, shape: BoxShape.circle,),
                         ),
                       )
                     : null,
@@ -899,6 +1013,16 @@ class _OptionTileState extends State<_OptionTile> {
 
 // ── Cover upload ──────────────────────────────────────────────────────────────
 class _CoverUpload extends StatefulWidget {
+  final PickedBrowserFile? file;
+  final Future<void> Function() onPick;
+  final VoidCallback onRemove;
+
+  const _CoverUpload({
+    required this.file,
+    required this.onPick,
+    required this.onRemove,
+  });
+
   @override
   State<_CoverUpload> createState() => _CoverUploadState();
 }
@@ -908,45 +1032,199 @@ class _CoverUploadState extends State<_CoverUpload> {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
+    final file = widget.file;
+    final hasFile = file != null && file.bytes.isNotEmpty;
+
     return MouseRegion(
       cursor: SystemMouseCursors.click,
       onEnter: (_) => setState(() => _h = true),
       onExit: (_) => setState(() => _h = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 150),
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 28),
-        decoration: BoxDecoration(
-          color: _h ? const Color(0xFFEFF6FF) : const Color(0xFFFAFBFC),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: _h ? const Color(0xFF137FEC) : AppColors.border,
-            width: _h ? 1.5 : 1,
-          ),
-        ),
-        child: Column(children: [
-          Container(
-            width: 46, height: 46,
-            decoration: BoxDecoration(
-              color: _h ? const Color(0xFFEFF6FF) : AppColors.headerBg,
-              borderRadius: BorderRadius.circular(12),
+      child: GestureDetector(
+        onTap: widget.onPick,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: double.infinity,
+          height: 184,
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: _h ? AppColors.primarySoft : AppColors.hoverBg,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: _h || hasFile ? AppColors.primary : AppColors.border,
+              width: _h || hasFile ? 1.5 : 1,
             ),
-            child: Icon(Icons.add_photo_alternate_outlined, size: 22,
-                color: _h ? const Color(0xFF137FEC) : AppColors.muted),
           ),
-          const SizedBox(height: 10),
-          RichText(text: TextSpan(children: [
-            TextSpan(text: 'Upload a file',
-                style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700,
-                    color: _h ? const Color(0xFF137FEC) : AppColors.muted,
-                    fontFamily: 'Inter')),
-            const TextSpan(text: '  or drag and drop',
-                style: TextStyle(fontSize: 12, color: Color(0xFF9CA3AF), fontFamily: 'Inter')),
-          ])),
-          const SizedBox(height: 5),
-          const Text('PNG, JPG, GIF up to 10MB',
-              style: TextStyle(fontSize: 11, color: Color(0xFF9CA3AF))),
-        ]),
+          child: hasFile
+              ? _CoverPreview(
+                  bytes: Uint8List.fromList(file.bytes),
+                  filename: file.name,
+                  onReplace: widget.onPick,
+                  onRemove: widget.onRemove,
+                )
+              : Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Container(
+                      width: 46,
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: _h ? AppColors.primarySoft : AppColors.headerBg,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Icon(
+                        Icons.add_photo_alternate_outlined,
+                        size: 22,
+                        color: _h ? AppColors.primary : AppColors.muted,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Text(
+                      'Upload a file',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: _h ? AppColors.primary : AppColors.muted,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'or drag and drop',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textHint,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'PNG, JPG up to 5MB',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 11, color: AppColors.textHint),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+}
+
+class _CoverPreview extends StatelessWidget {
+  final Uint8List bytes;
+  final String? filename;
+  final Future<void> Function() onReplace;
+  final VoidCallback onRemove;
+
+  const _CoverPreview({
+    required this.bytes,
+    required this.filename,
+    required this.onReplace,
+    required this.onRemove,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Image.memory(bytes, fit: BoxFit.cover),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.05),
+                  Colors.black.withValues(alpha: 0.58),
+                ],
+              ),
+            ),
+          ),
+          Positioned(
+            left: 10,
+            right: 10,
+            bottom: 10,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  (filename ?? 'Course cover').trim().isEmpty
+                      ? 'Course cover'
+                      : filename!,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    _TinyCoverAction(
+                      icon: Icons.swap_horiz_rounded,
+                      label: 'Replace',
+                      onTap: onReplace,
+                    ),
+                    const SizedBox(width: 6),
+                    _TinyCoverAction(
+                      icon: Icons.close_rounded,
+                      label: 'Remove',
+                      onTap: onRemove,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TinyCoverAction extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+
+  const _TinyCoverAction({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+        decoration: BoxDecoration(
+          color: Colors.white.withValues(alpha: 0.92),
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 12, color: AppColors.primary),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.primary,
+                fontSize: 10.5,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -996,6 +1274,7 @@ class _PrimaryBtnState extends State<_PrimaryBtn> {
   bool _h = false;
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final enabled = widget.onTap != null;
     return MouseRegion(
       cursor: enabled ? SystemMouseCursors.click : MouseCursor.defer,
@@ -1017,7 +1296,7 @@ class _PrimaryBtnState extends State<_PrimaryBtn> {
             child: Text(widget.label,
                 style: TextStyle(
                     fontSize: 13.5, fontWeight: FontWeight.w700,
-                    color: enabled ? Colors.white : AppColors.muted)),
+                    color: enabled ? Colors.white : AppColors.muted,),),
           ),
         ),
       ),
@@ -1047,14 +1326,14 @@ class _OutlineBtnState extends State<_OutlineBtn> {
         height: 40,
         padding: const EdgeInsets.symmetric(horizontal: 18),
         decoration: BoxDecoration(
-          color: _h ? AppColors.headerBg : Colors.white,
+          color: _h ? AppColors.headerBg : AppColors.cardBg,
           border: Border.all(color: AppColors.border),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Center(
           child: Text(widget.label,
               style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w600,
-                  color: AppColors.text)),
+                  color: AppColors.text,),),
         ),
       ),
     ),

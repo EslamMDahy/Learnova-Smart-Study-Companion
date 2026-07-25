@@ -1,13 +1,12 @@
 import 'dart:typed_data';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
-import 'dart:async';
 
 import 'package:flutter/material.dart';
-import '../../../../../core/theme/app_theme.dart';
+import 'package:learnova/core/theme/app_theme.dart';
+import 'package:learnova/core/utils/browser_file_drop.dart';
+import 'package:learnova/core/utils/browser_file_picker.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  Result
+//  Public contracts
 // ─────────────────────────────────────────────────────────────────────────────
 class UploadSheetResult {
   final Uint8List bytes;
@@ -22,24 +21,96 @@ class UploadSheetResult {
   });
 }
 
+enum UploadSheetProcessingStage { uploading, processing, ready, error }
+
+class UploadSheetUploadUpdate {
+  final UploadSheetProcessingStage stage;
+  final double? progress;
+  final String? message;
+
+  const UploadSheetUploadUpdate({
+    required this.stage,
+    this.progress,
+    this.message,
+  });
+}
+
+class UploadSheetUploadResult {
+  final bool success;
+  final bool ready;
+  final int? materialId;
+  final String? message;
+
+  const UploadSheetUploadResult({
+    required this.success,
+    required this.ready,
+    this.materialId,
+    this.message,
+  });
+
+  const UploadSheetUploadResult.ready({int? materialId, String? message})
+      : this(
+          success: true,
+          ready: true,
+          materialId: materialId,
+          message: message ?? 'AI analysis completed. Ready to save.',
+        );
+
+  const UploadSheetUploadResult.error(String message, {int? materialId})
+      : this(
+          success: false,
+          ready: false,
+          materialId: materialId,
+          message: message,
+        );
+}
+
+typedef UploadSheetUploadHandler = Future<UploadSheetUploadResult> Function(
+  UploadSheetResult file,
+  void Function(UploadSheetUploadUpdate update) update,
+);
+
 // ─────────────────────────────────────────────────────────────────────────────
-//  Model
+//  Internal model
 // ─────────────────────────────────────────────────────────────────────────────
-enum _FileStatus { ready, error }
+enum _FileStatus { queued, uploading, processing, ready, error }
 
 class _QueuedFile {
   final String name;
   final int sizeBytes;
   final Uint8List bytes;
   final _FileStatus status;
-  final String? errorMsg;
+  final String? message;
+  final int? materialId;
+  final double progress;
+
   const _QueuedFile({
     required this.name,
     required this.sizeBytes,
     required this.bytes,
     required this.status,
-    this.errorMsg,
+    this.message,
+    this.materialId,
+    this.progress = 0,
   });
+
+  _QueuedFile copyWith({
+    _FileStatus? status,
+    String? message,
+    int? materialId,
+    double? progress,
+    bool clearMessage = false,
+  }) {
+    return _QueuedFile(
+      name: name,
+      sizeBytes: sizeBytes,
+      bytes: bytes,
+      status: status ?? this.status,
+      message: clearMessage ? null : (message ?? this.message),
+      materialId: materialId ?? this.materialId,
+      progress: progress ?? this.progress,
+    );
+  }
 
   String get displaySize {
     if (sizeBytes < 1024) return '$sizeBytes B';
@@ -51,6 +122,8 @@ class _QueuedFile {
     final i = name.lastIndexOf('.');
     return i >= 0 ? name.substring(i + 1).toUpperCase() : 'FILE';
   }
+
+  bool get canRemove => status == _FileStatus.queued || status == _FileStatus.error;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,7 +131,15 @@ class _QueuedFile {
 // ─────────────────────────────────────────────────────────────────────────────
 class UploadMaterialSheet extends StatefulWidget {
   final String moduleTitle;
-  const UploadMaterialSheet({super.key, required this.moduleTitle});
+  final UploadSheetUploadHandler? onUpload;
+  final bool autoCloseOnReady;
+
+  const UploadMaterialSheet({
+    super.key,
+    required this.moduleTitle,
+    this.onUpload,
+    this.autoCloseOnReady = false,
+  });
 
   @override
   State<UploadMaterialSheet> createState() => _UploadMaterialSheetState();
@@ -67,10 +148,14 @@ class UploadMaterialSheet extends StatefulWidget {
 class _UploadMaterialSheetState extends State<UploadMaterialSheet>
     with TickerProviderStateMixin {
   final List<_QueuedFile> _queue = [];
+  final GlobalKey _dropZoneKey = GlobalKey();
+  BrowserFileDropSubscription? _dropSubscription;
   bool _hovering = false;
+  bool _dropHovering = false;
+  bool _processing = false;
   late final AnimationController _pulseCtrl;
   late final Animation<double> _pulse;
-  static const int _maxBytes = 500 * 1024 * 1024;
+  static const int _maxBytes = 50 * 1024 * 1024;
 
   @override
   void initState() {
@@ -80,129 +165,270 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
       duration: const Duration(seconds: 2),
     )..repeat(reverse: true);
     _pulse = CurvedAnimation(parent: _pulseCtrl, curve: Curves.easeInOut);
+    _dropSubscription = listenForBrowserFileDrops(
+      acceptedExtensions: const ['pdf'],
+      isInsideDropZone: _isPointInsideDropZone,
+      onHoverChanged: _setDropHovering,
+      onDrop: _queueDroppedFiles,
+    );
   }
 
   @override
   void dispose() {
+    _dropSubscription?.dispose();
     _pulseCtrl.dispose();
     super.dispose();
   }
 
   Future<void> _browse() async {
-    final c = Completer<void>();
-    final input = html.FileUploadInputElement()
-      ..accept = '.pdf,.docx,.pptx,.mp4'
-      ..multiple = true;
-    input.onChange.listen((_) async {
-      final files = input.files;
-      if (files != null) {
-        for (int i = 0; i < files.length; i++) {
-          final f = files[i];
-          await _read(f);
+    if (_processing) return;
+    final files = await pickBrowserFiles(acceptedExtensions: ['pdf']);
+    if (!mounted) return;
+    for (final file in files) {
+      _queuePickedFile(file);
+    }
+  }
+
+
+  bool _isPointInsideDropZone(double clientX, double clientY) {
+    if (!mounted || _processing) return false;
+    final context = _dropZoneKey.currentContext;
+    final renderObject = context?.findRenderObject();
+    if (renderObject is! RenderBox || !renderObject.hasSize) return false;
+
+    final topLeft = renderObject.localToGlobal(Offset.zero);
+    final rect = topLeft & renderObject.size;
+    return rect.contains(Offset(clientX, clientY));
+  }
+
+  void _setDropHovering(bool hovering) {
+    if (!mounted || _processing) return;
+    if (_dropHovering == hovering) return;
+    setState(() => _dropHovering = hovering);
+  }
+
+  Future<void> _queueDroppedFiles(List<PickedBrowserFile> files) async {
+    if (!mounted || _processing || files.isEmpty) return;
+    setState(() => _dropHovering = false);
+    for (final file in files) {
+      if (!mounted || _processing) return;
+      _queuePickedFile(file);
+    }
+  }
+
+  void _queuePickedFile(PickedBrowserFile file) {
+    final valid = file.sizeBytes <= _maxBytes && _isSupportedPdf(file);
+    setState(() {
+      _queue.add(_QueuedFile(
+        name: file.name,
+        sizeBytes: file.sizeBytes,
+        bytes: file.bytes,
+        status: valid ? _FileStatus.queued : _FileStatus.error,
+        message: valid ? 'Waiting in queue' : 'Only PDF files are supported, up to 50 MB.',
+      ));
+    });
+  }
+
+  static final RegExp _pdfExtension = RegExp(r'\.pdf$', caseSensitive: false);
+
+  bool _isSupportedPdf(PickedBrowserFile file) {
+    final hasPdfExtension = _pdfExtension.hasMatch(file.name);
+    final mime = file.mimeType.trim().toLowerCase();
+    final mimeLooksPdf = mime.isEmpty || mime == 'application/pdf';
+    return hasPdfExtension && mimeLooksPdf;
+  }
+
+  String _contentTypeForUpload(String filename) {
+    if (_pdfExtension.hasMatch(filename)) return 'application/pdf';
+    throw StateError('Unsupported upload type for $filename');
+  }
+
+  UploadSheetResult _resultFor(_QueuedFile file) {
+    final dot = file.name.lastIndexOf('.');
+    return UploadSheetResult(
+      bytes: file.bytes,
+      filename: file.name,
+      contentType: _contentTypeForUpload(file.name),
+      title: dot > 0 ? file.name.substring(0, dot) : file.name,
+    );
+  }
+
+  void _remove(int i) {
+    if (_processing || !_queue[i].canRemove) return;
+    setState(() => _queue.removeAt(i));
+  }
+
+  void _clearTerminal() {
+    if (_processing) return;
+    setState(() => _queue.removeWhere(
+          (f) => f.status == _FileStatus.ready || f.status == _FileStatus.error,
+        ));
+  }
+
+  Future<void> _primaryAction() async {
+    if (_processing) return;
+    if (_queue.isEmpty) return;
+
+    final queuedCount = _queue.where((f) => f.status == _FileStatus.queued).length;
+    final readyCount = _queue.where((f) => f.status == _FileStatus.ready).length;
+    final terminalCount = _queue.where((f) => f.status == _FileStatus.ready || f.status == _FileStatus.error).length;
+
+    if (queuedCount == 0 && terminalCount == _queue.length && readyCount > 0) {
+      Navigator.of(context).pop(true);
+      return;
+    }
+
+    await _runQueue();
+  }
+
+  Future<void> _runQueue() async {
+    final handler = widget.onUpload;
+    if (handler == null) {
+      setState(() {
+        for (var i = 0; i < _queue.length; i++) {
+          if (_queue[i].status == _FileStatus.queued) {
+            _queue[i] = _queue[i].copyWith(
+              status: _FileStatus.ready,
+              progress: 1,
+              message: 'Ready to save',
+            );
+          }
+        }
+      });
+      return;
+    }
+
+    setState(() => _processing = true);
+    try {
+      for (var i = 0; i < _queue.length; i++) {
+        if (!mounted) return;
+        if (_queue[i].status != _FileStatus.queued) continue;
+
+        setState(() {
+          _queue[i] = _queue[i].copyWith(
+            status: _FileStatus.uploading,
+            progress: 0,
+            message: 'Uploading to storage...',
+            clearMessage: false,
+          );
+        });
+
+        final file = _resultFor(_queue[i]);
+        try {
+          final result = await handler(file, (update) {
+            if (!mounted) return;
+            setState(() {
+              _queue[i] = _queue[i].copyWith(
+                status: _mapStage(update.stage),
+                progress: update.progress,
+                message: update.message,
+              );
+            });
+          });
+
+          if (!mounted) return;
+          setState(() {
+            _queue[i] = _queue[i].copyWith(
+              status: result.success && result.ready ? _FileStatus.ready : _FileStatus.error,
+              materialId: result.materialId,
+              progress: result.success && result.ready ? 1 : _queue[i].progress,
+              message: result.message ??
+                  (result.success ? 'AI analysis completed.' : 'Upload failed.'),
+            );
+          });
+        } catch (e) {
+          if (!mounted) return;
+          setState(() {
+            _queue[i] = _queue[i].copyWith(
+              status: _FileStatus.error,
+              message: 'Upload failed. Please retry this file.',
+            );
+          });
         }
       }
-      c.complete();
-    });
-    input.click();
-    await c.future;
+    } finally {
+      if (!mounted) return;
+      setState(() => _processing = false);
+      if (widget.autoCloseOnReady && _queue.isNotEmpty && _queue.every((f) => f.status == _FileStatus.ready)) {
+        Navigator.of(context).pop(true);
+      }
+    }
   }
 
-  Future<void> _read(html.File file) async {
-    final c = Completer<void>();
-    final reader = html.FileReader();
-    reader.onLoad.listen((_) {
-      final bytes = reader.result as Uint8List;
-      final valid = bytes.length <= _maxBytes &&
-          RegExp(r'\.(pdf|docx|pptx|mp4)$', caseSensitive: false)
-              .hasMatch(file.name);
-      setState(() {
-        _queue.add(_QueuedFile(
-          name: file.name,
-          sizeBytes: bytes.length,
-          bytes: bytes,
-          status: valid ? _FileStatus.ready : _FileStatus.error,
-          errorMsg: valid ? null : 'Unsupported or exceeds 500 MB',
-        ));
-      });
-      c.complete();
-    });
-    reader.readAsArrayBuffer(file);
-    await c.future;
-  }
-
-  void _remove(int i) => setState(() => _queue.removeAt(i));
-  void _clearDone() =>
-      setState(() => _queue.removeWhere((f) => f.status == _FileStatus.ready));
-
-  void _save() {
-    final ready = _queue.where((f) => f.status == _FileStatus.ready).toList();
-    if (ready.isEmpty) return;
-    final results = ready.map((f) {
-      final dot = f.name.lastIndexOf('.');
-      return UploadSheetResult(
-        bytes: f.bytes,
-        filename: f.name,
-        contentType: 'application/pdf',
-        title: dot > 0 ? f.name.substring(0, dot) : f.name,
-      );
-    }).toList();
-    Navigator.of(context).pop(results);
+  _FileStatus _mapStage(UploadSheetProcessingStage stage) {
+    switch (stage) {
+      case UploadSheetProcessingStage.uploading:
+        return _FileStatus.uploading;
+      case UploadSheetProcessingStage.processing:
+        return _FileStatus.processing;
+      case UploadSheetProcessingStage.ready:
+        return _FileStatus.ready;
+      case UploadSheetProcessingStage.error:
+        return _FileStatus.error;
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     final readyCount = _queue.where((f) => f.status == _FileStatus.ready).length;
+    final queuedCount = _queue.where((f) => f.status == _FileStatus.queued).length;
+    final activeCount = _queue.where((f) => f.status == _FileStatus.uploading || f.status == _FileStatus.processing).length;
 
     return Dialog(
       backgroundColor: Colors.transparent,
-      insetPadding: const EdgeInsets.symmetric(horizontal: 120, vertical: 60),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 110, vertical: 54),
       child: LayoutBuilder(builder: (ctx, constraints) {
         return Container(
-          width: constraints.maxWidth.clamp(0.0, 900.0),
-          height: constraints.maxHeight.clamp(0.0, 580.0),
+          width: constraints.maxWidth.clamp(0.0, 920.0),
+          height: constraints.maxHeight.clamp(0.0, 560.0),
           decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(24),
+            color: AppColors.cardBg,
+            borderRadius: BorderRadius.circular(14),
             boxShadow: [
               BoxShadow(
-                color: const Color(0xFF137FEC).withOpacity(0.12),
-                blurRadius: 80,
-                offset: const Offset(0, 24),
+                color: AppColors.primary.withValues(alpha: 0.10),
+                blurRadius: 60,
+                offset: const Offset(0, 18),
               ),
               BoxShadow(
-                color: Colors.black.withOpacity(0.18),
-                blurRadius: 40,
+                color: Colors.black.withValues(alpha: 0.16),
+                blurRadius: 30,
                 offset: const Offset(0, 8),
               ),
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
+            borderRadius: BorderRadius.circular(14),
             child: Row(children: [
-              // ══ LEFT — dark hero panel ══════════════════════════════
               Expanded(
-                flex: 56,
+                flex: 54,
                 child: _LeftPanel(
                   moduleTitle: widget.moduleTitle,
+                  dropZoneKey: _dropZoneKey,
                   hovering: _hovering,
+                  dropHovering: _dropHovering,
                   pulse: _pulse,
                   queueCount: _queue.length,
+                  processing: _processing,
                   onBrowse: _browse,
                   onEnter: () => setState(() => _hovering = true),
                   onExit: () => setState(() => _hovering = false),
                 ),
               ),
-
-              // ══ RIGHT — white queue panel ═══════════════════════════
               Expanded(
-                flex: 44,
+                flex: 46,
                 child: _RightPanel(
                   queue: _queue,
                   readyCount: readyCount,
+                  queuedCount: queuedCount,
+                  activeCount: activeCount,
+                  processing: _processing,
                   onRemove: _remove,
-                  onClear: _clearDone,
-                  onCancel: () => Navigator.of(context).pop(),
-                  onSave: readyCount > 0 ? _save : null,
+                  onClear: _clearTerminal,
+                  onCancel: () => Navigator.of(context).pop(readyCount > 0),
+                  onPrimary: _primaryButtonEnabled ? _primaryAction : null,
+                  primaryLabel: _primaryLabel,
                 ),
               ),
             ]),
@@ -211,6 +437,26 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
       }),
     );
   }
+
+  bool get _primaryButtonEnabled {
+    if (_processing || _queue.isEmpty) return false;
+    final hasQueued = _queue.any((f) => f.status == _FileStatus.queued);
+    final hasReady = _queue.any((f) => f.status == _FileStatus.ready);
+    return hasQueued || hasReady;
+  }
+
+  String get _primaryLabel {
+    if (_processing) return 'Processing queue...';
+    if (_queue.isEmpty) return 'Save to Course';
+    final queuedCount = _queue.where((f) => f.status == _FileStatus.queued).length;
+    final readyCount = _queue.where((f) => f.status == _FileStatus.ready).length;
+    final terminalCount = _queue.where((f) => f.status == _FileStatus.ready || f.status == _FileStatus.error).length;
+    if (queuedCount > 0) return queuedCount == 1 ? 'Upload & Analyze' : 'Upload Queue ($queuedCount)';
+    if (terminalCount == _queue.length && readyCount > 0) {
+      return readyCount == 1 ? 'Save to Course' : 'Save to Course ($readyCount)';
+    }
+    return 'Waiting for AI...';
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -218,18 +464,24 @@ class _UploadMaterialSheetState extends State<UploadMaterialSheet>
 // ─────────────────────────────────────────────────────────────────────────────
 class _LeftPanel extends StatelessWidget {
   final String moduleTitle;
+  final GlobalKey dropZoneKey;
   final bool hovering;
+  final bool dropHovering;
   final Animation<double> pulse;
   final int queueCount;
+  final bool processing;
   final VoidCallback onBrowse;
   final VoidCallback onEnter;
   final VoidCallback onExit;
 
   const _LeftPanel({
     required this.moduleTitle,
+    required this.dropZoneKey,
     required this.hovering,
+    required this.dropHovering,
     required this.pulse,
     required this.queueCount,
+    required this.processing,
     required this.onBrowse,
     required this.onEnter,
     required this.onExit,
@@ -237,33 +489,32 @@ class _LeftPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
+    final activeHover = (hovering || dropHovering) && !processing;
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0D1B2E), Color(0xFF0F2540), Color(0xFF0A1929)],
-          stops: [0.0, 0.5, 1.0],
+          colors: [Color(0xFF0B1727), Color(0xFF0F2540), Color(0xFF0A1929)],
+          stops: [0.0, 0.52, 1.0],
         ),
       ),
       child: Stack(children: [
-        // Decorative grid lines (subtle)
         Positioned.fill(child: CustomPaint(painter: _GridPainter())),
-
-        // Glowing orb behind drop zone
         AnimatedBuilder(
           animation: pulse,
           builder: (_, __) => Positioned(
-            left: -60,
-            top: -60 + pulse.value * 20,
+            left: -70,
+            top: -70 + pulse.value * 18,
             child: Container(
-              width: 320,
-              height: 320,
+              width: 300,
+              height: 300,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: RadialGradient(
                   colors: [
-                    const Color(0xFF137FEC).withOpacity(0.18 + pulse.value * 0.06),
+                    AppColors.primary.withValues(alpha: 0.16 + pulse.value * 0.05),
                     Colors.transparent,
                   ],
                 ),
@@ -271,171 +522,171 @@ class _LeftPanel extends StatelessWidget {
             ),
           ),
         ),
-
-        // Content
         Padding(
-          padding: const EdgeInsets.fromLTRB(40, 40, 40, 36),
+          padding: const EdgeInsets.fromLTRB(36, 34, 36, 30),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
               Row(children: [
                 Container(
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: const Color(0xFF137FEC).withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(
-                        color: const Color(0xFF137FEC).withOpacity(0.4)),
+                    color: AppColors.primary.withValues(alpha: 0.20),
+                    borderRadius: BorderRadius.circular(9),
+                    border: Border.all(color: AppColors.primary.withValues(alpha: 0.38)),
                   ),
-                  child: const Icon(Icons.upload_file_rounded,
-                      size: 20, color: Color(0xFF60AFFE)),
+                  child: Icon(Icons.upload_file_rounded, size: 20, color: AppColors.infoText),
                 ),
                 const SizedBox(width: 12),
-                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                  const Text('Upload Materials',
+                Expanded(
+                  child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(
+                      processing ? 'AI Pipeline Running' : 'Upload Materials',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: Color(0xFF60AFFE),
-                          letterSpacing: 0.5)),
-                  Text('→ $moduleTitle',
-                      style: TextStyle(
-                          fontSize: 11,
-                          color: Colors.white.withOpacity(0.4))),
-                ]),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.infoText,
+                        letterSpacing: 0.35,
+                      ),
+                    ),
+                    Text(
+                      '→ $moduleTitle',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(fontSize: 11, color: Colors.white.withValues(alpha: 0.46)),
+                    ),
+                  ]),
+                ),
               ]),
-
-              const SizedBox(height: 36),
-
-              // Big headline
+              const SizedBox(height: 32),
               const Text(
-                'Drop your\nfiles here.',
+                'Upload PDFs\nfor AI analysis.',
                 style: TextStyle(
-                  fontSize: 38,
+                  fontSize: 34,
                   fontWeight: FontWeight.w800,
                   color: Colors.white,
-                  height: 1.1,
-                  letterSpacing: -1.0,
+                  height: 1.08,
+                  letterSpacing: -0.8,
                 ),
               ),
               const SizedBox(height: 12),
               Text(
-                'PDF, DOCX, PPTX, MP4  ·  Max 500 MB',
-                style: TextStyle(
-                    fontSize: 13,
-                    color: Colors.white.withOpacity(0.45)),
+                'One file is processed at a time · PDF only · Max 50 MB',
+                style: TextStyle(fontSize: 13, color: Colors.white.withValues(alpha: 0.48)),
               ),
-
-              const SizedBox(height: 40),
-
-              // Drop zone box
+              const SizedBox(height: 34),
               Expanded(
                 child: MouseRegion(
                   onEnter: (_) => onEnter(),
                   onExit: (_) => onExit(),
                   child: GestureDetector(
-                    onTap: onBrowse,
+                    onTap: processing ? null : onBrowse,
                     child: AnimatedBuilder(
                       animation: pulse,
                       builder: (_, __) => AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
+                        key: dropZoneKey,
+                        duration: const Duration(milliseconds: 180),
                         width: double.infinity,
                         decoration: BoxDecoration(
-                          color: hovering
-                              ? const Color(0xFF137FEC).withOpacity(0.12)
-                              : Colors.white.withOpacity(0.04 + pulse.value * 0.02),
-                          borderRadius: BorderRadius.circular(20),
+                          color: activeHover
+                              ? AppColors.primary.withValues(alpha: 0.12)
+                              : Colors.white.withValues(alpha: 0.04 + pulse.value * 0.015),
+                          borderRadius: BorderRadius.circular(14),
                           border: Border.all(
-                            color: hovering
-                                ? const Color(0xFF137FEC)
-                                : Colors.white.withOpacity(0.12 + pulse.value * 0.06),
-                            width: hovering ? 2.0 : 1.5,
+                            color: activeHover
+                                ? AppColors.primary
+                                : Colors.white.withValues(alpha: 0.12 + pulse.value * 0.05),
+                            width: activeHover ? 2 : 1.3,
                           ),
                         ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            // Animated icon
                             AnimatedBuilder(
                               animation: pulse,
                               builder: (_, __) => Transform.translate(
-                                offset: Offset(0, -4 + pulse.value * 8),
+                                offset: Offset(0, -3 + pulse.value * 6),
                                 child: Container(
-                                  width: 80,
-                                  height: 80,
+                                  width: 74,
+                                  height: 74,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: hovering
-                                        ? const Color(0xFF137FEC).withOpacity(0.25)
-                                        : Colors.white.withOpacity(0.07),
+                                    color: activeHover
+                                        ? AppColors.primary.withValues(alpha: 0.24)
+                                        : Colors.white.withValues(alpha: 0.07),
                                     border: Border.all(
-                                      color: hovering
-                                          ? const Color(0xFF60AFFE).withOpacity(0.6)
-                                          : Colors.white.withOpacity(0.15),
+                                      color: activeHover
+                                          ? AppColors.infoText.withValues(alpha: 0.58)
+                                          : Colors.white.withValues(alpha: 0.15),
                                     ),
                                   ),
                                   child: Icon(
-                                    hovering
-                                        ? Icons.cloud_done_outlined
-                                        : Icons.cloud_upload_outlined,
-                                    size: 36,
-                                    color: hovering
-                                        ? const Color(0xFF60AFFE)
-                                        : Colors.white.withOpacity(0.6),
+                                    processing ? Icons.sync_rounded : Icons.cloud_upload_outlined,
+                                    size: 34,
+                                    color: processing
+                                        ? AppColors.infoText
+                                        : Colors.white.withValues(alpha: 0.62),
                                   ),
                                 ),
                               ),
                             ),
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 18),
                             Text(
-                              hovering
-                                  ? 'Release to add files'
-                                  : 'Drag & drop files',
+                              processing
+                                  ? 'Queue is locked while processing'
+                                  : dropHovering
+                                      ? 'Drop PDFs to add them'
+                                      : hovering
+                                          ? 'Click to add PDFs'
+                                          : 'Drag & drop PDFs',
                               style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.w700,
-                                color: hovering
-                                    ? const Color(0xFF60AFFE)
-                                    : Colors.white.withOpacity(0.85),
-                                letterSpacing: -0.3,
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: activeHover
+                                    ? AppColors.infoText
+                                    : Colors.white.withValues(alpha: 0.86),
+                                letterSpacing: -0.2,
                               ),
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              'or click anywhere here to browse',
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.white.withOpacity(0.4),
-                              ),
+                              queueCount == 0
+                                  ? 'Files will move from queued → processing → ready'
+                                  : '$queueCount file${queueCount == 1 ? '' : 's'} in queue',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(fontSize: 12.5, color: Colors.white.withValues(alpha: 0.42)),
                             ),
-                            const SizedBox(height: 28),
-                            // Browse button
-                            GestureDetector(
-                              onTap: onBrowse,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 32, vertical: 13),
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFF137FEC),
-                                  borderRadius: BorderRadius.circular(10),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: const Color(0xFF137FEC)
-                                          .withOpacity(0.4),
-                                      blurRadius: 20,
-                                      offset: const Offset(0, 6),
+                            const SizedBox(height: 24),
+                            IgnorePointer(
+                              ignoring: processing,
+                              child: Opacity(
+                                opacity: processing ? 0.55 : 1,
+                                child: GestureDetector(
+                                  onTap: onBrowse,
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.primary,
+                                      borderRadius: BorderRadius.circular(9),
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: AppColors.primary.withValues(alpha: 0.34),
+                                          blurRadius: 18,
+                                          offset: const Offset(0, 5),
+                                        ),
+                                      ],
                                     ),
-                                  ],
-                                ),
-                                child: const Text(
-                                  'Browse Files',
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    letterSpacing: 0.2,
+                                    child: const Text(
+                                      'Browse Files',
+                                      style: TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                        color: Colors.white,
+                                      ),
+                                    ),
                                   ),
                                 ),
                               ),
@@ -447,22 +698,11 @@ class _LeftPanel extends StatelessWidget {
                   ),
                 ),
               ),
-
-              const SizedBox(height: 16),
-
-              // Tips — compact inline
-              Row(children: [
-                const Icon(Icons.auto_awesome_rounded, size: 13, color: Color(0xFF60AFFE)),
-                const SizedBox(width: 6),
-                Text('AI auto-analysis', style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.45))),
-                const SizedBox(width: 16),
-                const Icon(Icons.layers_outlined, size: 13, color: Color(0xFF60AFFE)),
-                const SizedBox(width: 6),
-                Text('Multi-file upload', style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.45))),
-                const SizedBox(width: 16),
-                const Icon(Icons.text_snippet_outlined, size: 13, color: Color(0xFF60AFFE)),
-                const SizedBox(width: 6),
-                Text('OCR supported', style: TextStyle(fontSize: 11.5, color: Colors.white.withOpacity(0.45))),
+              const SizedBox(height: 14),
+              Wrap(spacing: 14, runSpacing: 8, children: [
+                _Tip(icon: Icons.auto_awesome_rounded, text: 'AI auto-analysis'),
+                _Tip(icon: Icons.linear_scale_rounded, text: 'Sequential queue'),
+                _Tip(icon: Icons.text_snippet_outlined, text: 'OCR supported'),
               ]),
             ],
           ),
@@ -472,14 +712,27 @@ class _LeftPanel extends StatelessWidget {
   }
 }
 
+class _Tip extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _Tip({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) => Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(icon, size: 13, color: AppColors.infoText),
+        const SizedBox(width: 6),
+        Text(text, style: TextStyle(fontSize: 11.5, color: Colors.white.withValues(alpha: 0.46))),
+      ]);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
-//  Subtle grid painter
+//  Grid painter
 // ─────────────────────────────────────────────────────────────────────────────
 class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = Colors.white.withOpacity(0.025)
+      ..color = Colors.white.withValues(alpha: 0.025)
       ..strokeWidth = 1;
     const step = 48.0;
     for (double x = 0; x < size.width; x += step) {
@@ -500,182 +753,175 @@ class _GridPainter extends CustomPainter {
 class _RightPanel extends StatelessWidget {
   final List<_QueuedFile> queue;
   final int readyCount;
+  final int queuedCount;
+  final int activeCount;
+  final bool processing;
   final ValueChanged<int> onRemove;
   final VoidCallback onClear;
   final VoidCallback onCancel;
-  final VoidCallback? onSave;
+  final VoidCallback? onPrimary;
+  final String primaryLabel;
 
   const _RightPanel({
     required this.queue,
     required this.readyCount,
+    required this.queuedCount,
+    required this.activeCount,
+    required this.processing,
     required this.onRemove,
     required this.onClear,
     required this.onCancel,
-    this.onSave,
+    required this.onPrimary,
+    required this.primaryLabel,
   });
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     return Container(
-      color: Colors.white,
+      color: AppColors.cardBg,
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Queue header
         Padding(
-          padding: const EdgeInsets.fromLTRB(28, 32, 28, 0),
+          padding: const EdgeInsets.fromLTRB(26, 28, 26, 0),
           child: Row(children: [
-            const Text('Upload Queue',
-                style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                    letterSpacing: -0.4)),
+            Text(
+              'Processing Queue',
+              style: TextStyle(
+                fontSize: 19,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textTitle,
+                letterSpacing: -0.35,
+              ),
+            ),
             const Spacer(),
             if (queue.isNotEmpty)
               Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFEFF6FF),
-                  borderRadius: BorderRadius.circular(20),
+                  color: activeCount > 0 ? const Color(0xFFFFF7E6) : AppColors.primarySoft,
+                  borderRadius: BorderRadius.circular(999),
                 ),
-                child: Text('${queue.length} Files',
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.primary)),
+                child: Text(
+                  activeCount > 0 ? '$activeCount active' : '${queue.length} files',
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    fontWeight: FontWeight.w800,
+                    color: activeCount > 0 ? const Color(0xFFD97706) : AppColors.primary,
+                  ),
+                ),
               ),
           ]),
         ),
-
         const SizedBox(height: 8),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 28),
+          padding: const EdgeInsets.symmetric(horizontal: 26),
           child: Text(
             queue.isEmpty
                 ? 'Files you add will appear here'
-                : '$readyCount of ${queue.length} ready to save',
-            style: const TextStyle(fontSize: 13, color: Color(0xFF94A3B8)),
+                : '$readyCount ready · $queuedCount queued${activeCount > 0 ? ' · $activeCount processing' : ''}',
+            style: TextStyle(fontSize: 13, color: AppColors.textHint),
           ),
         ),
-
-        const SizedBox(height: 20),
-        const Divider(height: 1, color: Color(0xFFF1F5F9)),
-
-        // File list
+        const SizedBox(height: 18),
+        Divider(height: 1, color: AppColors.headerBg),
         Expanded(
           child: queue.isEmpty
               ? Center(
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     Container(
-                      width: 72,
-                      height: 72,
+                      width: 66,
+                      height: 66,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF8FAFC),
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: const Color(0xFFE2E8F0)),
+                        color: AppColors.surfaceBg,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
                       ),
-                      child: const Icon(Icons.inbox_outlined,
-                          size: 32, color: Color(0xFFCBD5E1)),
+                      child: Icon(Icons.inbox_outlined, size: 30, color: AppColors.borderSoft),
                     ),
-                    const SizedBox(height: 16),
-                    const Text('Nothing here yet',
-                        style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Color(0xFF94A3B8))),
+                    const SizedBox(height: 15),
+                    Text(
+                      'Nothing here yet',
+                      style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800, color: AppColors.textHint),
+                    ),
                     const SizedBox(height: 6),
-                    const Text('Drop files on the left\nto add them to the queue',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: Color(0xFFCBD5E1),
-                            height: 1.5)),
+                    Text(
+                      'Add PDFs from the left.\nEach file will process one by one.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(fontSize: 13, color: AppColors.borderSoft, height: 1.45),
+                    ),
                   ]),
                 )
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(0, 8, 0, 8),
                   itemCount: queue.length,
-                  separatorBuilder: (_, __) =>
-                      const Divider(height: 1, color: Color(0xFFF8FAFC)),
+                  separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.surfaceBg),
                   itemBuilder: (_, i) => _QueueTile(
                     file: queue[i],
                     onRemove: () => onRemove(i),
                   ),
                 ),
         ),
-
-        // Queue actions
         if (queue.isNotEmpty) ...[
-          const Divider(height: 1, color: Color(0xFFF1F5F9)),
+          Divider(height: 1, color: AppColors.headerBg),
           Padding(
-            padding: const EdgeInsets.fromLTRB(28, 12, 28, 8),
+            padding: const EdgeInsets.fromLTRB(26, 12, 26, 8),
             child: SizedBox(
               width: double.infinity,
-              height: 38,
+              height: 36,
               child: OutlinedButton(
-                onPressed: readyCount > 0 ? onClear : null,
+                onPressed: processing ? null : onClear,
                 style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFFE2E8F0)),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(9)),
-                  foregroundColor: const Color(0xFF64748B),
+                  side: BorderSide(color: AppColors.border),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                  foregroundColor: AppColors.textMuted,
                 ),
-                child: const Text('Clear Completed',
-                    style:
-                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                child: const Text('Clear completed / failed', style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
               ),
             ),
           ),
         ],
-
-        // Footer buttons
         Container(
-          padding: const EdgeInsets.fromLTRB(28, 16, 28, 28),
-          decoration: const BoxDecoration(
-            border: Border(top: BorderSide(color: Color(0xFFF1F5F9))),
-          ),
+          padding: const EdgeInsets.fromLTRB(26, 14, 26, 24),
+          decoration: BoxDecoration(border: Border(top: BorderSide(color: AppColors.headerBg))),
           child: Column(children: [
-            // Save
             SizedBox(
               width: double.infinity,
-              height: 48,
+              height: 46,
               child: ElevatedButton.icon(
-                onPressed: onSave,
-                icon: const Icon(Icons.save_alt_rounded, size: 18),
-                label: Text(
-                  readyCount > 1
-                      ? 'Save to Course ($readyCount)'
-                      : 'Save to Course',
-                  style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w700),
-                ),
+                onPressed: onPrimary,
+                icon: processing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                      )
+                    : Icon(
+                        queuedCount > 0 ? Icons.file_upload_outlined : Icons.save_alt_rounded,
+                        size: 18,
+                      ),
+                label: Text(primaryLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800)),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF137FEC),
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
-                  disabledBackgroundColor: const Color(0xFFE2E8F0),
-                  disabledForegroundColor: const Color(0xFF94A3B8),
+                  disabledBackgroundColor: AppColors.border,
+                  disabledForegroundColor: AppColors.textHint,
                   elevation: 0,
                   shadowColor: Colors.transparent,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(9)),
                 ),
               ),
             ),
-            const SizedBox(height: 10),
-            // Cancel
+            const SizedBox(height: 9),
             SizedBox(
               width: double.infinity,
-              height: 44,
+              height: 40,
               child: TextButton(
-                onPressed: onCancel,
+                onPressed: processing ? null : onCancel,
                 style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFF94A3B8),
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
+                  foregroundColor: AppColors.textHint,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                 ),
-                child: const Text('Cancel',
-                    style: TextStyle(
-                        fontSize: 14, fontWeight: FontWeight.w500)),
+                child: const Text('Cancel', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
               ),
             ),
           ]),
@@ -693,94 +939,111 @@ class _QueueTile extends StatelessWidget {
   final VoidCallback onRemove;
   const _QueueTile({required this.file, required this.onRemove});
 
-  (IconData, Color, Color) get _style {
+  (IconData, Color, Color) get _fileVisual {
     switch (file.ext) {
       case 'PDF':
-        return (Icons.picture_as_pdf_rounded,
-            const Color(0xFFFEE2E2), const Color(0xFFEF4444));
-      case 'MP4': case 'MOV':
-        return (Icons.play_circle_filled_rounded,
-            const Color(0xFFDBEAFE), const Color(0xFF3B82F6));
-      case 'DOCX': case 'DOC':
-        return (Icons.article_rounded,
-            const Color(0xFFDCFCE7), const Color(0xFF22C55E));
-      case 'PPTX': case 'PPT':
-        return (Icons.slideshow_rounded,
-            const Color(0xFFFFEDD5), const Color(0xFFF97316));
+        return (Icons.picture_as_pdf_rounded, AppColors.dangerBorder, AppColors.errorDot);
       default:
-        return (Icons.insert_drive_file_rounded,
-            const Color(0xFFF3E8FF), const Color(0xFFA855F7));
+        return (Icons.insert_drive_file_rounded, AppColors.purpleBg, const Color(0xFFA855F7));
+    }
+  }
+
+  (String, IconData, Color, Color) get _statusVisual {
+    switch (file.status) {
+      case _FileStatus.queued:
+        return ('Queued', Icons.schedule_rounded, AppColors.primarySoft, AppColors.primary);
+      case _FileStatus.uploading:
+        return ('Uploading', Icons.cloud_upload_rounded, const Color(0xFFE0F2FE), const Color(0xFF0369A1));
+      case _FileStatus.processing:
+        return ('Processing', Icons.sync_rounded, const Color(0xFFFFF7E6), const Color(0xFFD97706));
+      case _FileStatus.ready:
+        return ('Ready', Icons.check_circle_rounded, AppColors.successBg, AppColors.successDot);
+      case _FileStatus.error:
+        return ('Error', Icons.error_outline_rounded, AppColors.dangerBg, AppColors.errorDot);
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final (icon, iconBg, iconFg) = _style;
-    final isReady = file.status == _FileStatus.ready;
-    final isError = file.status == _FileStatus.error;
+    Theme.of(context);
+    final (icon, iconBg, iconFg) = _fileVisual;
+    final (statusLabel, statusIcon, statusBg, statusFg) = _statusVisual;
+    final showProgress = file.status == _FileStatus.uploading || file.status == _FileStatus.processing;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(28, 12, 20, 12),
-      child: Row(children: [
+      padding: const EdgeInsets.fromLTRB(26, 12, 18, 12),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.center, children: [
         Container(
-          width: 46,
-          height: 46,
-          decoration: BoxDecoration(
-              color: iconBg, borderRadius: BorderRadius.circular(12)),
-          child: Icon(icon, size: 22, color: iconFg),
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(color: iconBg, borderRadius: BorderRadius.circular(10)),
+          child: Icon(icon, size: 21, color: iconFg),
         ),
-        const SizedBox(width: 14),
+        const SizedBox(width: 12),
         Expanded(
-          child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-            Text(file.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: Color(0xFF1E293B))),
-            const SizedBox(height: 5),
-            if (isReady)
-              Row(children: [
-                const Icon(Icons.check_circle_rounded,
-                    size: 14, color: Color(0xFF22C55E)),
-                const SizedBox(width: 5),
-                Text(file.displaySize,
-                    style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF22C55E))),
-                const SizedBox(width: 8),
-                const Text('Ready for Review',
-                    style: TextStyle(
-                        fontSize: 12, color: Color(0xFF94A3B8))),
-              ])
-            else if (isError)
-              Row(children: [
-                const Icon(Icons.error_outline_rounded,
-                    size: 14, color: Color(0xFFEF4444)),
-                const SizedBox(width: 5),
-                Expanded(
-                  child: Text(file.errorMsg ?? 'Error',
-                      style: const TextStyle(
-                          fontSize: 12, color: Color(0xFFEF4444))),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Row(children: [
+              Expanded(
+                child: Text(
+                  file.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(fontSize: 13.5, fontWeight: FontWeight.w800, color: AppColors.textGray),
                 ),
-              ]),
+              ),
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(color: statusBg, borderRadius: BorderRadius.circular(999)),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(statusIcon, size: 12, color: statusFg),
+                  const SizedBox(width: 4),
+                  Text(statusLabel, style: TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, color: statusFg)),
+                ]),
+              ),
+            ]),
+            const SizedBox(height: 6),
+            Text(
+              file.message ?? file.displaySize,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 12,
+                height: 1.25,
+                color: file.status == _FileStatus.error ? AppColors.errorDot : AppColors.textHint,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            if (showProgress) ...[
+              const SizedBox(height: 7),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  minHeight: 4,
+                  value: file.status == _FileStatus.processing
+                      ? null
+                      : file.progress.clamp(0.0, 1.0).toDouble(),
+                  backgroundColor: AppColors.surfaceBg,
+                ),
+              ),
+            ],
           ]),
         ),
+        const SizedBox(width: 10),
         InkWell(
-          onTap: onRemove,
+          hoverColor: Colors.transparent,
+          splashColor: Colors.transparent,
+          highlightColor: Colors.transparent,
+          overlayColor: const WidgetStatePropertyAll(Colors.transparent),
+          onTap: file.canRemove ? onRemove : null,
           borderRadius: BorderRadius.circular(8),
-          child: Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(8),
+          child: Opacity(
+            opacity: file.canRemove ? 1 : 0.35,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(8)),
+              child: Icon(Icons.close_rounded, size: 14, color: AppColors.borderSoft),
             ),
-            child: const Icon(Icons.close_rounded,
-                size: 14, color: Color(0xFFCBD5E1)),
           ),
         ),
       ]),

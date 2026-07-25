@@ -1,6 +1,9 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:convert';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
+
+import '../network/api_exceptions.dart';
 import '../storage/token_storage.dart';
 import '../storage/user_storage.dart';
 import '../../features/auth/data/auth_providers.dart';
@@ -23,49 +26,155 @@ class AppBootstrapController extends Notifier<AppBootstrapState> {
       final hasToken = TokenStorage.hasToken;
       final isPersisted = TokenStorage.isPersisted;
 
-      // On web: even when sessionStorage is wiped (F5 / tab reopen / browser reopen),
-      // the HttpOnly refresh cookie may still be alive. Always attempt a silent
-      // refresh before declaring the user a guest.
-      //
-      // On native: no cookie mechanism — if there is no token and no persist
-      // flag the user is definitively a guest.
-      final mightHaveCookie = kIsWeb;
+      // On Flutter Web/Wasm the refresh token is an HttpOnly cookie. Dart
+      // cannot read that cookie, so absence of a local access token does not
+      // mean the browser session is gone. Always allow one silent /auth/refresh
+      // attempt before deciding the user is a guest.
 
-      if (!hasToken && !isPersisted && !mightHaveCookie) {
-        state = AppBootstrapState.done;
-        return;
-      }
+      final currentToken = TokenStorage.token?.trim();
+      final needsRefresh = currentToken == null ||
+          currentToken.isEmpty ||
+          _shouldRefreshAccessToken(currentToken);
 
-      if (UserStorage.hasMe && hasToken) {
+      if (!needsRefresh && UserStorage.hasMe && hasToken) {
+        ref.read(apiClientProvider).scheduleProactiveRefresh(currentToken);
         state = AppBootstrapState.done;
         return;
       }
 
       final api = ref.read(authApiProvider);
 
-      if (!hasToken) {
+      if (needsRefresh) {
         try {
-          final newToken = await api.refresh();
+          final newToken = await api.refresh(logFailure: false);
           TokenStorage.saveSession(
             accessToken: newToken,
             persist: isPersisted,
           );
-        } catch (_) {
-          TokenStorage.clear();
-          UserStorage.clear();
+          ref.read(apiClientProvider).scheduleProactiveRefresh(newToken);
+        } catch (e) {
+          // Refresh auth failure means the cookie/token is invalid, so logout.
+          // Infrastructure failure (server down/restarting/timeout) must not
+          // destroy the saved session; the user can recover when the backend
+          // is available again.
+          if (_isRefreshAuthFailure(e)) {
+            TokenStorage.clear();
+            UserStorage.clear();
+          }
           state = AppBootstrapState.done;
           return;
         }
+      } else {
+        ref.read(apiClientProvider).scheduleProactiveRefresh(currentToken);
       }
 
       final raw = await api.me();
       final normalized = _normalize(raw);
-      UserStorage.saveMe(normalized, persist: TokenStorage.isPersisted);
-    } catch (_) {
-      TokenStorage.clear();
-      UserStorage.clear();
+
+      final existing = UserStorage.meJson;
+      final Map<String, dynamic> merged;
+
+      if (existing != null) {
+        final existingUser = (existing['user'] is Map)
+            ? (existing['user'] as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
+
+        final newUser = (normalized['user'] is Map)
+            ? (normalized['user'] as Map).cast<String, dynamic>()
+            : <String, dynamic>{};
+
+        final mergedUser = <String, dynamic>{...existingUser};
+        newUser.forEach((k, v) {
+          if (v != null) mergedUser[k] = v;
+        });
+
+        merged = {
+          ...existing,
+          ...normalized,
+          'user': mergedUser,
+        };
+      } else {
+        merged = normalized;
+      }
+
+      UserStorage.saveMe(merged, persist: TokenStorage.isPersisted);
+    } catch (e) {
+      // Do not log the user out just because /auth/me could not be reached
+      // during startup. Only explicit 401/403 auth responses should clear the
+      // local session.
+      if (_isAuthFailure(e)) {
+        TokenStorage.clear();
+        UserStorage.clear();
+      }
     } finally {
       state = AppBootstrapState.done;
+    }
+  }
+
+  static bool _isRefreshAuthFailure(Object error) {
+    final ex = _extractApiException(error);
+    final status = ex?.statusCode;
+    final code = ex?.cleanCode;
+
+    return status == 401 ||
+        status == 403 ||
+        code == 'REFRESH_AUTH_FAILED' ||
+        code == 'REFRESH_EXPIRED' ||
+        code == 'REFRESH_REVOKED';
+  }
+
+  static bool _isAuthFailure(Object error) {
+    final ex = _extractApiException(error);
+    final status = ex?.statusCode;
+    return status == 401 || status == 403;
+  }
+
+  static ApiException? _extractApiException(Object error) {
+    if (error is ApiException) return error;
+    if (error is DioException && error.error is ApiException) {
+      return error.error as ApiException;
+    }
+    if (error is DioException) {
+      final status = error.response?.statusCode;
+      if (status != null) {
+        return ApiException(
+          error.message ?? 'Request failed.',
+          statusCode: status,
+        );
+      }
+    }
+    return null;
+  }
+
+  static bool _shouldRefreshAccessToken(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return true;
+
+      String pad(String s) {
+        final rem = s.length % 4;
+        return rem == 0 ? s : s + '=' * (4 - rem);
+      }
+
+      final payload = jsonDecode(
+        utf8.decode(base64Url.decode(pad(parts[1]))),
+      ) as Map<String, dynamic>;
+
+      final exp = payload['exp'];
+      if (exp is! num) return true;
+
+      final expiry = DateTime.fromMillisecondsSinceEpoch(
+        exp.toInt() * 1000,
+        isUtc: true,
+      );
+
+      final refreshBefore = DateTime.now()
+          .toUtc()
+          .add(const Duration(minutes: 2));
+
+      return !expiry.isAfter(refreshBefore);
+    } catch (_) {
+      return true;
     }
   }
 

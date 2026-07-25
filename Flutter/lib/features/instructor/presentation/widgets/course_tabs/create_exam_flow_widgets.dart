@@ -1,0 +1,1485 @@
+part of 'create_exam_flow.dart';
+
+class _Stepper extends StatelessWidget {
+  final int current;
+  const _Stepper({required this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    const steps = [
+      (1, 'Questions', 'Build the set'),
+      (2, 'Settings', 'Configure exam'),
+      (3, 'Preview', 'Final review'),
+    ];
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(22, 18, 22, 16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 20, offset: const Offset(0, 8))],
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < steps.length; i++) ...[
+            Expanded(
+              child: _ProgressStep(
+                index: steps[i].$1,
+                label: steps[i].$2,
+                caption: steps[i].$3,
+                current: current,
+              ),
+            ),
+            if (i != steps.length - 1)
+              Expanded(
+                child: Container(
+                  height: 2,
+                  margin: const EdgeInsets.only(bottom: 28),
+                  decoration: BoxDecoration(
+                    color: current > steps[i].$1 ? AppColors.primary : AppColors.border,
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                ),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _ProgressStep extends StatelessWidget {
+  final int index;
+  final String label;
+  final String caption;
+  final int current;
+
+  const _ProgressStep({required this.index, required this.label, required this.caption, required this.current});
+
+  @override
+  Widget build(BuildContext context) {
+    final active = current == index;
+    final done = current > index;
+    final tone = done || active ? AppColors.primary : AppColors.textMuted;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          width: 34,
+          height: 34,
+          decoration: BoxDecoration(
+            color: done || active ? AppColors.primary : AppColors.surfaceBg,
+            borderRadius: BorderRadius.circular(17),
+            border: Border.all(color: done || active ? AppColors.primary : AppColors.border, width: 1.2),
+          ),
+          child: Center(
+            child: done
+                ? const Icon(Icons.check_rounded, color: Colors.white, size: 18)
+                : Text(
+                    '$index',
+                    style: TextStyle(
+                      color: active ? Colors.white : AppColors.textMuted,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 12,
+                    ),
+                  ),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(label, style: TextStyle(color: tone, fontWeight: FontWeight.w900, fontSize: 12.5)),
+        const SizedBox(height: 2),
+        Text(caption, style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600, fontSize: 11)),
+      ],
+    );
+  }
+}
+
+
+class _SettingsStep extends StatelessWidget {
+  final TextEditingController titleCtrl;
+  final TextEditingController descriptionCtrl;
+  final TextEditingController instructionsCtrl;
+  final TextEditingController durationCtrl;
+  final TextEditingController attemptsCtrl;
+  final TextEditingController passingScoreCtrl;
+  final String examType;
+  final ExamTemplateModel selectedTemplate;
+  final DateTime? availableFrom;
+  final DateTime? availableTo;
+  final bool shuffleQuestions;
+  final bool shuffleAnswers;
+  final bool showResultImmediately;
+  final bool allowReview;
+  final bool publishAfterSave;
+  final double totalPoints;
+  final ValueChanged<String> onExamTypeChanged;
+  final ValueChanged<DateTime?> onStartChanged;
+  final ValueChanged<DateTime?> onEndChanged;
+  final ValueChanged<bool> onShuffleQuestionsChanged;
+  final ValueChanged<bool> onShuffleAnswersChanged;
+  final ValueChanged<bool> onShowResultChanged;
+  final ValueChanged<bool> onAllowReviewChanged;
+  final ValueChanged<bool> onPublishChanged;
+
+  const _SettingsStep({
+    required this.titleCtrl,
+    required this.descriptionCtrl,
+    required this.instructionsCtrl,
+    required this.durationCtrl,
+    required this.attemptsCtrl,
+    required this.passingScoreCtrl,
+    required this.examType,
+    required this.selectedTemplate,
+    required this.availableFrom,
+    required this.availableTo,
+    required this.shuffleQuestions,
+    required this.shuffleAnswers,
+    required this.showResultImmediately,
+    required this.allowReview,
+    required this.publishAfterSave,
+    required this.totalPoints,
+    required this.onExamTypeChanged,
+    required this.onStartChanged,
+    required this.onEndChanged,
+    required this.onShuffleQuestionsChanged,
+    required this.onShuffleAnswersChanged,
+    required this.onShowResultChanged,
+    required this.onAllowReviewChanged,
+    required this.onPublishChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return _Panel(
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final wide = constraints.maxWidth > 980;
+          final left = Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const _PanelTitle(
+                icon: Icons.tune_rounded,
+                title: 'Exam settings',
+                subtitle: 'Core fields are sent to the current backend. Review/result preferences are kept in the flow UI until backend fields exist.',
+              ),
+              const SizedBox(height: 18),
+              _TextInput(label: 'Title', controller: titleCtrl, hint: 'Midterm Exam'),
+              const SizedBox(height: 14),
+              _TextInput(label: 'Description', controller: descriptionCtrl, hint: 'Short student-facing description', maxLines: 3),
+              const SizedBox(height: 14),
+              _TextInput(label: 'Instructions', controller: instructionsCtrl, hint: 'Rules, allowed materials, grading notes...', maxLines: 5),
+            ],
+          );
+
+          final right = Column(
+            children: [
+              _TemplateAppliedCard(template: selectedTemplate),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: _SelectField<String>(
+                      label: 'Exam type',
+                      value: examType,
+                      hint: 'Quiz',
+                      items: const [
+                        DropdownMenuItem(value: 'quiz', child: Text('Quiz')),
+                        DropdownMenuItem(value: 'midterm', child: Text('Midterm')),
+                        DropdownMenuItem(value: 'final', child: Text('Final')),
+                        DropdownMenuItem(value: 'practice', child: Text('Practice')),
+                      ],
+                      onChanged: (value) => onExamTypeChanged(value ?? 'quiz'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(child: _TextInput(label: 'Duration', controller: durationCtrl, hint: '60', suffix: 'min', number: true)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(child: _TextInput(label: 'Attempts', controller: attemptsCtrl, hint: '1', number: true)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _TextInput(label: 'Passing score', controller: passingScoreCtrl, hint: '60', suffix: '%', number: true)),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(child: _DateField(label: 'Start date', value: availableFrom, onChanged: onStartChanged)),
+                  const SizedBox(width: 12),
+                  Expanded(child: _DateField(label: 'End date', value: availableTo, onChanged: onEndChanged)),
+                ],
+              ),
+              const SizedBox(height: 18),
+              _SwitchTile(title: 'Shuffle questions', subtitle: 'Randomize question order per attempt.', value: shuffleQuestions, onChanged: onShuffleQuestionsChanged),
+              _SwitchTile(title: 'Shuffle answers', subtitle: 'Randomize options where supported.', value: shuffleAnswers, onChanged: onShuffleAnswersChanged),
+              _SwitchTile(title: 'Show result immediately', subtitle: 'UI preference; backend field not available yet.', value: showResultImmediately, onChanged: onShowResultChanged),
+              _SwitchTile(title: 'Allow review', subtitle: 'UI preference; backend field not available yet.', value: allowReview, onChanged: onAllowReviewChanged),
+              const SizedBox(height: 12),
+              _PublishSelector(value: publishAfterSave, onChanged: onPublishChanged),
+              const SizedBox(height: 12),
+              _ScopeMetric(label: 'Current total points', value: _points(totalPoints), icon: Icons.scoreboard_outlined),
+            ],
+          );
+
+          final content = !wide
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [left, const SizedBox(height: 22), right],
+                )
+              : Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 11, child: left),
+                    const SizedBox(width: 26),
+                    Expanded(flex: 9, child: right),
+                  ],
+                );
+
+          return Scrollbar(
+            child: SingleChildScrollView(
+              child: content,
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+
+class _TemplateAppliedCard extends StatelessWidget {
+  final ExamTemplateModel template;
+
+  const _TemplateAppliedCard({required this.template});
+
+  @override
+  Widget build(BuildContext context) {
+    final distribution = template.sections.where((section) => section.questionCount > 0).toList()
+      ..sort((a, b) => a.orderIndex.compareTo(b.orderIndex));
+    final chips = <String>[
+      '${template.questionCount} questions',
+      '${template.durationMinutes} min',
+      '${template.maxAttempts} attempt${template.maxAttempts == 1 ? '' : 's'}',
+      '${template.passingScore.toStringAsFixed(0)}% pass',
+      if (distribution.isNotEmpty) ...distribution.map((section) => '${section.questionCount} ${_shortTemplateTypeLabel(section.questionType)}'),
+      if (distribution.isEmpty && template.preferredType != null) template.preferredType!.label,
+      if (template.preferredDifficulty != null) template.preferredDifficulty!.label,
+    ];
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.18)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.description_outlined, color: AppColors.primary, size: 18),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  template.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w900, fontSize: 13.5),
+                ),
+              ),
+            ],
+          ),
+          if (template.description.trim().isNotEmpty) ...[
+            const SizedBox(height: 6),
+            Text(
+              template.description.trim(),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w700, fontSize: 12),
+            ),
+          ],
+          const SizedBox(height: 10),
+          Wrap(
+            spacing: 6,
+            runSpacing: 6,
+            children: chips.map((chip) => _TinyPill(label: chip)).toList(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+
+String _shortTemplateTypeLabel(String questionType) {
+  switch (questionType) {
+    case 'true_false':
+      return 'TF';
+    case 'short_answer':
+      return 'SA';
+    case 'essay':
+      return 'Essay';
+    case 'multi_select':
+      return 'MS';
+    default:
+      return 'MCQ';
+  }
+}
+
+class _QuestionSelectionStep extends StatelessWidget {
+  final List<_TopicTarget> targets;
+  final List<QuestionModel> questions;
+  final ExamTemplateModel template;
+  final int scopedCount;
+  final ValueChanged<QuestionModel> onRemove;
+  final ValueChanged<QuestionModel> onReplace;
+
+  const _QuestionSelectionStep({
+    required this.targets,
+    required this.questions,
+    required this.template,
+    required this.scopedCount,
+    required this.onRemove,
+    required this.onReplace,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = <QuestionType, List<QuestionModel>>{};
+    for (final type in QuestionType.values) {
+      final items = questions.where((question) => question.type == type).toList();
+      if (items.isNotEmpty) grouped[type] = items;
+    }
+
+    return _Panel(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(22, 20, 22, 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _PanelTitle(
+                    icon: Icons.playlist_add_check_rounded,
+                    title: 'Question set',
+                    subtitle:
+                        '${template.name} template • ${questions.length} selected from $scopedCount scoped questions. Replace or remove questions before settings.',
+                  ),
+                ),
+                const SizedBox(width: 18),
+                _QuestionSetSummary(label: 'Target', value: '${template.questionCount}'),
+                const SizedBox(width: 10),
+                _QuestionSetSummary(label: 'Selected', value: '${questions.length}'),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border),
+          Expanded(
+            child: questions.isEmpty
+                ? const _EmptyState(
+                    title: 'No questions selected',
+                    message: 'The chosen scope has no saved questions. Go back and pick another scope.',
+                  )
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(22, 18, 22, 22),
+                    children: [
+                      for (final entry in grouped.entries) ...[
+                        _QuestionTypeSection(
+                          type: entry.key,
+                          questions: entry.value,
+                          targets: targets,
+                          onRemove: onRemove,
+                          onReplace: onReplace,
+                        ),
+                        const SizedBox(height: 18),
+                      ],
+                    ],
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuestionSetSummary extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _QuestionSetSummary({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 96,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(value, style: TextStyle(color: AppColors.textTitle, fontSize: 17, fontWeight: FontWeight.w900)),
+          const SizedBox(height: 2),
+          Text(label, style: TextStyle(color: AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.w800)),
+        ],
+      ),
+    );
+  }
+}
+
+class _QuestionTypeSection extends StatelessWidget {
+  final QuestionType type;
+  final List<QuestionModel> questions;
+  final List<_TopicTarget> targets;
+  final ValueChanged<QuestionModel> onRemove;
+  final ValueChanged<QuestionModel> onReplace;
+
+  const _QuestionTypeSection({
+    required this.type,
+    required this.questions,
+    required this.targets,
+    required this.onRemove,
+    required this.onReplace,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+            child: Row(
+              children: [
+                Text(type.label, style: TextStyle(color: AppColors.textTitle, fontSize: 14, fontWeight: FontWeight.w900)),
+                const SizedBox(width: 8),
+                _TinyPill(label: '${questions.length}'),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border),
+          for (var i = 0; i < questions.length; i++) ...[
+            _QuestionSetRow(
+              index: i + 1,
+              question: questions[i],
+              target: _targetForQuestionStatic(targets, questions[i]),
+              onRemove: () => onRemove(questions[i]),
+              onReplace: () => onReplace(questions[i]),
+            ),
+            if (i != questions.length - 1) Divider(height: 1, color: AppColors.border),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _QuestionSetRow extends StatelessWidget {
+  final int index;
+  final QuestionModel question;
+  final _TopicTarget? target;
+  final VoidCallback onRemove;
+  final VoidCallback onReplace;
+
+  const _QuestionSetRow({
+    required this.index,
+    required this.question,
+    required this.target,
+    required this.onRemove,
+    required this.onReplace,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      child: Row(
+        children: [
+          _IndexBadge(index: index, selected: true),
+          const SizedBox(width: 12),
+          Expanded(
+            flex: 7,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  question.text.replaceAll('\n', ' '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w900, fontSize: 13.5),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  _questionMetaWithoutType(question),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w700, fontSize: 11),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 18),
+          Expanded(
+            flex: 3,
+            child: Text(
+              _contextLabel(question, target),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w800, fontSize: 12),
+            ),
+          ),
+          const SizedBox(width: 12),
+          _TinyPill(label: '${question.maxScore} pt'),
+          const SizedBox(width: 10),
+          TextButton.icon(
+            onPressed: onReplace,
+            icon: const Icon(Icons.swap_horiz_rounded, size: 15),
+            label: const Text('Replace'),
+          ),
+          const SizedBox(width: 2),
+          IconButton(
+            onPressed: onRemove,
+            tooltip: 'Remove',
+            icon: Icon(Icons.close_rounded, color: AppColors.dangerText, size: 19),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewStep extends StatelessWidget {
+  final List<_TopicTarget> targets;
+  final List<QuestionModel> questions;
+  final double totalPoints;
+  final String title;
+  final bool publishAfterSave;
+  final bool showResultImmediately;
+  final bool allowReview;
+  const _PreviewStep({
+    required this.targets,
+    required this.questions,
+    required this.totalPoints,
+    required this.title,
+    required this.publishAfterSave,
+    required this.showResultImmediately,
+    required this.allowReview,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final grouped = <QuestionType, List<QuestionModel>>{};
+    for (final type in QuestionType.values) {
+      final items = questions.where((question) => question.type == type).toList();
+      if (items.isNotEmpty) grouped[type] = items;
+    }
+
+    int startIndexFor(QuestionType type) {
+      var total = 0;
+      for (final entry in grouped.entries) {
+        if (entry.key == type) return total;
+        total += entry.value.length;
+      }
+      return 0;
+    }
+
+    return _Panel(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 14),
+            child: _PanelTitle(
+              icon: Icons.preview_outlined,
+              title: 'Preview before save',
+              subtitle: '$title • ${questions.length} questions • ${_points(totalPoints)} points',
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border),
+          Expanded(
+            child: questions.isEmpty
+                ? const _EmptyState(title: 'No selected questions', message: 'Go back and select at least one question.')
+                : ListView(
+                    padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+                    children: [
+                      for (final entry in grouped.entries) ...[
+                        _PreviewQuestionTypeSection(
+                          type: entry.key,
+                          questions: entry.value,
+                          targets: targets,
+                          startIndex: startIndexFor(entry.key),
+                        ),
+                        const SizedBox(height: 14),
+                      ],
+                    ],
+                  ),
+          ),
+          Divider(height: 1, color: AppColors.border),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+            child: Row(
+              children: [
+                _TinyPill(label: showResultImmediately ? 'Result immediately' : 'Result delayed'),
+                const SizedBox(width: 8),
+                _TinyPill(label: allowReview ? 'Review allowed' : 'Review disabled'),
+                const Spacer(),
+                Text(publishAfterSave ? 'Ready to publish' : 'Ready to save', style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w800)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _FlowFooter extends StatelessWidget {
+  final int step;
+  final bool saving;
+  final bool publishAfterSave;
+  final VoidCallback onBack;
+  final VoidCallback onNext;
+
+  const _FlowFooter({
+    required this.step,
+    required this.saving,
+    required this.publishAfterSave,
+    required this.onBack,
+    required this.onNext,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cta = step == 3 ? (publishAfterSave ? 'Save & Publish' : 'Save Exam') : 'Continue';
+    return Container(
+      padding: const EdgeInsets.fromLTRB(0, 14, 0, 16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        border: Border(top: BorderSide(color: AppColors.border)),
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 1180),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 28),
+            child: Row(
+              children: [
+                _FooterActionButton(
+                  label: step == 1 ? 'Back to Question Bank' : 'Back',
+                  icon: step == 1 ? Icons.close_rounded : Icons.arrow_back_rounded,
+                  onPressed: saving ? null : onBack,
+                  primary: false,
+                ),
+                const Spacer(),
+                _FooterActionButton(
+                  label: saving ? 'Saving...' : cta,
+                  icon: step == 3 ? Icons.save_rounded : Icons.arrow_forward_rounded,
+                  onPressed: saving ? null : onNext,
+                  primary: true,
+                  loading: saving,
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FooterActionButton extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final VoidCallback? onPressed;
+  final bool primary;
+  final bool loading;
+
+  const _FooterActionButton({
+    required this.label,
+    required this.icon,
+    required this.onPressed,
+    required this.primary,
+    this.loading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final child = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        if (loading)
+          const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+        else
+          Icon(icon, size: 16),
+        const SizedBox(width: 8),
+        Text(label),
+      ],
+    );
+    final shape = RoundedRectangleBorder(borderRadius: BorderRadius.circular(10));
+    const size = Size(0, 44);
+    if (primary) {
+      return FilledButton(
+        onPressed: onPressed,
+        style: FilledButton.styleFrom(minimumSize: size, padding: const EdgeInsets.symmetric(horizontal: 22), shape: shape),
+        child: child,
+      );
+    }
+    return OutlinedButton(
+      onPressed: onPressed,
+      style: OutlinedButton.styleFrom(minimumSize: size, padding: const EdgeInsets.symmetric(horizontal: 22), shape: shape),
+      child: child,
+    );
+  }
+}
+
+class _Panel extends StatelessWidget {
+  final Widget child;
+  final EdgeInsetsGeometry padding;
+  const _Panel({required this.child, this.padding = const EdgeInsets.all(22)});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      height: double.infinity,
+      padding: padding,
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+        boxShadow: [BoxShadow(color: AppColors.shadowThin, blurRadius: 18, offset: const Offset(0, 8))],
+      ),
+      child: child,
+    );
+  }
+}
+
+class _PanelTitle extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final Widget? trailing;
+
+  const _PanelTitle({required this.icon, required this.title, required this.subtitle, this.trailing});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(color: AppColors.primarySoft, borderRadius: BorderRadius.circular(13)),
+          child: Icon(icon, color: AppColors.primary, size: 21),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+              const SizedBox(height: 3),
+              Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+            ],
+          ),
+        ),
+        if (trailing != null) ...[const SizedBox(width: 12), trailing!],
+      ],
+    );
+  }
+}
+
+class _SelectField<T> extends StatelessWidget {
+  final String label;
+  final T? value;
+  final String hint;
+  final List<DropdownMenuItem<T>> items;
+  final ValueChanged<T?> onChanged;
+  const _SelectField({
+    required this.label,
+    required this.value,
+    required this.hint,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final dropdown = DropdownButtonFormField<T>(
+      initialValue: value,
+      isExpanded: true,
+      hint: items.isNotEmpty ? items.first.child : null,
+      items: items,
+      onChanged: onChanged,
+      decoration: _input(hint).copyWith(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
+      ),
+      style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w800, fontSize: 13),
+    );
+    if (label.isEmpty) return dropdown;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Label(label),
+        dropdown,
+      ],
+    );
+  }
+}
+
+class _TextInput extends StatelessWidget {
+  final String label;
+  final TextEditingController controller;
+  final String hint;
+  final String? suffix;
+  final int maxLines;
+  final bool number;
+  const _TextInput({
+    required this.label,
+    required this.controller,
+    required this.hint,
+    this.suffix,
+    this.maxLines = 1,
+    this.number = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final field = TextField(
+      controller: controller,
+      maxLines: maxLines,
+      keyboardType: number ? TextInputType.number : TextInputType.text,
+      decoration: _input(hint).copyWith(
+        suffixText: suffix,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 13, vertical: 14),
+      ),
+      style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w700, fontSize: 13),
+    );
+    if (label.isEmpty) return field;
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [_Label(label), field]);
+  }
+}
+
+class _DateField extends StatelessWidget {
+  final String label;
+  final DateTime? value;
+  final ValueChanged<DateTime?> onChanged;
+  const _DateField({required this.label, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _Label(label),
+        InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: () async {
+            final now = DateTime.now();
+            final date = await showDatePicker(
+              context: context,
+              initialDate: value ?? now,
+              firstDate: DateTime(now.year - 1),
+              lastDate: DateTime(now.year + 5),
+            );
+            if (date == null || !context.mounted) return;
+            final time = await showTimePicker(
+              context: context,
+              initialTime: value == null ? TimeOfDay.now() : TimeOfDay.fromDateTime(value!),
+            );
+            if (time == null) return;
+            onChanged(DateTime(date.year, date.month, date.day, time.hour, time.minute));
+          },
+          child: InputDecorator(
+            decoration: _input('Select date'),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    value == null ? 'Not set' : _formatDateTime(value!),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: value == null ? AppColors.textMuted : AppColors.textTitle, fontWeight: FontWeight.w800, fontSize: 13),
+                  ),
+                ),
+                if (value != null)
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    onPressed: () => onChanged(null),
+                    icon: Icon(Icons.close_rounded, size: 16, color: AppColors.textMuted),
+                  )
+                else
+                  Icon(Icons.calendar_today_outlined, size: 16, color: AppColors.textMuted),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SwitchTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const _SwitchTile({required this.title, required this.subtitle, required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(title, style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w900, fontSize: 13)),
+                const SizedBox(height: 2),
+                Text(subtitle, style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600, fontSize: 11.5)),
+              ],
+            ),
+          ),
+          Switch(value: value, onChanged: onChanged),
+        ],
+      ),
+    );
+  }
+}
+
+class _PublishSelector extends StatelessWidget {
+  final bool value;
+  final ValueChanged<bool> onChanged;
+  const _PublishSelector({required this.value, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(child: _ChoiceCard(title: 'Save exam', subtitle: 'Stored in quizzes, hidden until published', selected: !value, onTap: () => onChanged(false))),
+        const SizedBox(width: 10),
+        Expanded(child: _ChoiceCard(title: 'Publish after save', subtitle: 'Creates snapshots and opens exam', selected: value, onTap: () => onChanged(true))),
+      ],
+    );
+  }
+}
+
+class _ChoiceCard extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final bool selected;
+  final VoidCallback onTap;
+  const _ChoiceCard({required this.title, required this.subtitle, required this.selected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.primarySoft : AppColors.surfaceBg,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: selected ? AppColors.primary : AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(selected ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: selected ? AppColors.primary : AppColors.textMuted, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title, style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w900, fontSize: 12.5)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600, fontSize: 10.8)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ScopeMetric extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  const _ScopeMetric({required this.label, required this.value, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          Icon(icon, color: AppColors.primary, size: 19),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(value, style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900, color: AppColors.textTitle)),
+                Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w700, fontSize: 11)),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewQuestionTypeSection extends StatelessWidget {
+  final QuestionType type;
+  final List<QuestionModel> questions;
+  final List<_TopicTarget> targets;
+  final int startIndex;
+
+  const _PreviewQuestionTypeSection({
+    required this.type,
+    required this.questions,
+    required this.targets,
+    required this.startIndex,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 13, 16, 11),
+            child: Row(
+              children: [
+                Text(type.label, style: TextStyle(color: AppColors.textTitle, fontSize: 14, fontWeight: FontWeight.w900)),
+                const SizedBox(width: 8),
+                _TinyPill(label: '${questions.length}'),
+              ],
+            ),
+          ),
+          Divider(height: 1, color: AppColors.border),
+          for (var i = 0; i < questions.length; i++) ...[
+            Padding(
+              padding: const EdgeInsets.all(12),
+              child: _PreviewQuestionCard(
+                index: startIndex + i,
+                question: questions[i],
+                target: _targetForQuestionStatic(targets, questions[i]),
+              ),
+            ),
+            if (i != questions.length - 1) Divider(height: 1, color: AppColors.border),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PreviewQuestionCard extends StatelessWidget {
+  final int index;
+  final QuestionModel question;
+  final _TopicTarget? target;
+
+  const _PreviewQuestionCard({required this.index, required this.question, required this.target});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardBg,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _IndexBadge(index: index + 1, selected: true),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(question.text, style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w900, fontSize: 15, height: 1.32)),
+                    const SizedBox(height: 8),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _TinyPill(label: question.typeLabel),
+                        _TinyPill(label: question.difficultyLabel),
+                        _TinyPill(label: '${question.maxScore} point${question.maxScore == 1 ? '' : 's'}'),
+                        _TinyPill(label: _sourceLabel(question.source)),
+                        _TinyPill(label: _contextLabel(question, target)),
+                        if (question.learningOutcomes.isNotEmpty)
+                          _TinyPill(label: 'LO: ${question.learningOutcomes.map((lo) => lo.title).join(', ')}'),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          _AnswerPreview(question: question),
+          if ((question.explanation ?? '').trim().isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text('Explanation', style: TextStyle(color: AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.4)),
+            const SizedBox(height: 4),
+            Text(question.explanation!, style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w600, height: 1.4)),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _AnswerPreview extends StatelessWidget {
+  final QuestionModel question;
+  const _AnswerPreview({required this.question});
+
+  @override
+  Widget build(BuildContext context) {
+    if (question.options.isEmpty) {
+      return _AnswerBox(label: 'Correct answer', value: question.expectedAnswer ?? question.sampleAnswer ?? '-');
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Answers', style: TextStyle(color: AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.w900, letterSpacing: 0.4)),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: question.options.map((option) {
+            return Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+              decoration: BoxDecoration(
+                color: option.isCorrect ? AppColors.successBg : AppColors.surfaceBg,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: option.isCorrect ? AppColors.successText.withValues(alpha: 0.28) : AppColors.border),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(option.isCorrect ? Icons.check_circle_rounded : Icons.radio_button_unchecked_rounded, size: 15, color: option.isCorrect ? AppColors.successText : AppColors.textMuted),
+                  const SizedBox(width: 6),
+                  Text(option.text, style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w800, fontSize: 12)),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
+    );
+  }
+}
+
+class _AnswerBox extends StatelessWidget {
+  final String label;
+  final String value;
+  const _AnswerBox({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: AppColors.surfaceBg, borderRadius: BorderRadius.circular(12), border: Border.all(color: AppColors.border)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text(label.toUpperCase(), style: TextStyle(color: AppColors.textMuted, fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: 0.5)),
+        const SizedBox(height: 5),
+        Text(value, style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w800)),
+      ],),
+    );
+  }
+}
+
+class _ReplaceQuestionDialog extends StatefulWidget {
+  final QuestionModel original;
+  final List<QuestionModel> candidates;
+  final List<QuestionModel> relaxedCandidates;
+
+  const _ReplaceQuestionDialog({required this.original, required this.candidates, required this.relaxedCandidates});
+
+  @override
+  State<_ReplaceQuestionDialog> createState() => _ReplaceQuestionDialogState();
+}
+
+class _ReplaceQuestionDialogState extends State<_ReplaceQuestionDialog> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final questions = _expanded ? widget.relaxedCandidates : widget.candidates;
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 48, vertical: 42),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 760, maxHeight: 680),
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(20),
+              child: _PanelTitle(
+                icon: Icons.swap_horiz_rounded,
+                title: 'Replace question',
+                subtitle: _expanded
+                    ? 'Expanded alternatives from the same scope.'
+                    : 'Strict alternatives match type, difficulty, and topic or LO where possible.',
+                trailing: TextButton.icon(
+                  onPressed: () => setState(() => _expanded = !_expanded),
+                  icon: Icon(_expanded ? Icons.filter_alt_rounded : Icons.open_in_full_rounded, size: 16),
+                  label: Text(_expanded ? 'Strict match' : 'Expand filter'),
+                ),
+              ),
+            ),
+            Divider(height: 1, color: AppColors.border),
+            Expanded(
+              child: questions.isEmpty
+                  ? const _EmptyState(title: 'No alternatives found', message: 'Expand the filter or go back to the selection step.')
+                  : ListView.separated(
+                      itemCount: questions.length,
+                      separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                      itemBuilder: (context, index) {
+                        final question = questions[index];
+                        return ListTile(
+                          onTap: () => Navigator.of(context).pop(question),
+                          title: Text(question.text.replaceAll('\n', ' '), maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w900)),
+                          subtitle: Text(_questionMeta(question), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          trailing: const Icon(Icons.arrow_forward_rounded),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ExamSavedDialog extends StatelessWidget {
+  final String title;
+  final String message;
+  final int examId;
+  const _ExamSavedDialog({required this.title, required this.message, required this.examId});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      icon: Icon(Icons.check_circle_rounded, color: AppColors.successText, size: 36),
+      title: Text(title),
+      content: Text('$message\n\nExam ID: $examId'),
+      actions: [
+        FilledButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Done')),
+      ],
+    );
+  }
+}
+
+class _IndexBadge extends StatelessWidget {
+  final int index;
+  final bool selected;
+  const _IndexBadge({required this.index, required this.selected});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 32,
+      height: 32,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: selected ? AppColors.primary : AppColors.primarySoft,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text('$index', style: TextStyle(color: selected ? Colors.white : AppColors.primary, fontWeight: FontWeight.w900, fontSize: 12)),
+    );
+  }
+}
+
+class _TinyPill extends StatelessWidget {
+  final String label;
+  const _TinyPill({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceBg,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.w800)),
+    );
+  }
+}
+
+class _Label extends StatelessWidget {
+  final String text;
+  const _Label(this.text);
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Text(text, style: TextStyle(color: AppColors.textTitle, fontSize: 12.5, fontWeight: FontWeight.w900)),
+    );
+  }
+}
+
+class _ErrorBanner extends StatelessWidget {
+  final String message;
+  const _ErrorBanner({required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.dangerBg,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.dangerText.withValues(alpha: 0.25)),
+      ),
+      child: Text(message, style: TextStyle(color: AppColors.dangerText, fontWeight: FontWeight.w800)),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  final String title;
+  final String message;
+  const _EmptyState({required this.title, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.inbox_outlined, size: 38, color: AppColors.textMuted),
+            const SizedBox(height: 10),
+            Text(title, style: TextStyle(color: AppColors.textTitle, fontWeight: FontWeight.w900, fontSize: 16)),
+            const SizedBox(height: 6),
+            Text(message, textAlign: TextAlign.center, style: TextStyle(color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+InputDecoration _input(String hint) {
+  return InputDecoration(
+    hintText: hint,
+    filled: true,
+    fillColor: AppColors.surfaceBg,
+    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
+    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: AppColors.border)),
+    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: AppColors.primary)),
+  );
+}
+
+
+_TopicTarget? _targetForQuestionStatic(List<_TopicTarget> targets, QuestionModel question) {
+  final topicId = question.topicId;
+  if (topicId == null) return null;
+  for (final target in targets) {
+    if (target.topic.id == topicId) return target;
+  }
+  return null;
+}
+
+String _contextLabel(QuestionModel question, _TopicTarget? target) {
+  final topic = question.topicName ?? target?.topicLabel;
+  final material = question.materialName ?? target?.material.displayTitle;
+  final module = question.moduleName ?? target?.module.title;
+  final parts = [topic, material, module].whereType<String>().where((item) => item.trim().isNotEmpty).toList();
+  return parts.isEmpty ? 'General' : parts.take(2).join(' • ');
+}
+
+String _questionMeta(QuestionModel question) {
+  final lo = question.learningOutcomes.isEmpty
+      ? 'No LO'
+      : 'LO: ${question.learningOutcomes.map((item) => item.title).take(1).join(', ')}';
+  return '${question.typeLabel} • ${question.difficultyLabel} • ${_sourceLabel(question.source)} • $lo';
+}
+
+String _questionMetaWithoutType(QuestionModel question) {
+  final lo = question.learningOutcomes.isEmpty
+      ? 'No LO'
+      : 'LO: ${question.learningOutcomes.map((item) => item.title).take(1).join(', ')}';
+  return '${question.difficultyLabel} • ${_sourceLabel(question.source)} • $lo';
+}
+
+String _sourceLabel(QuestionSource source) {
+  switch (source) {
+    case QuestionSource.aiGenerated:
+      return 'AI';
+    case QuestionSource.nativeExtraction:
+      return 'Material';
+    case QuestionSource.imported:
+      return 'Imported';
+    case QuestionSource.manual:
+      return 'Manual';
+  }
+}
+
+String _points(double value) {
+  if (value == value.roundToDouble()) return value.toInt().toString();
+  return value.toStringAsFixed(1);
+}
+
+String _formatDateTime(DateTime value) {
+  final month = value.month.toString().padLeft(2, '0');
+  final day = value.day.toString().padLeft(2, '0');
+  final hour = value.hour.toString().padLeft(2, '0');
+  final minute = value.minute.toString().padLeft(2, '0');
+  return '${value.year}-$month-$day $hour:$minute';
+}

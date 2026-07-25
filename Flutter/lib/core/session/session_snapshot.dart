@@ -3,7 +3,14 @@ import '../storage/user_storage.dart';
 
 /// A read-only view of the current authentication/session state.
 ///
-/// This is derived from storage and used by routing/guards.
+/// Important distinction on web:
+/// - `isPersisted` only means we MAY be able to restore a session via the
+///   HttpOnly refresh cookie.
+/// - It does NOT mean the user is currently authenticated yet.
+///
+/// Treating `isPersisted` as authenticated causes protected routes to build
+/// before bootstrap finishes, which can trigger premature 401s on feature
+/// requests (for example course materials) and incorrectly log the user out.
 class SessionSnapshot {
   const SessionSnapshot({
     required this.hasAccessToken,
@@ -21,7 +28,14 @@ class SessionSnapshot {
   final bool isInstructor;
   final String? pendingVerificationEmail;
 
-  bool get isAuthed => hasAccessToken || isPersisted;
+  /// Current authenticated state.
+  ///
+  /// Only a live access token counts as authenticated. A persisted flag by
+  /// itself merely means bootstrap may still restore the session.
+  bool get isAuthed => hasAccessToken;
+
+  /// True when the app may still be able to restore a remembered session.
+  bool get canRestoreSession => !hasAccessToken && isPersisted;
 
   static SessionSnapshot fromStorage() {
     return SessionSnapshot(

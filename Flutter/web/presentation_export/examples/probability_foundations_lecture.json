@@ -1,0 +1,399 @@
+{
+  "schema_version": 4,
+  "title": "Probability Foundations — Instructor Lecture",
+  "slides": [
+    {
+      "slide_number": 1,
+      "layout_type": "title_slide",
+      "kicker": "STATISTICS 101",
+      "title": "Probability Foundations",
+      "subtitle": "From sample spaces to conditional reasoning",
+      "course": "Introduction to Statistics",
+      "instructor": "Instructor Name",
+      "term": "Lecture 04"
+    },
+    {
+      "slide_number": 2,
+      "layout_type": "lecture_objectives",
+      "kicker": "TODAY'S ROADMAP",
+      "title": "Learning Objectives",
+      "outcome": "By the end of this lecture, students should be able to:",
+      "objectives": [
+        "Define a sample space and represent events as subsets.",
+        "Distinguish mutually exclusive events from independent events.",
+        "Apply addition, multiplication, and conditional-probability rules.",
+        "Interpret Bayes' theorem as an update from prior to posterior belief.",
+        "Solve and explain a probability problem using a structured workflow."
+      ]
+    },
+    {
+      "slide_number": 3,
+      "layout_type": "section_divider",
+      "kicker": "PART I",
+      "section_number": "01",
+      "title": "Building a Probability Model",
+      "subtitle": "Every correct calculation starts with a clearly defined experiment, outcome, and event."
+    },
+    {
+      "slide_number": 4,
+      "layout_type": "concept_explanation",
+      "kicker": "CORE CONCEPT",
+      "title": "Sample Spaces and Events",
+      "content": {
+        "lead": "A probability model describes every outcome that can occur and the events we care about.",
+        "body": "The sample space Ω contains all possible outcomes. An event is any subset of Ω. The quality of the model depends on whether the outcomes are complete, non-overlapping, and expressed at the right level of detail.",
+        "bullets": [
+          "Outcome: one possible result of the experiment",
+          "Sample space: the complete set of possible outcomes",
+          "Event: a collection of outcomes that answers a question",
+          "Complement: every outcome that is not in the event"
+        ],
+        "key_term": "EVENT",
+        "definition": "An event is a subset of the sample space.",
+        "example": "For one die roll, A = {2, 4, 6} represents an even result."
+      }
+    },
+    {
+      "slide_number": 5,
+      "layout_type": "text_with_image",
+      "kicker": "MODEL BEFORE MATH",
+      "title": "Translate the Story Before You Calculate",
+      "content": {
+        "lead": "Probability problems are easier when the narrative is converted into explicit events.",
+        "body": "Underline the experiment, list the possible outcomes, name the relevant events, and only then select a rule.",
+        "bullets": [
+          "State what is random and what is fixed",
+          "Choose event labels that match the question",
+          "Check whether order and replacement matter",
+          "Keep units and conditions visible"
+        ]
+      },
+      "visual": {
+        "src": "assets/book.webp",
+        "fit": "cover",
+        "position": "right",
+        "caption": "A clear model connects the wording of a problem to its mathematical structure.",
+        "alt": "Open textbook used as a visual metaphor for translating a written problem"
+      }
+    },
+    {
+      "slide_number": 6,
+      "layout_type": "comparison",
+      "kicker": "DO NOT CONFUSE",
+      "title": "Mutually Exclusive vs. Independent Events",
+      "comparison": {
+        "left": {
+          "title": "Mutually Exclusive",
+          "subtitle": "The events cannot occur together.",
+          "points": [
+            "P(A ∩ B) = 0",
+            "One event rules out the other",
+            "Example: one die roll is 2 and 5",
+            "Usually not independent when both have positive probability"
+          ]
+        },
+        "right": {
+          "title": "Independent",
+          "subtitle": "Knowing one event occurred does not change the other.",
+          "points": [
+            "P(A ∩ B) = P(A)P(B)",
+            "Information about A does not change P(B)",
+            "Example: outcomes of two separate fair coin flips",
+            "The events may occur together"
+          ]
+        }
+      }
+    },
+    {
+      "slide_number": 7,
+      "layout_type": "process_steps",
+      "kicker": "PROBLEM-SOLVING METHOD",
+      "title": "A Reliable Five-Step Workflow",
+      "process": [
+        {
+          "title": "Define",
+          "body": "Name the random experiment and the target event."
+        },
+        {
+          "title": "Represent",
+          "body": "Use a list, tree, table, or diagram to organize outcomes."
+        },
+        {
+          "title": "Select",
+          "body": "Choose the rule that matches the event relationship."
+        },
+        {
+          "title": "Calculate",
+          "body": "Substitute values and keep intermediate steps visible."
+        },
+        {
+          "title": "Interpret",
+          "body": "Explain the result in the language of the original problem."
+        }
+      ]
+    },
+    {
+      "slide_number": 8,
+      "layout_type": "diagram",
+      "kicker": "CONCEPT MAP",
+      "title": "How the Main Probability Ideas Connect",
+      "diagram": {
+        "nodes": [
+          {
+            "id": "experiment",
+            "level": 0,
+            "title": "Random Experiment",
+            "body": "A repeatable process with uncertain output"
+          },
+          {
+            "id": "space",
+            "level": 1,
+            "title": "Sample Space Ω",
+            "body": "All possible outcomes"
+          },
+          {
+            "id": "events",
+            "level": 2,
+            "title": "Events A and B",
+            "body": "Subsets that answer questions"
+          },
+          {
+            "id": "joint",
+            "level": 3,
+            "title": "Joint Probability",
+            "body": "P(A ∩ B)"
+          },
+          {
+            "id": "conditional",
+            "level": 3,
+            "title": "Conditional Probability",
+            "body": "P(A | B)"
+          }
+        ],
+        "edges": [
+          {
+            "from": "experiment",
+            "to": "space"
+          },
+          {
+            "from": "space",
+            "to": "events"
+          },
+          {
+            "from": "events",
+            "to": "joint"
+          },
+          {
+            "from": "events",
+            "to": "conditional"
+          }
+        ]
+      }
+    },
+    {
+      "slide_number": 9,
+      "layout_type": "table",
+      "kicker": "REFERENCE TABLE",
+      "title": "Core Probability Rules",
+      "table": {
+        "headers": [
+          "Rule",
+          "Expression",
+          "Use When",
+          "Common Check"
+        ],
+        "rows": [
+          [
+            "Complement",
+            "P(Aᶜ) = 1 − P(A)",
+            "The event is easier to describe by what does not happen",
+            "Result remains between 0 and 1"
+          ],
+          [
+            "Addition",
+            "P(A ∪ B) = P(A) + P(B) − P(A ∩ B)",
+            "At least one of two events occurs",
+            "Subtract the overlap once"
+          ],
+          [
+            "Multiplication",
+            "P(A ∩ B) = P(A)P(B | A)",
+            "Both events occur",
+            "Use P(B) only when independent"
+          ],
+          [
+            "Conditional",
+            "P(A | B) = P(A ∩ B) / P(B)",
+            "The sample space is restricted by B",
+            "P(B) must be greater than zero"
+          ]
+        ]
+      }
+    },
+    {
+      "slide_number": 10,
+      "layout_type": "equation_explanation",
+      "kicker": "KEY EQUATION",
+      "title": "Conditional Probability",
+      "equation": {
+        "label": "Definition",
+        "latex": "P(A | B) = P(A ∩ B) / P(B)",
+        "render_mode": "text",
+        "explanation": "The numerator counts outcomes in both A and B; the denominator restricts attention to outcomes in B."
+      },
+      "content": {
+        "bullets": [
+          "Read P(A | B) as probability of A given B",
+          "Treat B as the new sample space",
+          "The order of A and B matters",
+          "The denominator cannot be zero"
+        ]
+      }
+    },
+    {
+      "slide_number": 11,
+      "layout_type": "equation_derivation",
+      "kicker": "DERIVATION",
+      "title": "Bayes' Theorem Is a Rearrangement of Joint Probability",
+      "equation": {
+        "label": "Bayes' theorem",
+        "latex": "P(A\\mid B)=\\frac{P(B\\mid A)P(A)}{P(B)}",
+        "render_mode": "svg",
+        "steps": [
+          {
+            "latex": "P(A\\cap B)=P(A\\mid B)P(B)",
+            "render_mode": "svg",
+            "explanation": "Write the multiplication rule with B as the condition."
+          },
+          {
+            "latex": "P(A\\cap B)=P(B\\mid A)P(A)",
+            "render_mode": "svg",
+            "explanation": "Write the same joint event with A as the condition."
+          },
+          {
+            "latex": "P(A\\mid B)P(B)=P(B\\mid A)P(A)",
+            "render_mode": "svg",
+            "explanation": "Set the two expressions for the same joint probability equal."
+          },
+          {
+            "latex": "P(A\\mid B)=\\frac{P(B\\mid A)P(A)}{P(B)}",
+            "render_mode": "svg",
+            "explanation": "Divide by P(B) to isolate the posterior probability."
+          }
+        ]
+      }
+    },
+    {
+      "slide_number": 12,
+      "layout_type": "worked_example",
+      "kicker": "WORKED EXAMPLE",
+      "title": "Quality Control: Probability of a Defective Item",
+      "problem": {
+        "statement": "A production line makes 240 items and 12 are defective. Estimate the probability that a randomly selected item is defective.",
+        "given": [
+          "Total items = 240",
+          "Defective items = 12"
+        ],
+        "formula": "P(defective) = defective items / total items",
+        "solution_steps": [
+          "Substitute the observed counts: P(defective) = 12 / 240.",
+          "Simplify the fraction: 12 / 240 = 0.05.",
+          "Convert to a percentage: 0.05 × 100 = 5%."
+        ],
+        "final_answer": "The estimated probability of selecting a defective item is 0.05, or 5%."
+      }
+    },
+    {
+      "slide_number": 13,
+      "layout_type": "multiple_choice",
+      "kicker": "CHECK FOR UNDERSTANDING",
+      "title": "Which Rule Should You Use?",
+      "problem": {
+        "statement": "A card is drawn from a standard deck. What is the probability that it is a heart or a king?",
+        "choices": [
+          "P(heart) + P(king)",
+          "P(heart)P(king)",
+          "P(heart) + P(king) − P(heart ∩ king)",
+          "1 − P(heart)"
+        ],
+        "answer": "P(heart) + P(king) − P(heart ∩ king)",
+        "hint": "The king of hearts belongs to both events, so count the overlap only once.",
+        "show_answer": false
+      }
+    },
+    {
+      "slide_number": 14,
+      "layout_type": "practice_activity",
+      "kicker": "PAIR ACTIVITY",
+      "title": "Build a Probability Model from a Short Scenario",
+      "activity": {
+        "task": "Model the outcomes of selecting two students from a group and decide whether order matters.",
+        "duration": "8 minutes",
+        "instructions": [
+          "Define the experiment and state any assumptions.",
+          "Choose labels for the relevant events.",
+          "Represent the outcomes using a table or tree.",
+          "Write one probability question that can be answered from your model.",
+          "Exchange models with another pair and check for missing outcomes."
+        ],
+        "deliverable": "One labeled representation and one justified probability calculation"
+      }
+    },
+    {
+      "slide_number": 15,
+      "layout_type": "case_study",
+      "kicker": "DISCUSSION",
+      "title": "Case Study: A Screening Test with Rare Prevalence",
+      "case_study": {
+        "context": "A screening program tests a population in which only 1% of people have the condition.",
+        "challenge": "The test has high sensitivity, yet many positive results may still be false positives because the condition is rare.",
+        "evidence": "Students receive sensitivity, specificity, and prevalence values and must organize them in a 2×2 table.",
+        "questions": [
+          "Which probability represents the positive predictive value?",
+          "Why does prevalence change the interpretation of a positive result?"
+        ]
+      }
+    },
+    {
+      "slide_number": 16,
+      "layout_type": "quote",
+      "kicker": "INSTRUCTOR INSIGHT",
+      "title": "Interpretation Matters",
+      "quote": {
+        "text": "A probability is not just a number; it is a statement about a model, its assumptions, and the information currently available.",
+        "author": "Lecture takeaway",
+        "role": "Probability Foundations"
+      }
+    },
+    {
+      "slide_number": 17,
+      "layout_type": "summary",
+      "kicker": "LECTURE SUMMARY",
+      "title": "What to Remember",
+      "summary": {
+        "points": [
+          "Define the sample space before selecting a probability rule.",
+          "Mutually exclusive and independent describe different relationships.",
+          "Conditional probability changes the reference set.",
+          "Bayes' theorem combines prior knowledge with new evidence.",
+          "A complete solution includes interpretation, not only arithmetic."
+        ],
+        "takeaway": "Model the event relationship first; the correct formula usually follows.",
+        "next": "Discrete random variables and expected value"
+      }
+    },
+    {
+      "slide_number": 18,
+      "layout_type": "references",
+      "kicker": "FURTHER READING",
+      "title": "References and Recommended Practice",
+      "references": [
+        "OpenIntro Statistics — Probability chapter.",
+        "Course notes: Sample spaces, counting, and conditional probability.",
+        "Practice set 04: Addition and multiplication rules.",
+        "Tutorial worksheet: Bayes' theorem using frequency tables.",
+        "Instructor-provided examples and worked solutions in Learnova."
+      ]
+    }
+  ]
+}

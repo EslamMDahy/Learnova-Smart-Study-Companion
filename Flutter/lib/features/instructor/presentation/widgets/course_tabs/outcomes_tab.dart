@@ -11,16 +11,17 @@ class CourseOutcomesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return ColoredBox(
       color: AppColors.pageBg,
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-      child: Container(
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1480),
+            child: CourseOutcomesManager(courseId: course.id, embedded: true),
+          ),
         ),
-        child: CourseOutcomesManager(courseId: course.id, embedded: true),
       ),
     );
   }

@@ -1,17 +1,32 @@
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
 import 'dart:convert';
 
-void downloadTextFile({required String filename, required String content, String mimeType = 'text/plain'}) {
-  final bytes = utf8.encode(content);
-  final blob = html.Blob([bytes], mimeType);
-  final url = html.Url.createObjectUrlFromBlob(blob);
-  final a = html.AnchorElement(href: url)
-    ..setAttribute('download', filename)
-    ..style.display = 'none';
+import 'package:web/web.dart' as web;
 
-  html.document.body?.children.add(a);
-  a.click();
-  a.remove();
-  html.Url.revokeObjectUrl(url);
+void downloadTextFile({
+  required String filename,
+  required String content,
+  String mimeType = 'text/plain',
+}) {
+  final uri = 'data:$mimeType;charset=utf-8,${Uri.encodeComponent(content)}';
+  _downloadDataUri(filename: filename, uri: uri);
+}
+
+void downloadBytesFile({
+  required String filename,
+  required List<int> bytes,
+  String mimeType = 'application/octet-stream',
+}) {
+  final uri = 'data:$mimeType;base64,${base64Encode(bytes)}';
+  _downloadDataUri(filename: filename, uri: uri);
+}
+
+void _downloadDataUri({required String filename, required String uri}) {
+  final anchor = web.document.createElement('a') as web.HTMLAnchorElement;
+  anchor.href = uri;
+  anchor.download = filename;
+  anchor.style.display = 'none';
+
+  web.document.body?.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
 }

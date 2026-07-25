@@ -3,9 +3,11 @@
 //  In-memory + backend-ready (fromJson / toJson wired to real DB schema).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import 'question_vocabulary.dart';
+
 enum QuestionType { multipleChoice, trueFalse, shortAnswer, essay, multiSelect, fillInTheBlank, numeric, code }
 enum QuestionDifficulty { easy, medium, hard }
-enum QuestionSource { manual, aiGenerated, imported }
+enum QuestionSource { manual, aiGenerated, nativeExtraction, imported }
 enum QuestionApprovalStatus { pending, approved, rejected }
 
 class QuestionOption {
@@ -41,6 +43,21 @@ class QuestionOption {
   };
 }
 
+
+class QuestionLearningOutcomeRef {
+  final int id;
+  final String title;
+
+  const QuestionLearningOutcomeRef({required this.id, required this.title});
+
+  factory QuestionLearningOutcomeRef.fromJson(Map<String, dynamic> json) {
+    return QuestionLearningOutcomeRef(
+      id: (json['id'] as num).toInt(),
+      title: (json['title'] ?? '').toString(),
+    );
+  }
+}
+
 class QuestionModel {
   // IDs — local uses String (uuid), remote uses int
   final String id;
@@ -58,11 +75,13 @@ class QuestionModel {
   final String? sampleAnswer;         // short_answer / essay / fill_in_blank
   final String? explanation;
   final String? expectedAnswer;
+  final Object? gradingRubric;
   final List<String> tags;
 
   // Statistics (from backend)
   final int usageCount;
   final double? successRate;
+  final double? averageTimeSeconds;
   final int maxScore;
   final bool autoGradable;
 
@@ -74,8 +93,11 @@ class QuestionModel {
   final String? materialName;
   final int? topicId;
   final String? topicName;
+  final List<QuestionLearningOutcomeRef> learningOutcomes;
+  final int? createdBy;
 
   final DateTime createdAt;
+  final DateTime updatedAt;
 
   const QuestionModel({
     required this.id,
@@ -91,9 +113,11 @@ class QuestionModel {
     this.sampleAnswer,
     this.explanation,
     this.expectedAnswer,
+    this.gradingRubric,
     this.tags = const [],
     this.usageCount = 0,
     this.successRate,
+    this.averageTimeSeconds,
     this.maxScore = 1,
     this.autoGradable = true,
     this.courseId,
@@ -103,29 +127,15 @@ class QuestionModel {
     this.materialName,
     this.topicId,
     this.topicName,
+    this.learningOutcomes = const [],
+    this.createdBy,
     required this.createdAt,
-  });
+    DateTime? updatedAt,
+  }) : updatedAt = updatedAt ?? createdAt;
 
-  String get typeLabel {
-    switch (type) {
-      case QuestionType.multipleChoice:   return 'Multiple Choice';
-      case QuestionType.trueFalse:        return 'True / False';
-      case QuestionType.shortAnswer:      return 'Short Answer';
-      case QuestionType.essay:            return 'Essay';
-      case QuestionType.multiSelect:      return 'Multi-Select';
-      case QuestionType.fillInTheBlank:   return 'Fill in the Blank';
-      case QuestionType.numeric:          return 'Numeric';
-      case QuestionType.code:             return 'Code';
-    }
-  }
+  String get typeLabel => type.label;
 
-  String get difficultyLabel {
-    switch (difficulty) {
-      case QuestionDifficulty.easy:   return 'Easy';
-      case QuestionDifficulty.medium: return 'Medium';
-      case QuestionDifficulty.hard:   return 'Hard';
-    }
-  }
+  String get difficultyLabel => difficulty.label;
 
   String get contextLabel {
     if (topicName != null)    return topicName!;
@@ -135,40 +145,11 @@ class QuestionModel {
   }
 
   /// Parse a backend Question row into a QuestionModel.
-  factory QuestionModel.fromJson(Map<String, dynamic> json) {
+  factory QuestionModel.fromJson(Map<String, dynamic> json, {bool includeDetails = true}) {
     DateTime dt(dynamic v) =>
         DateTime.tryParse((v ?? '').toString()) ??
         DateTime.fromMillisecondsSinceEpoch(0);
 
-    QuestionType parseType(String raw) {
-      switch (raw) {
-        case 'multiple_choice': return QuestionType.multipleChoice;
-        case 'true_false':      return QuestionType.trueFalse;
-        case 'short_answer':    return QuestionType.shortAnswer;
-        case 'essay':           return QuestionType.essay;
-        case 'multi_select':    return QuestionType.multiSelect;
-        case 'fill_in_the_blank': return QuestionType.fillInTheBlank;
-        case 'numeric':         return QuestionType.numeric;
-        case 'code':            return QuestionType.code;
-        default:                return QuestionType.multipleChoice;
-      }
-    }
-
-    QuestionDifficulty parseDifficulty(String raw) {
-      switch (raw) {
-        case 'easy':   return QuestionDifficulty.easy;
-        case 'hard':   return QuestionDifficulty.hard;
-        default:       return QuestionDifficulty.medium;
-      }
-    }
-
-    QuestionSource parseSource(String raw) {
-      switch (raw) {
-        case 'ai_generated': return QuestionSource.aiGenerated;
-        case 'imported':     return QuestionSource.imported;
-        default:             return QuestionSource.manual;
-      }
-    }
 
     QuestionApprovalStatus parseApproval(String raw) {
       switch (raw) {
@@ -178,63 +159,98 @@ class QuestionModel {
       }
     }
 
-    final rawOptions = (json['options'] as List?) ?? const [];
+    final rawExpectedAnswer = includeDetails ? json['expected_answer'] : null;
+    final expectedAnswerText = rawExpectedAnswer is List
+        ? rawExpectedAnswer.map((e) => e.toString()).join(', ')
+        : rawExpectedAnswer?.toString();
+
+    final rawType = (json['type'] ?? 'multiple_choice').toString();
+    final parsedType = parseQuestionType(rawType);
+    final rawOptions = includeDetails ? ((json['options'] as List?) ?? const []) : const [];
+    final expectedAnswerIds = rawExpectedAnswer is List
+        ? rawExpectedAnswer.map((v) => v.toString()).toSet()
+        : null;
     final options = rawOptions
         .whereType<Map>()
-        .map((e) => QuestionOption.fromJson(Map<String, dynamic>.from(e)))
+        .map((e) {
+          final option = QuestionOption.fromJson(Map<String, dynamic>.from(e));
+          final isCorrect = expectedAnswerIds != null
+              ? expectedAnswerIds.contains(option.id)
+              : rawExpectedAnswer?.toString() == option.id;
+          return QuestionOption(
+            id: option.id,
+            text: option.text,
+            isCorrect: option.isCorrect || isCorrect,
+            explanation: option.explanation,
+            orderIndex: option.orderIndex,
+          );
+        })
         .toList();
 
     final remoteId = json['id'] == null ? null : (json['id'] as num).toInt();
     final rawTags = (json['tags'] as List?) ?? const [];
+    final rawLearningOutcomes = (json['learning_outcomes'] as List?) ?? const [];
+    final topic = json['topic'] is Map
+        ? Map<String, dynamic>.from(json['topic'] as Map)
+        : const <String, dynamic>{};
 
     return QuestionModel(
       id: remoteId?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString(),
       remoteId: remoteId,
       text: (json['question_text'] ?? '').toString(),
-      type: parseType((json['type'] ?? 'multiple_choice').toString()),
-      difficulty: parseDifficulty((json['difficulty'] ?? 'medium').toString()),
-      source: parseSource((json['source'] ?? 'manual').toString()),
+      type: parsedType,
+      difficulty: parseQuestionDifficulty((json['difficulty'] ?? 'medium').toString()),
+      source: parseQuestionSource((json['source'] ?? 'manual').toString()),
       approvalStatus: parseApproval((json['approval_status'] ?? 'approved').toString()),
       options: options,
-      explanation: json['explanation']?.toString(),
-      expectedAnswer: json['expected_answer']?.toString(),
+      explanation: includeDetails ? json['explanation']?.toString() : null,
+      expectedAnswer: expectedAnswerText,
+      gradingRubric: includeDetails ? json['grading_rubric'] : null,
+      correctOptionId: parsedType == QuestionType.multipleChoice ? expectedAnswerText : null,
+      correctBool: parsedType == QuestionType.trueFalse ? expectedAnswerText?.toLowerCase() == 'true' : null,
+      sampleAnswer: parsedType == QuestionType.shortAnswer || parsedType == QuestionType.essay ? expectedAnswerText : null,
       tags: rawTags.map((e) => e.toString()).toList(),
       usageCount: (json['usage_count'] as num?)?.toInt() ?? 0,
       successRate: json['success_rate'] == null ? null : (json['success_rate'] as num).toDouble(),
+      averageTimeSeconds: json['average_time_seconds'] == null ? null : (json['average_time_seconds'] as num).toDouble(),
       maxScore: (json['max_score'] as num?)?.toInt() ?? 1,
       autoGradable: (json['auto_gradable'] as bool?) ?? true,
       courseId: json['course_id'] == null ? null : (json['course_id'] as num).toInt(),
       moduleId: json['module_id'] == null ? null : (json['module_id'] as num).toInt(),
+      moduleName: json['module_name']?.toString(),
       materialId: json['material_id'] == null ? null : (json['material_id'] as num).toInt(),
+      materialName: json['material_name']?.toString(),
       topicId: json['topic_id'] == null ? null : (json['topic_id'] as num).toInt(),
+      topicName: json['topic_title']?.toString() ??
+          json['topic_name']?.toString() ??
+          topic['title']?.toString(),
+      learningOutcomes: rawLearningOutcomes
+          .whereType<Map>()
+          .map((e) => QuestionLearningOutcomeRef.fromJson(Map<String, dynamic>.from(e)))
+          .toList(),
+      createdBy: json['created_by'] == null ? null : (json['created_by'] as num).toInt(),
       createdAt: dt(json['created_at']),
+      updatedAt: dt(json['updated_at'] ?? json['created_at']),
     );
   }
 
   Map<String, dynamic> toJson() {
-    String typeStr() {
-      switch (type) {
-        case QuestionType.multipleChoice:   return 'multiple_choice';
-        case QuestionType.trueFalse:        return 'true_false';
-        case QuestionType.shortAnswer:      return 'short_answer';
-        case QuestionType.essay:            return 'essay';
-        case QuestionType.multiSelect:      return 'multi_select';
-        case QuestionType.fillInTheBlank:   return 'fill_in_the_blank';
-        case QuestionType.numeric:          return 'numeric';
-        case QuestionType.code:             return 'code';
-      }
-    }
     return {
       'question_text': text,
-      'type': typeStr(),
-      'difficulty': difficulty.name,
+      'type': type.backendValue,
+      'difficulty': difficulty.backendValue,
       if (options.isNotEmpty) 'options': options.map((o) => o.toJson()).toList(),
       if (explanation != null) 'explanation': explanation,
       if (expectedAnswer != null) 'expected_answer': expectedAnswer,
+      if (gradingRubric != null) 'grading_rubric': gradingRubric,
       if (tags.isNotEmpty) 'tags': tags,
       if (moduleId != null) 'module_id': moduleId,
       if (materialId != null) 'material_id': materialId,
       if (topicId != null) 'topic_id': topicId,
+      if (createdBy != null) 'created_by': createdBy,
+      if (averageTimeSeconds != null) 'average_time_seconds': averageTimeSeconds,
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt.toIso8601String(),
     };
   }
 }

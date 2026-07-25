@@ -13,7 +13,7 @@ import 'admin_dashboard_state.dart';
 
 final adminDashboardControllerProvider =
     StateNotifierProvider<AdminDashboardController, AdminDashboardState>(
-  (ref) => AdminDashboardController(ref),
+  AdminDashboardController.new,
 );
 
 class AdminDashboardController extends StateNotifier<AdminDashboardState> {

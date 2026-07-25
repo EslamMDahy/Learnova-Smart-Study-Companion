@@ -1,883 +1,935 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
-import '../../../../../core/theme/app_theme.dart';
+import '../../../../../core/network/error_mapper.dart';
 import '../../../../../core/ui/toast.dart';
+import '../../../../../core/utils/file_download_stub.dart'
+    if (dart.library.js_interop) '../../../../../core/utils/file_download_web.dart'
+    if (dart.library.html) '../../../../../core/utils/file_download_web.dart';
+import '../../../../../shared/widgets/app_ui_components.dart';
 import '../../../data/courses_models.dart';
+import '../../../data/exam_models.dart';
+import '../../../data/exam_templates_storage.dart';
+import '../../../data/learning_outcomes_models.dart';
 import '../../../data/materials_models.dart';
+import '../../../data/modules_materials_providers.dart';
+import '../../../data/modules_models.dart';
 import '../../../data/question_models.dart';
+import '../../../data/question_bank_refresh_signal.dart';
+import '../../../data/question_vocabulary.dart';
+import '../../../data/questions_api.dart';
+import '../../../data/topics_models.dart';
 import '../../controllers/course_details_controller.dart';
 import '../../controllers/course_details_state.dart';
-import '../add_question_sheet.dart';
+import '../add_question_sheet.dart' as add_question_sheet;
+import '../course_outcomes_panel.dart';
+import '../question_bank/question_bank_authoring_flow.dart';
+import 'create_exam_flow.dart';
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  CourseQuestionBankTab — matches Figma (images 3 & 4)
-//  NOW WIRED: Sync to Backend button calls the real API.
-// ─────────────────────────────────────────────────────────────────────────────
+part 'question_bank_tab_exam_setup.dart';
+part 'question_bank_tab_exam_setup_components.dart';
+part 'question_bank_tab_exam_setup_status.dart';
+part 'question_bank_tab_exam_setup_pickers.dart';
+part 'question_bank_tab_topic_picker.dart';
+part 'question_bank_tab_workspace.dart';
+part 'question_bank_tab_review.dart';
+part 'question_bank_tab_edit_dialog.dart';
+
+
+
+Future<void> showCourseCreateExamDialog({
+  required BuildContext context,
+  required WidgetRef ref,
+  required MyCourseItem course,
+  List<QuestionModel>? initialQuestions,
+  VoidCallback? onChanged,
+}) async {
+  final questions = initialQuestions ?? await _loadCourseQuestionsForCreateExam(context, ref, course.id);
+  if (questions == null) return;
+
+  if (!context.mounted) return;
+  unawaited(_warmCreateExamMetadata(ref, course.id));
+  final templatesFuture = ref
+      .read(examTemplatesStorageProvider)
+      .load(course.id)
+      .catchError((Object _) => ExamTemplateModel.defaults(course.id));
+  final outcomes = ref.read(courseLOProvider(course.id));
+  final latestState = ref.read(courseDetailsControllerProvider(course.id));
+  final latestTopicTargets = _topicTargetsFromCourseDetailsState(latestState);
+
+  final result = await showDialog<Object?>(
+    context: context,
+    barrierDismissible: false,
+    builder: (_) => _CreateExamStartDialog(
+      course: course,
+      templates: ExamTemplateModel.defaults(course.id),
+      templatesFuture: templatesFuture,
+      modules: latestState.modules,
+      topicTargets: latestTopicTargets,
+      outcomes: outcomes,
+      questions: questions,
+    ),
+  );
+  if (result == null || !context.mounted) return;
+
+  if (result is _GeneratedExamResult) {
+    onChanged?.call();
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _GeneratedExamSuccessDialog(
+        exam: result.exam,
+        template: result.template,
+      ),
+    );
+    return;
+  }
+
+  if (result is _ExamStartConfig) {
+    await showCreateExamFlowDialog(
+      context: context,
+      course: course,
+      questions: questions,
+      initialTemplate: result.template,
+      initialScopeModuleId: result.moduleId,
+      initialScopeMaterialId: result.materialId,
+      initialScopeTopicIds: result.topicIds,
+      initialScopeOutcomeIds: result.outcomeIds,
+      initialTitle: result.title,
+      onCreated: onChanged,
+    );
+  }
+}
+
+Future<void> _warmCreateExamMetadata(WidgetRef ref, int courseId) async {
+  try {
+    await Future.wait<void>([
+      ref
+          .read(courseDetailsControllerProvider(courseId).notifier)
+          .loadModulesAndAllMaterials(hydrateTopicDetails: false),
+      ensureCourseLearningOutcomesLoaded(ref, courseId),
+    ]);
+  } catch (_) {
+    // The dialog can still fall back to metadata already attached to questions.
+  }
+}
+
+Future<List<QuestionModel>?> _loadCourseQuestionsForCreateExam(
+  BuildContext context,
+  WidgetRef ref,
+  int courseId,
+) async {
+  try {
+    final response = await ref.read(questionsApiProvider).getCourseQuestions(
+      courseId: courseId,
+      summaryOnly: true,
+    );
+    return response.questions;
+  } catch (e) {
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Could not load course questions: ${mapApiFailure(e).message}')),
+      );
+    }
+    return null;
+  }
+}
+
+List<_TopicTarget> _topicTargetsFromCourseDetailsState(CourseDetailsState courseState) {
+  final result = <_TopicTarget>[];
+  for (final module in courseState.modules) {
+    final materials = courseState.materials[module.id] ?? const <MaterialItem>[];
+    final materialsById = {for (final material in materials) material.id: material};
+    final topics = courseState.topics[module.id] ?? const <TopicItem>[];
+    final topicById = {for (final topic in topics) topic.id: topic};
+    for (final topic in topics) {
+      final material = materialsById[topic.materialId];
+      if (material == null) continue;
+      final parentTitle = topic.parentTopicId == null
+          ? null
+          : topicById[topic.parentTopicId]?.title;
+      result.add(_TopicTarget(
+        module: module,
+        material: material,
+        topic: topic,
+        parentTopicTitle: parentTitle,
+      ));
+    }
+  }
+  result.sort((a, b) {
+    final moduleCmp = a.module.orderIndex.compareTo(b.module.orderIndex);
+    if (moduleCmp != 0) return moduleCmp;
+    final materialCmp = a.material.displayTitle.compareTo(b.material.displayTitle);
+    if (materialCmp != 0) return materialCmp;
+    return a.topic.orderIndex.compareTo(b.topic.orderIndex);
+  });
+  return result;
+}
 
 class CourseQuestionBankTab extends ConsumerStatefulWidget {
   final MyCourseItem course;
+
   const CourseQuestionBankTab({super.key, required this.course});
 
   @override
-  ConsumerState<CourseQuestionBankTab> createState() =>
-      _CourseQuestionBankTabState();
+  ConsumerState<CourseQuestionBankTab> createState() => _CourseQuestionBankTabState();
 }
 
-class _CourseQuestionBankTabState
-    extends ConsumerState<CourseQuestionBankTab> {
+class _CourseQuestionBankTabState extends ConsumerState<CourseQuestionBankTab> {
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _searchDebounce;
+  CancelToken? _questionsCancelToken;
+  CancelToken? _exportCancelToken;
+  int _questionsRequestSerial = 0;
+  final Map<String, String> _questionSearchTextById = <String, String>{};
+
   String _search = '';
   QuestionType? _filterType;
   QuestionDifficulty? _filterDiff;
+  QuestionSource? _filterSource;
+  bool? _filterUsed;
   int? _filterModuleId;
+  int? _filterMaterialId;
+  int? _filterTopicId;
+  int? _filterOutcomeId;
+  String? _selectedQuestionId;
+  _ExamStartConfig? _examStartConfig;
+  bool _showQuestionAuthoring = false;
+  Set<int> _authoringModuleIds = const <int>{};
+  Set<int> _authoringMaterialIds = const <int>{};
+  Set<int> _authoringTopicIds = const <int>{};
+  QuestionAuthoringLaunchContext? _authoringLaunchContext;
 
-  // Tracks user-selected materialId for sync context.
-  // The instructor must pick which material the questions belong to.
-  int? _selectedModuleId;
-  int? _selectedMaterialId;
+  bool _loading = true;
+  bool _creatingExam = false;
+  bool _exportingQuestionBank = false;
+  String? _activeQuestionBankExportJobId;
+  bool _treeRequested = false;
+  Future<void>? _treeLoadFuture;
+  String? _error;
+  List<QuestionModel> _questions = [];
+  int _pageIndex = 0;
+  int _pageSize = 10;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_loadQuestions());
+      unawaited(_loadCourseTree());
+    });
+  }
+
+  @override
+  void dispose() {
+    _searchDebounce?.cancel();
+    _questionsCancelToken?.cancel('Question bank disposed');
+    _exportCancelToken?.cancel('Question bank export disposed');
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadQuestions() async {
+    if (!mounted) return;
+
+    final requestSerial = ++_questionsRequestSerial;
+    _questionsCancelToken?.cancel('Newer question bank request started');
+    final cancelToken = CancelToken();
+    _questionsCancelToken = cancelToken;
+    final showBlockingLoader = _questions.isEmpty;
+
+    setState(() {
+      if (showBlockingLoader) _loading = true;
+      _error = null;
+    });
+
+    try {
+      final api = ref.read(questionsApiProvider);
+      final resp = await api.getCourseQuestions(
+        courseId: widget.course.id,
+        cancelToken: cancelToken,
+        summaryOnly: true,
+      );
+      if (!mounted || requestSerial != _questionsRequestSerial) return;
+      final sortedQuestions = _sortQuestionsNewestFirst(resp.questions);
+      _rebuildQuestionSearchIndex(sortedQuestions);
+      setState(() {
+        _questions = sortedQuestions;
+        _loading = false;
+        _pageIndex = 0;
+        if (_selectedQuestionId != null &&
+            !_questions.any((question) => question.id == _selectedQuestionId)) {
+          _selectedQuestionId = null;
+        }
+      });
+    } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) return;
+      if (!mounted || requestSerial != _questionsRequestSerial) return;
+      setState(() {
+        _error = mapApiFailure(e).message;
+        _loading = false;
+      });
+    } finally {
+      if (identical(_questionsCancelToken, cancelToken)) {
+        _questionsCancelToken = null;
+      }
+    }
+  }
+
+  void _rebuildQuestionSearchIndex(List<QuestionModel> questions) {
+    _questionSearchTextById
+      ..clear()
+      ..addEntries(
+        questions.map(
+          (question) => MapEntry(question.id, _buildQuestionSearchText(question)),
+        ),
+      );
+  }
+
+  void _upsertQuestionSearchIndex(QuestionModel question) {
+    _questionSearchTextById[question.id] = _buildQuestionSearchText(question);
+  }
+
+  String _buildQuestionSearchText(QuestionModel q) {
+    final buffer = StringBuffer()
+      ..write(q.text)
+      ..write(' ')
+      ..write(q.topicName ?? '')
+      ..write(' ')
+      ..write(q.moduleName ?? '')
+      ..write(' ')
+      ..write(q.materialName ?? '')
+      ..write(' ')
+      ..write(q.typeLabel)
+      ..write(' ')
+      ..write(q.difficultyLabel)
+      ..write(' ')
+      ..write(_sourceLabel(q.source));
+    for (final outcome in q.learningOutcomes) {
+      buffer
+        ..write(' ')
+        ..write(outcome.title);
+    }
+    for (final tag in q.tags) {
+      buffer
+        ..write(' ')
+        ..write(tag);
+    }
+    return buffer.toString().toLowerCase();
+  }
+
+  Future<void> _loadCourseTree({bool force = false}) async {
+    final inFlight = _treeLoadFuture;
+    if (inFlight != null && !force) return inFlight;
+    if (_treeRequested && !force) return;
+
+    _treeRequested = true;
+    final future = ref
+        .read(courseDetailsControllerProvider(widget.course.id).notifier)
+        .loadModulesAndAllMaterials(
+          force: force,
+          hydrateTopicDetails: false,
+        );
+    _treeLoadFuture = future;
+
+    try {
+      await future;
+    } catch (_) {
+      _treeRequested = false;
+      // The question list can still work without the full authoring tree.
+    } finally {
+      if (identical(_treeLoadFuture, future)) {
+        _treeLoadFuture = null;
+      }
+    }
+  }
+
+  void _onSearchChanged(String value) {
+    _searchDebounce?.cancel();
+    _searchDebounce = Timer(const Duration(milliseconds: 220), () {
+      if (!mounted || value == _search) return;
+      setState(() {
+        _search = value;
+        _pageIndex = 0;
+      });
+    });
+  }
+
+  Future<void> _editQuestion(
+    QuestionModel question,
+    List<_TopicTarget> topicTargets,
+  ) async {
+    var editableQuestion = question;
+    final qid = question.remoteId ?? int.tryParse(question.id);
+    if (qid != null && qid > 0) {
+      try {
+        editableQuestion = await ref.read(questionsApiProvider).getQuestion(
+              courseId: widget.course.id,
+              questionId: qid,
+            );
+      } catch (_) {
+        editableQuestion = question;
+      }
+    }
+
+    if (!mounted) return;
+    final updated = await showDialog<QuestionModel>(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => _EditQuestionDialog(
+        courseId: widget.course.id,
+        question: editableQuestion,
+        topicTargets: topicTargets,
+      ),
+    );
+
+    if (updated == null || !mounted) return;
+
+    _upsertQuestionSearchIndex(updated);
+    setState(() {
+      _questions = _sortQuestionsNewestFirst(_questions.map((item) {
+        if (item.id == question.id || item.remoteId == question.remoteId) return updated;
+        return item;
+      }).toList());
+      _selectedQuestionId = updated.id;
+    });
+  }
+
+  void _openQuestionReview(
+    QuestionModel question,
+    List<_TopicTarget> topicTargets,
+  ) {
+    if (!mounted) return;
+    setState(() => _selectedQuestionId = question.id);
+    showDialog<void>(
+      context: context,
+      builder: (_) => _QuestionReviewDialog(
+        courseId: widget.course.id,
+        question: question,
+        topicTargets: topicTargets,
+      ),
+    );
+  }
+
+  void _showDeleteUnavailable() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Delete is not available in the current backend API contract.'),
+      ),
+    );
+  }
+
+  Future<void> _exportQuestionBank() async {
+    if (!mounted || _exportingQuestionBank) return;
+
+    _exportCancelToken?.cancel('A newer question bank export request started');
+    final cancelToken = CancelToken();
+    _exportCancelToken = cancelToken;
+
+    setState(() => _exportingQuestionBank = true);
+
+    final api = ref.read(questionsApiProvider);
+    var jobId = _activeQuestionBankExportJobId;
+
+    try {
+      if (jobId == null) {
+        final job = await api.requestQuestionBankExport(
+          courseId: widget.course.id,
+          cancelToken: cancelToken,
+        );
+        jobId = job.jobId;
+
+        if (!mounted || cancelToken.isCancelled) return;
+        setState(() => _activeQuestionBankExportJobId = jobId);
+        AppToast.info(
+          context,
+          title: 'Export started',
+          message: 'Your Excel file is being prepared in the background.',
+        );
+      }
+
+      final resolvedJobId = jobId;
+      if (resolvedJobId == null) {
+        throw const FormatException('Question bank export job id is missing');
+      }
+
+      final startedAt = DateTime.now();
+      var timeoutCount = 0;
+
+      while (!cancelToken.isCancelled) {
+        final status = await api.waitForQuestionBankExport(
+          courseId: widget.course.id,
+          jobId: resolvedJobId,
+          cancelToken: cancelToken,
+        );
+
+        if (status.isTimeout) {
+          timeoutCount += 1;
+          final exceededWaitLimit =
+              timeoutCount >= 16 || DateTime.now().difference(startedAt) >= const Duration(minutes: 8);
+          if (exceededWaitLimit) {
+            if (!mounted) return;
+            AppToast.info(
+              context,
+              title: 'Export still processing',
+              message: 'The job is still running. Use Resume Export to check it again.',
+              duration: const Duration(seconds: 5),
+            );
+            return;
+          }
+          continue;
+        }
+
+        if (status.isFailed) {
+          if (!mounted) return;
+          setState(() => _activeQuestionBankExportJobId = null);
+          AppToast.error(
+            context,
+            title: 'Export failed',
+            message: status.errorMessage ?? 'The question bank could not be exported.',
+          );
+          return;
+        }
+
+        final file = await api.downloadQuestionBankExport(
+          courseId: widget.course.id,
+          jobId: resolvedJobId,
+          cancelToken: cancelToken,
+        );
+        if (cancelToken.isCancelled) return;
+
+        downloadBytesFile(
+          filename: file.filename,
+          bytes: file.bytes,
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        );
+
+        if (!mounted) return;
+        setState(() => _activeQuestionBankExportJobId = null);
+        AppToast.success(
+          context,
+          title: 'Question bank exported',
+          message: 'The Excel file has been downloaded.',
+        );
+        return;
+      }
+    } catch (error) {
+      if (cancelToken.isCancelled || !mounted) return;
+
+      final failure = mapApiFailure(error);
+      final jobCanNoLongerBeResumed =
+          failure.statusCode == 403 || failure.statusCode == 404 || failure.statusCode == 422;
+      if (jobCanNoLongerBeResumed) {
+        setState(() => _activeQuestionBankExportJobId = null);
+      }
+
+      final canResume = jobId != null && !jobCanNoLongerBeResumed;
+      AppToast.error(
+        context,
+        title: canResume ? 'Export interrupted' : 'Export failed',
+        message: canResume
+            ? '${failure.message} Use Resume Export to try checking the same job again.'
+            : failure.message,
+      );
+    } finally {
+      if (identical(_exportCancelToken, cancelToken)) {
+        _exportCancelToken = null;
+      }
+      if (mounted) {
+        setState(() => _exportingQuestionBank = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final state = ref.watch(courseDetailsControllerProvider(widget.course.id));
-    final filtered = _applyFilters(state.questions);
+    ref.listen<int>(questionBankRefreshSignalProvider(widget.course.id), (previous, next) {
+      if (previous == null || previous == next) return;
+      unawaited(_loadQuestions());
+    });
+
+    final courseState = ref.watch(courseDetailsControllerProvider(widget.course.id));
+    const courseOutcomes = <LearningOutcome>[];
+    final topicTargets = _topicTargetsFromState(courseState);
+    final topicTargetByTopicId = {for (final target in topicTargets) target.topic.id: target};
+    final filtered = _applyFilters(_questions, topicTargetByTopicId);
+    final totalPages = filtered.isEmpty ? 1 : ((filtered.length - 1) ~/ _pageSize) + 1;
+    final safePageIndex = _pageIndex.clamp(0, totalPages - 1).toInt();
+    final startIndex = filtered.isEmpty ? 0 : safePageIndex * _pageSize;
+    final endIndex = filtered.isEmpty
+        ? 0
+        : (startIndex + _pageSize > filtered.length ? filtered.length : startIndex + _pageSize);
+    final pageQuestions = filtered.isEmpty ? <QuestionModel>[] : filtered.sublist(startIndex, endIndex);
+    final selectedQuestionId = _selectedQuestionId;
+    final examReadyCount = _questions.where((question) => question.remoteId != null).length;
+
+    if (_creatingExam) {
+      final config = _examStartConfig;
+      return CreateExamFlow(
+        course: widget.course,
+        questions: _questions,
+        initialTemplate: config?.template,
+        initialScopeModuleId: config?.moduleId,
+        initialScopeMaterialId: config?.materialId,
+        initialScopeTopicIds: config?.topicIds ?? const <int>{},
+        initialScopeOutcomeIds: config?.outcomeIds ?? const <int>{},
+        initialTitle: config?.title,
+        onCancel: () => setState(() {
+          _creatingExam = false;
+          _examStartConfig = null;
+        }),
+        onCreated: () async {
+          await _loadQuestions();
+          if (!mounted) return;
+          setState(() {
+            _creatingExam = false;
+            _examStartConfig = null;
+          });
+        },
+      );
+    }
+
+    if (_showQuestionAuthoring) {
+      return QuestionBankAuthoringFlow(
+        course: widget.course,
+        initialModuleIds: _authoringModuleIds,
+        initialMaterialIds: _authoringMaterialIds,
+        initialTopicIds: _authoringTopicIds,
+        embedded: true,
+        startInAiMode: true,
+        launchContext: _authoringLaunchContext,
+        onClose: _closeQuestionAuthoring,
+        onSavedToQuestionBank: _closeQuestionAuthoringAfterSave,
+      );
+    }
 
     return Container(
       color: AppColors.pageBg,
-      child: Column(children: [
-        // ── AI Generator banner ───────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: AppColors.border))),
-          child: Row(children: [
-            Container(
-              width: 32,
-              height: 32,
-              decoration: BoxDecoration(
-                color: const Color(0xFFEFF6FF),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              alignment: Alignment.center,
-              child: const Icon(Icons.auto_awesome_rounded,
-                  size: 16, color: AppColors.primary),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                const Text('Question Bank',
-                    style: TextStyle(
-                        fontSize: 13.5,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textTitle)),
-                Text(
-                    state.lastSyncedCount != null
-                        ? '${state.lastSyncedCount} question(s) synced to backend successfully.'
-                        : 'Add questions manually, then sync them to the backend.',
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.textMuted)),
-              ]),
-            ),
-            const SizedBox(width: 16),
-            _BlueTextBtn(
-              label: 'AI Review (Coming soon)',
-              onTap: () => _generateWithAI(state),
-            ),
-          ]),
-        ),
-
-        // ── Toolbar ───────────────────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
-          decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(bottom: BorderSide(color: AppColors.border))),
-          child: Row(children: [
-            // Search
-            Expanded(
-              child: SizedBox(
-                height: 36,
-                child: TextField(
-                  onChanged: (v) => setState(() => _search = v),
-                  style: const TextStyle(fontSize: 13),
-                  decoration: InputDecoration(
-                    hintText: 'Search questions by keyword or topic...',
-                    hintStyle: const TextStyle(fontSize: 13),
-                    prefixIcon: const Icon(Icons.search_rounded,
-                        size: 15, color: AppColors.textHint),
-                    contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                    filled: true,
-                    fillColor: AppColors.pageBg,
-                    enabledBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            const BorderSide(color: AppColors.border)),
-                    focusedBorder: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide: const BorderSide(
-                            color: AppColors.primary, width: 1.5)),
-                  ),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 20, 20, 48),
+        child: Align(
+          alignment: Alignment.topCenter,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 1480),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _QuestionBankHeader(
+                  loading: _loading,
+                  canCreateExam: _questions.isNotEmpty,
+                  exportingQuestionBank: _exportingQuestionBank,
+                  hasPendingQuestionBankExport: _activeQuestionBankExportJobId != null,
+                  totalQuestionsCount: _questions.length,
+                  visibleQuestionsCount: filtered.length,
+                  examReadyCount: examReadyCount,
+                  onRefresh: _loadQuestions,
+                  onGenerateQuestions: _openGenerateQuestionsTopicPicker,
+                  onExportQuestionBank: _exportQuestionBank,
+                  onCreateExam: _openCreateExamStart,
                 ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            // Filter dropdowns
-            _DropFilter<int?>(
-              label: 'All Topics',
-              value: _filterModuleId,
-              options: {
-                null: 'All Topics',
-                for (final m in state.modules) m.id: m.title,
-              },
-              onChanged: (v) => setState(() => _filterModuleId = v),
-            ),
-            const SizedBox(width: 8),
-            _DropFilter<QuestionDifficulty?>(
-              label: 'Any Difficulty',
-              value: _filterDiff,
-              options: {
-                null: 'Any Difficulty',
-                QuestionDifficulty.easy: 'Easy',
-                QuestionDifficulty.medium: 'Medium',
-                QuestionDifficulty.hard: 'Hard',
-              },
-              onChanged: (v) => setState(() => _filterDiff = v),
-            ),
-            const SizedBox(width: 8),
-            _DropFilter<QuestionType?>(
-              label: 'All Types',
-              value: _filterType,
-              options: {
-                null: 'All Types',
-                QuestionType.multipleChoice: 'Multiple Choice',
-                QuestionType.trueFalse: 'True / False',
-                QuestionType.shortAnswer: 'Short Answer',
-                QuestionType.essay: 'Essay',
-              },
-              onChanged: (v) => setState(() => _filterType = v),
-            ),
-          ]),
-        ),
-
-        // ── Stats bar ─────────────────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 7, 16, 7),
-          decoration: const BoxDecoration(
-              color: Color(0xFFFAFBFC),
-              border: Border(bottom: BorderSide(color: AppColors.border))),
-          child: Row(children: [
-            const Text('AVAILABLE QUESTIONS',
-                style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textHint,
-                    letterSpacing: 0.5)),
-            const Spacer(),
-            // Show sync error if present
-            if (state.questionsError != null) ...[
-              const Icon(Icons.error_outline,
-                  size: 13, color: AppColors.dangerText),
-              const SizedBox(width: 4),
-              Text(state.questionsError!,
-                  style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.dangerText,
-                      fontWeight: FontWeight.w600)),
-              const SizedBox(width: 12),
-            ],
-            Text('${filtered.length} questions',
-                style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textMuted)),
-          ]),
-        ),
-
-        // ── Question list ─────────────────────────────────────────────────
-        Expanded(
-          child: filtered.isEmpty
-              ? _buildEmpty(state.questions.isEmpty)
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: filtered.length + 1,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (ctx, i) {
-                    if (i == filtered.length) {
-                      return _AddNewBtn(
-                        onTap: () => _showAddQuestion(state),
-                      );
+                const SizedBox(height: 16),
+                _QuestionBankWorkspace(
+                  loading: _loading,
+                  error: _error == null ? null : _friendlyError(_error!),
+                  questions: pageQuestions,
+                  allQuestionsCount: _questions.length,
+                  filteredQuestionsCount: filtered.length,
+                  pageStartIndex: startIndex,
+                  pageIndex: safePageIndex,
+                  pageSize: _pageSize,
+                  totalPages: totalPages,
+                  selectedQuestionId: selectedQuestionId,
+                  searchController: _searchController,
+                  filterModuleId: _filterModuleId,
+                  filterDiff: _filterDiff,
+                  filterType: _filterType,
+                  filterSource: _filterSource,
+                  filterUsed: _filterUsed,
+                  filterMaterialId: _filterMaterialId,
+                  filterTopicId: _filterTopicId,
+                  filterOutcomeId: _filterOutcomeId,
+                  modules: courseState.modules,
+                  topicTargets: topicTargets,
+                  topicTargetByTopicId: topicTargetByTopicId,
+                  allQuestions: _questions,
+                  courseOutcomes: courseOutcomes,
+                  onSearchChanged: _onSearchChanged,
+                  onSelectQuestion: (question) => _openQuestionReview(question, topicTargets),
+                  onModuleChanged: (value) => setState(() {
+                    _filterModuleId = value;
+                    _pageIndex = 0;
+                    if (value == null) {
+                      _filterMaterialId = null;
+                      _filterTopicId = null;
+                    } else if (_filterMaterialId != null &&
+                        !_materialBelongsToModule(topicTargets, _filterMaterialId!, value)) {
+                      _filterMaterialId = null;
+                      _filterTopicId = null;
                     }
-                    return _QuestionCard(
-                      question: filtered[i],
-                      onDelete: () {
-                        ref
-                            .read(courseDetailsControllerProvider(
-                                    widget.course.id)
-                                .notifier)
-                            .deleteQuestion(filtered[i].id);
-                        AppToast.success(ctx,
-                            title: 'Question removed',
-                            message: 'Removed from Question Bank.');
-                      },
-                    );
-                  },
+                  }),
+                  onMaterialChanged: (value) => setState(() {
+                    _filterMaterialId = value;
+                    _pageIndex = 0;
+                    if (value == null) {
+                      _filterTopicId = null;
+                    } else if (_filterTopicId != null &&
+                        !_topicBelongsToMaterial(topicTargets, _filterTopicId!, value)) {
+                      _filterTopicId = null;
+                    }
+                  }),
+                  onTopicChanged: (value) => setState(() {
+                    _filterTopicId = value;
+                    _pageIndex = 0;
+                  }),
+                  onOutcomeChanged: (value) => setState(() {
+                    _filterOutcomeId = value;
+                    _pageIndex = 0;
+                  }),
+                  onSourceChanged: (value) => setState(() {
+                    _filterSource = value;
+                    _pageIndex = 0;
+                  }),
+                  onUsageChanged: (value) => setState(() {
+                    _filterUsed = value;
+                    _pageIndex = 0;
+                  }),
+                  onDifficultyChanged: (value) => setState(() {
+                    _filterDiff = value;
+                    _pageIndex = 0;
+                  }),
+                  onTypeChanged: (value) => setState(() {
+                    _filterType = value;
+                    _pageIndex = 0;
+                  }),
+                  onPageChanged: (value) => setState(() => _pageIndex = value),
+                  onPageSizeChanged: (value) => setState(() {
+                    _pageSize = value;
+                    _pageIndex = 0;
+                  }),
+                  onClearFilters: _clearFilters,
+                  onRetry: _loadQuestions,
+                  onEditQuestion: _editQuestion,
+                  onDeleteUnavailable: _showDeleteUnavailable,
                 ),
-        ),
-
-        // ── Bottom action ─────────────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-          decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(top: BorderSide(color: AppColors.border))),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              OutlinedButton.icon(
-                onPressed: () => _showAddQuestion(state),
-                icon: const Icon(Icons.add, size: 15),
-                label: const Text('Add New Question'),
-              ),
-              // ── WIRED: Sync to Backend button ───────────────────────────
-              ElevatedButton.icon(
-                onPressed: (state.questions.isEmpty || state.questionsLoading)
-                    ? null
-                    : () => _showSyncDialog(state),
-                icon: state.questionsLoading
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor:
-                              AlwaysStoppedAnimation<Color>(Colors.white),
-                        ),
-                      )
-                    : const Icon(Icons.cloud_upload_outlined, size: 15),
-                label: Text(
-                  state.questionsLoading
-                      ? 'Syncing…'
-                      : '${state.questions.length} question${state.questions.length == 1 ? '' : 's'} — Sync to Backend',
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
-      ]),
+      ),
     );
   }
 
-  List<QuestionModel> _applyFilters(List<QuestionModel> all) {
-    return all.where((q) {
-      if (_search.isNotEmpty &&
-          !q.text.toLowerCase().contains(_search.toLowerCase())) {
-        return false;
-      }
-      if (_filterType != null && q.type != _filterType) return false;
-      if (_filterDiff != null && q.difficulty != _filterDiff) return false;
-      if (_filterModuleId != null && q.moduleId != _filterModuleId) {
-        return false;
-      }
-      return true;
-    }).toList();
-  }
+  Future<void> _openGenerateQuestionsTopicPicker() async {
+    try {
+      await _loadCourseTree();
+    } catch (_) {
+      // The dialog below will still use whatever data is already cached.
+    }
 
-  Widget _buildEmpty(bool noQuestions) {
-    return Center(
-      child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Icon(Icons.quiz_outlined, size: 42, color: AppColors.primary),
-        const SizedBox(height: 12),
-        Text(
-          noQuestions ? 'No questions yet' : 'No matching questions',
-          style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textTitle),
+    if (!mounted) return;
+    final latestState = ref.read(courseDetailsControllerProvider(widget.course.id));
+    final topicTargets = _topicTargetsFromState(latestState);
+
+    if (topicTargets.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No topics found yet. Upload a material and wait for topics before generating questions.'),
         ),
-        const SizedBox(height: 6),
-        Text(
-          noQuestions
-              ? 'Add questions manually or use AI to generate them from your materials.'
-              : 'Try adjusting your filters or search term.',
-          style: const TextStyle(
-              fontSize: 13, color: AppColors.textMuted, height: 1.5),
-          textAlign: TextAlign.center,
-        ),
-        if (noQuestions) ...[
-          const SizedBox(height: 16),
-          Row(mainAxisSize: MainAxisSize.min, children: [
-            ElevatedButton.icon(
-              onPressed: () => _showAddQuestion(
-                  ref.read(courseDetailsControllerProvider(widget.course.id))),
-              icon: const Icon(Icons.add),
-              label: const Text('Add Question'),
-            ),
-            const SizedBox(width: 10),
-            OutlinedButton.icon(
-              onPressed: () => _generateWithAI(
-                  ref.read(courseDetailsControllerProvider(widget.course.id))),
-              icon: const Icon(Icons.auto_awesome_rounded, size: 15),
-              label: const Text('Generate with AI'),
-            ),
-          ]),
-        ],
-      ]),
+      );
+      return;
+    }
+
+    final selected = await showDialog<_TopicTarget>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _QuestionGenerationTopicPickerDialog(topicTargets: topicTargets),
     );
+    if (selected == null || !mounted) return;
+    _openQuestionAuthoringForTopic(selected);
   }
 
-  void _showAddQuestion(CourseDetailsState state) {
-    showAddQuestionDialog(
-      context,
-      modules: state.modules,
-      onAdd: (q) {
-        ref
-            .read(courseDetailsControllerProvider(widget.course.id).notifier)
-            .addQuestion(q);
-        if (mounted) {
-          AppToast.success(context,
-              title: 'Question added',
-              message: 'Added to Question Bank.');
-        }
+  void _openQuestionAuthoringForTopic(_TopicTarget target) {
+    final isSubtopic = target.topic.parentTopicId != null;
+    final moduleIds = <int>{target.module.id};
+    final materialIds = <int>{target.material.id};
+    final topicIds = <int>{target.topic.id};
+    final targetSnapshot = add_question_sheet.QuestionAuthoringTarget(
+      moduleId: target.module.id,
+      moduleName: target.module.title,
+      materialId: target.material.id,
+      materialName: target.material.displayTitle,
+      topicId: target.topic.id,
+      topicName: target.topic.title,
+      isSubtopic: isSubtopic,
+      parentTopicName: target.parentTopicTitle,
+    );
+
+    setState(() {
+      _authoringModuleIds = moduleIds;
+      _authoringMaterialIds = materialIds;
+      _authoringTopicIds = topicIds;
+      _authoringLaunchContext = QuestionAuthoringLaunchContext(
+        kind: isSubtopic
+            ? QuestionAuthoringScopeKind.subtopic
+            : QuestionAuthoringScopeKind.topic,
+        title: targetSnapshot.label,
+        subtitle: '${target.module.title} • ${target.material.displayTitle}',
+        selectedModuleId: target.module.id,
+        selectedMaterialId: target.material.id,
+        selectedTopicId: target.topic.id,
+        selectedModuleIds: moduleIds,
+        selectedMaterialIds: materialIds,
+        selectedTopicIds: topicIds,
+        targetSnapshots: <add_question_sheet.QuestionAuthoringTarget>[targetSnapshot],
+      );
+      _showQuestionAuthoring = true;
+    });
+  }
+
+  void _closeQuestionAuthoring() {
+    if (!mounted) return;
+    setState(() {
+      _showQuestionAuthoring = false;
+      _authoringModuleIds = const <int>{};
+      _authoringMaterialIds = const <int>{};
+      _authoringTopicIds = const <int>{};
+      _authoringLaunchContext = null;
+    });
+  }
+
+  void _closeQuestionAuthoringAfterSave() {
+    _closeQuestionAuthoring();
+    unawaited(_loadQuestions());
+  }
+
+  Future<void> _openCreateExamStart() async {
+    if (_questions.isEmpty || _creatingExam) return;
+    await showCourseCreateExamDialog(
+      context: context,
+      ref: ref,
+      course: widget.course,
+      initialQuestions: _questions,
+      onChanged: () {
+        unawaited(_loadQuestions());
       },
     );
   }
 
-  void _generateWithAI(CourseDetailsState state) {
-    AppToast.info(
-      context,
-      title: 'Coming soon',
-      message:
-          'AI generation / review will appear here when it is enabled on the server.',
-    );
+  void _clearFilters() {
+    _searchController.clear();
+    setState(() {
+      _search = '';
+      _filterType = null;
+      _filterDiff = null;
+      _filterSource = null;
+      _filterUsed = null;
+      _filterModuleId = null;
+      _filterMaterialId = null;
+      _filterTopicId = null;
+      _filterOutcomeId = null;
+      _pageIndex = 0;
+    });
   }
 
-  // ── Sync Dialog ───────────────────────────────────────────────────────────
-  //
-  // The backend endpoint requires a materialId to associate questions with a
-  // specific uploaded material. We show a picker so the instructor selects
-  // which material to link the questions to.
+  List<QuestionModel> _applyFilters(List<QuestionModel> input, Map<int, _TopicTarget> topicTargetByTopicId) {
+    final searchText = _search.trim().toLowerCase();
+    final hasSearch = searchText.isNotEmpty;
+    final hasTopicFilters = _filterModuleId != null || _filterMaterialId != null || _filterTopicId != null;
+    final hasQuestionFilters = _filterType != null ||
+        _filterDiff != null ||
+        _filterSource != null ||
+        _filterUsed != null ||
+        _filterOutcomeId != null;
 
-  void _showSyncDialog(CourseDetailsState state) {
-    // Flatten all materials across modules.
-    final allMaterials = <_MaterialOption>[];
-    for (final module in state.modules) {
-      final mats = state.materials[module.id] ?? [];
-      for (final mat in mats) {
-        allMaterials.add(_MaterialOption(
-          moduleId: module.id,
-          moduleTitle: module.title,
-          material: mat,
-        ));
+    if (!hasSearch && !hasTopicFilters && !hasQuestionFilters) {
+      return _sortQuestionsNewestFirst(input);
+    }
+
+    final result = <QuestionModel>[];
+    for (final q in input) {
+      if (hasSearch) {
+        final haystack = _questionSearchTextById[q.id] ?? _buildQuestionSearchText(q);
+        if (!haystack.contains(searchText)) continue;
+      }
+
+      if (hasTopicFilters) {
+        final target = q.topicId == null ? null : topicTargetByTopicId[q.topicId];
+        final moduleId = q.moduleId ?? target?.module.id;
+        final materialId = q.materialId ?? target?.material.id;
+        final topicId = q.topicId ?? target?.topic.id;
+        if (_filterModuleId != null && moduleId != _filterModuleId) continue;
+        if (_filterMaterialId != null && materialId != _filterMaterialId) continue;
+        if (_filterTopicId != null && topicId != _filterTopicId) continue;
+      }
+
+      if (_filterType != null && q.type != _filterType) continue;
+      if (_filterDiff != null && q.difficulty != _filterDiff) continue;
+      if (_filterSource != null && q.source != _filterSource) continue;
+      if (_filterUsed != null && (q.usageCount > 0) != _filterUsed) continue;
+      if (_filterOutcomeId != null && !q.learningOutcomes.any((outcome) => outcome.id == _filterOutcomeId)) {
+        continue;
+      }
+      result.add(q);
+    }
+    return _sortQuestionsNewestFirst(result);
+  }
+
+  List<_TopicTarget> _topicTargetsFromState(CourseDetailsState courseState) {
+    final result = <_TopicTarget>[];
+    for (final module in courseState.modules) {
+      final materials = courseState.materials[module.id] ?? const <MaterialItem>[];
+      final materialsById = {for (final material in materials) material.id: material};
+      final topics = courseState.topics[module.id] ?? const <TopicItem>[];
+      final topicById = {for (final topic in topics) topic.id: topic};
+      for (final topic in topics) {
+        final material = materialsById[topic.materialId];
+        if (material == null) continue;
+        final parentTitle = topic.parentTopicId == null
+            ? null
+            : topicById[topic.parentTopicId]?.title;
+        result.add(_TopicTarget(
+          module: module,
+          material: material,
+          topic: topic,
+          parentTopicTitle: parentTitle,
+        ),);
       }
     }
-
-    // Count MCQ-only questions (only type supported by backend endpoint).
-    final mcqCount = state.questions
-        .where((q) => q.type == QuestionType.multipleChoice)
-        .length;
-
-    int? pickedModuleId = _selectedModuleId;
-    int? pickedMaterialId = _selectedMaterialId;
-
-    showDialog(
-      context: context,
-      builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setDialogState) => AlertDialog(
-          title: const Text('Sync Questions to Backend',
-              style: TextStyle(fontWeight: FontWeight.w800)),
-          content: SizedBox(
-            width: 420,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              // MCQ note
-              Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFFBEB),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: const Color(0xFFFDE68A)),
-                ),
-                child: Row(children: [
-                  const Icon(Icons.info_outline_rounded,
-                      size: 16, color: Color(0xFFB45309)),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      '$mcqCount of ${state.questions.length} question(s) '
-                      'are MCQ and will be synced. '
-                      'Other types are not yet supported by the API.',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textMuted),
-                    ),
-                  ),
-                ]),
-              ),
-              const SizedBox(height: 16),
-              // Material picker
-              if (allMaterials.isEmpty) ...[
-                const Text(
-                  'No materials found. Upload a material first so questions can be linked to it.',
-                  style: TextStyle(fontSize: 13, color: AppColors.textMuted),
-                ),
-              ] else ...[
-                const Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('Link to material:',
-                      style: TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700)),
-                ),
-                const SizedBox(height: 8),
-                DropdownButtonFormField<int>(
-                  value: pickedMaterialId,
-                  hint: const Text('Select a material',
-                      style: TextStyle(fontSize: 13)),
-                  isExpanded: true,
-                  decoration: InputDecoration(
-                    contentPadding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                    border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(8),
-                        borderSide:
-                            const BorderSide(color: AppColors.border)),
-                  ),
-                  items: allMaterials.map((opt) {
-                    return DropdownMenuItem<int>(
-                      value: opt.material.id,
-                      child: Text(
-                        '${opt.moduleTitle} › ${opt.material.displayTitle}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 13),
-                      ),
-                    );
-                  }).toList(),
-                  onChanged: (v) => setDialogState(() {
-                    pickedMaterialId = v;
-                    pickedModuleId = allMaterials
-                        .firstWhere((o) => o.material.id == v)
-                        .moduleId;
-                  }),
-                ),
-              ],
-            ]),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(ctx),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: (pickedMaterialId == null ||
-                      pickedModuleId == null ||
-                      mcqCount == 0)
-                  ? null
-                  : () async {
-                      setState(() {
-                        _selectedModuleId = pickedModuleId;
-                        _selectedMaterialId = pickedMaterialId;
-                      });
-                      Navigator.pop(ctx);
-                      await _doSync(
-                        moduleId: pickedModuleId!,
-                        materialId: pickedMaterialId!,
-                      );
-                    },
-              child: const Text('Sync'),
-            ),
-          ],
-        ),
-      ),
-    );
+    result.sort((a, b) {
+      final moduleCmp = a.module.orderIndex.compareTo(b.module.orderIndex);
+      if (moduleCmp != 0) return moduleCmp;
+      final materialCmp = a.material.displayTitle.compareTo(b.material.displayTitle);
+      if (materialCmp != 0) return materialCmp;
+      return a.topic.orderIndex.compareTo(b.topic.orderIndex);
+    });
+    return result;
   }
 
-  Future<void> _doSync({
-    required int moduleId,
-    required int materialId,
-  }) async {
-    final ok = await ref
-        .read(courseDetailsControllerProvider(widget.course.id).notifier)
-        .syncQuestionsToBackend(
-          moduleId: moduleId,
-          materialId: materialId,
-        );
 
-    if (!mounted) return;
+  List<QuestionModel> _sortQuestionsNewestFirst(List<QuestionModel> questions) {
+    final sorted = List<QuestionModel>.of(questions);
+    sorted.sort((a, b) {
+      final createdCmp = b.createdAt.compareTo(a.createdAt);
+      if (createdCmp != 0) return createdCmp;
+      final updatedCmp = b.updatedAt.compareTo(a.updatedAt);
+      if (updatedCmp != 0) return updatedCmp;
+      final bId = b.remoteId ?? int.tryParse(b.id) ?? 0;
+      final aId = a.remoteId ?? int.tryParse(a.id) ?? 0;
+      return bId.compareTo(aId);
+    });
+    return sorted;
+  }
 
-    final state =
-        ref.read(courseDetailsControllerProvider(widget.course.id));
-
-    if (ok) {
-      AppToast.success(
-        context,
-        title: 'Questions synced',
-        message:
-            '${state.lastSyncedCount} question(s) saved to the backend successfully.',
-      );
-    } else {
-      AppToast.error(
-        context,
-        title: 'Sync failed',
-        message: state.questionsError ??
-            'Could not sync questions. Please try again.',
-      );
+  String _friendlyError(String raw) {
+    final lower = raw.toLowerCase();
+    if (lower.contains('session expired') || lower.contains('login again')) {
+      return 'Your session expired while loading questions. Please log in again.';
     }
+    return raw.trim().isNotEmpty ? raw : 'Could not load saved questions right now.';
   }
 }
 
-// ── Helper data class ─────────────────────────────────────────────────────────
 
-class _MaterialOption {
-  final int moduleId;
-  final String moduleTitle;
-  final MaterialItem material;
-
-  const _MaterialOption({
-    required this.moduleId,
-    required this.moduleTitle,
-    required this.material,
-  });
-}
-
-// ── Question Card ──────────────────────────────────────────────────────────────
-
-class _QuestionCard extends StatelessWidget {
-  final QuestionModel question;
-  final VoidCallback onDelete;
-  const _QuestionCard({required this.question, required this.onDelete});
-
-  @override
-  Widget build(BuildContext context) {
-    final isSynced = question.remoteId != null;
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-          color: isSynced
-              ? const Color(0xFF86EFAC) // green border for synced
-              : AppColors.border,
-        ),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Header row
-        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Container(
-            width: 18,
-            height: 18,
-            margin: const EdgeInsets.only(top: 2, right: 10),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.border, width: 1.5),
-              borderRadius: BorderRadius.circular(4),
-            ),
-          ),
-          Expanded(
-            child: Text(question.text,
-                style: const TextStyle(
-                    fontSize: 13.5,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textTitle,
-                    height: 1.4)),
-          ),
-          const SizedBox(width: 8),
-          // Synced badge
-          if (isSynced) ...[
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-              decoration: BoxDecoration(
-                color: const Color(0xFFDCFCE7),
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: const Text('Synced',
-                  style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF16A34A))),
-            ),
-            const SizedBox(width: 6),
-          ],
-          _DiffBadge(question.difficulty),
-          const SizedBox(width: 6),
-          InkWell(
-            onTap: onDelete,
-            borderRadius: BorderRadius.circular(6),
-            child: const Padding(
-              padding: EdgeInsets.all(4),
-              child: Icon(Icons.delete_outline,
-                  size: 15, color: AppColors.dangerText),
-            ),
-          ),
-        ]),
-        const SizedBox(height: 8),
-
-        // Meta chips
-        Row(children: [
-          const SizedBox(width: 28),
-          _MetaChip(Icons.category_outlined, question.typeLabel),
-          const SizedBox(width: 6),
-          _MetaChip(Icons.location_on_outlined, question.contextLabel),
-          if (question.explanation != null) ...[
-            const SizedBox(width: 6),
-            const _MetaChip(Icons.info_outline_rounded, 'Has explanation'),
-          ],
-        ]),
-
-        // MC options preview
-        if (question.type == QuestionType.multipleChoice &&
-            question.options.isNotEmpty) ...[
-          const SizedBox(height: 10),
-          ...question.options.take(4).map((opt) {
-            final isCorrect = opt.id == question.correctOptionId;
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 4, left: 28),
-              child: Row(children: [
-                Icon(
-                  isCorrect
-                      ? Icons.check_circle_rounded
-                      : Icons.radio_button_unchecked_rounded,
-                  size: 13,
-                  color: isCorrect
-                      ? const Color(0xFF16A34A)
-                      : AppColors.textHint,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(opt.text,
-                      style: TextStyle(
-                          fontSize: 12.5,
-                          color: isCorrect
-                              ? const Color(0xFF16A34A)
-                              : AppColors.textMuted,
-                          fontWeight: isCorrect
-                              ? FontWeight.w600
-                              : FontWeight.w400)),
-                ),
-              ]),
-            );
-          }),
-        ],
-
-        // T/F answer
-        if (question.type == QuestionType.trueFalse &&
-            question.correctBool != null) ...[
-          const SizedBox(height: 6),
-          Padding(
-            padding: const EdgeInsets.only(left: 28),
-            child: Row(children: [
-              const Icon(Icons.check_circle_outline,
-                  size: 12, color: Color(0xFF16A34A)),
-              const SizedBox(width: 4),
-              Text(
-                  'Correct: ${question.correctBool! ? "True" : "False"}',
-                  style: const TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF16A34A),
-                      fontWeight: FontWeight.w600)),
-            ]),
-          ),
-        ],
-      ]),
-    );
-  }
-}
-
-// ── Micro widgets ──────────────────────────────────────────────────────────────
-
-class _DiffBadge extends StatelessWidget {
-  final QuestionDifficulty diff;
-  const _DiffBadge(this.diff);
-
-  @override
-  Widget build(BuildContext context) {
-    Color bg, fg;
-    String label;
-    switch (diff) {
-      case QuestionDifficulty.easy:
-        bg = const Color(0xFFDCFCE7);
-        fg = const Color(0xFF16A34A);
-        label = 'Easy';
-        break;
-      case QuestionDifficulty.medium:
-        bg = const Color(0xFFFEF3C7);
-        fg = const Color(0xFFD97706);
-        label = 'Medium';
-        break;
-      case QuestionDifficulty.hard:
-        bg = AppColors.dangerBg;
-        fg = AppColors.dangerText;
-        label = 'Hard';
-        break;
-    }
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-      decoration:
-          BoxDecoration(color: bg, borderRadius: BorderRadius.circular(20)),
-      child: Text(label,
-          style: TextStyle(
-              fontSize: 11, fontWeight: FontWeight.w700, color: fg)),
-    );
-  }
-}
-
-class _MetaChip extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _MetaChip(this.icon, this.label);
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-      decoration: BoxDecoration(
-          color: AppColors.pageBg,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.border)),
-      child: Row(mainAxisSize: MainAxisSize.min, children: [
-        Icon(icon, size: 10, color: AppColors.textMuted),
-        const SizedBox(width: 4),
-        Text(label,
-            style:
-                const TextStyle(fontSize: 11, color: AppColors.textMuted)),
-      ]),
-    );
-  }
-}
-
-class _BlueTextBtn extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _BlueTextBtn({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Text(label,
-          style: const TextStyle(
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-              color: AppColors.primary)),
-    );
-  }
-}
-
-class _AddNewBtn extends StatelessWidget {
-  final VoidCallback onTap;
-  const _AddNewBtn({required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: AppColors.primary.withOpacity(0.3),
-          ),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.add_circle_outline_rounded,
-              size: 18,
-              color: AppColors.primary,
-            ),
-            SizedBox(width: 8),
-            Text(
-              'Add New Question',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-                color: AppColors.primary,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _DropFilter<T> extends StatelessWidget {
-  final String label;
-  final T value;
-  final Map<T, String> options;
-  final ValueChanged<T?> onChanged;
-
-  const _DropFilter({
-    required this.label,
-    required this.value,
-    required this.options,
-    required this.onChanged,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isActive = value != null;
-    return GestureDetector(
-      onTap: () => _showMenu(context),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        decoration: BoxDecoration(
-          color: isActive ? const Color(0xFFEFF6FF) : Colors.white,
-          border: Border.all(
-            color: isActive ? AppColors.primary : AppColors.border,
-          ),
-          borderRadius: BorderRadius.circular(6),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              isActive ? (options[value] ?? label) : label,
-              style: TextStyle(
-                fontSize: 12.5,
-                fontWeight: FontWeight.w600,
-                color: isActive ? AppColors.primary : AppColors.textMuted,
-              ),
-            ),
-            const SizedBox(width: 4),
-            Icon(
-              Icons.keyboard_arrow_down_rounded,
-              size: 14,
-              color: isActive ? AppColors.primary : AppColors.textMuted,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showMenu(BuildContext context) async {
-    final box = context.findRenderObject() as RenderBox;
-    final offset = box.localToGlobal(Offset.zero);
-    final size = box.size;
-
-    final result = await showMenu<T>(
-      context: context,
-      position: RelativeRect.fromLTRB(
-          offset.dx,
-          offset.dy + size.height,
-          offset.dx + size.width,
-          0),
-      items: options.entries
-          .map((e) => PopupMenuItem<T>(
-                value: e.key,
-                child: Text(e.value,
-                    style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: e.key == value
-                            ? FontWeight.w700
-                            : FontWeight.w400)),
-              ))
-          .toList(),
-    );
-    if (result != null) onChanged(result);
-  }
-}

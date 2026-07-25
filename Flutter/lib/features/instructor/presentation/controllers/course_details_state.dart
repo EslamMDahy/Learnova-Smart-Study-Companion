@@ -16,6 +16,10 @@ class CourseDetailsState {
   // ── Topics per module (key = moduleId) ────────────────────────────────────
   final Map<int, bool> topicsLoading;
   final Map<int, List<TopicItem>> topics;
+  // Material IDs whose topics have already been fetched. This lets the
+  // materials screen load topics only for the opened file instead of fetching
+  // every material's topics when the page mounts or refreshes.
+  final Set<int> topicsLoadedMaterialIds;
 
   // ── Fresh download URLs per material (key = materialId) ───────────────────
   final Map<int, String> downloadUrls;
@@ -42,6 +46,7 @@ class CourseDetailsState {
     this.materials = const {},
     this.topicsLoading = const {},
     this.topics = const {},
+    this.topicsLoadedMaterialIds = const <int>{},
     this.downloadUrls = const {},
     this.downloadUrlLoading = const {},
     this.questions = const [],
@@ -61,6 +66,7 @@ class CourseDetailsState {
     Map<int, List<MaterialItem>>? materials,
     Map<int, bool>? topicsLoading,
     Map<int, List<TopicItem>>? topics,
+    Set<int>? topicsLoadedMaterialIds,
     Map<int, String>? downloadUrls,
     Map<int, bool>? downloadUrlLoading,
     List<QuestionModel>? questions,
@@ -79,6 +85,7 @@ class CourseDetailsState {
       materials: materials ?? this.materials,
       topicsLoading: topicsLoading ?? this.topicsLoading,
       topics: topics ?? this.topics,
+      topicsLoadedMaterialIds: topicsLoadedMaterialIds ?? this.topicsLoadedMaterialIds,
       downloadUrls: downloadUrls ?? this.downloadUrls,
       downloadUrlLoading: downloadUrlLoading ?? this.downloadUrlLoading,
       questions: questions ?? this.questions,

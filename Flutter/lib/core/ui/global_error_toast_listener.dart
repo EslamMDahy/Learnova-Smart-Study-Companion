@@ -12,6 +12,7 @@ import '../routing/routes.dart';
 import '../storage/token_storage.dart';
 import '../storage/user_storage.dart';
 import 'toast.dart';
+import 'package:learnova/core/theme/app_theme.dart';
 
 class GlobalErrorToastListener extends ConsumerStatefulWidget {
   final Widget child;
@@ -29,6 +30,7 @@ class _GlobalErrorToastListenerState
 
   @override
   Widget build(BuildContext context) {
+    Theme.of(context);
     ref.listen<AppFailure?>(appErrorProvider, (prev, next) {
       if (next == null) return;
 
@@ -89,7 +91,7 @@ class _GlobalErrorToastListenerState
             type: errorType,
             message: next.message,
             errorId: errorId,
-          ));
+          ),);
           return;
         }
 
@@ -137,11 +139,6 @@ class _GlobalErrorToastListenerState
     BuildContext ctx,
     AppFailure f,
   ) async {
-    try {
-      TokenStorage.clear();
-      UserStorage.clear();
-    } catch (_) {}
-
     await showDialog<void>(
       context: ctx,
       barrierDismissible: false,
@@ -150,15 +147,13 @@ class _GlobalErrorToastListenerState
         title: Row(
           children: [
             const Icon(Icons.lock_outline_rounded,
-                color: Color(0xFF137FEC), size: 22),
+                color: AppColors.primary, size: 22,),
             const SizedBox(width: 10),
             Text(AppFailurePresenter.title(f)),
           ],
         ),
-        content: Text(
-          f.message.trim().isNotEmpty
-              ? f.message.trim()
-              : 'Your session has expired. Please log in again.',
+        content: const Text(
+          'Your session has expired. Please log in again.',
         ),
         actions: [
           TextButton(
@@ -168,6 +163,13 @@ class _GlobalErrorToastListenerState
         ],
       ),
     );
+
+    if (!ctx.mounted) return;
+
+    try {
+      TokenStorage.clear();
+      UserStorage.clear();
+    } catch (_) {}
 
     try {
       GoRouter.of(ctx).go(Routes.login);
